@@ -19,11 +19,11 @@ function LimitRow({
   label,
   limit,
   color,
-}: {
+}: Readonly<{
   label: string;
   limit: NonNullable<AiUsageData['tools'][number]['fiveHour']>;
   color: string;
-}) {
+}>) {
   return (
     <div>
       <div className="mb-1 flex items-baseline text-xs">
