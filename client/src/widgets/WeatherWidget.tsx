@@ -2,22 +2,7 @@ import type { WeatherData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { useDeviceLocation } from '../useDeviceLocation';
 import { WidgetCard } from '../components/WidgetCard';
-
-function glyph(symbol: string): string {
-  const night = symbol.endsWith('_night');
-  const base = symbol.replace(/_(day|night|polartwilight)$/, '');
-  if (base.includes('thunder')) return '⛈️';
-  if (base.includes('sleet')) return '🌨️';
-  if (base.includes('snow')) return '❄️';
-  if (base.includes('rainshowers')) return '🌦️';
-  if (base.includes('rain')) return '🌧️';
-  if (base === 'fog') return '🌫️';
-  if (base === 'clearsky') return night ? '🌙' : '☀️';
-  if (base === 'fair' || base === 'partlycloudy') return night ? '☁️' : '🌤️';
-  return '☁️';
-}
-
-const deg = (temp: number) => `${Math.round(temp)}°`;
+import { deg, glyph } from '../lib/weather';
 
 export function WeatherWidget() {
   const { envelope, offline, refetch } = useWidget<WeatherData>('weather');

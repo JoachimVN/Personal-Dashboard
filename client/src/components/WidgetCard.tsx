@@ -11,20 +11,21 @@ interface WidgetCardProps<T> {
 
 export function WidgetCard<T>({ title, envelope, offline, children }: WidgetCardProps<T>) {
   return (
-    <WidgetShell
-      title={title}
-      badge={
-        envelope?.status === 'stale' && envelope.fetchedAt ? (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
-            updated {relativeTime(envelope.fetchedAt)}
-          </span>
-        ) : undefined
-      }
-    >
+    <WidgetShell title={title} badge={<StaleBadge envelope={envelope} />}>
       <WidgetBody envelope={envelope} offline={offline}>
         {children}
       </WidgetBody>
     </WidgetShell>
+  );
+}
+
+/** Amber "updated Xm ago" pill shown while a widget serves cached data after a failed refresh. */
+export function StaleBadge({ envelope }: { envelope: WidgetEnvelope<unknown> | null }) {
+  if (envelope?.status !== 'stale' || !envelope.fetchedAt) return null;
+  return (
+    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+      updated {relativeTime(envelope.fetchedAt)}
+    </span>
   );
 }
 

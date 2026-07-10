@@ -3,6 +3,7 @@ import type { GitHubData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
+import { rampColor } from '../lib/contributions';
 
 const linkClass =
   'truncate font-medium text-ink hover:underline';
@@ -103,9 +104,6 @@ function WorkList({
   );
 }
 
-// Ordinal blue ramp, validated per mode; index 0 is the neutral zero cell.
-const LIGHT_RAMP = ['#e2e8f0', '#86b6ef', '#3987e5', '#1c5cab', '#0d366b'];
-const DARK_RAMP = ['#334155', '#184f95', '#2a78d6', '#6da7ec', '#b7d3f6'];
 const WEEKS_SHOWN = 26;
 
 export function ContributionsWidget() {
@@ -137,8 +135,6 @@ function ContributionGrid({
   }, [data]);
 
   const max = Math.max(1, ...weeks.flat().map((day) => day.count));
-  const bucket = (count: number) =>
-    count === 0 ? 0 : Math.min(4, Math.ceil((count / max) * 4));
 
   return (
     <div>
@@ -146,17 +142,13 @@ function ContributionGrid({
         {weeks.map((week, i) => (
           <div key={i} className="flex flex-col gap-0.5">
             {week.map((day) => (
-              <span key={day.date} className="h-2.5 w-2.5" onMouseEnter={() => onHover(day)}>
-                <span
-                  className="block h-full w-full rounded-[3px] dark:hidden"
-                  style={{ backgroundColor: LIGHT_RAMP[bucket(day.count)] }}
-                  aria-label={`${day.date}: ${day.count} contributions`}
-                />
-                <span
-                  className="hidden h-full w-full rounded-[3px] dark:block"
-                  style={{ backgroundColor: DARK_RAMP[bucket(day.count)] }}
-                />
-              </span>
+              <span
+                key={day.date}
+                className="block h-2.5 w-2.5 rounded-[3px]"
+                style={{ backgroundColor: rampColor(day.count, max) }}
+                aria-label={`${day.date}: ${day.count} contributions`}
+                onMouseEnter={() => onHover(day)}
+              />
             ))}
           </div>
         ))}

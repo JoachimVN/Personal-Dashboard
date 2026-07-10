@@ -1,4 +1,9 @@
-import { Dashboard } from './Dashboard';
+import { useEffect } from 'react';
+import { useHashRoute } from './router';
+import { SECTIONS, sectionById } from './sections/registry';
+import { SectionCard } from './sections/SectionCard';
+import { SectionView } from './sections/SectionView';
+import { SystemFooter } from './components/SystemFooter';
 
 /** Fixed decorative layer the glass cards blur against — accent-tinted glow blobs on the canvas. */
 function BackgroundGlow() {
@@ -29,13 +34,36 @@ function BackgroundGlow() {
   );
 }
 
+function Overview() {
+  return (
+    <>
+      <h1 className="mb-4 text-lg font-bold sm:mb-6">Dashboard</h1>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {SECTIONS.map((section) => (
+          <SectionCard key={section.id} section={section} />
+        ))}
+      </div>
+      <SystemFooter />
+    </>
+  );
+}
+
 export default function App() {
+  const route = useHashRoute();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [route]);
+
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <BackgroundGlow />
       <main className="mx-auto max-w-6xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:p-6">
-        <h1 className="mb-4 text-lg font-bold sm:mb-6">Dashboard</h1>
-        <Dashboard />
+        {route.view === 'overview' ? (
+          <Overview />
+        ) : (
+          <SectionView section={sectionById(route.sectionId)} />
+        )}
       </main>
     </div>
   );
