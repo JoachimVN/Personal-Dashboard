@@ -106,9 +106,18 @@ async function codexSnapshot(): Promise<UsageSnapshot> {
 }
 
 const DEFAULT_COOLDOWN_MS = 20 * 60_000;
+/**
+ * Floor between attempts even after a success. The endpoint's real quota is far looser than our
+ * refreshMs (observed ~23 min Retry-After on a single request), so retrying on the next refreshMs
+ * tick would immediately trip a 429 right after every successful call.
+ */
+const MIN_POLL_INTERVAL_MS = 20 * 60_000;
 
 interface ClaudeUsageState {
-  cooldownUntil: number;
+  /** Set only on a real 429 from Anthropic; surfaced to the client as `rateLimitedUntil`. */
+  rateLimitedUntil: number;
+  /** Self-imposed pacing floor, set after every attempt so we don't hammer the endpoint faster than its real quota allows. */
+  nextAttemptAt: number;
   /** Last successfully fetched snapshot, kept so a cooldown/error serves it instead of blanking the widget. */
   lastGood?: UsageSnapshot;
 }
@@ -117,12 +126,14 @@ interface ClaudeUsageState {
  * Claude Code uses this account endpoint for the same percentages shown in its own usage UI.
  * The OAuth token is intentionally opt-in: API keys do not have subscription-limit data.
  *
- * The endpoint's real quota is looser than our poll interval (observed ~23 min Retry-After on a
- * single request), so a fixed schedule alone will periodically 429. `state.cooldownUntil` is
- * mutated in place so once we're told to back off, every call short-circuits — no network request,
- * no log spam — until the server-given wait has elapsed. While backed off (or on any other fetch
- * failure), we keep serving `state.lastGood` rather than going blank: it's still the most accurate
- * number we have, tagged with the `asOf` moment it was actually captured so the UI can show its age.
+ * The endpoint's real quota is looser than our refreshMs (observed ~23 min Retry-After on a single
+ * request), so `state.nextAttemptAt` self-paces every attempt — including after a success — to
+ * MIN_POLL_INTERVAL_MS, not just after a 429; otherwise the very next refreshMs tick would trip the
+ * real limit right after every successful call. `state.rateLimitedUntil` tracks only genuine 429s
+ * (surfaced to the client), while `nextAttemptAt` is the combined floor checked before any call. While
+ * backed off (or on any other fetch failure), we keep serving `state.lastGood` rather than going
+ * blank: it's still the most accurate number we have, tagged with the `asOf` moment it was actually
+ * captured so the UI can show its age.
  */
 async function claudeSnapshot(
   oauthToken: string | undefined,
@@ -130,7 +141,7 @@ async function claudeSnapshot(
   state: ClaudeUsageState,
 ): Promise<UsageSnapshot> {
   if (!oauthToken) return { available: false };
-  if (Date.now() < state.cooldownUntil) return state.lastGood ?? { available: false };
+  if (Date.now() < state.nextAttemptAt) return state.lastGood ?? { available: false };
   try {
     const response = await fetch('https://api.anthropic.com/api/oauth/usage', {
       headers: {
@@ -141,8 +152,9 @@ async function claudeSnapshot(
     });
     if (response.status === 429) {
       const retryAfterSec = Number(response.headers.get('retry-after'));
-      state.cooldownUntil =
+      state.rateLimitedUntil =
         Date.now() + (Number.isFinite(retryAfterSec) ? retryAfterSec * 1_000 : DEFAULT_COOLDOWN_MS);
+      state.nextAttemptAt = state.rateLimitedUntil;
       return state.lastGood ?? { available: false };
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -160,6 +172,8 @@ async function claudeSnapshot(
       asOf: new Date().toISOString(),
     };
     state.lastGood = snapshot;
+    state.rateLimitedUntil = 0;
+    state.nextAttemptAt = Date.now() + MIN_POLL_INTERVAL_MS;
     return snapshot;
   } catch {
     // Do not log a response body: it can include account-specific information.
@@ -184,7 +198,11 @@ export function createClaudeUsageProvider(
   const persisted = history.getSnapshot('ai-usage-claude');
   const isFresh =
     persisted?.asOf !== undefined && Date.now() - Date.parse(persisted.asOf) < MAX_SEED_AGE_MS;
-  const state: ClaudeUsageState = { cooldownUntil: 0, lastGood: isFresh ? persisted : undefined };
+  const state: ClaudeUsageState = {
+    rateLimitedUntil: 0,
+    nextAttemptAt: 0,
+    lastGood: isFresh ? persisted : undefined,
+  };
   return {
     id: 'ai-usage-claude',
     schema: aiUsageToolSchema,
@@ -194,7 +212,7 @@ export function createClaudeUsageProvider(
     fetch: async (signal) => {
       const snapshot = await claudeSnapshot(claudeOauthToken, signal, state);
       const rateLimitedUntil =
-        state.cooldownUntil > Date.now() ? new Date(state.cooldownUntil).toISOString() : undefined;
+        state.rateLimitedUntil > Date.now() ? new Date(state.rateLimitedUntil).toISOString() : undefined;
       return { ...snapshot, rateLimitedUntil, history: history.record('ai-usage-claude', snapshot) };
     },
   };
