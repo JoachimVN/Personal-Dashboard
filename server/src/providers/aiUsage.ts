@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
-import { aiUsageSchema, type AiUsageData } from '@personal-dashboard/shared';
+import { aiUsageToolSchema, type AiUsageToolData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 
 const codexLimitSchema = z.object({
@@ -33,8 +33,6 @@ const claudeUsageSchema = z.object({
   seven_day: claudeLimitSchema.nullish(),
 });
 
-type Snapshot = AiUsageData['tools'][number];
-
 function limit(usedPercent: number, resetsAt: number | string) {
   const reset =
     typeof resetsAt === 'number' ? new Date(resetsAt * 1_000) : new Date(resetsAt);
@@ -61,7 +59,7 @@ async function jsonlFiles(directory: string): Promise<string[]> {
  * Codex appends the live account limits to its local session event stream. Read only the newest
  * few logs: limits are account-wide and a current session always writes into the latest files.
  */
-async function codexSnapshot(): Promise<Snapshot> {
+async function codexSnapshot(): Promise<AiUsageToolData> {
   const sessionsDir = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
   try {
     const files = (await jsonlFiles(sessionsDir)).sort().slice(-12);
@@ -91,18 +89,30 @@ async function codexSnapshot(): Promise<Snapshot> {
 
     const fiveHour = newest?.primary && limit(newest.primary.used_percent, newest.primary.resets_at);
     const weekly = newest?.secondary && limit(newest.secondary.used_percent, newest.secondary.resets_at);
-    return { tool: 'codex', available: Boolean(fiveHour || weekly), fiveHour, weekly };
+    return { available: Boolean(fiveHour || weekly), fiveHour, weekly };
   } catch {
-    return { tool: 'codex', available: false };
+    return { available: false };
   }
 }
+
+const DEFAULT_COOLDOWN_MS = 20 * 60_000;
 
 /**
  * Claude Code uses this account endpoint for the same percentages shown in its own usage UI.
  * The OAuth token is intentionally opt-in: API keys do not have subscription-limit data.
+ *
+ * The endpoint's real quota is looser than our poll interval (observed ~23 min Retry-After on a
+ * single request), so a fixed schedule alone will periodically 429. `cooldown` is mutated in place
+ * so once we're told to back off, every call short-circuits — no network request, no log spam —
+ * until the server-given wait has elapsed.
  */
-async function claudeSnapshot(oauthToken: string | undefined, signal: AbortSignal): Promise<Snapshot> {
-  if (!oauthToken) return { tool: 'claude', available: false };
+async function claudeSnapshot(
+  oauthToken: string | undefined,
+  signal: AbortSignal,
+  cooldown: { until: number },
+): Promise<AiUsageToolData> {
+  if (!oauthToken) return { available: false };
+  if (Date.now() < cooldown.until) return { available: false };
   try {
     const response = await fetch('https://api.anthropic.com/api/oauth/usage', {
       headers: {
@@ -111,6 +121,11 @@ async function claudeSnapshot(oauthToken: string | undefined, signal: AbortSigna
       },
       signal,
     });
+    if (response.status === 429) {
+      const retryAfterSec = Number(response.headers.get('retry-after'));
+      cooldown.until = Date.now() + (Number.isFinite(retryAfterSec) ? retryAfterSec * 1_000 : DEFAULT_COOLDOWN_MS);
+      throw new Error('HTTP 429');
+    }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const usage = claudeUsageSchema.parse(await response.json());
     const fiveHour = usage.five_hour
@@ -119,27 +134,38 @@ async function claudeSnapshot(oauthToken: string | undefined, signal: AbortSigna
     const weekly = usage.seven_day
       ? limit(usage.seven_day.utilization, usage.seven_day.resets_at)
       : undefined;
-    return { tool: 'claude', available: Boolean(fiveHour || weekly), fiveHour, weekly };
+    return { available: Boolean(fiveHour || weekly), fiveHour, weekly };
   } catch {
     // Do not log a response body: it can include account-specific information.
     console.warn('[ai-usage] Claude limit snapshot unavailable');
-    return { tool: 'claude', available: false };
+    return { available: false };
   }
 }
 
-export function createAiUsageProvider(claudeOauthToken?: string): Provider<AiUsageData> {
+/**
+ * Claude limits come from a rate-limited external API, so this stays on a conservative,
+ * fixed cadence regardless of the Codex refresh setting — plus self-imposed backoff, see claudeSnapshot.
+ */
+export function createClaudeUsageProvider(claudeOauthToken?: string): Provider<AiUsageToolData> {
+  const cooldown = { until: 0 };
   return {
-    id: 'ai-usage',
-    schema: aiUsageSchema,
-    refreshMs: 5 * 60_000,
+    id: 'ai-usage-claude',
+    schema: aiUsageToolSchema,
+    refreshMs: 60_000,
     timeoutMs: 60_000,
     isConfigured: () => true,
-    async fetch(signal) {
-      const [claude, codex] = await Promise.all([
-        claudeSnapshot(claudeOauthToken, signal),
-        codexSnapshot(),
-      ]);
-      return { tools: [claude, codex] };
-    },
+    fetch: (signal) => claudeSnapshot(claudeOauthToken, signal, cooldown),
+  };
+}
+
+/** Codex just re-reads local session files, so its cadence is configurable — see config.json. */
+export function createCodexUsageProvider(refreshMs: number): Provider<AiUsageToolData> {
+  return {
+    id: 'ai-usage-codex',
+    schema: aiUsageToolSchema,
+    refreshMs,
+    timeoutMs: 10_000,
+    isConfigured: () => true,
+    fetch: () => codexSnapshot(),
   };
 }

@@ -88,10 +88,10 @@ Note: the activity feed uses GitHub's events API, which is **delayed** (typicall
 
 ### AI usage (Claude Code / Codex)
 
-The widget shows each service's current rolling allowance: **five-hour** and **weekly** percentages, with reset times — not token totals or estimated costs.
+Each service has its own card showing its current rolling allowance: **five-hour** and **weekly** percentages, with reset times — not token totals or estimated costs. A thin marker on each bar shows where usage "should" be if it tracked evenly with the window's elapsed time; the marker turns amber when usage is running ahead of that pace.
 
-- **Codex:** no setup when Codex is signed in locally; its local session snapshots contain the current account limits.
-- **Claude Code:** set `CLAUDE_CODE_OAUTH_TOKEN` in `server/.env` to the OAuth access token used by your signed-in Claude Code account. This is not an Anthropic API key. The Claude endpoint is an internal CLI integration, so the dashboard leaves Claude unavailable if the token expires or Anthropic changes it.
+- **Codex:** no setup when Codex is signed in locally; its local session snapshots contain the current account limits. This card polls those local files only (no network call), so it refreshes independently and much more often than Claude — tune the interval with `aiUsage.codexRefreshMs` (ms, default `30000`) in `server/config.json`.
+- **Claude Code:** set `CLAUDE_CODE_OAUTH_TOKEN` in `server/.env` to the OAuth access token used by your signed-in Claude Code account (run `claude setup-token`). This is not an Anthropic API key. The Claude endpoint is an internal CLI integration with a tight rate limit, so this card stays on a fixed 5-minute refresh regardless of the Codex setting; the dashboard leaves Claude unavailable if the token expires or Anthropic changes it.
 
 Each machine's dashboard reports that machine's signed-in accounts only. News feeds are configured in `server/config.json`.
 

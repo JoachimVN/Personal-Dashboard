@@ -7,17 +7,11 @@ const rateLimitSchema = z.object({
   resetsAt: z.string().datetime(),
 });
 
-export const aiUsageSchema = z.object({
-  /** Current subscription-limit snapshots. These are not API-equivalent cost estimates. */
-  tools: z.array(
-    z.object({
-      tool: z.enum(['claude', 'codex']),
-      /** False when the local CLI has not supplied a current limit snapshot. */
-      available: z.boolean(),
-      fiveHour: rateLimitSchema.optional(),
-      weekly: rateLimitSchema.optional(),
-    }),
-  ),
+export const aiUsageToolSchema = z.object({
+  /** False when the local CLI has not supplied a current limit snapshot. */
+  available: z.boolean(),
+  fiveHour: rateLimitSchema.optional(),
+  weekly: rateLimitSchema.optional(),
 });
 
-export type AiUsageData = z.infer<typeof aiUsageSchema>;
+export type AiUsageToolData = z.infer<typeof aiUsageToolSchema>;

@@ -11,25 +11,48 @@ interface WidgetCardProps<T> {
 
 export function WidgetCard<T>({ title, envelope, offline, children }: WidgetCardProps<T>) {
   return (
+    <WidgetShell
+      title={title}
+      badge={
+        envelope?.status === 'stale' && envelope.fetchedAt ? (
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+            updated {relativeTime(envelope.fetchedAt)}
+          </span>
+        ) : undefined
+      }
+    >
+      <WidgetBody envelope={envelope} offline={offline}>
+        {children}
+      </WidgetBody>
+    </WidgetShell>
+  );
+}
+
+/** Card chrome (border/header) without the single-envelope status machine — for cards that combine multiple independently-polled sections. */
+export function WidgetShell({
+  title,
+  badge,
+  children,
+}: {
+  title: string;
+  badge?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
       <header className="mb-3 flex items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
           {title}
         </h2>
-        {envelope?.status === 'stale' && envelope.fetchedAt && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
-            updated {relativeTime(envelope.fetchedAt)}
-          </span>
-        )}
+        {badge}
       </header>
-      <Body envelope={envelope} offline={offline}>
-        {children}
-      </Body>
+      {children}
     </section>
   );
 }
 
-function Body<T>({
+/** The loading/disabled/error/ready state machine, reusable for a single section within a WidgetShell. */
+export function WidgetBody<T>({
   envelope,
   offline,
   children,

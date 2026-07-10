@@ -20,6 +20,12 @@ const configSchema = z.object({
       feeds: z.array(z.object({ name: z.string(), url: z.string() })).default([]),
     })
     .default({ feeds: [] }),
+  aiUsage: z
+    .object({
+      /** How often to re-read Codex's local session files, in ms. Cheap — no external API call. */
+      codexRefreshMs: z.number().int().min(5_000).default(30_000),
+    })
+    .default({ codexRefreshMs: 30_000 }),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
