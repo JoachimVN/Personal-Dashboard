@@ -1,128 +1,133 @@
-import { execFile } from 'node:child_process';
-import { createRequire } from 'node:module';
+import { readdir, readFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
-import { promisify } from 'node:util';
 import { z } from 'zod';
 import { aiUsageSchema, type AiUsageData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 
-const execFileAsync = promisify(execFile);
-
-// ccusage's JSON output is an external contract — the dependency is pinned
-// exactly. `claude` days carry totalCost + modelBreakdowns; `codex` days carry
-// costUSD + a models map without per-model cost.
-const dailySchema = z.object({
-  daily: z.array(
-    z.object({
-      date: z.string(),
-      totalTokens: z.number(),
-      totalCost: z.number().optional(),
-      costUSD: z.number().optional(),
-      modelBreakdowns: z
-        .array(
-          z.object({
-            modelName: z.string(),
-            cost: z.number(),
-            inputTokens: z.number(),
-            outputTokens: z.number(),
-            cacheCreationTokens: z.number(),
-            cacheReadTokens: z.number(),
-          }),
-        )
-        .optional(),
-      models: z.record(z.string(), z.object({ totalTokens: z.number() })).optional(),
-    }),
-  ),
+const codexLimitSchema = z.object({
+  used_percent: z.number(),
+  resets_at: z.number(),
 });
 
-type Day = z.infer<typeof dailySchema>['daily'][number];
-type Tool = 'claude' | 'codex';
+const codexEventSchema = z.object({
+  timestamp: z.string(),
+  type: z.literal('event_msg'),
+  payload: z.object({
+    rate_limits: z
+      .object({
+        primary: codexLimitSchema.nullish(),
+        secondary: codexLimitSchema.nullish(),
+      })
+      .nullish(),
+  }),
+});
 
-function ccusageBin(): string {
-  const require = createRequire(import.meta.url);
-  const pkgPath = require.resolve('ccusage/package.json');
-  const pkg = require('ccusage/package.json') as { bin: Record<string, string> };
-  return path.join(path.dirname(pkgPath), pkg.bin.ccusage);
-}
+const claudeLimitSchema = z.object({
+  utilization: z.number(),
+  resets_at: z.string(),
+});
 
-const dayCost = (day: Day) => day.totalCost ?? day.costUSD ?? 0;
+const claudeUsageSchema = z.object({
+  five_hour: claudeLimitSchema.nullish(),
+  seven_day: claudeLimitSchema.nullish(),
+});
 
-/** Last `count` dates ending today, as YYYY-MM-DD in the given timezone. */
-function recentDates(timezone: string, count: number): string[] {
-  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone });
-  return Array.from({ length: count }, (_, i) =>
-    fmt.format(new Date(Date.now() - (count - 1 - i) * 86_400_000)),
-  );
-}
+type Snapshot = AiUsageData['tools'][number];
 
-function summarizeTool(tool: Tool, days: Day[], timezone: string): AiUsageData['tools'][number] {
-  const dates = recentDates(timezone, 14);
-  const today = dates[dates.length - 1];
-  const weekDates = new Set(dates.slice(-7));
-  const byDate = new Map(days.map((day) => [day.date, day]));
-
-  const todayEntry = byDate.get(today);
-  const weekEntries = days.filter((day) => weekDates.has(day.date));
-
-  const models = new Map<string, { tokens: number; cost?: number }>();
-  for (const day of weekEntries) {
-    for (const breakdown of day.modelBreakdowns ?? []) {
-      const entry = models.get(breakdown.modelName) ?? { tokens: 0, cost: 0 };
-      entry.tokens +=
-        breakdown.inputTokens +
-        breakdown.outputTokens +
-        breakdown.cacheCreationTokens +
-        breakdown.cacheReadTokens;
-      entry.cost = (entry.cost ?? 0) + breakdown.cost;
-      models.set(breakdown.modelName, entry);
-    }
-    for (const [name, usage] of Object.entries(day.models ?? {})) {
-      const entry = models.get(name) ?? { tokens: 0 };
-      entry.tokens += usage.totalTokens;
-      models.set(name, entry);
-    }
-  }
-
+function limit(usedPercent: number, resetsAt: number | string) {
+  const reset =
+    typeof resetsAt === 'number' ? new Date(resetsAt * 1_000) : new Date(resetsAt);
+  if (!Number.isFinite(usedPercent) || Number.isNaN(reset.getTime())) return undefined;
   return {
-    tool,
-    available: days.length > 0,
-    today: {
-      cost: todayEntry ? dayCost(todayEntry) : 0,
-      tokens: todayEntry?.totalTokens ?? 0,
-    },
-    week: {
-      cost: weekEntries.reduce((sum, day) => sum + dayCost(day), 0),
-      tokens: weekEntries.reduce((sum, day) => sum + day.totalTokens, 0),
-    },
-    models: [...models.entries()]
-      .map(([name, entry]) => ({ name, ...entry }))
-      .sort((a, b) => b.tokens - a.tokens),
-    days: dates.map((date) => {
-      const day = byDate.get(date);
-      return { date, cost: day ? dayCost(day) : 0 };
-    }),
+    usedPercent: Math.max(0, Math.min(100, usedPercent)),
+    resetsAt: reset.toISOString(),
   };
 }
 
-export function createAiUsageProvider(timezone: string): Provider<AiUsageData> {
-  const bin = ccusageBin();
+async function jsonlFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const nested = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) return jsonlFiles(entryPath);
+      return entry.isFile() && entry.name.endsWith('.jsonl') ? [entryPath] : [];
+    }),
+  );
+  return nested.flat();
+}
 
-  const runTool = async (tool: Tool, signal: AbortSignal): Promise<Day[]> => {
-    try {
-      const { stdout } = await execFileAsync(
-        process.execPath,
-        [bin, tool, 'daily', '--json', '--timezone', timezone],
-        { signal, maxBuffer: 64 * 1024 * 1024 },
-      );
-      return dailySchema.parse(JSON.parse(stdout)).daily;
-    } catch (err) {
-      if (signal.aborted) throw err;
-      // No usage data on this machine (or ccusage failed for this tool only).
-      console.warn(`[ai-usage] ccusage ${tool} unavailable:`, (err as Error).message);
-      return [];
+/**
+ * Codex appends the live account limits to its local session event stream. Read only the newest
+ * few logs: limits are account-wide and a current session always writes into the latest files.
+ */
+async function codexSnapshot(): Promise<Snapshot> {
+  const sessionsDir = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
+  try {
+    const files = (await jsonlFiles(sessionsDir)).sort().slice(-12);
+    let newest:
+      | { timestamp: string; primary?: z.infer<typeof codexLimitSchema>; secondary?: z.infer<typeof codexLimitSchema> }
+      | undefined;
+
+    for (const file of files) {
+      const lines = (await readFile(file, 'utf8')).trim().split('\n');
+      for (const line of lines) {
+        try {
+          const event = codexEventSchema.parse(JSON.parse(line));
+          const limits = event.payload.rate_limits;
+          if (!limits || (!limits.primary && !limits.secondary)) continue;
+          if (!newest || event.timestamp > newest.timestamp) {
+            newest = {
+              timestamp: event.timestamp,
+              primary: limits.primary ?? undefined,
+              secondary: limits.secondary ?? undefined,
+            };
+          }
+        } catch {
+          // Session streams also contain unrelated messages; ignore malformed/irrelevant lines.
+        }
+      }
     }
-  };
 
+    const fiveHour = newest?.primary && limit(newest.primary.used_percent, newest.primary.resets_at);
+    const weekly = newest?.secondary && limit(newest.secondary.used_percent, newest.secondary.resets_at);
+    return { tool: 'codex', available: Boolean(fiveHour || weekly), fiveHour, weekly };
+  } catch {
+    return { tool: 'codex', available: false };
+  }
+}
+
+/**
+ * Claude Code uses this account endpoint for the same percentages shown in its own usage UI.
+ * The OAuth token is intentionally opt-in: API keys do not have subscription-limit data.
+ */
+async function claudeSnapshot(oauthToken: string | undefined, signal: AbortSignal): Promise<Snapshot> {
+  if (!oauthToken) return { tool: 'claude', available: false };
+  try {
+    const response = await fetch('https://api.anthropic.com/api/oauth/usage', {
+      headers: {
+        Authorization: `Bearer ${oauthToken}`,
+        'anthropic-beta': 'oauth-2025-04-20',
+      },
+      signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const usage = claudeUsageSchema.parse(await response.json());
+    const fiveHour = usage.five_hour
+      ? limit(usage.five_hour.utilization, usage.five_hour.resets_at)
+      : undefined;
+    const weekly = usage.seven_day
+      ? limit(usage.seven_day.utilization, usage.seven_day.resets_at)
+      : undefined;
+    return { tool: 'claude', available: Boolean(fiveHour || weekly), fiveHour, weekly };
+  } catch {
+    // Do not log a response body: it can include account-specific information.
+    console.warn('[ai-usage] Claude limit snapshot unavailable');
+    return { tool: 'claude', available: false };
+  }
+}
+
+export function createAiUsageProvider(claudeOauthToken?: string): Provider<AiUsageData> {
   return {
     id: 'ai-usage',
     schema: aiUsageSchema,
@@ -131,15 +136,10 @@ export function createAiUsageProvider(timezone: string): Provider<AiUsageData> {
     isConfigured: () => true,
     async fetch(signal) {
       const [claude, codex] = await Promise.all([
-        runTool('claude', signal),
-        runTool('codex', signal),
+        claudeSnapshot(claudeOauthToken, signal),
+        codexSnapshot(),
       ]);
-      return {
-        tools: [
-          summarizeTool('claude', claude, timezone),
-          summarizeTool('codex', codex, timezone),
-        ],
-      };
+      return { tools: [claude, codex] };
     },
   };
 }

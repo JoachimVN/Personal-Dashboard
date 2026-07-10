@@ -1,24 +1,21 @@
 import { z } from 'zod';
 
+const rateLimitSchema = z.object({
+  /** Percent of the provider's rolling allowance that has been used. */
+  usedPercent: z.number().min(0).max(100),
+  /** ISO timestamp at which this rolling allowance resets. */
+  resetsAt: z.string().datetime(),
+});
+
 export const aiUsageSchema = z.object({
-  /** All dollar figures are estimated API-equivalent cost, not actual spend. */
+  /** Current subscription-limit snapshots. These are not API-equivalent cost estimates. */
   tools: z.array(
     z.object({
       tool: z.enum(['claude', 'codex']),
-      /** False when this machine has no usage data for the tool. */
+      /** False when the local CLI has not supplied a current limit snapshot. */
       available: z.boolean(),
-      today: z.object({ cost: z.number(), tokens: z.number() }),
-      week: z.object({ cost: z.number(), tokens: z.number() }),
-      /** Last-7-day per-model split; codex has no per-model cost, only tokens. */
-      models: z.array(
-        z.object({
-          name: z.string(),
-          tokens: z.number(),
-          cost: z.number().optional(),
-        }),
-      ),
-      /** Exactly the last 14 dashboard-timezone dates, zero-filled. */
-      days: z.array(z.object({ date: z.string(), cost: z.number() })),
+      fiveHour: rateLimitSchema.optional(),
+      weekly: rateLimitSchema.optional(),
     }),
   ),
 });

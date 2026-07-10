@@ -15,7 +15,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Provider[] {
     createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
     createGmailProvider(env.google),
     createGitHubProvider(env.github, config.github.pinnedRepos),
-    createAiUsageProvider(env.timezone),
+    createAiUsageProvider(env.claudeOauthToken),
     createNewsProvider(config.news.feeds),
     createSystemProvider(env.timezone),
   ];

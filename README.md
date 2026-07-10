@@ -88,7 +88,12 @@ Note: the activity feed uses GitHub's events API, which is **delayed** (typicall
 
 ### AI usage (Claude Code / Codex)
 
-No setup — it reads local usage logs via [ccusage](https://github.com/ccusage/ccusage) and shows **estimated API-equivalent cost** (not actual subscription spend). Each machine's dashboard shows that machine's usage only. News feeds are configured in `server/config.json`.
+The widget shows each service's current rolling allowance: **five-hour** and **weekly** percentages, with reset times — not token totals or estimated costs.
+
+- **Codex:** no setup when Codex is signed in locally; its local session snapshots contain the current account limits.
+- **Claude Code:** set `CLAUDE_CODE_OAUTH_TOKEN` in `server/.env` to the OAuth access token used by your signed-in Claude Code account. This is not an Anthropic API key. The Claude endpoint is an internal CLI integration, so the dashboard leaves Claude unavailable if the token expires or Anthropic changes it.
+
+Each machine's dashboard reports that machine's signed-in accounts only. News feeds are configured in `server/config.json`.
 
 ### Calendar (iCloud / Apple Calendar)
 
