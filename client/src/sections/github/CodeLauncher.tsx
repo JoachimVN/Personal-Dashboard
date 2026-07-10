@@ -19,15 +19,15 @@ export function CodeLauncher() {
   }
 
   return (
-    <section className="rounded-xl border border-line bg-surface p-3">
-      <h2 className="text-sm font-semibold">Code session</h2>
+    <section className="glass rounded-2xl p-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Code session</h2>
       <p className="mt-1 text-xs text-ink-muted">Open a repo in VS Code with Codex and Claude Code terminal tasks.</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <select value={repo} onChange={(event) => setRepo(event.target.value)} className="rounded border border-line bg-canvas px-2 py-1.5 text-sm" disabled={!projects.length}>
+        <select value={repo} onChange={(event) => setRepo(event.target.value)} className="rounded border border-card-border bg-canvas px-2 py-1.5 text-sm" disabled={!projects.length}>
           {projects.map((project) => <option key={project} value={project}>{project}</option>)}
         </select>
         <button type="button" onClick={() => void launch('session')} disabled={!repo} className="rounded bg-ink px-3 py-1.5 text-sm font-semibold text-canvas disabled:opacity-50">Start session</button>
-        <button type="button" onClick={() => void launch('github-desktop')} disabled={!repo} className="rounded border border-line px-3 py-1.5 text-sm font-semibold">GitHub Desktop</button>
+        <button type="button" onClick={() => void launch('github-desktop')} disabled={!repo} className="rounded border border-card-border px-3 py-1.5 text-sm font-semibold">GitHub Desktop</button>
       </div>
       {message && <p className="mt-2 text-xs text-ink-muted">{message}</p>}
     </section>

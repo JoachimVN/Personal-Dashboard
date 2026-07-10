@@ -63,7 +63,7 @@ export function TodayBrief() {
   }, [calendar.envelope?.data?.events, github.envelope?.data?.activity, gmail.envelope?.data?.unreadThreads, previous, weather.envelope?.data?.current]);
 
   return (
-    <div className="col-span-2 rounded-lg border border-line/80 bg-track/50 px-3 py-2.5">
+    <div className="col-span-2 rounded-lg border border-card-border bg-track/50 px-3 py-2.5">
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Today brief</span>
         {previous && <span className="text-[10px] text-ink-faint">since last visit</span>}
