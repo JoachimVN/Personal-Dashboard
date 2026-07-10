@@ -29,6 +29,23 @@ npm run build
 npm start
 ```
 
+## Run at login
+
+**macOS** — installs (or refreshes) a launchd agent that builds the client and keeps `npm start` running:
+
+```bash
+./scripts/install-launchd.sh
+```
+
+**Windows** — two options:
+
+- *Startup shortcut*: `Win+R` → `shell:startup` → add a shortcut with target
+  `cmd /c "cd /d C:\path\to\Personal-Dashboard && npm start"` (runs with a visible console).
+- *Task Scheduler* (headless): create a task triggered **At log on**, action `cmd`, arguments
+  `/c cd /d C:\path\to\Personal-Dashboard && npm start`, and tick "Run whether user is logged on or not".
+
+Run `npm run build` once first on Windows so `client/dist` exists.
+
 ## Phone access (Tailscale Serve)
 
 The server binds to loopback only. To reach it from your phone:
@@ -37,7 +54,9 @@ The server binds to loopback only. To reach it from your phone:
 tailscale serve 4821
 ```
 
-This proxies the dashboard onto your tailnet with HTTPS (required for PWA install). Open the printed `https://<machine>.<tailnet>.ts.net` URL on your phone and use Share → **Add to Home Screen**.
+This proxies the dashboard onto your tailnet with HTTPS (required for PWA install). Requirements: Tailscale installed and signed in on this machine and on your phone (same tailnet), and HTTPS certificates enabled once in the [admin console](https://login.tailscale.com/admin/dns) (Enable HTTPS).
+
+On the phone, open the printed `https://<machine>.<tailnet>.ts.net` URL in Safari and use Share → **Add to Home Screen** — the dashboard then launches fullscreen like an app. Both your Mac and Windows PC can serve their own instance; the phone just bookmarks each machine's URL.
 
 Setting `HOST=0.0.0.0` instead exposes the dashboard **unauthenticated** on your LAN — only do that on networks you trust.
 
@@ -66,6 +85,10 @@ If the contribution graph errors with a fine-grained PAT, fall back to a classic
 Pinned repos for the repo-health card live in `server/config.json`.
 
 Note: the activity feed uses GitHub's events API, which is **delayed** (typically minutes) — it is not real-time.
+
+### AI usage (Claude Code / Codex)
+
+No setup — it reads local usage logs via [ccusage](https://github.com/ccusage/ccusage) and shows **estimated API-equivalent cost** (not actual subscription spend). Each machine's dashboard shows that machine's usage only. News feeds are configured in `server/config.json`.
 
 ### Calendar (iCloud / Apple Calendar)
 
