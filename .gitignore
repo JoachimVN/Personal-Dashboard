@@ -14,3 +14,4 @@ server/.tokens/
 # Logs & OS noise
 *.log
 .DS_Store
+/.vscode
