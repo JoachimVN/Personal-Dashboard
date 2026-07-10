@@ -1,5 +1,5 @@
 import type { AiUsageToolData } from '@personal-dashboard/shared';
-import { relativeTime } from '../../lib/time';
+import { relativeFutureTime, relativeTime } from '../../lib/time';
 import { useWidget } from '../../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { FIVE_HOUR_MS, UsageMeter, WEEKLY_MS } from './UsageMeter';
@@ -47,12 +47,18 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
                 caption="Weekly window · last 7 d"
               />
               {data.asOf && (
-                <p className="text-[11px] text-ink-faint">As of {relativeTime(data.asOf)}</p>
+                <p className="text-[11px] text-ink-faint">
+                  As of {relativeTime(data.asOf)}
+                  {data.rateLimitedUntil &&
+                    ` · rate limited, retrying ${relativeFutureTime(data.rateLimitedUntil)}`}
+                </p>
               )}
             </div>
           ) : (
             <p className="text-xs text-ink-faint">
-              No current limit snapshot available on this machine.
+              {data.rateLimitedUntil
+                ? `Rate limited by Anthropic — retrying ${relativeFutureTime(data.rateLimitedUntil)}.`
+                : 'No current limit snapshot available on this machine.'}
             </p>
           )
         }

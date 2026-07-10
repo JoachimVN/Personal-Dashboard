@@ -23,6 +23,8 @@ export const aiUsageToolSchema = z.object({
   weekly: rateLimitSchema.optional(),
   /** When this snapshot was actually captured — may lag `fetchedAt` when serving a cached reading. */
   asOf: z.string().datetime().optional(),
+  /** Set while backed off from an upstream 429; ISO timestamp of when the next attempt is allowed. */
+  rateLimitedUntil: z.string().datetime().optional(),
   /** Server-sampled usage snapshots, oldest first. Empty until the server has recorded some. */
   history: z.array(usageHistoryPointSchema).default([]),
 });

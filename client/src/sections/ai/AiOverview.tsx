@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import type { AiUsageToolData } from '@personal-dashboard/shared';
+import { relativeFutureTime } from '../../lib/time';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { UsageSparkline } from './UsageHistoryChart';
@@ -56,7 +57,11 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
               />
             </div>
           ) : (
-            <p className="text-xs text-ink-faint">No snapshot on this machine.</p>
+            <p className="text-xs text-ink-faint">
+              {data.rateLimitedUntil
+                ? `Rate limited — retrying ${relativeFutureTime(data.rateLimitedUntil)}.`
+                : 'No snapshot on this machine.'}
+            </p>
           )
         }
       </WidgetBody>

@@ -193,7 +193,9 @@ export function createClaudeUsageProvider(
     isConfigured: () => true,
     fetch: async (signal) => {
       const snapshot = await claudeSnapshot(claudeOauthToken, signal, state);
-      return { ...snapshot, history: history.record('ai-usage-claude', snapshot) };
+      const rateLimitedUntil =
+        state.cooldownUntil > Date.now() ? new Date(state.cooldownUntil).toISOString() : undefined;
+      return { ...snapshot, rateLimitedUntil, history: history.record('ai-usage-claude', snapshot) };
     },
   };
 }
