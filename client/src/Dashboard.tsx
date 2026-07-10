@@ -7,6 +7,7 @@ import {
   RepoHealthWidget,
 } from './widgets/GitHubWidgets';
 import { GmailWidget } from './widgets/GmailWidget';
+import { NewsWidget } from './widgets/NewsWidget';
 import { SystemWidget } from './widgets/SystemWidget';
 import { WeatherWidget } from './widgets/WeatherWidget';
 
@@ -21,6 +22,7 @@ export function Dashboard() {
       <AiUsageWidget />
       <ContributionsWidget />
       <RepoHealthWidget />
+      <NewsWidget />
       <SystemWidget />
     </div>
   );

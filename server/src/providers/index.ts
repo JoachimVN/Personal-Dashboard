@@ -5,6 +5,7 @@ import { createAiUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
 import { createGmailProvider } from './gmail.js';
+import { createNewsProvider } from './news.js';
 import { createSystemProvider } from './system.js';
 import { createWeatherProvider } from './weather.js';
 
@@ -15,6 +16,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Provider[] {
     createGmailProvider(env.google),
     createGitHubProvider(env.github, config.github.pinnedRepos),
     createAiUsageProvider(env.timezone),
+    createNewsProvider(config.news.feeds),
     createSystemProvider(env.timezone),
   ];
 }

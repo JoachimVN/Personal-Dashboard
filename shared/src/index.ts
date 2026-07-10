@@ -5,3 +5,4 @@ export * from './schemas/github.js';
 export * from './schemas/aiUsage.js';
 export * from './schemas/calendar.js';
 export * from './schemas/gmail.js';
+export * from './schemas/news.js';

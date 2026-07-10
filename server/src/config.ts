@@ -15,6 +15,11 @@ const configSchema = z.object({
       allowlist: z.array(z.string()).default([]),
     })
     .default({ allowlist: [] }),
+  news: z
+    .object({
+      feeds: z.array(z.object({ name: z.string(), url: z.string() })).default([]),
+    })
+    .default({ feeds: [] }),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
