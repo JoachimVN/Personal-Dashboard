@@ -9,7 +9,8 @@ export interface Provider<T = unknown> {
   timeoutMs: number;
   /** false → status "disabled", never fetched (missing credentials/config). */
   isConfigured(): boolean;
-  fetch(signal: AbortSignal): Promise<T>;
+  /** `force` is true for a user-initiated refresh — providers may use it to bypass self-imposed (but not externally-imposed) pacing. */
+  fetch(signal: AbortSignal, force: boolean): Promise<T>;
 }
 
 interface Entry {
@@ -64,8 +65,8 @@ export class ProviderScheduler {
     }
   }
 
-  /** Single-flight: a refresh while the previous one is running is a no-op. */
-  refresh(id: string): Promise<void> {
+  /** Single-flight: a refresh while the previous one is running is a no-op. `force` is passed through for user-initiated refreshes. */
+  refresh(id: string, force = false): Promise<void> {
     const entry = this.entries.get(id);
     if (!entry || entry.status === 'disabled') return Promise.resolve();
     if (entry.inFlight) return entry.refreshPromise ?? Promise.resolve();
@@ -76,7 +77,7 @@ export class ProviderScheduler {
       const timeout = setTimeout(() => controller.abort(), entry.provider.timeoutMs);
       timeout.unref?.();
       try {
-        const raw = await entry.provider.fetch(controller.signal);
+        const raw = await entry.provider.fetch(controller.signal, force);
         entry.data = entry.provider.schema.parse(raw);
         entry.fetchedAt = new Date();
         entry.status = 'ready';

@@ -7,6 +7,7 @@ export interface ServerEnv {
   isProduction: boolean;
   weather?: { lat: number; lon: number };
   github?: { token: string; username: string };
+  githubIssuesToken?: string;
   icloud?: { username: string; password: string };
   claudeOauthToken?: string;
   google?: { clientId: string; clientSecret: string };
@@ -41,6 +42,7 @@ export function loadEnv(): ServerEnv {
       process.env.GITHUB_TOKEN && process.env.GITHUB_USERNAME
         ? { token: process.env.GITHUB_TOKEN, username: process.env.GITHUB_USERNAME }
         : undefined,
+    githubIssuesToken: process.env.GITHUB_ISSUES_TOKEN || undefined,
     icloud:
       process.env.ICLOUD_USERNAME && process.env.ICLOUD_APP_PASSWORD
         ? {

@@ -139,9 +139,13 @@ async function claudeSnapshot(
   oauthToken: string | undefined,
   signal: AbortSignal,
   state: ClaudeUsageState,
+  force: boolean,
 ): Promise<UsageSnapshot> {
   if (!oauthToken) return { available: false };
-  if (Date.now() < state.nextAttemptAt) return state.lastGood ?? { available: false };
+  // A real 429 from Anthropic is always respected; `force` (user-initiated refresh) only
+  // bypasses our own post-success pacing floor.
+  if (Date.now() < state.rateLimitedUntil) return state.lastGood ?? { available: false };
+  if (!force && Date.now() < state.nextAttemptAt) return state.lastGood ?? { available: false };
   try {
     const response = await fetch('https://api.anthropic.com/api/oauth/usage', {
       headers: {
@@ -184,7 +188,10 @@ async function claudeSnapshot(
 
 /**
  * Claude limits come from a rate-limited external API, so this stays on a conservative,
- * fixed cadence regardless of the Codex refresh setting — plus self-imposed backoff, see claudeSnapshot.
+ * fixed cadence regardless of the Codex refresh setting — plus self-imposed backoff, see
+ * claudeSnapshot. A user-initiated refresh (`force`, e.g. the dashboard's Refresh button)
+ * bypasses that self-imposed pacing to fetch a live number on demand, but never bypasses an
+ * actual Anthropic 429 — see claudeSnapshot.
  */
 /** Don't re-serve a persisted snapshot older than this across restarts — show nothing over ancient numbers. */
 const MAX_SEED_AGE_MS = 24 * 60 * 60_000;
@@ -209,8 +216,8 @@ export function createClaudeUsageProvider(
     refreshMs: 60_000,
     timeoutMs: 60_000,
     isConfigured: () => true,
-    fetch: async (signal) => {
-      const snapshot = await claudeSnapshot(claudeOauthToken, signal, state);
+    fetch: async (signal, force) => {
+      const snapshot = await claudeSnapshot(claudeOauthToken, signal, state, force);
       const rateLimitedUntil =
         state.rateLimitedUntil > Date.now() ? new Date(state.rateLimitedUntil).toISOString() : undefined;
       return { ...snapshot, rateLimitedUntil, history: history.record('ai-usage-claude', snapshot) };

@@ -30,6 +30,14 @@ const configSchema = z.object({
       historyRetentionDays: z.number().int().min(1).default(7),
     })
     .default({ codexRefreshMs: 30_000, historySampleMs: 15 * 60_000, historyRetentionDays: 7 }),
+  code: z
+    .object({
+      projects: z.array(z.object({
+        repo: z.string(),
+        paths: z.object({ darwin: z.string().optional(), win32: z.string().optional() }).default({}),
+      })).default([]),
+    })
+    .default({ projects: [] }),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

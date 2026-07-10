@@ -8,6 +8,7 @@ import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { deg, glyph } from '../../lib/weather';
 import { relativeTime } from '../../lib/time';
+import { TodayBrief } from './TodayBrief';
 
 function Mini({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
@@ -35,6 +36,7 @@ export function PersonalOverview() {
 
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-3">
+      <TodayBrief />
       <Mini label="Weather">
         <WidgetBody envelope={weather.envelope} offline={weather.offline}>
           {(data) => (

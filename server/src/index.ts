@@ -6,6 +6,8 @@ import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { ProviderScheduler } from './scheduler.js';
 import { createProviders } from './providers/index.js';
+import { createIssue, issueErrorCode, parseIssueInput } from './issues.js';
+import { availableProjects, codeActionError, launchCodeAction } from './codeSession.js';
 
 const env = loadEnv();
 const config = loadConfig();
@@ -54,13 +56,43 @@ app.get('/api/widgets/:id', (req, res) => {
   res.json(envelope);
 });
 
+app.get('/api/github/repos', (_req, res) => {
+  res.json({ repos: config.github.pinnedRepos });
+});
+
+app.post('/api/github/issues', async (req, res) => {
+  if (!env.githubIssuesToken) {
+    res.status(503).json({ error: 'github-issues-not-configured' });
+    return;
+  }
+  try {
+    const issue = parseIssueInput(req.body, config.github.pinnedRepos);
+    res.status(201).json(await createIssue(env.githubIssuesToken, issue));
+  } catch (error) {
+    const code = issueErrorCode(error);
+    res.status(code === 'invalid-issue' || code === 'repo-not-allowed' ? 400 : 502).json({ error: code });
+  }
+});
+
+app.get('/api/code/projects', (_req, res) => res.json({ projects: availableProjects(config) }));
+
+app.post('/api/code/actions', async (req, res) => {
+  try {
+    await launchCodeAction(req.body, config);
+    res.status(204).end();
+  } catch (error) {
+    const code = codeActionError(error);
+    res.status(code === 'invalid-code-action' || code === 'project-not-configured' ? 400 : 502).json({ error: code });
+  }
+});
+
 app.post('/api/widgets/:id/refresh', async (req, res) => {
   if (!AI_USAGE_WIDGET_IDS.has(req.params.id)) {
     res.status(404).json({ error: 'refresh-not-supported' });
     return;
   }
 
-  await scheduler.refresh(req.params.id);
+  await scheduler.refresh(req.params.id, true);
   const envelope = scheduler.getEnvelope(req.params.id);
   if (!envelope) {
     res.status(404).json({ error: 'unknown-widget' });
