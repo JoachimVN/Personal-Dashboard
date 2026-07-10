@@ -2,7 +2,10 @@ import { motion } from 'motion/react';
 import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
+import { UsageSparkline } from './UsageHistoryChart';
 import { AI_TOOLS } from './tools';
+
+const DAY_MS = 24 * 60 * 60_000;
 
 function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
   const { envelope, offline } = useWidget<AiUsageToolData>(id);
@@ -41,6 +44,12 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                   style={{ backgroundColor: color }}
                 />
               </div>
+              <UsageSparkline
+                points={data.history}
+                metric="fiveHourUsedPercent"
+                windowMs={DAY_MS}
+                color={color}
+              />
             </div>
           ) : (
             <p className="text-xs text-ink-faint">No snapshot on this machine.</p>
