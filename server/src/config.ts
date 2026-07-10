@@ -4,11 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 
 const configSchema = z.object({
-  github: z
-    .object({
-      pinnedRepos: z.array(z.string()).default([]),
-    })
-    .default({ pinnedRepos: [] }),
   calendar: z
     .object({
       /** Calendar display names to show; empty = all event calendars. */

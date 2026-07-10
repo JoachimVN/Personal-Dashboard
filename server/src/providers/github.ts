@@ -58,6 +58,17 @@ interface SearchItem {
 
 const repoFromApiUrl = (url: string) => url.replace('https://api.github.com/repos/', '');
 
+/** Owned, non-fork, non-archived repos — the live replacement for a hand-maintained pinned-repo allowlist. */
+export async function listOwnedRepos(auth: { token: string; username: string }): Promise<string[]> {
+  const octokit = new Octokit({ auth: auth.token });
+  const repos = await octokit.paginate('GET /user/repos', {
+    affiliation: 'owner',
+    sort: 'updated',
+    per_page: 100,
+  });
+  return repos.filter((repo) => !repo.fork && !repo.archived).map((repo) => repo.full_name);
+}
+
 const CONTRIBUTIONS_QUERY = `
   query ($login: String!) {
     user(login: $login) {
@@ -89,7 +100,6 @@ interface ContributionsResponse {
 
 export function createGitHubProvider(
   auth: { token: string; username: string } | undefined,
-  pinnedRepos: string[],
 ): Provider<GitHubData> {
   return {
     id: 'github',
@@ -111,7 +121,7 @@ export function createGitHubProvider(
           request,
         });
 
-      const [events, authored, reviewRequested, assignedIssues, contributions, health] =
+      const [events, authored, reviewRequested, assignedIssues, contributions, ownedRepos] =
         await Promise.all([
           octokit.request('GET /users/{username}/events', {
             username: auth.username,
@@ -125,40 +135,42 @@ export function createGitHubProvider(
             login: auth.username,
             request,
           }),
-          Promise.all(
-            pinnedRepos.map(async (fullName) => {
-              const [owner, repo] = fullName.split('/');
-              const [repoInfo, runs, release] = await Promise.all([
-                octokit.request('GET /repos/{owner}/{repo}', { owner, repo, request }),
-                octokit.request('GET /repos/{owner}/{repo}/actions/runs', {
-                  owner,
-                  repo,
-                  per_page: 1,
-                  request,
-                }),
-                octokit
-                  .request('GET /repos/{owner}/{repo}/releases/latest', { owner, repo, request })
-                  .catch(() => undefined),
-              ]);
-              const run = runs.data.workflow_runs[0];
-              const ciStatus = !run
-                ? ('none' as const)
-                : run.status !== 'completed'
-                  ? ('running' as const)
-                  : run.conclusion === 'success'
-                    ? ('success' as const)
-                    : ('failure' as const);
-              return {
-                fullName,
-                stars: repoInfo.data.stargazers_count,
-                ciStatus,
-                ciUrl: run?.html_url,
-                latestRelease: release?.data.tag_name,
-                url: repoInfo.data.html_url,
-              };
-            }),
-          ),
+          listOwnedRepos(auth),
         ]);
+
+      const health = await Promise.all(
+        ownedRepos.map(async (fullName) => {
+          const [owner, repo] = fullName.split('/');
+          const [repoInfo, runs, release] = await Promise.all([
+            octokit.request('GET /repos/{owner}/{repo}', { owner, repo, request }),
+            octokit.request('GET /repos/{owner}/{repo}/actions/runs', {
+              owner,
+              repo,
+              per_page: 1,
+              request,
+            }),
+            octokit
+              .request('GET /repos/{owner}/{repo}/releases/latest', { owner, repo, request })
+              .catch(() => undefined),
+          ]);
+          const run = runs.data.workflow_runs[0];
+          const ciStatus = !run
+            ? ('none' as const)
+            : run.status !== 'completed'
+              ? ('running' as const)
+              : run.conclusion === 'success'
+                ? ('success' as const)
+                : ('failure' as const);
+          return {
+            fullName,
+            stars: repoInfo.data.stargazers_count,
+            ciStatus,
+            ciUrl: run?.html_url,
+            latestRelease: release?.data.tag_name,
+            url: repoInfo.data.html_url,
+          };
+        }),
+      );
 
       const activity = (events.data as RawEvent[])
         .map((event) => {

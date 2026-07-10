@@ -8,6 +8,7 @@ import { ProviderScheduler } from './scheduler.js';
 import { createProviders } from './providers/index.js';
 import { createIssue, issueErrorCode, parseIssueInput } from './issues.js';
 import { availableProjects, codeActionError, launchCodeAction } from './codeSession.js';
+import { listOwnedRepos } from './providers/github.js';
 
 const env = loadEnv();
 const config = loadConfig();
@@ -56,17 +57,26 @@ app.get('/api/widgets/:id', (req, res) => {
   res.json(envelope);
 });
 
-app.get('/api/github/repos', (_req, res) => {
-  res.json({ repos: config.github.pinnedRepos });
+app.get('/api/github/repos', async (_req, res) => {
+  if (!env.github) {
+    res.status(503).json({ error: 'github-not-configured' });
+    return;
+  }
+  try {
+    res.json({ repos: await listOwnedRepos(env.github) });
+  } catch {
+    res.status(502).json({ error: 'github-repos-failed' });
+  }
 });
 
 app.post('/api/github/issues', async (req, res) => {
-  if (!env.githubIssuesToken) {
+  if (!env.githubIssuesToken || !env.github) {
     res.status(503).json({ error: 'github-issues-not-configured' });
     return;
   }
   try {
-    const issue = parseIssueInput(req.body, config.github.pinnedRepos);
+    const allowedRepos = await listOwnedRepos(env.github);
+    const issue = parseIssueInput(req.body, allowedRepos);
     res.status(201).json(await createIssue(env.githubIssuesToken, issue));
   } catch (error) {
     const code = issueErrorCode(error);
