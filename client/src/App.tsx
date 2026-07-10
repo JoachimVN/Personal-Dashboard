@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { useHashRoute } from './router';
 import { SECTIONS, sectionById } from './sections/registry';
 import { SectionCard } from './sections/SectionCard';
@@ -34,17 +35,35 @@ function BackgroundGlow() {
   );
 }
 
+const overviewGridVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.06 } },
+};
+
+/** Staggered card entrance runs once per app load, not again when navigating back from a section. */
+let overviewEntranceDone = false;
+
 function Overview() {
+  const runEntrance = !overviewEntranceDone;
+  useEffect(() => {
+    overviewEntranceDone = true;
+  }, []);
+
   return (
-    <>
+    <motion.div exit={{ opacity: 0, transition: { duration: 0.15 } }}>
       <h1 className="mb-4 text-lg font-bold sm:mb-6">Dashboard</h1>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <motion.div
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        variants={overviewGridVariants}
+        initial={runEntrance ? 'hidden' : false}
+        animate="visible"
+      >
         {SECTIONS.map((section) => (
           <SectionCard key={section.id} section={section} />
         ))}
-      </div>
+      </motion.div>
       <SystemFooter />
-    </>
+    </motion.div>
   );
 }
 
@@ -59,11 +78,20 @@ export default function App() {
     <div className="min-h-screen bg-canvas text-ink">
       <BackgroundGlow />
       <main className="mx-auto max-w-6xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:p-6">
-        {route.view === 'overview' ? (
-          <Overview />
-        ) : (
-          <SectionView section={sectionById(route.sectionId)} />
-        )}
+        <MotionConfig
+          reducedMotion="user"
+          transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+        >
+          <LayoutGroup>
+            <AnimatePresence mode="popLayout" initial={false}>
+              {route.view === 'overview' ? (
+                <Overview key="overview" />
+              ) : (
+                <SectionView key={route.sectionId} section={sectionById(route.sectionId)} />
+              )}
+            </AnimatePresence>
+          </LayoutGroup>
+        </MotionConfig>
       </main>
     </div>
   );

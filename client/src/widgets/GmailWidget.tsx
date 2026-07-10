@@ -2,6 +2,7 @@ import type { GmailData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
+import { AnimatedNumber } from '../components/AnimatedNumber';
 
 export function GmailWidget() {
   const { envelope, offline } = useWidget<GmailData>('gmail');
@@ -11,7 +12,9 @@ export function GmailWidget() {
       {(data) => (
         <div>
           <p className="mb-2 text-sm">
-            <span className="text-2xl font-bold tabular-nums">{data.unreadThreads}</span>{' '}
+            <span className="text-2xl font-bold tabular-nums">
+              <AnimatedNumber value={data.unreadThreads} />
+            </span>{' '}
             <span className="text-ink-muted">unread</span>
           </p>
           <ul className="space-y-1.5 text-sm">

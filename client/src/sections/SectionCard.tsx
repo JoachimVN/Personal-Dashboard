@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { motion } from 'motion/react';
 import type { SectionDef } from './registry';
 import { sectionHref } from '../router';
 
@@ -16,24 +17,36 @@ export function AccentDot() {
   );
 }
 
+export const sectionCardVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0 },
+};
+
 /** Overview block for one section — the whole card is a link into the section's full view. */
 export function SectionCard({ section }: { section: SectionDef }) {
   return (
-    <a
+    <motion.a
       href={sectionHref(section.id)}
-      className="glass block rounded-2xl p-4 transition-transform duration-200 hover:scale-[1.01] active:scale-[0.99]"
+      layoutId={`section-${section.id}`}
+      variants={sectionCardVariants}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      className="glass block rounded-2xl p-4"
       style={accentStyle(section)}
     >
       <header className="mb-3 flex items-center gap-2">
         <AccentDot />
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-(--accent)">
+        <motion.h2
+          layoutId={`section-title-${section.id}`}
+          className="text-sm font-semibold uppercase tracking-wide text-(--accent)"
+        >
           {section.title}
-        </h2>
+        </motion.h2>
         <span aria-hidden className="ml-auto text-lg leading-none text-ink-faint">
           ›
         </span>
       </header>
       <section.Overview />
-    </a>
+    </motion.a>
   );
 }

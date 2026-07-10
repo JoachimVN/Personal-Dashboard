@@ -3,13 +3,16 @@ import type { GitHubData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { rampColor } from '../../lib/contributions';
+import { AnimatedNumber } from '../../components/AnimatedNumber';
 
 const STRIP_WEEKS = 12;
 
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <div>
-      <div className="text-xl font-bold tabular-nums">{value}</div>
+      <div className="text-xl font-bold tabular-nums">
+        <AnimatedNumber value={value} />
+      </div>
       <div className="text-[11px] text-ink-faint">{label}</div>
     </div>
   );

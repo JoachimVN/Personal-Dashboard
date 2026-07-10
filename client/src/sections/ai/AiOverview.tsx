@@ -1,3 +1,4 @@
+import { motion } from 'motion/react';
 import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
@@ -31,12 +32,13 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                 </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-track">
-                <div
+                <motion.div
                   className="h-full rounded-full"
-                  style={{
+                  initial={{ width: 0 }}
+                  animate={{
                     width: `${data.weekly?.usedPercent ?? data.fiveHour?.usedPercent ?? 0}%`,
-                    backgroundColor: color,
                   }}
+                  style={{ backgroundColor: color }}
                 />
               </div>
             </div>

@@ -1,4 +1,6 @@
+import { motion } from 'motion/react';
 import type { AiUsageToolData } from '@personal-dashboard/shared';
+import { AnimatedNumber } from '../../components/AnimatedNumber';
 
 export const FIVE_HOUR_MS = 5 * 60 * 60_000;
 export const WEEKLY_MS = 7 * 24 * 60 * 60_000;
@@ -38,12 +40,16 @@ export function UsageMeter({
     <div>
       <div className="mb-1 flex items-baseline text-xs">
         <span className="text-ink-muted">{label}</span>
-        <span className="ml-auto font-semibold tabular-nums">{Math.round(limit.usedPercent)}%</span>
+        <span className="ml-auto font-semibold tabular-nums">
+          <AnimatedNumber value={limit.usedPercent} suffix="%" />
+        </span>
       </div>
       <div className="relative h-1.5 overflow-hidden rounded-full bg-track">
-        <div
-          className="h-full rounded-full transition-[width] duration-300"
-          style={{ width: `${limit.usedPercent}%`, backgroundColor: color }}
+        <motion.div
+          className="h-full rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${limit.usedPercent}%` }}
+          style={{ backgroundColor: color }}
         />
         <div
           className="absolute top-0 h-full w-px"
