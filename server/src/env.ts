@@ -6,6 +6,7 @@ export interface ServerEnv {
   timezone: string;
   isProduction: boolean;
   weather?: { lat: number; lon: number };
+  github?: { token: string; username: string };
 }
 
 function parseWeather(): ServerEnv['weather'] {
@@ -33,5 +34,9 @@ export function loadEnv(): ServerEnv {
     timezone: process.env.DASHBOARD_TIMEZONE ?? 'Europe/Oslo',
     isProduction: process.env.NODE_ENV === 'production',
     weather: parseWeather(),
+    github:
+      process.env.GITHUB_TOKEN && process.env.GITHUB_USERNAME
+        ? { token: process.env.GITHUB_TOKEN, username: process.env.GITHUB_USERNAME }
+        : undefined,
   };
 }

@@ -1,15 +1,17 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { ProviderScheduler } from './scheduler.js';
 import { createProviders } from './providers/index.js';
 
 const env = loadEnv();
+const config = loadConfig();
 const app = express();
 
 const scheduler = new ProviderScheduler();
-for (const provider of createProviders(env)) {
+for (const provider of createProviders(env, config)) {
   scheduler.register(provider);
 }
 scheduler.start();

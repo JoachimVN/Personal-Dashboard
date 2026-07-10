@@ -1,18 +1,12 @@
 import type { ReactNode } from 'react';
 import type { WidgetEnvelope } from '@personal-dashboard/shared';
+import { relativeTime } from '../lib/time';
 
 interface WidgetCardProps<T> {
   title: string;
   envelope: WidgetEnvelope<T> | null;
   offline: boolean;
   children: (data: T) => ReactNode;
-}
-
-function relativeTime(iso: string): string {
-  const deltaSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (deltaSec < 60) return 'just now';
-  if (deltaSec < 3600) return `${Math.floor(deltaSec / 60)} min ago`;
-  return `${Math.floor(deltaSec / 3600)} h ago`;
 }
 
 export function WidgetCard<T>({ title, envelope, offline, children }: WidgetCardProps<T>) {

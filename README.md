@@ -50,4 +50,23 @@ npm test            # vitest (scheduler/cache behavior)
 
 ## Widget setup
 
-Docs for each widget's credentials (GitHub PAT permissions, iCloud app-specific password, Google OAuth client) land here as the widgets are built.
+### Weather (MET Norway)
+
+No key needed — set `WEATHER_LAT` / `WEATHER_LON` in `server/.env`.
+
+### GitHub
+
+Set `GITHUB_USERNAME` and `GITHUB_TOKEN` in `server/.env`. Create a **fine-grained PAT** (github.com → Settings → Developer settings) with:
+
+- **Repository access**: All repositories (or at least your pinned ones)
+- **Repository permissions**: Contents *read*, Actions *read*, Issues *read*, Pull requests *read* (Metadata read is added automatically)
+
+If the contribution graph errors with a fine-grained PAT, fall back to a classic PAT with `repo` + `read:user` scopes.
+
+Pinned repos for the repo-health card live in `server/config.json`.
+
+Note: the activity feed uses GitHub's events API, which is **delayed** (typically minutes) — it is not real-time.
+
+### Calendar, Gmail
+
+Docs land here as the widgets are built (iCloud app-specific password, Google OAuth client).
