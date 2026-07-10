@@ -9,6 +9,12 @@ const configSchema = z.object({
       pinnedRepos: z.array(z.string()).default([]),
     })
     .default({ pinnedRepos: [] }),
+  calendar: z
+    .object({
+      /** Calendar display names to show; empty = all event calendars. */
+      allowlist: z.array(z.string()).default([]),
+    })
+    .default({ allowlist: [] }),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

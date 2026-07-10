@@ -7,6 +7,7 @@ export interface ServerEnv {
   isProduction: boolean;
   weather?: { lat: number; lon: number };
   github?: { token: string; username: string };
+  icloud?: { username: string; password: string };
 }
 
 function parseWeather(): ServerEnv['weather'] {
@@ -37,6 +38,13 @@ export function loadEnv(): ServerEnv {
     github:
       process.env.GITHUB_TOKEN && process.env.GITHUB_USERNAME
         ? { token: process.env.GITHUB_TOKEN, username: process.env.GITHUB_USERNAME }
+        : undefined,
+    icloud:
+      process.env.ICLOUD_USERNAME && process.env.ICLOUD_APP_PASSWORD
+        ? {
+            username: process.env.ICLOUD_USERNAME,
+            password: process.env.ICLOUD_APP_PASSWORD,
+          }
         : undefined,
   };
 }

@@ -67,6 +67,15 @@ Pinned repos for the repo-health card live in `server/config.json`.
 
 Note: the activity feed uses GitHub's events API, which is **delayed** (typically minutes) — it is not real-time.
 
-### Calendar, Gmail
+### Calendar (iCloud / Apple Calendar)
 
-Docs land here as the widgets are built (iCloud app-specific password, Google OAuth client).
+1. Go to [account.apple.com](https://account.apple.com) → Sign-In and Security → **App-Specific Passwords** → generate one (call it e.g. `dashboard`).
+2. Set in `server/.env`:
+   - `ICLOUD_USERNAME` — your Apple ID email
+   - `ICLOUD_APP_PASSWORD` — the generated `xxxx-xxxx-xxxx-xxxx` password
+
+By default all event calendars are shown; to limit it, list display names in `server/config.json` under `calendar.allowlist` (e.g. `["Personal", "NTNU"]`).
+
+### Gmail
+
+Docs land here when the widget is built (Google OAuth client).
