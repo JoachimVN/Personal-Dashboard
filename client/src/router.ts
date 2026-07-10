@@ -14,7 +14,12 @@ function parseHash(): Route {
 export function useHashRoute() {
   const [route, setRoute] = useState<Route>(parseHash);
   useEffect(() => {
-    const onChange = () => setRoute(parseHash());
+    const onChange = () => {
+      // Shared-layout transitions measure the destination during this update.
+      // Resetting after render makes the browser move the already-animating element a second time.
+      window.scrollTo(0, 0);
+      setRoute(parseHash());
+    };
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);

@@ -50,7 +50,7 @@ function Overview() {
   }, []);
 
   return (
-    <motion.div exit={{ opacity: 0, transition: { duration: 0.15 } }}>
+    <motion.div className="col-start-1 row-start-1">
       <h1 className="mb-4 text-lg font-bold sm:mb-6">Dashboard</h1>
       <motion.div
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
@@ -70,10 +70,6 @@ function Overview() {
 export default function App() {
   const route = useHashRoute();
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [route]);
-
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <BackgroundGlow />
@@ -83,13 +79,15 @@ export default function App() {
           transition={{ type: 'spring', stiffness: 260, damping: 30 }}
         >
           <LayoutGroup>
-            <AnimatePresence mode="popLayout" initial={false}>
-              {route.view === 'overview' ? (
-                <Overview key="overview" />
-              ) : (
-                <SectionView key={route.sectionId} section={sectionById(route.sectionId)} />
-              )}
-            </AnimatePresence>
+            <div className="grid">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {route.view === 'overview' ? (
+                  <Overview key="overview" />
+                ) : (
+                  <SectionView key={route.sectionId} section={sectionById(route.sectionId)} />
+                )}
+              </AnimatePresence>
+            </div>
           </LayoutGroup>
         </MotionConfig>
       </main>

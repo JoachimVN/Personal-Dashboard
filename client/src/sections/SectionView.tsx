@@ -10,8 +10,8 @@ import { AccentDot, accentStyle } from './SectionCard';
 export function SectionView({ section }: { section: SectionDef }) {
   return (
     <motion.div
+      className="col-start-1 row-start-1"
       style={accentStyle(section)}
-      exit={{ opacity: 0, transition: { duration: 0.15 } }}
     >
       <motion.header
         layoutId={`section-${section.id}`}
@@ -35,6 +35,7 @@ export function SectionView({ section }: { section: SectionDef }) {
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0, transition: { delay: 0.15 } }}
+        exit={{ opacity: 0, y: 8, transition: { duration: 0.12 } }}
       >
         <section.Detail />
       </motion.div>
