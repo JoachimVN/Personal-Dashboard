@@ -3,6 +3,14 @@ import type { CalendarData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 
+/** Stable per-calendar dot color derived from the calendar's name; readable in both modes. */
+function calendarColor(name: string): string {
+  let hash = 0;
+  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+  const hue = Math.abs(hash) % 360;
+  return `light-dark(hsl(${hue} 55% 42%), hsl(${hue} 55% 65%))`;
+}
+
 function dayHeading(date: string): string {
   const today = new Date();
   const todayStr = today.toLocaleDateString('en-CA');
@@ -52,7 +60,15 @@ export function CalendarWidget() {
                           : `${event.startLabel}–${event.endLabel}`}
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate font-medium">{event.title}</span>
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            aria-hidden
+                            title={event.calendar}
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: calendarColor(event.calendar) }}
+                          />
+                          <span className="truncate font-medium">{event.title}</span>
+                        </span>
                         {event.location && (
                           <span className="block truncate text-xs text-ink-faint">
                             {event.location}

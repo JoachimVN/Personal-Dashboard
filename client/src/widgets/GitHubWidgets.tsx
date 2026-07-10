@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GitHubData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
@@ -56,6 +56,7 @@ export function GitHubWorkWidget() {
               meta: `${pr.repo.split('/')[1] ?? pr.repo} #${pr.number}${
                 pr.role === 'review-requested' ? ' · review requested' : ''
               }`,
+              time: relativeTime(pr.updatedAt),
             }))}
           />
           <WorkList
@@ -66,6 +67,7 @@ export function GitHubWorkWidget() {
               url: issue.url,
               title: issue.title,
               meta: `${issue.repo.split('/')[1] ?? issue.repo} #${issue.number}`,
+              time: relativeTime(issue.updatedAt),
             }))}
           />
         </div>
@@ -81,7 +83,7 @@ function WorkList({
 }: {
   label: string;
   empty: string;
-  items: { key: string; url: string; title: string; meta: string }[];
+  items: { key: string; url: string; title: string; meta: string; time: string }[];
 }) {
   return (
     <div>
@@ -95,7 +97,10 @@ function WorkList({
               <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
                 {item.title}
               </a>
-              <div className="text-xs text-ink-faint">{item.meta}</div>
+              <div className="flex gap-2 text-xs text-ink-faint">
+                <span className="truncate">{item.meta}</span>
+                <span className="ml-auto shrink-0">{item.time}</span>
+              </div>
             </li>
           ))}
         </ul>
@@ -103,8 +108,6 @@ function WorkList({
     </div>
   );
 }
-
-const WEEKS_SHOWN = 26;
 
 export function ContributionsWidget() {
   const { envelope, offline } = useWidget<GitHubData>('github');
@@ -131,14 +134,25 @@ function ContributionGrid({
     for (let i = 0; i < data.contributions.days.length; i += 7) {
       all.push(data.contributions.days.slice(i, i + 7));
     }
-    return all.slice(-WEEKS_SHOWN);
+    return all;
   }, [data]);
 
   const max = Math.max(1, ...weeks.flat().map((day) => day.count));
 
+  // Full year overflows on phones; start scrolled to the newest weeks.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [weeks.length]);
+
   return (
     <div>
-      <div className="flex gap-0.5 overflow-x-auto pb-1" onMouseLeave={() => onHover(null)}>
+      <div
+        ref={scrollRef}
+        className="flex gap-0.5 overflow-x-auto pb-1"
+        onMouseLeave={() => onHover(null)}
+      >
         {weeks.map((week, i) => (
           <div key={i} className="flex flex-col gap-0.5">
             {week.map((day) => (

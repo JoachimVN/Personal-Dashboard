@@ -26,6 +26,9 @@ export function WeatherWidget() {
                 <div className="text-ink-faint">{hour.hourLabel}</div>
                 <div className="text-base">{glyph(hour.symbol)}</div>
                 <div className="font-medium">{deg(hour.temperature)}</div>
+                <div className="text-[10px] text-sky-600 dark:text-sky-400">
+                  {hour.precipitationMm > 0 ? `${hour.precipitationMm} mm` : ' '}
+                </div>
               </div>
             ))}
           </div>
