@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@personal-dashboard/shared": "*",
+    "ccusage": "20.0.17",
     "cross-env": "^10.0.0",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",

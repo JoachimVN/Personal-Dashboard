@@ -1,3 +1,4 @@
+import { AiUsageWidget } from './widgets/AiUsageWidget';
 import {
   ContributionsWidget,
   GitHubActivityWidget,
@@ -13,6 +14,7 @@ export function Dashboard() {
       <WeatherWidget />
       <GitHubActivityWidget />
       <GitHubWorkWidget />
+      <AiUsageWidget />
       <ContributionsWidget />
       <RepoHealthWidget />
       <SystemWidget />
