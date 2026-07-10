@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Builds
+client/dist/
+server/dist/
+
+# Secrets — never commit these
+.env
+.env.*
+!.env.example
+server/.tokens/
+
+# Logs & OS noise
+*.log
+.DS_Store
