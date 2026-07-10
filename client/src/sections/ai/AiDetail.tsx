@@ -4,15 +4,24 @@ import { useWidget } from '../../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { FIVE_HOUR_MS, UsageMeter, WEEKLY_MS } from './UsageMeter';
 import { UsageHistoryChart } from './UsageHistoryChart';
+import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
 
 const DAY_MS = 24 * 60 * 60_000;
 
 function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
-  const { envelope, offline } = useWidget<AiUsageToolData>(id);
+  const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   return (
-    <WidgetShell title={label} badge={<StaleBadge envelope={envelope} />}>
+    <WidgetShell
+      title={label}
+      badge={
+        <div className="flex items-center gap-2">
+          <StaleBadge envelope={envelope} />
+          <UsageRefreshButton label={label} refreshing={refreshing} onRefresh={refresh} />
+        </div>
+      }
+    >
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) =>
           data.available ? (

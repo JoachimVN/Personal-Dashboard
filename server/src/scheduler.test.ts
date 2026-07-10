@@ -130,6 +130,29 @@ describe('ProviderScheduler', () => {
     expect(scheduler.getEnvelope('fake')!.status).toBe('ready');
   });
 
+  it('waits for the in-flight refresh instead of serving its previous result', async () => {
+    let resolveFetch!: (value: { value: number }) => void;
+    const fetch = vi.fn(
+      () => new Promise<{ value: number }>((resolve) => (resolveFetch = resolve)),
+    );
+    scheduler.register(fakeProvider({ fetch }));
+
+    const first = scheduler.refresh('fake');
+    const second = scheduler.refresh('fake');
+    let secondFinished = false;
+    void second.then(() => {
+      secondFinished = true;
+    });
+
+    await Promise.resolve();
+    expect(secondFinished).toBe(false);
+    resolveFetch({ value: 1 });
+    await Promise.all([first, second]);
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(secondFinished).toBe(true);
+  });
+
   it('never fetches an unconfigured provider and reports disabled', async () => {
     const fetch = vi.fn(async () => ({ value: 1 }));
     scheduler.register(fakeProvider({ isConfigured: () => false, fetch }));

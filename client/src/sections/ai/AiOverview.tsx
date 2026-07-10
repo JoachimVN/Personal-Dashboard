@@ -3,18 +3,22 @@ import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { UsageSparkline } from './UsageHistoryChart';
+import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
 
 const DAY_MS = 24 * 60 * 60_000;
 
 function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
-  const { envelope, offline } = useWidget<AiUsageToolData>(id);
+  const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-2 text-sm">
         <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
         <span className="font-medium">{label}</span>
+        <span className="ml-auto">
+          <UsageRefreshButton label={label} refreshing={refreshing} onRefresh={refresh} />
+        </span>
       </div>
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) =>

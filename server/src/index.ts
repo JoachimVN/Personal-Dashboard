@@ -19,6 +19,8 @@ for (const provider of providers.all) {
 }
 scheduler.start();
 
+const AI_USAGE_WIDGET_IDS = new Set(['ai-usage-claude', 'ai-usage-codex']);
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
@@ -44,6 +46,21 @@ app.get('/api/widgets', (_req, res) => {
 });
 
 app.get('/api/widgets/:id', (req, res) => {
+  const envelope = scheduler.getEnvelope(req.params.id);
+  if (!envelope) {
+    res.status(404).json({ error: 'unknown-widget' });
+    return;
+  }
+  res.json(envelope);
+});
+
+app.post('/api/widgets/:id/refresh', async (req, res) => {
+  if (!AI_USAGE_WIDGET_IDS.has(req.params.id)) {
+    res.status(404).json({ error: 'refresh-not-supported' });
+    return;
+  }
+
+  await scheduler.refresh(req.params.id);
   const envelope = scheduler.getEnvelope(req.params.id);
   if (!envelope) {
     res.status(404).json({ error: 'unknown-widget' });

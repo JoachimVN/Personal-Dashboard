@@ -20,6 +20,7 @@ interface Entry {
   lastAttemptAt?: Date;
   error?: string;
   inFlight: boolean;
+  refreshPromise?: Promise<void>;
   timer?: NodeJS.Timeout;
 }
 
@@ -64,33 +65,39 @@ export class ProviderScheduler {
   }
 
   /** Single-flight: a refresh while the previous one is running is a no-op. */
-  async refresh(id: string): Promise<void> {
+  refresh(id: string): Promise<void> {
     const entry = this.entries.get(id);
-    if (!entry || entry.status === 'disabled' || entry.inFlight) return;
+    if (!entry || entry.status === 'disabled') return Promise.resolve();
+    if (entry.inFlight) return entry.refreshPromise ?? Promise.resolve();
 
     entry.inFlight = true;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), entry.provider.timeoutMs);
-    timeout.unref?.();
-    try {
-      const raw = await entry.provider.fetch(controller.signal);
-      entry.data = entry.provider.schema.parse(raw);
-      entry.fetchedAt = new Date();
-      entry.status = 'ready';
-      entry.error = undefined;
-    } catch (err) {
-      // Timeout surfaces as AbortError regardless of how the provider failed.
-      const error = controller.signal.aborted
-        ? 'timeout'
-        : sanitizeError(err);
-      entry.error = error;
-      entry.status = entry.data !== undefined ? 'stale' : 'error';
-      console.error(`[${id}] refresh failed (${error}):`, err);
-    } finally {
-      clearTimeout(timeout);
-      entry.lastAttemptAt = new Date();
-      entry.inFlight = false;
-    }
+    entry.refreshPromise = (async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), entry.provider.timeoutMs);
+      timeout.unref?.();
+      try {
+        const raw = await entry.provider.fetch(controller.signal);
+        entry.data = entry.provider.schema.parse(raw);
+        entry.fetchedAt = new Date();
+        entry.status = 'ready';
+        entry.error = undefined;
+      } catch (err) {
+        // Timeout surfaces as AbortError regardless of how the provider failed.
+        const error = controller.signal.aborted
+          ? 'timeout'
+          : sanitizeError(err);
+        entry.error = error;
+        entry.status = entry.data !== undefined ? 'stale' : 'error';
+        console.error(`[${id}] refresh failed (${error}):`, err);
+      } finally {
+        clearTimeout(timeout);
+        entry.lastAttemptAt = new Date();
+        entry.inFlight = false;
+        entry.refreshPromise = undefined;
+      }
+    })();
+
+    return entry.refreshPromise;
   }
 
   getEnvelope(id: string): WidgetEnvelope | undefined {

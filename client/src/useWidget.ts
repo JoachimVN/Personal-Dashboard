@@ -9,6 +9,9 @@ export interface WidgetState<T> {
   /** True when the dashboard itself can't reach the server. */
   offline: boolean;
   refetch: () => void;
+  /** Requests an immediate provider refresh, then replaces the cached widget data. */
+  refresh: () => Promise<void>;
+  refreshing: boolean;
 }
 
 /**
@@ -19,19 +22,32 @@ export interface WidgetState<T> {
 export function useWidget<T>(id: string): WidgetState<T> {
   const [envelope, setEnvelope] = useState<WidgetEnvelope<T> | null>(null);
   const [offline, setOffline] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const request = useCallback(async (url: string, init?: RequestInit) => {
+    try {
+      const res = await fetch(url, init);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const next = (await res.json()) as WidgetEnvelope<T>;
+      setEnvelope(next);
+      setOffline(false);
+    } catch {
+      setOffline(true);
+    }
+  }, []);
 
   const refetch = useCallback(() => {
-    fetch(`/api/widgets/${id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json() as Promise<WidgetEnvelope<T>>;
-      })
-      .then((next) => {
-        setEnvelope(next);
-        setOffline(false);
-      })
-      .catch(() => setOffline(true));
-  }, [id]);
+    void request(`/api/widgets/${id}`);
+  }, [id, request]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await request(`/api/widgets/${id}/refresh`, { method: 'POST' });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [id, request]);
 
   useEffect(() => {
     refetch();
@@ -53,5 +69,5 @@ export function useWidget<T>(id: string): WidgetState<T> {
     };
   }, [refetch, envelope?.refreshMs]);
 
-  return { envelope, offline, refetch };
+  return { envelope, offline, refetch, refresh, refreshing };
 }
