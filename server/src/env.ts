@@ -5,6 +5,18 @@ export interface ServerEnv {
   host: string;
   timezone: string;
   isProduction: boolean;
+  weather?: { lat: number; lon: number };
+}
+
+function parseWeather(): ServerEnv['weather'] {
+  const lat = Number(process.env.WEATHER_LAT);
+  const lon = Number(process.env.WEATHER_LON);
+  if (!process.env.WEATHER_LAT || !process.env.WEATHER_LON) return undefined;
+  if (Number.isNaN(lat) || Number.isNaN(lon)) {
+    console.warn('⚠️  WEATHER_LAT/WEATHER_LON are not valid numbers — weather disabled.');
+    return undefined;
+  }
+  return { lat, lon };
 }
 
 export function loadEnv(): ServerEnv {
@@ -20,5 +32,6 @@ export function loadEnv(): ServerEnv {
     host,
     timezone: process.env.DASHBOARD_TIMEZONE ?? 'Europe/Oslo',
     isProduction: process.env.NODE_ENV === 'production',
+    weather: parseWeather(),
   };
 }
