@@ -102,6 +102,31 @@ describe('UsageHistoryStore', () => {
     ]);
   });
 
+  it('persists the last sampled snapshot and returns it in a new store instance', () => {
+    const store = new UsageHistoryStore(filePath, SAMPLE_MS, RETENTION_MS);
+    expect(store.getSnapshot('tool')).toBeUndefined();
+
+    const snap = snapshot('2026-07-10T12:00:00.000Z', 12, 34);
+    store.record('tool', snap);
+
+    const reloaded = new UsageHistoryStore(filePath, SAMPLE_MS, RETENTION_MS);
+    expect(reloaded.getSnapshot('tool')).toEqual(snap);
+  });
+
+  it('loads history files written before snapshots existed', () => {
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        version: 1,
+        tools: { tool: [{ at: '2026-07-10T11:00:00.000Z', fiveHourUsedPercent: 5 }] },
+      }),
+    );
+    const store = new UsageHistoryStore(filePath, SAMPLE_MS, RETENTION_MS);
+
+    expect(store.get('tool')).toHaveLength(1);
+    expect(store.getSnapshot('tool')).toBeUndefined();
+  });
+
   it('starts empty when the file is missing or corrupt', () => {
     expect(new UsageHistoryStore(filePath, SAMPLE_MS, RETENTION_MS).get('tool')).toEqual([]);
 

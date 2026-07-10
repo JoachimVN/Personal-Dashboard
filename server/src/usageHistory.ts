@@ -3,18 +3,22 @@ import path from 'node:path';
 import { z } from 'zod';
 import { usageHistoryPointSchema, type UsageHistoryPoint } from '@personal-dashboard/shared';
 
+const persistedSnapshotSchema = z.object({
+  available: z.boolean(),
+  fiveHour: z.object({ usedPercent: z.number(), resetsAt: z.string() }).optional(),
+  weekly: z.object({ usedPercent: z.number(), resetsAt: z.string() }).optional(),
+  asOf: z.string().optional(),
+});
+
 const fileSchema = z.object({
   version: z.literal(1),
   tools: z.record(z.string(), z.array(usageHistoryPointSchema)),
+  /** Last sampled snapshot per tool; absent in files written before this field existed. */
+  snapshots: z.record(z.string(), persistedSnapshotSchema).default({}),
 });
 
 /** The provider snapshot fields the store samples from — AiUsageToolData minus the history it produces. */
-export interface UsageSnapshot {
-  available: boolean;
-  fiveHour?: { usedPercent: number; resetsAt: string };
-  weekly?: { usedPercent: number; resetsAt: string };
-  asOf?: string;
-}
+export type UsageSnapshot = z.infer<typeof persistedSnapshotSchema>;
 
 /**
  * Records AI usage snapshots over time so the client can chart trends. One store is shared by
@@ -23,6 +27,7 @@ export interface UsageSnapshot {
  */
 export class UsageHistoryStore {
   private tools: Record<string, UsageHistoryPoint[]>;
+  private snapshots: Record<string, UsageSnapshot>;
   private readonly lastAsOf = new Map<string, string>();
 
   constructor(
@@ -30,7 +35,9 @@ export class UsageHistoryStore {
     private readonly sampleMs: number,
     private readonly retentionMs: number,
   ) {
-    this.tools = this.load();
+    const loaded = this.load();
+    this.tools = loaded.tools;
+    this.snapshots = loaded.snapshots;
   }
 
   /**
@@ -55,6 +62,7 @@ export class UsageHistoryStore {
     });
     const cutoff = Date.now() - this.retentionMs;
     this.tools[toolId] = points.filter((point) => Date.parse(point.at) >= cutoff);
+    this.snapshots[toolId] = snapshot;
     this.save();
     return this.tools[toolId];
   }
@@ -63,12 +71,18 @@ export class UsageHistoryStore {
     return this.tools[toolId] ?? [];
   }
 
-  private load(): Record<string, UsageHistoryPoint[]> {
+  /** Last persisted snapshot, for re-serving across restarts (e.g. while rate-limit cooldowns block a fresh fetch). */
+  getSnapshot(toolId: string): UsageSnapshot | undefined {
+    return this.snapshots[toolId];
+  }
+
+  private load(): { tools: Record<string, UsageHistoryPoint[]>; snapshots: Record<string, UsageSnapshot> } {
     try {
-      return fileSchema.parse(JSON.parse(readFileSync(this.filePath, 'utf8'))).tools;
+      const parsed = fileSchema.parse(JSON.parse(readFileSync(this.filePath, 'utf8')));
+      return { tools: parsed.tools, snapshots: parsed.snapshots };
     } catch {
       // Missing or corrupt file — start fresh rather than failing provider registration.
-      return {};
+      return { tools: {}, snapshots: {} };
     }
   }
 
@@ -77,7 +91,11 @@ export class UsageHistoryStore {
     try {
       mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
       const tmpPath = `${this.filePath}.tmp`;
-      writeFileSync(tmpPath, JSON.stringify({ version: 1, tools: this.tools }), { mode: 0o600 });
+      writeFileSync(
+        tmpPath,
+        JSON.stringify({ version: 1, tools: this.tools, snapshots: this.snapshots }),
+        { mode: 0o600 },
+      );
       renameSync(tmpPath, this.filePath);
     } catch (err) {
       console.warn('[ai-usage] Could not persist usage history:', (err as Error).message);

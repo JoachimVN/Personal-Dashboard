@@ -172,11 +172,19 @@ async function claudeSnapshot(
  * Claude limits come from a rate-limited external API, so this stays on a conservative,
  * fixed cadence regardless of the Codex refresh setting — plus self-imposed backoff, see claudeSnapshot.
  */
+/** Don't re-serve a persisted snapshot older than this across restarts — show nothing over ancient numbers. */
+const MAX_SEED_AGE_MS = 24 * 60 * 60_000;
+
 export function createClaudeUsageProvider(
   claudeOauthToken: string | undefined,
   history: UsageHistoryStore,
 ): Provider<AiUsageToolData> {
-  const state: ClaudeUsageState = { cooldownUntil: 0 };
+  // Seed lastGood from disk so a restart that lands inside a rate-limit cooldown still
+  // serves the previous reading (with its honest asOf age) instead of blanking the widget.
+  const persisted = history.getSnapshot('ai-usage-claude');
+  const isFresh =
+    persisted?.asOf !== undefined && Date.now() - Date.parse(persisted.asOf) < MAX_SEED_AGE_MS;
+  const state: ClaudeUsageState = { cooldownUntil: 0, lastGood: isFresh ? persisted : undefined };
   return {
     id: 'ai-usage-claude',
     schema: aiUsageToolSchema,
