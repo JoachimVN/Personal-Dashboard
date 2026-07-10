@@ -31,7 +31,7 @@ export function SectionCard({ section }: { section: SectionDef }) {
       variants={sectionCardVariants}
       whileHover={{ scale: 1.01 }}
       whileTap={{ scale: 0.99 }}
-      className="glass block rounded-2xl p-4"
+      className="glass relative z-10 block rounded-2xl p-4"
       style={accentStyle(section)}
     >
       <header className="mb-3 flex items-center gap-2">

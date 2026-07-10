@@ -15,7 +15,7 @@ export function SectionView({ section }: { section: SectionDef }) {
     >
       <motion.header
         layoutId={`section-${section.id}`}
-        className="glass mb-4 flex items-center gap-3 rounded-2xl p-4"
+        className="glass relative z-10 mb-4 flex items-center gap-3 rounded-2xl p-4"
       >
         <a
           href={OVERVIEW_HREF}
