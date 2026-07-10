@@ -57,6 +57,11 @@ request:
 `server/src/providers/x.ts`, wire it into `createProviders()` in `server/src/providers/index.ts`, and
 add a widget component under `client/src/widgets/` that calls `useWidget<XData>('x-id')`.
 
+The AI usage providers additionally record trend points through `server/src/usageHistory.ts`
+(`UsageHistoryStore`): a shared store that samples each genuinely-new snapshot (deduped by `asOf`,
+throttled by `aiUsage.historySampleMs`, pruned after `aiUsage.historyRetentionDays`) into the
+gitignored `server/.data/ai-usage-history.json` and embeds the history in the provider payload.
+
 ### Client polling and rendering
 
 `client/src/useWidget.ts` polls `/api/widgets/:id` at half the server's `refreshMs` (clamped between
@@ -69,17 +74,27 @@ failed.
 - `WidgetShell` is just the card chrome (border, header, badge slot) with no envelope logic.
 - `WidgetCard` = `WidgetShell` + `WidgetBody` for the common case of one card backed by one envelope.
 
-Use `WidgetShell` + multiple `WidgetBody`s directly (see `AiUsageWidget.tsx`) when a single card
-needs to combine several independently-polled sections — e.g. Claude and Codex usage poll on
-different schedules and must not block each other's rendering or share one `error`/`stale` state.
+Use `WidgetShell` + `WidgetBody` directly (see `sections/ai/AiDetail.tsx` or the section overview
+components) when a card doesn't map 1:1 onto a single envelope — e.g. Claude and Codex usage poll
+on different schedules and must not block each other's rendering or share one `error`/`stale` state.
 
-Widgets are assembled into the page purely by listing them in `client/src/Dashboard.tsx`.
+### Sections and navigation
+
+The UI is organized into **sections** (AI, GitHub, Personal), each with a condensed `Overview`
+block on the landing page and a full `Detail` view. Everything derives from
+`client/src/sections/registry.tsx` — adding a section = one `SECTIONS` entry plus its
+Overview/Detail components. Navigation is hash-based (`client/src/router.ts`, `#/ai` etc.) so deep
+links never hit the server's SPA catch-all. `SectionCard` (overview block) and `SectionView`
+(expanded view header) share `motion` layoutIds, which produces the expand/morph animation;
+page-level animation config (`MotionConfig`/`LayoutGroup`/`AnimatePresence`) lives in `App.tsx`.
+Design tokens (glass surfaces, ink text hierarchy, per-section accents) are `@theme` variables in
+`client/src/index.css`, mode-adaptive via `light-dark()` — use them instead of raw palette classes.
 
 ### Why some providers look more complex than others
 
 - **AI usage** (`server/src/providers/aiUsage.ts`) is actually two providers,
   `createClaudeUsageProvider` and `createCodexUsageProvider`, each with its own widget id
-  (`ai-usage-claude`, `ai-usage-codex`) and refresh cadence, even though they render in one card.
+  (`ai-usage-claude`, `ai-usage-codex`) and refresh cadence, even though they render in one section.
   Codex reads local session files (cheap, configurable cadence via `config.json`); Claude hits a
   rate-limited external endpoint and keeps a mutable in-closure `cooldown` that self-imposed backs off
   on a 429 (via `Retry-After`) independent of the scheduler's own interval.
