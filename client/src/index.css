@@ -1,1 +1,42 @@
 @import 'tailwindcss';
+
+/*
+ * All colors resolve per-mode via light-dark() + the :root color-scheme, so a single
+ * token works in both appearances without dark: utility duplication.
+ */
+@theme {
+  /* Surfaces */
+  --color-canvas: light-dark(#eef1f6, #05070d);
+  --color-card: light-dark(rgb(255 255 255 / 0.72), rgb(15 23 42 / 0.55));
+  --color-card-border: light-dark(rgb(15 23 42 / 0.08), rgb(148 163 184 / 0.16));
+  --color-track: light-dark(rgb(15 23 42 / 0.1), rgb(148 163 184 / 0.18));
+
+  /* Text hierarchy */
+  --color-ink: light-dark(#0f172a, #e2e8f0);
+  --color-ink-muted: light-dark(#64748b, #94a3b8);
+  --color-ink-faint: light-dark(#94a3b8, #64748b);
+
+  /* Section accents */
+  --color-accent-ai: light-dark(#6d28d9, #a78bfa);
+  --color-accent-github: light-dark(#1c5cab, #6da7ec);
+  --color-accent-personal: light-dark(#0f766e, #2dd4bf);
+
+  /* Brand accents */
+  --color-claude: light-dark(#2a78d6, #3987e5);
+  --color-codex: light-dark(#1baf7a, #199e70);
+}
+
+/* Glass card recipe — apply only to card-level surfaces; stacked backdrop-filters are expensive on mobile Safari. */
+@utility glass {
+  background-color: var(--color-card);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid var(--color-card-border);
+  box-shadow:
+    0 8px 32px light-dark(rgb(15 23 42 / 0.08), rgb(0 0 0 / 0.35)),
+    inset 0 1px 0 light-dark(rgb(255 255 255 / 0.6), rgb(255 255 255 / 0.06));
+}
+
+:root {
+  color-scheme: light dark;
+}

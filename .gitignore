@@ -11,6 +11,10 @@ server/dist/
 !.env.example
 server/.tokens/
 
+# Local data (AI usage history, …)
+server/.data/
+
 # Logs & OS noise
 *.log
 .DS_Store
+/.vscode

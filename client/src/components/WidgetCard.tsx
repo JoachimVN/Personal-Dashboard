@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { WidgetEnvelope } from '@personal-dashboard/shared';
+import { relativeTime } from '../lib/time';
 
 interface WidgetCardProps<T> {
   title: string;
@@ -8,34 +9,51 @@ interface WidgetCardProps<T> {
   children: (data: T) => ReactNode;
 }
 
-function relativeTime(iso: string): string {
-  const deltaSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (deltaSec < 60) return 'just now';
-  if (deltaSec < 3600) return `${Math.floor(deltaSec / 60)} min ago`;
-  return `${Math.floor(deltaSec / 3600)} h ago`;
-}
-
 export function WidgetCard<T>({ title, envelope, offline, children }: WidgetCardProps<T>) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <WidgetShell title={title} badge={<StaleBadge envelope={envelope} />}>
+      <WidgetBody envelope={envelope} offline={offline}>
+        {children}
+      </WidgetBody>
+    </WidgetShell>
+  );
+}
+
+/** Amber "updated Xm ago" pill shown while a widget serves cached data after a failed refresh. */
+export function StaleBadge({ envelope }: { envelope: WidgetEnvelope<unknown> | null }) {
+  if (envelope?.status !== 'stale' || !envelope.fetchedAt) return null;
+  return (
+    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+      updated {relativeTime(envelope.fetchedAt)}
+    </span>
+  );
+}
+
+/** Card chrome (border/header) without the single-envelope status machine — for cards that combine multiple independently-polled sections. */
+export function WidgetShell({
+  title,
+  badge,
+  children,
+}: {
+  title: string;
+  badge?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="glass rounded-2xl p-4">
       <header className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
           {title}
         </h2>
-        {envelope?.status === 'stale' && envelope.fetchedAt && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
-            updated {relativeTime(envelope.fetchedAt)}
-          </span>
-        )}
+        {badge}
       </header>
-      <Body envelope={envelope} offline={offline}>
-        {children}
-      </Body>
+      {children}
     </section>
   );
 }
 
-function Body<T>({
+/** The loading/disabled/error/ready state machine, reusable for a single section within a WidgetShell. */
+export function WidgetBody<T>({
   envelope,
   offline,
   children,
@@ -46,14 +64,14 @@ function Body<T>({
   if (!envelope || envelope.status === 'loading') {
     return (
       <div className="animate-pulse space-y-2">
-        <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
-        <div className="h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="h-4 w-3/4 rounded bg-track" />
+        <div className="h-4 w-1/2 rounded bg-track" />
       </div>
     );
   }
   if (envelope.status === 'disabled') {
     return (
-      <p className="text-sm text-slate-400 dark:text-slate-500">
+      <p className="text-sm text-ink-faint">
         Not configured — see the README to set this widget up.
       </p>
     );

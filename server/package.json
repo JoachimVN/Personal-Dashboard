@@ -7,13 +7,20 @@
     "dev": "tsx watch src/index.ts",
     "start": "cross-env NODE_ENV=production tsx src/index.ts",
     "test": "vitest run",
+    "setup:gmail": "tsx scripts/setupGmail.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@personal-dashboard/shared": "*",
+    "ccusage": "20.0.17",
     "cross-env": "^10.0.0",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
+    "googleapis": "^173.0.0",
+    "node-ical": "^0.26.1",
+    "octokit": "^5.0.5",
+    "rss-parser": "^3.13.0",
+    "tsdav": "^2.3.1",
     "tsx": "^4.20.0",
     "zod": "^4.0.0"
   },
