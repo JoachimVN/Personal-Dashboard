@@ -12,6 +12,8 @@ export const aiUsageToolSchema = z.object({
   available: z.boolean(),
   fiveHour: rateLimitSchema.optional(),
   weekly: rateLimitSchema.optional(),
+  /** When this snapshot was actually captured — may lag `fetchedAt` when serving a cached reading. */
+  asOf: z.string().datetime().optional(),
 });
 
 export type AiUsageToolData = z.infer<typeof aiUsageToolSchema>;

@@ -1,4 +1,5 @@
 import type { AiUsageToolData } from '@personal-dashboard/shared';
+import { relativeTime } from '../lib/time';
 import { useWidget } from '../useWidget';
 import { WidgetBody, WidgetShell } from '../components/WidgetCard';
 
@@ -77,11 +78,18 @@ function ToolSection({
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) =>
           data.available ? (
-            <div className="grid grid-cols-2 gap-3">
-              {data.fiveHour && (
-                <LimitRow label="5 hours" limit={data.fiveHour} color={color} windowMs={FIVE_HOUR_MS} />
+            <div>
+              <div className="grid grid-cols-2 gap-3">
+                {data.fiveHour && (
+                  <LimitRow label="5 hours" limit={data.fiveHour} color={color} windowMs={FIVE_HOUR_MS} />
+                )}
+                {data.weekly && <LimitRow label="Weekly" limit={data.weekly} color={color} windowMs={WEEKLY_MS} />}
+              </div>
+              {data.asOf && (
+                <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                  As of {relativeTime(data.asOf)}
+                </p>
               )}
-              {data.weekly && <LimitRow label="Weekly" limit={data.weekly} color={color} windowMs={WEEKLY_MS} />}
             </div>
           ) : (
             <p className="text-xs text-slate-400 dark:text-slate-500">
