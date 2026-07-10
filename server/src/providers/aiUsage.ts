@@ -140,6 +140,7 @@ async function claudeSnapshot(
   signal: AbortSignal,
   state: ClaudeUsageState,
   force: boolean,
+  history: Pick<UsageHistoryStore, 'setBackoff'>,
 ): Promise<UsageSnapshot> {
   if (!oauthToken) return { available: false };
   // A real 429 from Anthropic is always respected; `force` (user-initiated refresh) only
@@ -159,6 +160,8 @@ async function claudeSnapshot(
       state.rateLimitedUntil =
         Date.now() + (Number.isFinite(retryAfterSec) ? retryAfterSec * 1_000 : DEFAULT_COOLDOWN_MS);
       state.nextAttemptAt = state.rateLimitedUntil;
+      history.setBackoff('ai-usage-claude', new Date(state.rateLimitedUntil).toISOString());
+      history.setBackoff('ai-usage-claude-pacing', new Date(state.nextAttemptAt).toISOString());
       return state.lastGood ?? { available: false };
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -178,6 +181,8 @@ async function claudeSnapshot(
     state.lastGood = snapshot;
     state.rateLimitedUntil = 0;
     state.nextAttemptAt = Date.now() + MIN_POLL_INTERVAL_MS;
+    history.setBackoff('ai-usage-claude', undefined);
+    history.setBackoff('ai-usage-claude-pacing', new Date(state.nextAttemptAt).toISOString());
     return snapshot;
   } catch {
     // Do not log a response body: it can include account-specific information.
@@ -205,9 +210,11 @@ export function createClaudeUsageProvider(
   const persisted = history.getSnapshot('ai-usage-claude');
   const isFresh =
     persisted?.asOf !== undefined && Date.now() - Date.parse(persisted.asOf) < MAX_SEED_AGE_MS;
+  const savedBackoff = Date.parse(history.getBackoff('ai-usage-claude') ?? '');
+  const savedPacing = Date.parse(history.getBackoff('ai-usage-claude-pacing') ?? '');
   const state: ClaudeUsageState = {
-    rateLimitedUntil: 0,
-    nextAttemptAt: 0,
+    rateLimitedUntil: Number.isFinite(savedBackoff) ? Math.max(0, savedBackoff) : 0,
+    nextAttemptAt: Number.isFinite(savedPacing) ? Math.max(0, savedPacing) : 0,
     lastGood: isFresh ? persisted : undefined,
   };
   return {
@@ -217,7 +224,7 @@ export function createClaudeUsageProvider(
     timeoutMs: 60_000,
     isConfigured: () => true,
     fetch: async (signal, force) => {
-      const snapshot = await claudeSnapshot(claudeOauthToken, signal, state, force);
+      const snapshot = await claudeSnapshot(claudeOauthToken, signal, state, force, history);
       const rateLimitedUntil =
         state.rateLimitedUntil > Date.now() ? new Date(state.rateLimitedUntil).toISOString() : undefined;
       return { ...snapshot, rateLimitedUntil, history: history.record('ai-usage-claude', snapshot) };
