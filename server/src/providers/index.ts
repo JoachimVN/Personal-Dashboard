@@ -7,17 +7,26 @@ import { createGitHubProvider } from './github.js';
 import { createGmailProvider } from './gmail.js';
 import { createNewsProvider } from './news.js';
 import { createSystemProvider } from './system.js';
-import { createWeatherProvider } from './weather.js';
+import { createWeatherProvider, type WeatherProvider } from './weather.js';
 
-export function createProviders(env: ServerEnv, config: AppConfig): Provider[] {
-  return [
-    createWeatherProvider(env.weather, env.timezone),
-    createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
-    createGmailProvider(env.google),
-    createGitHubProvider(env.github, config.github.pinnedRepos),
-    createClaudeUsageProvider(env.claudeOauthToken),
-    createCodexUsageProvider(config.aiUsage.codexRefreshMs),
-    createNewsProvider(config.news.feeds),
-    createSystemProvider(env.timezone),
-  ];
+export interface Providers {
+  all: Provider[];
+  weather: WeatherProvider;
+}
+
+export function createProviders(env: ServerEnv, config: AppConfig): Providers {
+  const weather = createWeatherProvider(env.weather, env.timezone);
+  return {
+    weather,
+    all: [
+      weather,
+      createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
+      createGmailProvider(env.google),
+      createGitHubProvider(env.github, config.github.pinnedRepos),
+      createClaudeUsageProvider(env.claudeOauthToken),
+      createCodexUsageProvider(config.aiUsage.codexRefreshMs),
+      createNewsProvider(config.news.feeds),
+      createSystemProvider(env.timezone),
+    ],
+  };
 }

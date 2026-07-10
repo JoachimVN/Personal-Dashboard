@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
+import { z } from 'zod';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { ProviderScheduler } from './scheduler.js';
@@ -9,14 +10,32 @@ import { createProviders } from './providers/index.js';
 const env = loadEnv();
 const config = loadConfig();
 const app = express();
+app.use(express.json());
 
 const scheduler = new ProviderScheduler();
-for (const provider of createProviders(env, config)) {
+const providers = createProviders(env, config);
+for (const provider of providers.all) {
   scheduler.register(provider);
 }
 scheduler.start();
 
 app.get('/api/health', (_req, res) => {
+  res.json({ ok: true });
+});
+
+const locationSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+});
+
+app.post('/api/weather/location', async (req, res) => {
+  const parsed = locationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid-location' });
+    return;
+  }
+  providers.weather.setCoords(parsed.data);
+  await scheduler.refresh('weather'); // refresh() never throws — it stores the failure on the entry
   res.json({ ok: true });
 });
 

@@ -1,5 +1,6 @@
 import type { WeatherData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
+import { useDeviceLocation } from '../useDeviceLocation';
 import { WidgetCard } from '../components/WidgetCard';
 
 function glyph(symbol: string): string {
@@ -19,7 +20,8 @@ function glyph(symbol: string): string {
 const deg = (temp: number) => `${Math.round(temp)}°`;
 
 export function WeatherWidget() {
-  const { envelope, offline } = useWidget<WeatherData>('weather');
+  const { envelope, offline, refetch } = useWidget<WeatherData>('weather');
+  useDeviceLocation(refetch);
 
   return (
     <WidgetCard title="Weather" envelope={envelope} offline={offline}>

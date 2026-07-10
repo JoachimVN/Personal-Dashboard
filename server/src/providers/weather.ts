@@ -50,10 +50,16 @@ function symbolOf(entry: MetEntry): string {
   );
 }
 
+export interface WeatherProvider extends Provider<WeatherData> {
+  /** Overrides the env-configured location, e.g. with the client's device geolocation. */
+  setCoords(next: { lat: number; lon: number }): void;
+}
+
 export function createWeatherProvider(
-  coords: { lat: number; lon: number } | undefined,
+  fallbackCoords: { lat: number; lon: number } | undefined,
   timezone: string,
-): Provider<WeatherData> {
+): WeatherProvider {
+  let coords = fallbackCoords;
   const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }); // YYYY-MM-DD
   const hourFmt = new Intl.DateTimeFormat('en-GB', {
     timeZone: timezone,
@@ -68,6 +74,9 @@ export function createWeatherProvider(
     refreshMs: 15 * 60_000,
     timeoutMs: 10_000,
     isConfigured: () => coords !== undefined,
+    setCoords(next) {
+      coords = next;
+    },
     async fetch(signal) {
       if (!coords) throw new Error('weather is not configured');
       const url =
