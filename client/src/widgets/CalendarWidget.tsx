@@ -33,20 +33,20 @@ export function CalendarWidget() {
     <WidgetCard title="Calendar" envelope={envelope} offline={offline}>
       {(data) =>
         data.events.length === 0 ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500">
+          <p className="text-sm text-ink-faint">
             Nothing scheduled in the next 7 days.
           </p>
         ) : (
           <div className="space-y-3">
             {grouped.map(([date, events]) => (
               <div key={date}>
-                <h3 className="mb-1 text-xs font-medium text-slate-400 dark:text-slate-500">
+                <h3 className="mb-1 text-xs font-medium text-ink-faint">
                   {dayHeading(date)}
                 </h3>
                 <ul className="space-y-1 text-sm">
                   {events.map((event) => (
                     <li key={event.id} className="flex items-baseline gap-2">
-                      <span className="w-20 shrink-0 tabular-nums text-slate-500 dark:text-slate-400">
+                      <span className="w-20 shrink-0 tabular-nums text-ink-muted">
                         {event.allDay
                           ? 'all day'
                           : `${event.startLabel}–${event.endLabel}`}
@@ -54,7 +54,7 @@ export function CalendarWidget() {
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{event.title}</span>
                         {event.location && (
-                          <span className="block truncate text-xs text-slate-400 dark:text-slate-500">
+                          <span className="block truncate text-xs text-ink-faint">
                             {event.location}
                           </span>
                         )}

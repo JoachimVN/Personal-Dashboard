@@ -39,9 +39,9 @@ export function WidgetShell({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+    <section className="glass rounded-2xl p-4">
       <header className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
           {title}
         </h2>
         {badge}
@@ -63,14 +63,14 @@ export function WidgetBody<T>({
   if (!envelope || envelope.status === 'loading') {
     return (
       <div className="animate-pulse space-y-2">
-        <div className="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-700" />
-        <div className="h-4 w-1/2 rounded bg-slate-200 dark:bg-slate-700" />
+        <div className="h-4 w-3/4 rounded bg-track" />
+        <div className="h-4 w-1/2 rounded bg-track" />
       </div>
     );
   }
   if (envelope.status === 'disabled') {
     return (
-      <p className="text-sm text-slate-400 dark:text-slate-500">
+      <p className="text-sm text-ink-faint">
         Not configured — see the README to set this widget up.
       </p>
     );

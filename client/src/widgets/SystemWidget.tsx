@@ -15,19 +15,19 @@ export function SystemWidget() {
   return (
     <WidgetCard title="Server" envelope={envelope} offline={offline}>
       {(data) => (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-700 dark:text-slate-300">
-          <dt className="text-slate-400 dark:text-slate-500">Host</dt>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-ink">
+          <dt className="text-ink-faint">Host</dt>
           <dd>{data.hostname}</dd>
-          <dt className="text-slate-400 dark:text-slate-500">Platform</dt>
+          <dt className="text-ink-faint">Platform</dt>
           <dd>
             {data.platform} · {data.nodeVersion}
           </dd>
-          <dt className="text-slate-400 dark:text-slate-500">Uptime</dt>
+          <dt className="text-ink-faint">Uptime</dt>
           <dd>{formatUptime(data.uptimeSeconds)}</dd>
-          <dt className="text-slate-400 dark:text-slate-500">Time</dt>
+          <dt className="text-ink-faint">Time</dt>
           <dd>
             {data.serverTime}{' '}
-            <span className="text-slate-400 dark:text-slate-500">({data.timezone})</span>
+            <span className="text-ink-faint">({data.timezone})</span>
           </dd>
         </dl>
       )}

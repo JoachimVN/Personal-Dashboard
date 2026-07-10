@@ -14,8 +14,8 @@ export default defineConfig({
         short_name: 'Dashboard',
         description: 'Life, GitHub, and AI usage at a glance',
         display: 'standalone',
-        background_color: '#0f172a',
-        theme_color: '#0f172a',
+        background_color: '#05070d',
+        theme_color: '#05070d',
         icons: [
           {
             src: 'icon.svg',

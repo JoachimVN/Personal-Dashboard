@@ -38,10 +38,10 @@ function LimitRow({
   return (
     <div>
       <div className="mb-1 flex items-baseline text-xs">
-        <span className="text-slate-500 dark:text-slate-400">{label}</span>
+        <span className="text-ink-muted">{label}</span>
         <span className="ml-auto font-semibold tabular-nums">{Math.round(limit.usedPercent)}%</span>
       </div>
-      <div className="relative h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-track">
         <div
           className="h-full rounded-full transition-[width] duration-300"
           style={{ width: `${limit.usedPercent}%`, backgroundColor: color }}
@@ -55,7 +55,7 @@ function LimitRow({
           }}
         />
       </div>
-      <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
+      <p className="mt-1 text-[11px] text-ink-faint">
         Resets {resetLabel(limit.resetsAt)}
       </p>
     </div>
@@ -86,13 +86,13 @@ function ToolSection({
                 {data.weekly && <LimitRow label="Weekly" limit={data.weekly} color={color} windowMs={WEEKLY_MS} />}
               </div>
               {data.asOf && (
-                <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                <p className="mt-2 text-[11px] text-ink-faint">
                   As of {relativeTime(data.asOf)}
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-xs text-slate-400 dark:text-slate-500">
+            <p className="text-xs text-ink-faint">
               No current limit snapshot available on this machine.
             </p>
           )
@@ -106,8 +106,8 @@ export function AiUsageWidget() {
   return (
     <WidgetShell title="AI usage">
       <div className="space-y-4">
-        <ToolSection id="ai-usage-claude" label="Claude Code" color="light-dark(#2a78d6, #3987e5)" />
-        <ToolSection id="ai-usage-codex" label="Codex" color="light-dark(#1baf7a, #199e70)" />
+        <ToolSection id="ai-usage-claude" label="Claude Code" color="var(--color-claude)" />
+        <ToolSection id="ai-usage-codex" label="Codex" color="var(--color-codex)" />
       </div>
     </WidgetShell>
   );

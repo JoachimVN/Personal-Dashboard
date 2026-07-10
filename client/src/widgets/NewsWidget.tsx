@@ -16,11 +16,11 @@ export function NewsWidget() {
                 href={item.url}
                 target="_blank"
                 rel="noreferrer"
-                className="font-medium text-slate-800 hover:underline dark:text-slate-200"
+                className="font-medium text-ink hover:underline"
               >
                 {item.title}
               </a>
-              <div className="text-xs text-slate-400 dark:text-slate-500">
+              <div className="text-xs text-ink-faint">
                 {item.source} · {relativeTime(item.publishedAt)}
               </div>
             </li>

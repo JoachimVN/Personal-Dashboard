@@ -5,7 +5,7 @@ import { WidgetCard } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
 
 const linkClass =
-  'truncate font-medium text-slate-800 hover:underline dark:text-slate-200';
+  'truncate font-medium text-ink hover:underline';
 
 export function GitHubActivityWidget() {
   const { envelope, offline } = useWidget<GitHubData>('github');
@@ -15,7 +15,7 @@ export function GitHubActivityWidget() {
         <ul className="space-y-1.5 text-sm">
           {data.activity.map((item) => (
             <li key={item.id} className="flex items-baseline gap-2">
-              <span className="truncate text-slate-500 dark:text-slate-400">
+              <span className="truncate text-ink-muted">
                 {item.repo.split('/')[1] ?? item.repo}
               </span>
               {item.url ? (
@@ -25,13 +25,13 @@ export function GitHubActivityWidget() {
               ) : (
                 <span className="truncate">{item.summary}</span>
               )}
-              <span className="ml-auto shrink-0 text-xs text-slate-400 dark:text-slate-500">
+              <span className="ml-auto shrink-0 text-xs text-ink-faint">
                 {relativeTime(item.timestamp)}
               </span>
             </li>
           ))}
           {data.activity.length === 0 && (
-            <li className="text-slate-400 dark:text-slate-500">No recent public activity.</li>
+            <li className="text-ink-faint">No recent public activity.</li>
           )}
         </ul>
       )}
@@ -84,9 +84,9 @@ function WorkList({
 }) {
   return (
     <div>
-      <h3 className="mb-1 text-xs font-medium text-slate-400 dark:text-slate-500">{label}</h3>
+      <h3 className="mb-1 text-xs font-medium text-ink-faint">{label}</h3>
       {items.length === 0 ? (
-        <p className="text-slate-400 dark:text-slate-500">{empty}</p>
+        <p className="text-ink-faint">{empty}</p>
       ) : (
         <ul className="space-y-1">
           {items.map((item) => (
@@ -94,7 +94,7 @@ function WorkList({
               <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
                 {item.title}
               </a>
-              <div className="text-xs text-slate-400 dark:text-slate-500">{item.meta}</div>
+              <div className="text-xs text-ink-faint">{item.meta}</div>
             </li>
           ))}
         </ul>
@@ -161,7 +161,7 @@ function ContributionGrid({
           </div>
         ))}
       </div>
-      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+      <p className="mt-2 text-xs text-ink-muted">
         {hovered
           ? `${hovered.date} · ${hovered.count} contribution${hovered.count === 1 ? '' : 's'}`
           : `${data.contributions.total} contributions in the last year`}
@@ -182,12 +182,12 @@ export function RepoHealthWidget() {
                 {repo.fullName.split('/')[1]}
               </a>
               {repo.latestRelease && (
-                <span className="text-xs text-slate-400 dark:text-slate-500">
+                <span className="text-xs text-ink-faint">
                   {repo.latestRelease}
                 </span>
               )}
               <span className="ml-auto flex shrink-0 items-center gap-3 text-xs">
-                <span className="text-slate-500 dark:text-slate-400">★ {repo.stars}</span>
+                <span className="text-ink-muted">★ {repo.stars}</span>
                 <CiBadge status={repo.ciStatus} url={repo.ciUrl} />
               </span>
             </li>
@@ -201,7 +201,7 @@ export function RepoHealthWidget() {
 // Status colors reserved for state, shipped with icon + label, never color alone.
 function CiBadge({ status, url }: { status: string; url?: string }) {
   if (status === 'none') {
-    return <span className="text-slate-400 dark:text-slate-500">no CI</span>;
+    return <span className="text-ink-faint">no CI</span>;
   }
   const look =
     status === 'success'
