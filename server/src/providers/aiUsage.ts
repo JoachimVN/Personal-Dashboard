@@ -4,6 +4,10 @@ import path from 'node:path';
 import { z } from 'zod';
 import { aiUsageToolSchema, type AiUsageToolData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
+import type { UsageHistoryStore } from '../usageHistory.js';
+
+/** What the snapshot readers produce; the provider fetch adds the store-managed `history`. */
+type UsageSnapshot = Omit<AiUsageToolData, 'history'>;
 
 const codexLimitSchema = z.object({
   used_percent: z.number(),
@@ -64,7 +68,7 @@ function asIso(timestamp: string): string | undefined {
  * Codex appends the live account limits to its local session event stream. Read only the newest
  * few logs: limits are account-wide and a current session always writes into the latest files.
  */
-async function codexSnapshot(): Promise<AiUsageToolData> {
+async function codexSnapshot(): Promise<UsageSnapshot> {
   const sessionsDir = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
   try {
     const files = (await jsonlFiles(sessionsDir)).sort().slice(-12);
@@ -106,7 +110,7 @@ const DEFAULT_COOLDOWN_MS = 20 * 60_000;
 interface ClaudeUsageState {
   cooldownUntil: number;
   /** Last successfully fetched snapshot, kept so a cooldown/error serves it instead of blanking the widget. */
-  lastGood?: AiUsageToolData;
+  lastGood?: UsageSnapshot;
 }
 
 /**
@@ -124,7 +128,7 @@ async function claudeSnapshot(
   oauthToken: string | undefined,
   signal: AbortSignal,
   state: ClaudeUsageState,
-): Promise<AiUsageToolData> {
+): Promise<UsageSnapshot> {
   if (!oauthToken) return { available: false };
   if (Date.now() < state.cooldownUntil) return state.lastGood ?? { available: false };
   try {
@@ -149,7 +153,7 @@ async function claudeSnapshot(
     const weekly = usage.seven_day
       ? limit(usage.seven_day.utilization, usage.seven_day.resets_at)
       : undefined;
-    const snapshot: AiUsageToolData = {
+    const snapshot: UsageSnapshot = {
       available: Boolean(fiveHour || weekly),
       fiveHour,
       weekly,
@@ -168,7 +172,10 @@ async function claudeSnapshot(
  * Claude limits come from a rate-limited external API, so this stays on a conservative,
  * fixed cadence regardless of the Codex refresh setting — plus self-imposed backoff, see claudeSnapshot.
  */
-export function createClaudeUsageProvider(claudeOauthToken?: string): Provider<AiUsageToolData> {
+export function createClaudeUsageProvider(
+  claudeOauthToken: string | undefined,
+  history: UsageHistoryStore,
+): Provider<AiUsageToolData> {
   const state: ClaudeUsageState = { cooldownUntil: 0 };
   return {
     id: 'ai-usage-claude',
@@ -176,18 +183,27 @@ export function createClaudeUsageProvider(claudeOauthToken?: string): Provider<A
     refreshMs: 60_000,
     timeoutMs: 60_000,
     isConfigured: () => true,
-    fetch: (signal) => claudeSnapshot(claudeOauthToken, signal, state),
+    fetch: async (signal) => {
+      const snapshot = await claudeSnapshot(claudeOauthToken, signal, state);
+      return { ...snapshot, history: history.record('ai-usage-claude', snapshot) };
+    },
   };
 }
 
 /** Codex just re-reads local session files, so its cadence is configurable — see config.json. */
-export function createCodexUsageProvider(refreshMs: number): Provider<AiUsageToolData> {
+export function createCodexUsageProvider(
+  refreshMs: number,
+  history: UsageHistoryStore,
+): Provider<AiUsageToolData> {
   return {
     id: 'ai-usage-codex',
     schema: aiUsageToolSchema,
     refreshMs,
     timeoutMs: 10_000,
     isConfigured: () => true,
-    fetch: () => codexSnapshot(),
+    fetch: async () => {
+      const snapshot = await codexSnapshot();
+      return { ...snapshot, history: history.record('ai-usage-codex', snapshot) };
+    },
   };
 }

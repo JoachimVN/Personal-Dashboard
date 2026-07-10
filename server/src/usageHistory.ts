@@ -1,0 +1,86 @@
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { z } from 'zod';
+import { usageHistoryPointSchema, type UsageHistoryPoint } from '@personal-dashboard/shared';
+
+const fileSchema = z.object({
+  version: z.literal(1),
+  tools: z.record(z.string(), z.array(usageHistoryPointSchema)),
+});
+
+/** The provider snapshot fields the store samples from — AiUsageToolData minus the history it produces. */
+export interface UsageSnapshot {
+  available: boolean;
+  fiveHour?: { usedPercent: number; resetsAt: string };
+  weekly?: { usedPercent: number; resetsAt: string };
+  asOf?: string;
+}
+
+/**
+ * Records AI usage snapshots over time so the client can chart trends. One store is shared by
+ * all AI usage providers; points are persisted to a gitignored JSON file (same pattern as
+ * server/.tokens/) so history survives server restarts.
+ */
+export class UsageHistoryStore {
+  private tools: Record<string, UsageHistoryPoint[]>;
+  private readonly lastAsOf = new Map<string, string>();
+
+  constructor(
+    private readonly filePath: string,
+    private readonly sampleMs: number,
+    private readonly retentionMs: number,
+  ) {
+    this.tools = this.load();
+  }
+
+  /**
+   * Record a snapshot if it is a genuinely new reading (`asOf` dedupe — providers re-serve
+   * cached snapshots during cooldowns/idle) at least `sampleMs` after the previous point.
+   * Returns the tool's history for embedding in the provider payload. Never throws: a broken
+   * disk must not turn a working usage widget into fetch-failed.
+   */
+  record(toolId: string, snapshot: UsageSnapshot): UsageHistoryPoint[] {
+    const points = (this.tools[toolId] ??= []);
+    if (!snapshot.available || !snapshot.asOf) return points;
+    if (this.lastAsOf.get(toolId) === snapshot.asOf) return points;
+    this.lastAsOf.set(toolId, snapshot.asOf);
+
+    const last = points.at(-1);
+    if (last && Date.parse(snapshot.asOf) - Date.parse(last.at) < this.sampleMs) return points;
+
+    points.push({
+      at: snapshot.asOf,
+      fiveHourUsedPercent: snapshot.fiveHour?.usedPercent,
+      weeklyUsedPercent: snapshot.weekly?.usedPercent,
+    });
+    const cutoff = Date.now() - this.retentionMs;
+    this.tools[toolId] = points.filter((point) => Date.parse(point.at) >= cutoff);
+    this.save();
+    return this.tools[toolId];
+  }
+
+  get(toolId: string): UsageHistoryPoint[] {
+    return this.tools[toolId] ?? [];
+  }
+
+  private load(): Record<string, UsageHistoryPoint[]> {
+    try {
+      return fileSchema.parse(JSON.parse(readFileSync(this.filePath, 'utf8'))).tools;
+    } catch {
+      // Missing or corrupt file — start fresh rather than failing provider registration.
+      return {};
+    }
+  }
+
+  /** Write cadence is bounded by the sample gate (≤ a few writes/hour), so no debounce needed. */
+  private save(): void {
+    try {
+      mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
+      const tmpPath = `${this.filePath}.tmp`;
+      writeFileSync(tmpPath, JSON.stringify({ version: 1, tools: this.tools }), { mode: 0o600 });
+      renameSync(tmpPath, this.filePath);
+    } catch (err) {
+      console.warn('[ai-usage] Could not persist usage history:', (err as Error).message);
+    }
+  }
+}
