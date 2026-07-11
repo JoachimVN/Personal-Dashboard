@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { motion } from 'motion/react';
 
 export interface ArrangeableItem {
   id: string;
@@ -104,7 +105,10 @@ export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGri
   function dragOver(targetId: string, event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
     const sourceId = draggingId ?? event.dataTransfer.getData('text/plain');
-    if (sourceId && sourceId !== targetId) setDropTargetId(targetId);
+    if (sourceId && sourceId !== targetId) {
+      setDropTargetId(targetId);
+      placeBefore(sourceId, targetId);
+    }
   }
 
   function finishDrag() {
@@ -148,15 +152,17 @@ export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGri
           const isDragging = draggingId === item.id;
           const isDropTarget = dropTargetId === item.id;
           return (
-            <div
+            <motion.div
               key={item.id}
+              layout="position"
+              transition={{ type: 'spring', stiffness: 520, damping: 38 }}
               draggable={arranging}
               tabIndex={arranging ? 0 : undefined}
               aria-label={arranging ? `Reorder ${item.label}` : undefined}
               aria-keyshortcuts={arranging ? 'Shift+ArrowUp Shift+ArrowDown' : undefined}
               onKeyDown={arranging ? (event) => moveWithKeyboard(index, event) : undefined}
-              onDragStart={arranging ? (event) => startDrag(item.id, event) : undefined}
-              onDragEnd={arranging ? finishDrag : undefined}
+              onDragStartCapture={arranging ? (event) => startDrag(item.id, event) : undefined}
+              onDragEndCapture={arranging ? finishDrag : undefined}
               onDragOver={arranging ? (event) => dragOver(item.id, event) : undefined}
               onDrop={arranging ? (event) => drop(item.id, event) : undefined}
               className={`relative transition duration-150 ${
@@ -166,7 +172,7 @@ export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGri
               }`}
             >
               {item.render()}
-            </div>
+            </motion.div>
           );
         })}
       </div>
