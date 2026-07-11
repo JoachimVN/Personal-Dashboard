@@ -15,22 +15,26 @@ export function SectionView({ section }: { section: SectionDef }) {
     >
       <motion.header
         layoutId={`section-${section.id}`}
-        className="glass relative z-10 mb-4 flex items-center gap-3 rounded-2xl p-4"
+        className="detail-header glass relative z-10 mb-6 flex items-center gap-3 rounded-[1.5rem] p-3 pr-4 sm:mb-8"
       >
         <a
           href={OVERVIEW_HREF}
           aria-label="Back to overview"
-          className="-m-2 p-2 text-xl leading-none text-ink-muted hover:text-ink"
+          className="detail-back grid h-10 w-10 place-items-center rounded-2xl text-xl leading-none text-ink-muted transition hover:text-ink"
         >
-          ‹
+          ←
         </a>
-        <AccentDot />
-        <motion.h2
-          layoutId={`section-title-${section.id}`}
-          className="text-sm font-semibold uppercase tracking-wide text-(--accent)"
-        >
-          {section.title}
-        </motion.h2>
+        <span className="h-7 w-px bg-card-border" />
+        <div>
+          <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-ink-faint">{section.label}</span>
+          <motion.h2 layoutId={`section-title-${section.id}`} className="text-sm font-semibold tracking-tight text-ink">
+            {section.title}
+          </motion.h2>
+        </div>
+        <div className="ml-auto flex items-center gap-2 text-[11px] text-ink-faint">
+          <AccentDot />
+          <span>Live</span>
+        </div>
       </motion.header>
       <motion.div
         initial={{ opacity: 0, y: 8 }}

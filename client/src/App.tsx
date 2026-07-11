@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { useHashRoute } from './router';
 import { SECTIONS, sectionById } from './sections/registry';
@@ -9,28 +9,12 @@ import { SystemFooter } from './components/SystemFooter';
 /** Fixed decorative layer the glass cards blur against — accent-tinted glow blobs on the canvas. */
 function BackgroundGlow() {
   return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas">
-      <div
-        className="absolute -top-40 -left-32 h-[36rem] w-[36rem] rounded-full opacity-60"
-        style={{
-          background:
-            'radial-gradient(closest-side, color-mix(in oklab, var(--color-accent-ai) 22%, transparent), transparent)',
-        }}
-      />
-      <div
-        className="absolute top-1/3 -right-48 h-[40rem] w-[40rem] rounded-full opacity-50"
-        style={{
-          background:
-            'radial-gradient(closest-side, color-mix(in oklab, var(--color-accent-github) 20%, transparent), transparent)',
-        }}
-      />
-      <div
-        className="absolute -bottom-48 left-1/4 h-[38rem] w-[38rem] rounded-full opacity-50"
-        style={{
-          background:
-            'radial-gradient(closest-side, color-mix(in oklab, var(--color-accent-personal) 18%, transparent), transparent)',
-        }}
-      />
+    <div aria-hidden className="ambient-canvas pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas">
+      <div className="ambient-orb ambient-orb--one" />
+      <div className="ambient-orb ambient-orb--two" />
+      <div className="ambient-orb ambient-orb--three" />
+      <div className="ambient-grid" />
+      <div className="ambient-noise" />
     </div>
   );
 }
@@ -43,7 +27,17 @@ const overviewGridVariants = {
 /** Staggered card entrance runs once per app load, not again when navigating back from a section. */
 let overviewEntranceDone = false;
 
+function useCurrentTime() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(interval);
+  }, []);
+  return now;
+}
+
 function Overview() {
+  const now = useCurrentTime();
   const runEntrance = !overviewEntranceDone;
   useEffect(() => {
     overviewEntranceDone = true;
@@ -51,9 +45,32 @@ function Overview() {
 
   return (
     <motion.div className="col-start-1 row-start-1">
-      <h1 className="mb-4 text-lg font-bold sm:mb-6">Dashboard</h1>
+      <motion.header
+        className="dashboard-hero"
+        initial={runEntrance ? { opacity: 0, y: 10 } : false}
+        animate={{ opacity: 1, y: 0 }}
+      >
+        <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+          <span className="live-indicator"><span /></span>
+          <span>Personal system</span>
+          <span className="text-ink-faint">/</span>
+          <span className="text-ink-faint">Oslo</span>
+        </div>
+        <div className="mt-7 grid items-end gap-5 sm:mt-10 sm:grid-cols-[1fr_auto]">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-faint">
+              {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+            <h1 className="hero-title">Everything,<br /><span>in its place.</span></h1>
+          </div>
+          <div className="hidden text-right sm:block">
+            <p className="hero-time tabular-nums">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
+            <p className="mt-1 text-xs text-ink-faint">Your day at a glance</p>
+          </div>
+        </div>
+      </motion.header>
       <motion.div
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        className="dashboard-grid grid grid-cols-1 gap-4 lg:grid-cols-12"
         variants={overviewGridVariants}
         initial={runEntrance ? 'hidden' : false}
         animate="visible"
@@ -71,9 +88,9 @@ export default function App() {
   const route = useHashRoute();
 
   return (
-    <div className="min-h-screen bg-canvas text-ink">
+    <div className="min-h-screen bg-canvas text-ink selection:bg-(--color-accent-ai)/25">
       <BackgroundGlow />
-      <main className="mx-auto max-w-6xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:p-6">
+      <main className="mx-auto max-w-[78rem] px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 sm:px-8 sm:pt-10 lg:px-10">
         <MotionConfig
           reducedMotion="user"
           transition={{ type: 'spring', stiffness: 260, damping: 30 }}

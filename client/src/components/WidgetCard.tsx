@@ -40,9 +40,9 @@ export function WidgetShell({
   children: ReactNode;
 }) {
   return (
-    <section className="glass rounded-2xl p-4">
-      <header className="mb-3 flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
+    <section className="glass rounded-[1.5rem] p-5 transition-[border-color,box-shadow] duration-300 hover:border-white/15 sm:p-6">
+      <header className="mb-4 flex items-baseline justify-between gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-muted">
           {title}
         </h2>
         {badge}

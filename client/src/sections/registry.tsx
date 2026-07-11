@@ -12,6 +12,8 @@ export type SectionId = (typeof SECTION_IDS)[number];
 export interface SectionDef {
   id: SectionId;
   title: string;
+  label: string;
+  description: string;
   /** Theme variable holding this section's accent color, e.g. '--color-accent-ai'. */
   accentVar: string;
   /** Condensed content for the overview block. */
@@ -22,9 +24,33 @@ export interface SectionDef {
 
 /** Adding a section = one entry here plus its Overview/Detail components; routing and layout derive from this. */
 export const SECTIONS: SectionDef[] = [
-  { id: 'ai', title: 'AI', accentVar: '--color-accent-ai', Overview: AiOverview, Detail: AiDetail },
-  { id: 'github', title: 'GitHub', accentVar: '--color-accent-github', Overview: GitHubOverview, Detail: GitHubDetail },
-  { id: 'personal', title: 'Personal', accentVar: '--color-accent-personal', Overview: PersonalOverview, Detail: PersonalDetail },
+  {
+    id: 'ai',
+    title: 'AI',
+    label: 'Intelligence',
+    description: 'Usage, pace and context',
+    accentVar: '--color-accent-ai',
+    Overview: AiOverview,
+    Detail: AiDetail,
+  },
+  {
+    id: 'github',
+    title: 'GitHub',
+    label: 'Build',
+    description: 'Momentum across your work',
+    accentVar: '--color-accent-github',
+    Overview: GitHubOverview,
+    Detail: GitHubDetail,
+  },
+  {
+    id: 'personal',
+    title: 'Personal',
+    label: 'Today',
+    description: 'The shape of your day',
+    accentVar: '--color-accent-personal',
+    Overview: PersonalOverview,
+    Detail: PersonalDetail,
+  },
 ];
 
 export function sectionById(id: SectionId): SectionDef {
