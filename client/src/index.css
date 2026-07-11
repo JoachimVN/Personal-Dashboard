@@ -434,6 +434,11 @@ a {
   .dashboard-section-card--personal .section-card-content > div > :last-child {
     grid-column: span 2;
   }
+
+  .arrangeable-grid--personal > :nth-child(1),
+  .arrangeable-grid--personal > :nth-child(4) {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 639px) {

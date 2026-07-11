@@ -27,9 +27,9 @@ export function SectionView({ section }: { section: SectionDef }) {
         <span className="h-7 w-px bg-card-border" />
         <div>
           <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-ink-faint">{section.label}</span>
-          <motion.h2 layoutId={`section-title-${section.id}`} className="text-sm font-semibold tracking-tight text-ink">
+          <motion.p layoutId={`section-title-${section.id}`} className="text-sm font-semibold tracking-tight text-ink">
             {section.title}
-          </motion.h2>
+          </motion.p>
         </div>
         <div className="ml-auto flex items-center gap-2 text-[11px] text-ink-faint">
           <AccentDot />

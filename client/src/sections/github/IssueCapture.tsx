@@ -32,22 +32,35 @@ export function IssueCapture() {
   }
 
   return (
-    <form onSubmit={submit} className="glass rounded-2xl p-4">
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Quick issue capture</h2>
-        <button type="button" onClick={() => setDetail((open) => !open)} className="text-xs font-medium text-ink-muted hover:text-ink">
+    <form onSubmit={submit} className="action-card glass relative h-full overflow-hidden rounded-[1.75rem] p-5 sm:p-6">
+      <div aria-hidden className="action-card-glow bg-(--color-accent-github)" />
+      <div className="relative mb-5 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl border border-card-border bg-track/50 text-(--color-accent-github)">
+            <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+          </span>
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ink-faint">Capture</p>
+            <h2 className="text-base font-semibold tracking-[-0.025em]">Create an issue</h2>
+          </div>
+        </div>
+        <button type="button" onClick={() => setDetail((open) => !open)} className="rounded-full border border-card-border px-3 py-1.5 text-[11px] font-medium text-ink-muted transition hover:bg-track/60 hover:text-ink">
           {detail ? 'Less detail' : 'Add detail'}
         </button>
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <select value={repo} onChange={(event) => setRepo(event.target.value)} className="rounded border border-card-border bg-canvas px-2 py-1.5 text-sm" disabled={!repos.length}>
+      <p className="relative mb-4 text-xs leading-5 text-ink-muted">Get the thought out of your head and into the right repository.</p>
+      <div className="relative flex flex-col gap-2 sm:flex-row">
+        <select value={repo} aria-label="Repository" onChange={(event) => setRepo(event.target.value)} className="premium-field sm:max-w-48" disabled={!repos.length}>
           {repos.map((item) => <option key={item} value={item}>{item}</option>)}
         </select>
-        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Capture an issue…" maxLength={160} className="min-w-0 flex-1 rounded border border-card-border bg-canvas px-2 py-1.5 text-sm" />
-        <button type="submit" className="rounded bg-ink px-3 py-1.5 text-sm font-semibold text-canvas disabled:opacity-50" disabled={!repo || !title.trim()}>Create</button>
+        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="What needs attention?" maxLength={160} className="premium-field min-w-0 flex-1" />
+        <button type="submit" className="premium-primary-button" disabled={!repo || !title.trim()}>Create <span aria-hidden>↗</span></button>
       </div>
-      {detail && <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Optional context…" rows={3} className="mt-2 w-full rounded border border-card-border bg-canvas px-2 py-1.5 text-sm" />}
-      {message && <p className="mt-2 text-xs text-ink-muted">{message}</p>}
+      {detail && <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Add context, acceptance criteria or useful links…" rows={3} className="premium-field relative mt-2 w-full resize-none" />}
+      <div className="relative mt-3 flex items-center justify-between text-[10px] text-ink-faint">
+        <span>Press Enter to create</span>
+        {message && <span aria-live="polite" className="text-ink-muted">{message}</span>}
+      </div>
     </form>
   );
 }

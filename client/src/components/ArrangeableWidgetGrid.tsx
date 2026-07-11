@@ -134,7 +134,7 @@ export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGri
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-3 flex min-h-8 items-center justify-between px-1">
         {arranging && <p className="text-xs text-ink-faint">Drag cards to reorder</p>}
         <button
           type="button"
@@ -142,12 +142,12 @@ export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGri
             setArranging((prev) => !prev);
             finishDrag();
           }}
-          className="rounded-md px-2 py-1 text-xs font-medium text-ink-muted transition hover:bg-track hover:text-ink"
+          className="ml-auto rounded-full border border-card-border bg-card/40 px-3 py-1.5 text-[11px] font-medium text-ink-muted transition hover:bg-track hover:text-ink"
         >
           {arranging ? 'Done' : 'Arrange'}
         </button>
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className={`arrangeable-grid arrangeable-grid--${sectionId} grid grid-cols-1 gap-4 sm:grid-cols-2`}>
         {orderedItems.map((item, index) => {
           const isDragging = draggingId === item.id;
           const isDropTarget = dropTargetId === item.id;
