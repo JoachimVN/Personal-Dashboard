@@ -149,4 +149,4 @@ Shows the most recent message per conversation and an unread count; group-chat/c
 
 ## Arranging widgets
 
-The Personal section's widget cards can be reordered: open **Personal** → **Arrange** (top-right), then drag by the handle or use the ↑/↓ buttons. The order is saved server-side (`server/.data/layout.json`, gitignored) and shared across every device that reaches this dashboard.
+The Personal section's widget cards can be reordered: open **Personal** → **Arrange** (top-right), then drag a card to its new position. The order is saved server-side (`server/.data/layout.json`, gitignored) and shared across every device that reaches this dashboard.

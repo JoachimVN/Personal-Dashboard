@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Reorder, useDragControls, type DragControls } from 'motion/react';
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react';
 
 export interface ArrangeableItem {
   id: string;
@@ -33,74 +32,17 @@ async function persistLayout(sectionId: string, order: string[]): Promise<void> 
   }
 }
 
-function DragHandle({ dragControls }: { dragControls: DragControls }) {
-  return (
-    <button
-      type="button"
-      aria-label="Drag to reorder"
-      onPointerDown={(event) => dragControls.start(event)}
-      className="cursor-grab touch-none px-1 text-ink-faint select-none active:cursor-grabbing"
-    >
-      ⠿
-    </button>
-  );
-}
-
-function ArrangeRow({
-  item,
-  isFirst,
-  isLast,
-  onMove,
-  onDragEnd,
-}: {
-  item: ArrangeableItem;
-  isFirst: boolean;
-  isLast: boolean;
-  onMove: (direction: -1 | 1) => void;
-  onDragEnd: () => void;
-}) {
-  const dragControls = useDragControls();
-  return (
-    <Reorder.Item
-      value={item.id}
-      dragListener={false}
-      dragControls={dragControls}
-      onDragEnd={onDragEnd}
-      className="flex items-center gap-2 rounded-lg bg-track/60 px-2 py-1.5"
-    >
-      <DragHandle dragControls={dragControls} />
-      <span className="min-w-0 flex-1 truncate text-sm">{item.label}</span>
-      <button
-        type="button"
-        aria-label={`Move ${item.label} up`}
-        disabled={isFirst}
-        onClick={() => onMove(-1)}
-        className="rounded px-1.5 py-0.5 text-ink-muted hover:bg-track disabled:opacity-30"
-      >
-        ↑
-      </button>
-      <button
-        type="button"
-        aria-label={`Move ${item.label} down`}
-        disabled={isLast}
-        onClick={() => onMove(1)}
-        className="rounded px-1.5 py-0.5 text-ink-muted hover:bg-track disabled:opacity-30"
-      >
-        ↓
-      </button>
-    </Reorder.Item>
-  );
-}
-
 /**
- * A section's widget cards, reorderable via a compact drag-handle list rather than dragging the
- * full-size cards in place — simpler and more robust than fighting 2D grid drag physics.
+ * A section's widget cards, directly reorderable in their responsive grid. The uncluttered
+ * arrange mode uses the cards themselves as drag targets, with keyboard movement as a fallback.
  */
 export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGridProps) {
   const [order, setOrder] = useState<string[]>(() => items.map((item) => item.id));
   const orderRef = useRef(order);
   orderRef.current = order;
   const [arranging, setArranging] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +51,11 @@ export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGri
         const res = await fetch('/api/layout');
         if (!res.ok) return;
         const { layout } = (await res.json()) as { layout: Record<string, string[]> };
-        if (!cancelled) setOrder(mergeOrder(layout[sectionId], items));
+        if (!cancelled) {
+          const next = mergeOrder(layout[sectionId], items);
+          orderRef.current = next;
+          setOrder(next);
+        }
       } catch {
         // Keep the default order.
       }
@@ -130,41 +76,100 @@ export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGri
     const target = index + direction;
     if (target < 0 || target >= next.length) return;
     [next[index], next[target]] = [next[target], next[index]];
+    orderRef.current = next;
     setOrder(next);
     void persistLayout(sectionId, next);
   }
 
+  function placeBefore(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+    const next = [...orderRef.current];
+    const sourceIndex = next.indexOf(sourceId);
+    if (sourceIndex === -1) return;
+    next.splice(sourceIndex, 1);
+    const targetIndex = next.indexOf(targetId);
+    if (targetIndex === -1) return;
+    next.splice(targetIndex, 0, sourceId);
+    orderRef.current = next;
+    setOrder(next);
+  }
+
+  function startDrag(id: string, event: DragEvent<HTMLDivElement>) {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', id);
+    setDraggingId(id);
+    setDropTargetId(null);
+  }
+
+  function dragOver(targetId: string, event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const sourceId = draggingId ?? event.dataTransfer.getData('text/plain');
+    if (sourceId && sourceId !== targetId) setDropTargetId(targetId);
+  }
+
+  function finishDrag() {
+    setDraggingId(null);
+    setDropTargetId(null);
+  }
+
+  function drop(targetId: string, event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const sourceId = draggingId ?? event.dataTransfer.getData('text/plain');
+    if (sourceId && sourceId !== targetId) {
+      placeBefore(sourceId, targetId);
+      void persistLayout(sectionId, orderRef.current);
+    }
+    finishDrag();
+  }
+
+  function moveWithKeyboard(index: number, event: KeyboardEvent<HTMLDivElement>) {
+    if (!event.shiftKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+    event.preventDefault();
+    move(index, event.key === 'ArrowUp' ? -1 : 1);
+  }
+
   return (
     <div>
-      <div className="mb-2 flex justify-end">
+      <div className="mb-2 flex items-center justify-between">
+        {arranging && <p className="text-xs text-ink-faint">Drag cards to reorder</p>}
         <button
           type="button"
-          onClick={() => setArranging((prev) => !prev)}
-          className="rounded px-2 py-1 text-xs font-medium text-ink-muted transition hover:bg-track hover:text-ink"
+          onClick={() => {
+            setArranging((prev) => !prev);
+            finishDrag();
+          }}
+          className="rounded-md px-2 py-1 text-xs font-medium text-ink-muted transition hover:bg-track hover:text-ink"
         >
           {arranging ? 'Done' : 'Arrange'}
         </button>
       </div>
-      {arranging ? (
-        <Reorder.Group axis="y" values={order} onReorder={setOrder} className="space-y-1">
-          {orderedItems.map((item, index) => (
-            <ArrangeRow
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {orderedItems.map((item, index) => {
+          const isDragging = draggingId === item.id;
+          const isDropTarget = dropTargetId === item.id;
+          return (
+            <div
               key={item.id}
-              item={item}
-              isFirst={index === 0}
-              isLast={index === orderedItems.length - 1}
-              onMove={(direction) => move(index, direction)}
-              onDragEnd={() => void persistLayout(sectionId, orderRef.current)}
-            />
-          ))}
-        </Reorder.Group>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {orderedItems.map((item) => (
-            <div key={item.id}>{item.render()}</div>
-          ))}
-        </div>
-      )}
+              draggable={arranging}
+              tabIndex={arranging ? 0 : undefined}
+              aria-label={arranging ? `Reorder ${item.label}` : undefined}
+              aria-keyshortcuts={arranging ? 'Shift+ArrowUp Shift+ArrowDown' : undefined}
+              onKeyDown={arranging ? (event) => moveWithKeyboard(index, event) : undefined}
+              onDragStart={arranging ? (event) => startDrag(item.id, event) : undefined}
+              onDragEnd={arranging ? finishDrag : undefined}
+              onDragOver={arranging ? (event) => dragOver(item.id, event) : undefined}
+              onDrop={arranging ? (event) => drop(item.id, event) : undefined}
+              className={`relative transition duration-150 ${
+                arranging ? 'cursor-grab focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--color-accent-personal) active:cursor-grabbing' : ''
+              } ${
+                isDragging ? 'scale-[0.985] opacity-35' : isDropTarget ? 'rounded-2xl outline-2 -outline-offset-2 outline-(--color-accent-personal)' : ''
+              }`}
+            >
+              {item.render()}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
