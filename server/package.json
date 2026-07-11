@@ -11,6 +11,7 @@
     "start": "cross-env NODE_ENV=production tsx src/index.ts",
     "test": "vitest run",
     "setup:gmail": "tsx scripts/setupGmail.ts",
+    "setup:spotify": "tsx scripts/setupSpotify.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

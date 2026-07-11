@@ -116,6 +116,16 @@ The widget requests only the **`gmail.metadata`** scope — message headers and 
 
 ⚠️ **Testing-mode expiry**: while the OAuth consent screen is in *Testing* status, Google expires refresh tokens after **7 days** and you'd have to re-run setup weekly. Fix: on the consent screen page, add yourself as a test user, then **publish** the app (it can stay unverified — only your own account uses it); published apps get long-lived refresh tokens.
 
+### Spotify
+
+One-time setup:
+
+1. In [developer.spotify.com](https://developer.spotify.com/dashboard), create an app; put its Client ID/secret in `server/.env` as `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`.
+2. Run `npm run setup:spotify -w server`. It prints an exact redirect URI (`http://127.0.0.1:8888/callback`) — add that under the app's **Settings → Redirect URIs** and save.
+3. Open the printed authorize URL, approve. The refresh token is saved to `server/.tokens/spotify.json` (owner-only permissions); restart the server.
+
+Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months.
+
 ### Philips Hue
 
 One-time pairing:

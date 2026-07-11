@@ -11,6 +11,7 @@ import { createGmailProvider } from './gmail.js';
 import { createHueProvider, type HueProvider } from './hue.js';
 import { createIMessageProvider } from './imessage.js';
 import { createNewsProvider } from './news.js';
+import { createSpotifyProvider } from './spotify.js';
 import { createSystemProvider } from './system.js';
 import { createWeatherProvider, type WeatherProvider } from './weather.js';
 
@@ -39,6 +40,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
       createClaudeUsageProvider(env.claudeOauthToken, usageHistory),
       createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
       createNewsProvider(config.news.feeds),
+      createSpotifyProvider(env.spotify),
       createSystemProvider(env.timezone),
       hue,
       createIMessageProvider(),

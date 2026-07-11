@@ -3,10 +3,12 @@ import { AiOverview } from './ai/AiOverview';
 import { AiDetail } from './ai/AiDetail';
 import { GitHubOverview } from './github/GitHubOverview';
 import { GitHubDetail } from './github/GitHubDetail';
+import { SpotifyOverview } from './spotify/SpotifyOverview';
+import { SpotifyDetail } from './spotify/SpotifyDetail';
 import { PersonalOverview } from './personal/PersonalOverview';
 import { PersonalDetail } from './personal/PersonalDetail';
 
-export const SECTION_IDS = ['ai', 'github', 'personal'] as const;
+export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 export interface SectionDef {
@@ -41,6 +43,15 @@ export const SECTIONS: SectionDef[] = [
     accentVar: '--color-accent-github',
     Overview: GitHubOverview,
     Detail: GitHubDetail,
+  },
+  {
+    id: 'spotify',
+    title: 'Spotify',
+    label: 'Listening',
+    description: 'Now playing and your stats',
+    accentVar: '--color-accent-spotify',
+    Overview: SpotifyOverview,
+    Detail: SpotifyDetail,
   },
   {
     id: 'personal',
