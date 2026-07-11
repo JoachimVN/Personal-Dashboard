@@ -5,6 +5,7 @@ import { SECTIONS, sectionById } from './sections/registry';
 import { SectionCard } from './sections/SectionCard';
 import { SectionView } from './sections/SectionView';
 import { SystemFooter } from './components/SystemFooter';
+import { DailyCommandCenter } from './components/DailyCommandCenter';
 
 /** Fixed decorative layer the glass cards blur against — accent-tinted glow blobs on the canvas. */
 function BackgroundGlow() {
@@ -38,6 +39,8 @@ function useCurrentTime() {
 
 function Overview() {
   const now = useCurrentTime();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning.' : hour < 18 ? 'Good afternoon.' : 'Good evening.';
   const runEntrance = !overviewEntranceDone;
   useEffect(() => {
     overviewEntranceDone = true;
@@ -56,12 +59,12 @@ function Overview() {
           <span className="text-ink-faint">/</span>
           <span className="text-ink-faint">Oslo</span>
         </div>
-        <div className="mt-7 grid items-end gap-5 sm:mt-10 sm:grid-cols-[1fr_auto]">
+        <div className="mt-6 grid items-end gap-5 sm:mt-8 sm:grid-cols-[1fr_auto]">
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-faint">
               {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
-            <h1 className="hero-title">Everything,<br /><span>in its place.</span></h1>
+            <h1 className="hero-title">{greeting}<br /><span>Here is the signal.</span></h1>
           </div>
           <div className="hidden text-right sm:block">
             <p className="hero-time tabular-nums">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
@@ -69,6 +72,20 @@ function Overview() {
           </div>
         </div>
       </motion.header>
+      <motion.div
+        initial={runEntrance ? { opacity: 0, y: 12 } : false}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+      >
+        <DailyCommandCenter />
+      </motion.div>
+      <div className="dashboard-section-heading">
+        <div>
+          <p className="command-eyebrow">Your system</p>
+          <h2>Go deeper</h2>
+        </div>
+        <p>Open a section for the complete picture and quick actions.</p>
+      </div>
       <motion.div
         className="dashboard-grid grid grid-cols-1 gap-4 lg:grid-cols-12"
         variants={overviewGridVariants}

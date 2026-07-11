@@ -1,4 +1,4 @@
-import { accessSync, constants } from 'node:fs';
+import { accessSync, constants, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -6,6 +6,7 @@ import { iMessageDataSchema, type IMessageConversation, type IMessageData } from
 import type { Provider } from '../scheduler.js';
 
 const dbPath = path.join(os.homedir(), 'Library', 'Messages', 'chat.db');
+const addressBookPath = path.join(os.homedir(), 'Library', 'Application Support', 'AddressBook');
 
 // Apple's message.date is nanoseconds since 2001-01-01T00:00:00Z (the "Core Data" epoch).
 const APPLE_EPOCH_MS = 978307200000;
@@ -20,9 +21,155 @@ export interface RawIMessageRow {
   displayName: string | null;
   chatIdentifier: string;
   text: string | null;
+  attributedBody: Uint8Array | null;
   isFromMe: bigint;
   dateNs: bigint;
   unreadCount: bigint;
+}
+
+export interface RawContactRow {
+  handle: string | null;
+  firstName: string | null;
+  middleName: string | null;
+  lastName: string | null;
+  nickname: string | null;
+  organization: string | null;
+  name: string | null;
+}
+
+export type ContactResolver = (handle: string) => string | undefined;
+
+const NSString = Buffer.from('NSString');
+const OBJECT_REPLACEMENT_CHARACTER = /\uFFFC/g;
+const CONTACT_CACHE_MS = 5 * 60_000;
+
+function decodeTypedStreamLength(body: Uint8Array, offset: number): { length: number; start: number } | null {
+  const first = body[offset];
+  if (first === undefined) return null;
+  if (first !== 0x81) return { length: first, start: offset + 1 };
+  if (offset + 2 >= body.length) return null;
+  return {
+    length: body[offset + 1] | (body[offset + 2] << 8),
+    start: offset + 3,
+  };
+}
+
+/** Extract the NSString payload from Apple's NSAttributedString typedstream archive. */
+export function decodeAttributedBody(body: Uint8Array | null): string | null {
+  if (!body) return null;
+  const bytes = Buffer.from(body.buffer, body.byteOffset, body.byteLength);
+  let markerIndex = bytes.indexOf(NSString);
+  while (markerIndex !== -1) {
+    const header = markerIndex + NSString.length;
+    // NSString payloads in Messages are preceded by: 01, object ref, 84, 01, 2b.
+    if (
+      bytes[header] === 0x01
+      && bytes[header + 2] === 0x84
+      && bytes[header + 3] === 0x01
+      && bytes[header + 4] === 0x2b
+    ) {
+      const encodedLength = decodeTypedStreamLength(bytes, header + 5);
+      if (encodedLength && encodedLength.start + encodedLength.length <= bytes.length) {
+        try {
+          return new TextDecoder('utf-8', { fatal: true }).decode(
+            bytes.subarray(encodedLength.start, encodedLength.start + encodedLength.length),
+          );
+        } catch {
+          // Keep scanning in case this was a class marker rather than the string payload.
+        }
+      }
+    }
+    markerIndex = bytes.indexOf(NSString, markerIndex + NSString.length);
+  }
+  return null;
+}
+
+function contactName(row: RawContactRow): string | undefined {
+  const personalName = [row.firstName, row.middleName, row.lastName]
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .join(' ');
+  return personalName || row.nickname?.trim() || row.organization?.trim() || row.name?.trim() || undefined;
+}
+
+function contactKeys(handle: string): string[] {
+  const trimmed = handle.trim();
+  if (!trimmed) return [];
+  if (trimmed.includes('@')) return [`email:${trimmed.toLocaleLowerCase()}`];
+  const digits = trimmed.replace(/\D/g, '').replace(/^00/, '');
+  if (!digits) return [];
+  const keys = [`phone:${digits}`];
+  if (digits.length >= 8) keys.push(`phone-suffix:${digits.slice(-8)}`);
+  return keys;
+}
+
+export function createContactResolver(rows: RawContactRow[]): ContactResolver {
+  const contacts = new Map<string, string | null>();
+  for (const row of rows) {
+    const name = contactName(row);
+    if (!row.handle || !name) continue;
+    for (const key of contactKeys(row.handle)) {
+      const existing = contacts.get(key);
+      contacts.set(key, existing === undefined || existing === name ? name : null);
+    }
+  }
+  return (handle) => {
+    for (const key of contactKeys(handle)) {
+      const name = contacts.get(key);
+      if (name) return name;
+    }
+    return undefined;
+  };
+}
+
+function findAddressBookDatabases(directory: string, depth = 0): string[] {
+  if (depth > 4) return [];
+  try {
+    return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) return findAddressBookDatabases(entryPath, depth + 1);
+      return entry.isFile() && entry.name.endsWith('.abcddb') ? [entryPath] : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function readContactRows(databasePath: string): RawContactRow[] {
+  const db = new DatabaseSync(databasePath, { readOnly: true, timeout: 1_000 });
+  const nameColumns = `
+    r.ZFIRSTNAME AS firstName, r.ZMIDDLENAME AS middleName, r.ZLASTNAME AS lastName,
+    r.ZNICKNAME AS nickname, r.ZORGANIZATION AS organization, r.ZNAME AS name
+  `;
+  try {
+    const phones = db.prepare(`
+      SELECT p.ZFULLNUMBER AS handle, ${nameColumns}
+      FROM ZABCDPHONENUMBER p
+      JOIN ZABCDRECORD r ON r.Z_PK = p.ZOWNER
+      WHERE p.ZFULLNUMBER IS NOT NULL
+    `).all() as unknown as RawContactRow[];
+    const emails = db.prepare(`
+      SELECT e.ZADDRESS AS handle, ${nameColumns}
+      FROM ZABCDEMAILADDRESS e
+      JOIN ZABCDRECORD r ON r.Z_PK = e.ZOWNER
+      WHERE e.ZADDRESS IS NOT NULL
+    `).all() as unknown as RawContactRow[];
+    return [...phones, ...emails];
+  } finally {
+    db.close();
+  }
+}
+
+function loadContactResolver(): ContactResolver {
+  const rows = findAddressBookDatabases(addressBookPath).flatMap((databasePath) => {
+    try {
+      return readContactRows(databasePath);
+    } catch {
+      // Contacts sources can have different/older schemas; skip only the incompatible source.
+      return [];
+    }
+  });
+  return createContactResolver(rows);
 }
 
 function truncate(text: string): string {
@@ -30,15 +177,17 @@ function truncate(text: string): string {
 }
 
 /** Pure row → schema mapping, kept separate from DB I/O so it can be unit-tested against a fixture. */
-export function mapRows(rows: RawIMessageRow[]): IMessageConversation[] {
+export function mapRows(rows: RawIMessageRow[], resolveContact: ContactResolver = () => undefined): IMessageConversation[] {
   return rows.map((row) => {
     // Divide the bigint nanosecond timestamp down to milliseconds before converting to Number —
     // going through Number at nanosecond scale loses precision.
     const dateMs = APPLE_EPOCH_MS + Number(row.dateNs / 1_000_000n);
+    const message = row.text ?? decodeAttributedBody(row.attributedBody);
+    const preview = message?.replace(OBJECT_REPLACEMENT_CHARACTER, '[attachment]').trim();
     return {
       id: row.chatId.toString(),
-      label: row.displayName || row.chatIdentifier,
-      lastMessage: row.text ? truncate(row.text) : '[message]',
+      label: row.displayName || resolveContact(row.chatIdentifier) || row.chatIdentifier,
+      lastMessage: preview ? truncate(preview) : '[message]',
       isFromMe: row.isFromMe !== 0n,
       timestamp: new Date(dateMs).toISOString(),
       unreadCount: Number(row.unreadCount),
@@ -52,6 +201,7 @@ const CONVERSATIONS_QUERY = `
     c.display_name AS displayName,
     c.chat_identifier AS chatIdentifier,
     m.text AS text,
+    m.attributedBody AS attributedBody,
     m.is_from_me AS isFromMe,
     m.date AS dateNs,
     (
@@ -79,6 +229,8 @@ function isReadable(): boolean {
 }
 
 export function createIMessageProvider(): Provider<IMessageData> {
+  let resolveContact: ContactResolver = () => undefined;
+  let contactsLoadedAt = 0;
   return {
     id: 'imessage',
     schema: iMessageDataSchema,
@@ -93,8 +245,12 @@ export function createIMessageProvider(): Provider<IMessageData> {
       // query, so this stays a small, indexed, LIMIT-bounded read instead of relying on cancellation.
       const db = new DatabaseSync(dbPath, { readOnly: true, readBigInts: true, timeout: 1_000 });
       try {
+        if (Date.now() - contactsLoadedAt >= CONTACT_CACHE_MS) {
+          resolveContact = loadContactResolver();
+          contactsLoadedAt = Date.now();
+        }
         const rows = db.prepare(CONVERSATIONS_QUERY).all() as unknown as RawIMessageRow[];
-        return { conversations: mapRows(rows) };
+        return { conversations: mapRows(rows, resolveContact) };
       } finally {
         db.close();
       }

@@ -153,7 +153,7 @@ Reads `~/Library/Messages/chat.db` directly (read-only) — no setup beyond gran
    - Running via the `install-launchd.sh` agent — launchd execs `node` directly with no GUI parent, so add the **node binary itself** (find it with `which node`, e.g. `/opt/homebrew/bin/node`).
 3. Restart the server — granting access mid-session doesn't retroactively enable the widget.
 
-Shows the most recent message per conversation and an unread count; group-chat/contact names fall back to the raw handle (phone/email) when macOS hasn't set a display name, and rich messages without plain text show as `[message]` (Apple stores those in a binary format this doesn't parse).
+Shows the most recent message per conversation and an unread count. Personal chat handles are resolved through the local macOS Contacts database, while group/business display names come from Messages; unresolved handles fall back to their phone number or email. Modern `attributedBody` message text is decoded, and attachment-only messages show as `[attachment]`.
 
 ⚠️ **Privacy**: message previews are cached server-side and served to any device that reaches this dashboard, i.e. your phone over Tailscale — not just something read and kept on the Mac.
 

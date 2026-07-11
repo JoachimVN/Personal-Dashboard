@@ -121,7 +121,7 @@ a {
 }
 
 .dashboard-hero {
-  padding: 0.25rem 0.25rem 2.25rem;
+  padding: 0.25rem 0.25rem 1.75rem;
 }
 
 .live-indicator {
@@ -144,10 +144,244 @@ a {
 
 .hero-title {
   max-width: 760px;
-  font-size: clamp(2.75rem, 7vw, 5.8rem);
+  font-size: clamp(2.5rem, 5.6vw, 4.8rem);
   font-weight: 620;
   line-height: 0.91;
   letter-spacing: -0.07em;
+}
+
+.command-center {
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  border-radius: 2rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.command-center::before {
+  content: '';
+  position: absolute;
+  inset: -18rem auto auto -12rem;
+  width: 34rem;
+  height: 34rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-personal) 15%, transparent), transparent 68%);
+  pointer-events: none;
+}
+
+.command-center-head,
+.command-agenda-heading,
+.dashboard-section-heading {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.command-eyebrow,
+.command-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+.command-title {
+  margin-top: 0.4rem;
+  font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+  font-weight: 620;
+  letter-spacing: -0.04em;
+}
+
+.command-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-card-border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-canvas) 55%, transparent);
+}
+
+.command-nav a {
+  border-radius: 999px;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--color-ink-muted);
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.command-nav a:hover {
+  background: var(--color-track);
+  color: var(--color-ink);
+}
+
+.command-layout {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.command-primary,
+.command-signals,
+.command-agenda {
+  border: 1px solid var(--color-card-border);
+  background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
+}
+
+.command-primary {
+  min-width: 0;
+  border-radius: 1.4rem;
+  padding: 1.25rem;
+}
+
+.command-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.625rem;
+  color: var(--color-ink-faint);
+}
+
+.command-status span {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 8px rgb(16 185 129 / 0.6);
+}
+
+.command-event-time {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--color-accent-personal);
+}
+
+.command-event-title {
+  max-width: 36rem;
+  margin-top: 0.35rem;
+  font-size: clamp(1.65rem, 4vw, 2.75rem);
+  font-weight: 620;
+  line-height: 1.02;
+  letter-spacing: -0.055em;
+}
+
+.command-weather-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 1.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-card-border);
+}
+
+.command-forecast {
+  margin-left: auto;
+  text-align: center;
+  font-size: 0.625rem;
+  color: var(--color-ink-faint);
+}
+
+.command-forecast + .command-forecast {
+  margin-left: 0;
+}
+
+.command-forecast strong {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--color-ink-muted);
+  font-size: 0.7rem;
+}
+
+.command-signals {
+  display: grid;
+  border-radius: 1.4rem;
+  padding: 0.25rem 1.15rem;
+}
+
+.command-signal {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem 0;
+}
+
+.command-signal + .command-signal {
+  border-top: 1px solid var(--color-card-border);
+}
+
+.command-signal-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--signal-color);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--signal-color) 55%, transparent);
+}
+
+.command-signal-dot--personal { --signal-color: var(--color-accent-personal); }
+.command-signal-dot--github { --signal-color: var(--color-accent-github); }
+.command-signal-dot--ai { --signal-color: var(--color-accent-ai); }
+
+.command-agenda {
+  position: relative;
+  margin-top: 1rem;
+  border-radius: 1.4rem;
+  padding: 1rem 1.25rem;
+}
+
+.command-agenda-heading a {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+}
+
+.command-agenda-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+}
+
+.command-agenda-item {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.8rem;
+  font-size: 0.78rem;
+}
+
+.command-agenda-item time {
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.command-agenda-item span {
+  overflow: hidden;
+  font-weight: 520;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-section-heading {
+  margin: 2.5rem 0 1rem;
+  padding: 0 0.25rem;
+}
+
+.dashboard-section-heading h2 {
+  margin-top: 0.25rem;
+  font-size: 1.3rem;
+  font-weight: 620;
+  letter-spacing: -0.035em;
+}
+
+.dashboard-section-heading > p {
+  max-width: 22rem;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--color-ink-faint);
 }
 
 .hero-title span {
@@ -413,6 +647,10 @@ a {
 }
 
 @media (min-width: 1024px) {
+  .command-layout {
+    grid-template-columns: minmax(0, 1.75fr) minmax(18rem, 0.8fr);
+  }
+
   .dashboard-section-card--ai {
     grid-column: span 5;
   }
@@ -452,6 +690,33 @@ a {
 
   .dashboard-section-card {
     min-height: 0;
+  }
+
+  .command-center-head,
+  .dashboard-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .command-nav {
+    align-self: stretch;
+  }
+
+  .command-nav a {
+    flex: 1;
+    text-align: center;
+  }
+
+  .command-weather-row {
+    flex-wrap: wrap;
+  }
+
+  .command-forecast {
+    display: none;
+  }
+
+  .dashboard-section-heading > p {
+    text-align: left;
   }
 }
 
