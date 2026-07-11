@@ -2,6 +2,7 @@ import type { CalendarData, GmailData, WeatherData } from '@personal-dashboard/s
 import { ArrangeableWidgetGrid, type ArrangeableItem } from '../../components/ArrangeableWidgetGrid';
 import { CalendarWidget } from '../../widgets/CalendarWidget';
 import { GmailWidget } from '../../widgets/GmailWidget';
+import { HealthWidget } from '../../widgets/HealthWidget';
 import { HueWidget } from '../../widgets/HueWidget';
 import { IMessageWidget } from '../../widgets/IMessageWidget';
 import { NewsWidget } from '../../widgets/NewsWidget';
@@ -14,6 +15,7 @@ import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 const ITEMS: ArrangeableItem[] = [
   { id: 'weather', label: 'Weather', render: () => <WeatherWidget /> },
   { id: 'calendar', label: 'Calendar', render: () => <CalendarWidget /> },
+  { id: 'health', label: 'Health', render: () => <HealthWidget /> },
   { id: 'gmail', label: 'Mail', render: () => <GmailWidget /> },
   { id: 'news', label: 'News', render: () => <NewsWidget /> },
   { id: 'hue', label: 'Lights', render: () => <HueWidget /> },

@@ -157,6 +157,37 @@ Shows the most recent message per conversation and an unread count; group-chat/c
 
 ⚠️ **Privacy**: message previews are cached server-side and served to any device that reaches this dashboard, i.e. your phone over Tailscale — not just something read and kept on the Mac.
 
+### Health (Apple Health via Shortcut)
+
+Apple Health can't be read from a server, so the phone pushes to the dashboard instead. There's no
+external setup and no credentials — the widget appears immediately (empty until the first post) and
+is fed by an **Apple Shortcut** you build once.
+
+Build a Shortcut (and, optionally, a Personal Automation that runs it on a schedule) that:
+
+1. Uses **Get Health Sample / Find Health Samples** actions to read today's totals (steps, active
+   energy, exercise minutes, etc.).
+2. Builds a **Dictionary** with any of these keys — all optional, all merged into today's entry so
+   you can post them from separate actions:
+
+   | key | unit |
+   | --- | --- |
+   | `steps` | count |
+   | `activeEnergyKcal` | kcal |
+   | `exerciseMinutes` | minutes |
+   | `standHours` | hours |
+   | `restingHeartRate` | bpm |
+   | `sleepHours` | hours |
+   | `workouts` | array of `{ type, durationMin?, energyKcal?, distanceKm?, start? }` |
+
+   Add `date` (`YYYY-MM-DD`) only to backfill a past day; it defaults to today.
+3. **Gets Contents of URL** — `POST http://<your-tailscale-name>:4821/api/health/ingest`, Request
+   Body **JSON**, set to the dictionary.
+
+Posts through the day overwrite that day's totals (send cumulative values). Step goal, exercise-minute
+goal and history retention live under `health` in `server/config.json` (defaults: 10 000 steps,
+30 min, 30 days).
+
 ## Arranging widgets
 
 The Personal section's widget cards can be reordered: open **Personal** → **Arrange** (top-right), then drag a card to its new position. The order is saved server-side (`server/.data/layout.json`, gitignored) and shared across every device that reaches this dashboard.

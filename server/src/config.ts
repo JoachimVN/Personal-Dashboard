@@ -25,6 +25,16 @@ const configSchema = z.object({
       historyRetentionDays: z.number().int().min(1).default(7),
     })
     .default({ codexRefreshMs: 30_000, historySampleMs: 15 * 60_000, historyRetentionDays: 7 }),
+  health: z
+    .object({
+      /** Daily step goal the widget's progress bar fills toward. */
+      stepGoal: z.number().int().positive().default(10_000),
+      /** Daily exercise-minutes goal (Apple's Move ring default is 30). */
+      exerciseGoalMinutes: z.number().int().positive().default(30),
+      /** How many recent days of samples to retain for the trend chart. */
+      historyRetentionDays: z.number().int().min(1).default(30),
+    })
+    .default({ stepGoal: 10_000, exerciseGoalMinutes: 30, historyRetentionDays: 30 }),
   code: z
     .object({
       /** Local parent directory to scan for git repos, per OS. Each immediate subdirectory with a .git and a GitHub-remote origin becomes a launchable project. */
