@@ -8,7 +8,7 @@ interface RawEvent {
   repo: { name: string };
   created_at: string | null;
   payload: {
-    commits?: unknown[];
+    commits?: { sha: string; message: string }[];
     action?: string;
     ref?: string | null;
     ref_type?: string;
@@ -18,16 +18,25 @@ interface RawEvent {
   };
 }
 
-function describeEvent(event: RawEvent): { summary: string; url?: string } | undefined {
+function describeEvent(
+  event: RawEvent,
+): { summary: string; url?: string; commits?: string[] } | undefined {
   const p = event.payload;
   switch (event.type) {
     case 'PushEvent': {
-      const n = p.commits?.length ?? 0;
-      if (n === 0) {
-        const ref = p.ref?.replace('refs/heads/', '');
-        return { summary: ref ? `pushed to ${ref}` : 'pushed' };
+      const branch = p.ref?.replace('refs/heads/', '');
+      // The events API carries each commit's message inline — surface them
+      // instead of collapsing a push to a bare "pushed N commits".
+      const commits = (p.commits ?? [])
+        .map((commit) => commit.message.split('\n', 1)[0].trim())
+        .filter(Boolean);
+      if (commits.length === 0) {
+        return { summary: branch ? `pushed to ${branch}` : 'pushed' };
       }
-      return { summary: `pushed ${n} commit${n === 1 ? '' : 's'}` };
+      return {
+        summary: branch ? `pushed to ${branch}` : 'pushed',
+        commits,
+      };
     }
     case 'PullRequestEvent':
       return {
@@ -182,6 +191,7 @@ export function createGitHubProvider(
             repo: event.repo.name,
             timestamp: event.created_at,
             url: described.url,
+            commits: described.commits,
           };
         })
         .filter((entry) => entry !== undefined)

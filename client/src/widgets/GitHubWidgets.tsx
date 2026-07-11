@@ -15,20 +15,36 @@ export function GitHubActivityWidget() {
       {(data) => (
         <ul className="space-y-2 text-sm">
           {data.activity.map((item) => (
-            <li key={item.id} className="group flex items-baseline gap-2 rounded-xl border border-transparent bg-track/25 px-3 py-2 transition hover:border-card-border hover:bg-track/45">
-              <span className="truncate text-ink-muted">
-                {item.repo.split('/')[1] ?? item.repo}
-              </span>
-              {item.url ? (
-                <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
-                  {item.summary}
-                </a>
-              ) : (
-                <span className="truncate">{item.summary}</span>
+            <li key={item.id} className="group rounded-xl border border-transparent bg-track/25 px-3 py-2 transition hover:border-card-border hover:bg-track/45">
+              <div className="flex items-baseline gap-2">
+                <span className="truncate text-ink-muted">
+                  {item.repo.split('/')[1] ?? item.repo}
+                </span>
+                {item.url ? (
+                  <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
+                    {item.summary}
+                  </a>
+                ) : (
+                  <span className="truncate">{item.summary}</span>
+                )}
+                <span className="ml-auto shrink-0 text-xs text-ink-faint">
+                  {relativeTime(item.timestamp)}
+                </span>
+              </div>
+              {item.commits && item.commits.length > 0 && (
+                <ul className="mt-1.5 space-y-1 border-l border-card-border pl-3">
+                  {item.commits.slice(0, 3).map((message, i) => (
+                    <li key={i} className="truncate text-xs text-ink-muted">
+                      {message}
+                    </li>
+                  ))}
+                  {item.commits.length > 3 && (
+                    <li className="text-xs text-ink-faint">
+                      +{item.commits.length - 3} more
+                    </li>
+                  )}
+                </ul>
               )}
-              <span className="ml-auto shrink-0 text-xs text-ink-faint">
-                {relativeTime(item.timestamp)}
-              </span>
             </li>
           ))}
           {data.activity.length === 0 && (

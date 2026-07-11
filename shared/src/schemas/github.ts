@@ -4,11 +4,13 @@ export const githubSchema = z.object({
   activity: z.array(
     z.object({
       id: z.string(),
-      /** Human summary, e.g. "pushed 3 commits". */
+      /** Human summary, e.g. "pushed to main". */
       summary: z.string(),
       repo: z.string(),
       timestamp: z.string(),
       url: z.string().optional(),
+      /** First line of each commit message for push events; absent for other event types. */
+      commits: z.array(z.string()).optional(),
     }),
   ),
   pullRequests: z.array(
