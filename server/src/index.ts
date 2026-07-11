@@ -4,6 +4,7 @@ import express from 'express';
 import { z } from 'zod';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
+import { LayoutStore } from './layoutStore.js';
 import { ProviderScheduler } from './scheduler.js';
 import { createProviders } from './providers/index.js';
 import { createIssue, issueErrorCode, parseIssueInput } from './issues.js';
@@ -21,6 +22,10 @@ for (const provider of providers.all) {
   scheduler.register(provider);
 }
 scheduler.start();
+
+const layoutStore = new LayoutStore(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.data/layout.json'),
+);
 
 const AI_USAGE_WIDGET_IDS = new Set(['ai-usage-claude', 'ai-usage-codex']);
 
@@ -67,6 +72,26 @@ app.post('/api/hue/lights/:id', async (req, res) => {
   }
   await scheduler.refresh('hue', true);
   res.json(scheduler.getEnvelope('hue'));
+});
+
+const layoutOrderSchema = z.object({
+  order: z.array(z.string().min(1)).refine((order) => new Set(order).size === order.length, {
+    message: 'order must not contain duplicates',
+  }),
+});
+
+app.get('/api/layout', (_req, res) => {
+  res.json({ layout: layoutStore.getAll() });
+});
+
+app.put('/api/layout/:sectionId', (req, res) => {
+  const parsed = layoutOrderSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid-layout-order' });
+    return;
+  }
+  layoutStore.set(req.params.sectionId, parsed.data.order);
+  res.json({ order: parsed.data.order });
 });
 
 app.get('/api/widgets', (_req, res) => {

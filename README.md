@@ -146,3 +146,7 @@ Reads `~/Library/Messages/chat.db` directly (read-only) — no setup beyond gran
 Shows the most recent message per conversation and an unread count; group-chat/contact names fall back to the raw handle (phone/email) when macOS hasn't set a display name, and rich messages without plain text show as `[message]` (Apple stores those in a binary format this doesn't parse).
 
 ⚠️ **Privacy**: message previews are cached server-side and served to any device that reaches this dashboard, i.e. your phone over Tailscale — not just something read and kept on the Mac.
+
+## Arranging widgets
+
+The Personal section's widget cards can be reordered: open **Personal** → **Arrange** (top-right), then drag by the handle or use the ↑/↓ buttons. The order is saved server-side (`server/.data/layout.json`, gitignored) and shared across every device that reaches this dashboard.
