@@ -4,6 +4,7 @@ import type { Provider } from '../scheduler.js';
 
 // Identify ourselves as api.met.no's terms require.
 const USER_AGENT = 'personal-dashboard/0.1 github.com/JoachimVN/Personal-Dashboard';
+const GEOCODER_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 // Minimal view of the Locationforecast 2.0 "compact" response.
 const metSchema = z.object({
@@ -41,6 +42,41 @@ const metSchema = z.object({
 
 type MetEntry = z.infer<typeof metSchema>['properties']['timeseries'][number];
 
+const reverseGeocodeSchema = z.object({
+  address: z.record(z.string(), z.string()).optional(),
+  display_name: z.string().optional(),
+});
+
+function coordinateLabel(coords: { lat: number; lon: number }): string {
+  const latitude = `${Math.abs(coords.lat).toFixed(2)}° ${coords.lat >= 0 ? 'N' : 'S'}`;
+  const longitude = `${Math.abs(coords.lon).toFixed(2)}° ${coords.lon >= 0 ? 'E' : 'W'}`;
+  return `${latitude} · ${longitude}`;
+}
+
+async function reverseGeocode(coords: { lat: number; lon: number }, signal: AbortSignal): Promise<string> {
+  const url = new URL(GEOCODER_URL);
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('zoom', '10');
+  url.searchParams.set('lat', coords.lat.toFixed(4));
+  url.searchParams.set('lon', coords.lon.toFixed(4));
+  try {
+    const response = await fetch(url, { signal, headers: { 'User-Agent': USER_AGENT } });
+    if (!response.ok) return coordinateLabel(coords);
+    const result = reverseGeocodeSchema.parse(await response.json());
+    const address = result.address ?? {};
+    return address.city
+      ?? address.town
+      ?? address.village
+      ?? address.municipality
+      ?? address.suburb
+      ?? address.neighbourhood
+      ?? result.display_name?.split(',')[0]
+      ?? coordinateLabel(coords);
+  } catch {
+    return coordinateLabel(coords);
+  }
+}
+
 function symbolOf(entry: MetEntry): string {
   return (
     entry.data.next_1_hours?.summary.symbol_code ??
@@ -60,6 +96,7 @@ export function createWeatherProvider(
   timezone: string,
 ): WeatherProvider {
   let coords = fallbackCoords;
+  let locationCache: { key: string; name: string } | undefined;
   const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }); // YYYY-MM-DD
   const hourFmt = new Intl.DateTimeFormat('en-GB', {
     timeZone: timezone,
@@ -142,7 +179,11 @@ export function createWeatherProvider(
         };
       });
 
-      return { current, hours, days };
+      const locationKey = `${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}`;
+      if (!locationCache || locationCache.key !== locationKey) {
+        locationCache = { key: locationKey, name: await reverseGeocode(coords, signal) };
+      }
+      return { location: { ...coords, name: locationCache.name }, current, hours, days };
     },
   };
 }

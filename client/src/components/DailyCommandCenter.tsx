@@ -6,7 +6,7 @@ import type {
   WeatherData,
 } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
-import { deg, glyph } from '../lib/weather';
+import { deg, glyph, weatherLocation } from '../lib/weather';
 
 function formatEventDay(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
@@ -108,6 +108,7 @@ export function DailyCommandCenter() {
                   ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain`
                   : 'Weather details are loading'}
               </p>
+              {weather && <p className="text-[11px] text-ink-faint">📍 {weatherLocation(weather.location)}</p>}
             </div>
             {weather?.hours.slice(0, 4).map((hour) => (
               <div key={hour.time} className="command-forecast">

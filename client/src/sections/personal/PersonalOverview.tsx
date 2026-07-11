@@ -8,7 +8,7 @@ import type {
 } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
-import { deg, glyph } from '../../lib/weather';
+import { deg, glyph, weatherLocation } from '../../lib/weather';
 import { relativeTime } from '../../lib/time';
 import { TodayBrief } from './TodayBrief';
 
@@ -44,8 +44,9 @@ export function PersonalOverview() {
       <Mini label="Weather">
         <WidgetBody envelope={weather.envelope} offline={weather.offline}>
           {(data) => (
-            <span className="font-semibold">
-              {glyph(data.current.symbol)} {deg(data.current.temperature)}
+            <span className="flex flex-col">
+              <span className="font-semibold">{glyph(data.current.symbol)} {deg(data.current.temperature)}</span>
+              <span className="text-[10px] text-ink-faint">{weatherLocation(data.location)}</span>
             </span>
           )}
         </WidgetBody>
