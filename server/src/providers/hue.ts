@@ -87,9 +87,8 @@ function bridgeRequest(
 }
 
 /** Hue's `bri` is 1-254 (never 0, off is a separate flag) — normalize to 1-100 for the schema. */
-export function normalizeBrightness(bri: number | undefined): number {
-  const value = bri ?? 254;
-  return Math.min(100, Math.max(1, Math.round((value / 254) * 100)));
+export function normalizeBrightness(bri: number = 254): number {
+  return Math.min(100, Math.max(1, Math.round((bri / 254) * 100)));
 }
 
 export function denormalizeBrightness(percent: number): number {

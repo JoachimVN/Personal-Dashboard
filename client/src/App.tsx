@@ -37,10 +37,15 @@ function useCurrentTime() {
   return now;
 }
 
+function greetingFor(hour: number): string {
+  if (hour < 12) return 'Good morning.';
+  if (hour < 18) return 'Good afternoon.';
+  return 'Good evening.';
+}
+
 function Overview() {
   const now = useCurrentTime();
-  const hour = now.getHours();
-  const greeting = hour < 12 ? 'Good morning.' : hour < 18 ? 'Good afternoon.' : 'Good evening.';
+  const greeting = greetingFor(now.getHours());
   const runEntrance = !overviewEntranceDone;
   useEffect(() => {
     overviewEntranceDone = true;

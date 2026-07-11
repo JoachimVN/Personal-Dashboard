@@ -152,7 +152,7 @@ async function claudeSessionSnapshot(): Promise<UsageSnapshot> {
   try {
     const files = await jsonlFiles(projectsDir);
     const stats = await Promise.all(files.map(async (file) => ({ file, mtime: (await stat(file)).mtimeMs })));
-    const newest = stats.sort((a, b) => b.mtime - a.mtime)[0]?.file;
+    const newest = stats.toSorted((a, b) => b.mtime - a.mtime)[0]?.file;
     if (!newest) return { available: false };
 
     const lines = (await readFile(newest, 'utf8')).trim().split('\n');

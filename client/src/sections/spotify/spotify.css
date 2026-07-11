@@ -15,7 +15,9 @@
 .spotify-range-toggle {
   display: inline-flex;
   gap: 2px;
+  margin: 0;
   padding: 2px;
+  border: none;
   border-radius: 999px;
   background: var(--color-track);
 }

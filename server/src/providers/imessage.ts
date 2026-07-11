@@ -183,7 +183,7 @@ export function mapRows(rows: RawIMessageRow[], resolveContact: ContactResolver 
     // going through Number at nanosecond scale loses precision.
     const dateMs = APPLE_EPOCH_MS + Number(row.dateNs / 1_000_000n);
     const message = row.text ?? decodeAttributedBody(row.attributedBody);
-    const preview = message?.replace(OBJECT_REPLACEMENT_CHARACTER, '[attachment]').trim();
+    const preview = message?.replaceAll(OBJECT_REPLACEMENT_CHARACTER, '[attachment]').trim();
     return {
       id: row.chatId.toString(),
       label: row.displayName || resolveContact(row.chatIdentifier) || row.chatIdentifier,

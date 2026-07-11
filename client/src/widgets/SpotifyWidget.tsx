@@ -21,11 +21,11 @@ function Thumb({ url, size = 'h-10 w-10' }: { url?: string; size?: string }) {
   );
 }
 
-function Rank({ n }: { n: number }) {
+function Rank({ n }: Readonly<{ n: number }>) {
   return <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-faint">{n}</span>;
 }
 
-function TrackRow({ track, rank }: { track: Track; rank: number }) {
+function TrackRow({ track, rank }: Readonly<{ track: Track; rank: number }>) {
   return (
     <li className="flex items-center gap-3 rounded-xl bg-track/25 px-3 py-2 transition hover:bg-track/45">
       <Rank n={rank} />
@@ -46,7 +46,7 @@ function TrackRow({ track, rank }: { track: Track; rank: number }) {
 
 // ── Now playing ────────────────────────────────────────────────────────────
 
-export function NowPlaying({ nowPlaying }: { nowPlaying: SpotifyData['nowPlaying'] }) {
+export function NowPlaying({ nowPlaying }: Readonly<{ nowPlaying: SpotifyData['nowPlaying'] }>) {
   if (!nowPlaying) {
     return <p className="text-sm text-ink-muted">Nothing playing right now.</p>;
   }
@@ -109,15 +109,15 @@ export function NowPlayingWidget() {
 
 // ── Time-range toggle ───────────────────────────────────────────────────────
 
-function RangeToggle({ range, onChange }: { range: Range; onChange: (r: Range) => void }) {
+function RangeToggle({ range, onChange }: Readonly<{ range: Range; onChange: (r: Range) => void }>) {
   return (
-    <div className="spotify-range-toggle" role="group" aria-label="Time range">
+    <fieldset className="spotify-range-toggle" aria-label="Time range">
       {(['shortTerm', 'mediumTerm'] as Range[]).map((r) => (
         <button key={r} type="button" data-active={r === range} onClick={() => onChange(r)}>
           {RANGE_LABEL[r]}
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 }
 

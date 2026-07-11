@@ -180,7 +180,7 @@ export function createWeatherProvider(
       });
 
       const locationKey = `${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}`;
-      if (!locationCache || locationCache.key !== locationKey) {
+      if (locationCache?.key !== locationKey) {
         locationCache = { key: locationKey, name: await reverseGeocode(coords, signal) };
       }
       return { location: { ...coords, name: locationCache.name }, current, hours, days };

@@ -16,7 +16,7 @@ async function postLightState(id: string, state: { on?: boolean; brightness?: nu
   }
 }
 
-function LightRow({ light, refetch }: { light: HueLight; refetch: () => void }) {
+function LightRow({ light, refetch }: Readonly<{ light: HueLight; refetch: () => void }>) {
   const [override, setOverride] = useState<Partial<HueLight> | null>(null);
   const brightnessTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const effective = { ...light, ...override };
