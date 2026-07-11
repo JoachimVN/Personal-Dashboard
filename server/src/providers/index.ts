@@ -8,6 +8,7 @@ import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.j
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
 import { createGmailProvider } from './gmail.js';
+import { createHueProvider, type HueProvider } from './hue.js';
 import { createNewsProvider } from './news.js';
 import { createSystemProvider } from './system.js';
 import { createWeatherProvider, type WeatherProvider } from './weather.js';
@@ -15,10 +16,12 @@ import { createWeatherProvider, type WeatherProvider } from './weather.js';
 export interface Providers {
   all: Provider[];
   weather: WeatherProvider;
+  hue: HueProvider;
 }
 
 export function createProviders(env: ServerEnv, config: AppConfig): Providers {
   const weather = createWeatherProvider(env.weather, env.timezone);
+  const hue = createHueProvider(env.hue);
   const usageHistory = new UsageHistoryStore(
     path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.data/ai-usage-history.json'),
     config.aiUsage.historySampleMs,
@@ -26,6 +29,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
   );
   return {
     weather,
+    hue,
     all: [
       weather,
       createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
@@ -35,6 +39,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
       createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
       createNewsProvider(config.news.feeds),
       createSystemProvider(env.timezone),
+      hue,
     ],
   };
 }

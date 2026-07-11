@@ -44,6 +44,31 @@ app.post('/api/weather/location', async (req, res) => {
   res.json({ ok: true });
 });
 
+const hueStateSchema = z
+  .object({
+    on: z.boolean().optional(),
+    brightness: z.number().min(1).max(100).optional(),
+  })
+  .refine((body) => body.on !== undefined || body.brightness !== undefined, {
+    message: 'at least one of on/brightness is required',
+  });
+
+app.post('/api/hue/lights/:id', async (req, res) => {
+  const parsed = hueStateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid-hue-state' });
+    return;
+  }
+  try {
+    await providers.hue.setLightState(req.params.id, parsed.data);
+  } catch {
+    res.status(502).json({ error: 'hue-control-failed' });
+    return;
+  }
+  await scheduler.refresh('hue', true);
+  res.json(scheduler.getEnvelope('hue'));
+});
+
 app.get('/api/widgets', (_req, res) => {
   res.json({ widgets: scheduler.list() });
 });

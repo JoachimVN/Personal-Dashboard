@@ -115,3 +115,20 @@ One-time setup:
 The widget requests only the **`gmail.metadata`** scope — message headers and labels, never bodies.
 
 ⚠️ **Testing-mode expiry**: while the OAuth consent screen is in *Testing* status, Google expires refresh tokens after **7 days** and you'd have to re-run setup weekly. Fix: on the consent screen page, add yourself as a test user, then **publish** the app (it can stay unverified — only your own account uses it); published apps get long-lived refresh tokens.
+
+### Philips Hue
+
+One-time pairing:
+
+1. Find your bridge's IP — either via [discovery.meethue.com](https://discovery.meethue.com) or your router's device list.
+2. Press the physical link button on the bridge, then within ~30 seconds run:
+   ```bash
+   curl -k -X POST https://<bridge-ip>/api -d '{"devicetype":"personal-dashboard"}'
+   ```
+   (`-k` skips certificate verification — the bridge's HTTPS cert is self-signed and never leaves your LAN.) The response contains a `username` — that's your API key.
+3. Set in `server/.env`:
+   - `HUE_BRIDGE_IP` — the bridge's IP
+   - `HUE_USERNAME` — the API key from step 2
+4. Restart the server — like every env-configured widget, Hue is only checked at startup.
+
+Control is read + write: toggling a light or dragging its brightness slider sends the change straight to the bridge. Individual lights only for now — no rooms/groups/scenes. If the bridge's IP ever changes (e.g. a new DHCP lease), update `HUE_BRIDGE_IP` and restart.

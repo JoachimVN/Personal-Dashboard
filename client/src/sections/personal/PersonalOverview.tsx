@@ -1,6 +1,7 @@
 import type {
   CalendarData,
   GmailData,
+  HueData,
   NewsData,
   WeatherData,
 } from '@personal-dashboard/shared';
@@ -33,6 +34,7 @@ export function PersonalOverview() {
   const calendar = useWidget<CalendarData>('calendar');
   const gmail = useWidget<GmailData>('gmail');
   const news = useWidget<NewsData>('news');
+  const hue = useWidget<HueData>('hue');
 
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-3">
@@ -67,6 +69,19 @@ export function PersonalOverview() {
               </span>
             ) : (
               <span className="text-ink-faint">Nothing scheduled</span>
+            );
+          }}
+        </WidgetBody>
+      </Mini>
+      <Mini label="Lights">
+        <WidgetBody envelope={hue.envelope} offline={hue.offline}>
+          {(data) => {
+            const on = data.lights.filter((light) => light.on).length;
+            return (
+              <span>
+                <span className="font-semibold tabular-nums">{on}</span>{' '}
+                <span className="text-ink-muted">/ {data.lights.length} on</span>
+              </span>
             );
           }}
         </WidgetBody>
