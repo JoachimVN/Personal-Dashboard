@@ -52,18 +52,42 @@ interface ArrangeableCardProps {
   onDrop: (id: string, event: DragEvent<HTMLDivElement>) => void;
 }
 
-function ArrangeableCard({
+interface ArrangeableCardDragProps {
+  tabIndex?: number;
+  'aria-label'?: string;
+  'aria-keyshortcuts'?: string;
+  onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
+  onDragStartCapture?: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEndCapture?: () => void;
+  onDragOver?: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop?: (event: DragEvent<HTMLDivElement>) => void;
+}
+
+function arrangeableCardDragProps({
   item,
   index,
   arranging,
-  isDragging,
-  isDropTarget,
   onMoveWithKeyboard,
   onDragStart,
   onDragEnd,
   onDragOver,
   onDrop,
-}: Readonly<ArrangeableCardProps>) {
+}: Readonly<ArrangeableCardProps>): ArrangeableCardDragProps {
+  if (!arranging) return {};
+  return {
+    tabIndex: 0,
+    'aria-label': `Reorder ${item.label}`,
+    'aria-keyshortcuts': 'Shift+ArrowUp Shift+ArrowDown',
+    onKeyDown: (event) => onMoveWithKeyboard(index, event),
+    onDragStartCapture: (event) => onDragStart(item.id, event),
+    onDragEndCapture: onDragEnd,
+    onDragOver: (event) => onDragOver(item.id, event),
+    onDrop: (event) => onDrop(item.id, event),
+  };
+}
+
+function ArrangeableCard(props: Readonly<ArrangeableCardProps>) {
+  const { item, arranging, isDragging, isDropTarget } = props;
   const arrangingClass = arranging
     ? 'cursor-grab focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--color-accent-personal) active:cursor-grabbing'
     : '';
@@ -72,14 +96,7 @@ function ArrangeableCard({
       layout="position"
       transition={{ type: 'spring', stiffness: 520, damping: 38 }}
       draggable={arranging}
-      tabIndex={arranging ? 0 : undefined}
-      aria-label={arranging ? `Reorder ${item.label}` : undefined}
-      aria-keyshortcuts={arranging ? 'Shift+ArrowUp Shift+ArrowDown' : undefined}
-      onKeyDown={arranging ? (event) => onMoveWithKeyboard(index, event) : undefined}
-      onDragStartCapture={arranging ? (event) => onDragStart(item.id, event) : undefined}
-      onDragEndCapture={arranging ? onDragEnd : undefined}
-      onDragOver={arranging ? (event) => onDragOver(item.id, event) : undefined}
-      onDrop={arranging ? (event) => onDrop(item.id, event) : undefined}
+      {...arrangeableCardDragProps(props)}
       className={`relative transition duration-150 ${arrangingClass} ${cardStateClass(isDragging, isDropTarget)}`}
     >
       {item.render()}

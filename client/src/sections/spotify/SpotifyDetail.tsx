@@ -19,7 +19,10 @@ function SpotifySignals() {
           const np = data.nowPlaying;
           const topArtist = data.topArtists.shortTerm[0];
           const topTrack = data.topTracks.shortTerm[0];
-          const playbackStatus = np ? (np.isPlaying ? 'Live' : 'Paused') : 'Idle';
+          let playbackStatus = 'Idle';
+          if (np) {
+            playbackStatus = np.isPlaying ? 'Live' : 'Paused';
+          }
           return (
             <div className="grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-3">
               <div className="row-span-2 text-center">

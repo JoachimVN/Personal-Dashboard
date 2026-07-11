@@ -27,7 +27,10 @@ function PersonalSignals() {
   const calendar = useWidget<CalendarData>('calendar').envelope?.data;
   const gmail = useWidget<GmailData>('gmail').envelope?.data;
   const next = calendar?.events[0];
-  const nextEventDetail = next ? (next.allDay ? 'All day' : next.startLabel) : 'Nothing scheduled next';
+  let nextEventDetail = 'Nothing scheduled next';
+  if (next) {
+    nextEventDetail = next.allDay ? 'All day' : next.startLabel;
+  }
 
   return (
     <div className="detail-signal-panel grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-3">
