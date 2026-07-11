@@ -7,6 +7,9 @@ const persistedSnapshotSchema = z.object({
   available: z.boolean(),
   fiveHour: z.object({ usedPercent: z.number(), resetsAt: z.string() }).optional(),
   weekly: z.object({ usedPercent: z.number(), resetsAt: z.string() }).optional(),
+  context: z
+    .object({ usedPercent: z.number(), tokens: z.number(), contextWindow: z.number(), model: z.string().optional() })
+    .optional(),
   asOf: z.string().optional(),
 });
 
@@ -63,6 +66,7 @@ export class UsageHistoryStore {
       at: snapshot.asOf,
       fiveHourUsedPercent: snapshot.fiveHour?.usedPercent,
       weeklyUsedPercent: snapshot.weekly?.usedPercent,
+      contextUsedPercent: snapshot.context?.usedPercent,
     });
     const cutoff = Date.now() - this.retentionMs;
     this.tools[toolId] = points.filter((point) => Date.parse(point.at) >= cutoff);
