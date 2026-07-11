@@ -2,13 +2,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { z } from 'zod';
+import { healthIngestSchema } from '@personal-dashboard/shared';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
+import { LayoutStore } from './layoutStore.js';
 import { ProviderScheduler } from './scheduler.js';
 import { createProviders } from './providers/index.js';
 import { createIssue, issueErrorCode, parseIssueInput } from './issues.js';
 import { availableProjects, codeActionError, launchCodeAction } from './codeSession.js';
 import { listOwnedRepos } from './providers/github.js';
+import { todayInZone } from './providers/health.js';
 
 const env = loadEnv();
 const config = loadConfig();
@@ -21,6 +24,10 @@ for (const provider of providers.all) {
   scheduler.register(provider);
 }
 scheduler.start();
+
+const layoutStore = new LayoutStore(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.data/layout.json'),
+);
 
 const AI_USAGE_WIDGET_IDS = new Set(['ai-usage-claude', 'ai-usage-codex']);
 
@@ -42,6 +49,64 @@ app.post('/api/weather/location', async (req, res) => {
   providers.weather.setCoords(parsed.data);
   await scheduler.refresh('weather'); // refresh() never throws — it stores the failure on the entry
   res.json({ ok: true });
+});
+
+const hueStateSchema = z
+  .object({
+    on: z.boolean().optional(),
+    brightness: z.number().min(1).max(100).optional(),
+  })
+  .refine((body) => body.on !== undefined || body.brightness !== undefined, {
+    message: 'at least one of on/brightness is required',
+  });
+
+app.post('/api/hue/lights/:id', async (req, res) => {
+  const parsed = hueStateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid-hue-state' });
+    return;
+  }
+  try {
+    await providers.hue.setLightState(req.params.id, parsed.data);
+  } catch {
+    res.status(502).json({ error: 'hue-control-failed' });
+    return;
+  }
+  await scheduler.refresh('hue', true);
+  res.json(scheduler.getEnvelope('hue'));
+});
+
+// Ingest endpoint for an Apple Health Shortcut running on the user's phone (over Tailscale).
+// Same trust model as the rest of the dashboard: loopback + `tailscale serve`, no separate auth.
+app.post('/api/health/ingest', async (req, res) => {
+  const parsed = healthIngestSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid-health-sample' });
+    return;
+  }
+  providers.health.ingest(parsed.data, todayInZone(env.timezone));
+  await scheduler.refresh('health'); // reflect the new sample immediately, not on the next 5-min poll
+  res.json({ ok: true });
+});
+
+const layoutOrderSchema = z.object({
+  order: z.array(z.string().min(1)).refine((order) => new Set(order).size === order.length, {
+    message: 'order must not contain duplicates',
+  }),
+});
+
+app.get('/api/layout', (_req, res) => {
+  res.json({ layout: layoutStore.getAll() });
+});
+
+app.put('/api/layout/:sectionId', (req, res) => {
+  const parsed = layoutOrderSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid-layout-order' });
+    return;
+  }
+  layoutStore.set(req.params.sectionId, parsed.data.order);
+  res.json({ order: parsed.data.order });
 });
 
 app.get('/api/widgets', (_req, res) => {

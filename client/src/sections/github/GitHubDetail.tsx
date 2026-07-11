@@ -1,3 +1,7 @@
+import type { GitHubData } from '@personal-dashboard/shared';
+import { AnimatedNumber } from '../../components/AnimatedNumber';
+import { WidgetBody } from '../../components/WidgetCard';
+import { useWidget } from '../../useWidget';
 import {
   ContributionsWidget,
   GitHubActivityWidget,
@@ -6,23 +10,62 @@ import {
 } from '../../widgets/GitHubWidgets';
 import { IssueCapture } from './IssueCapture';
 import { CodeLauncher } from './CodeLauncher';
+import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
+
+function GitHubSignals() {
+  const { envelope, offline } = useWidget<GitHubData>('github');
+  return (
+    <div className="detail-signal-panel">
+      <WidgetBody envelope={envelope} offline={offline}>
+        {(data) => (
+          <div className="grid grid-cols-3 gap-5">
+            {[
+              [data.contributions.total, 'Year'],
+              [data.pullRequests.length, 'Open PRs'],
+              [data.issues.length, 'Issues'],
+            ].map(([value, label]) => (
+              <div key={label}>
+                <p className="text-2xl font-semibold tracking-[-0.05em] tabular-nums"><AnimatedNumber value={Number(value)} /></p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-ink-faint">{label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </WidgetBody>
+    </div>
+  );
+}
 
 export function GitHubDetail() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div className="sm:col-span-2">
-        <IssueCapture />
+    <div>
+      <DetailIntro
+        eyebrow="Build workspace"
+        title={<>Turn momentum<br /><span className="text-ink-faint">into shipped work.</span></>}
+        description="Capture the next move, launch a focused session, and keep a clean pulse on the work already in motion."
+        accent="var(--color-accent-github)"
+      >
+        <GitHubSignals />
+      </DetailIntro>
+      <DetailSectionHeading label="Start here" title="From thought to working session" detail="Capture quickly or open the full development workspace in one move." />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="lg:col-span-3">
+          <IssueCapture />
+        </div>
+        <div className="lg:col-span-2">
+          <CodeLauncher />
+        </div>
       </div>
-      <div className="sm:col-span-2">
-        <CodeLauncher />
-      </div>
-      <GitHubActivityWidget />
-      <GitHubWorkWidget />
-      <div className="sm:col-span-2">
-        <ContributionsWidget />
-      </div>
-      <div className="sm:col-span-2">
-        <RepoHealthWidget />
+      <DetailSectionHeading label="Workstream" title="What is moving now" />
+      <div className="github-work-grid grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <GitHubActivityWidget />
+        <GitHubWorkWidget />
+        <div className="lg:col-span-2">
+          <ContributionsWidget />
+        </div>
+        <div className="lg:col-span-2">
+          <RepoHealthWidget />
+        </div>
       </div>
     </div>
   );

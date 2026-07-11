@@ -2,7 +2,7 @@ import type { WeatherData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { useDeviceLocation } from '../useDeviceLocation';
 import { WidgetCard } from '../components/WidgetCard';
-import { deg, glyph } from '../lib/weather';
+import { deg, glyph, weatherLocation } from '../lib/weather';
 
 export function WeatherWidget() {
   const { envelope, offline, refetch } = useWidget<WeatherData>('weather');
@@ -19,6 +19,7 @@ export function WeatherWidget() {
               💨 {Math.round(data.current.windSpeed)} m/s
             </span>
           </div>
+          <p className="text-xs text-ink-faint">📍 {weatherLocation(data.location)}</p>
 
           <div className="flex gap-3 overflow-x-auto pb-1 text-center text-xs">
             {data.hours.map((hour) => (

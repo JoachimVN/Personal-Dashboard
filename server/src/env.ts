@@ -11,6 +11,8 @@ export interface ServerEnv {
   icloud?: { username: string; password: string };
   claudeOauthToken?: string;
   google?: { clientId: string; clientSecret: string };
+  spotify?: { clientId: string; clientSecret: string };
+  hue?: { bridgeIp: string; username: string };
 }
 
 function parseWeather(): ServerEnv['weather'] {
@@ -57,6 +59,17 @@ export function loadEnv(): ServerEnv {
             clientId: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
           }
+        : undefined,
+    spotify:
+      process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET
+        ? {
+            clientId: process.env.SPOTIFY_CLIENT_ID,
+            clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+          }
+        : undefined,
+    hue:
+      process.env.HUE_BRIDGE_IP && process.env.HUE_USERNAME
+        ? { bridgeIp: process.env.HUE_BRIDGE_IP, username: process.env.HUE_USERNAME }
         : undefined,
   };
 }

@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { relativeFutureTime } from '../../lib/time';
+import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { UsageSparkline } from './UsageHistoryChart';
@@ -55,6 +56,15 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                 windowMs={DAY_MS}
                 color={color}
               />
+              {data.context && (
+                <div className="flex items-baseline justify-between pt-0.5 text-[11px] text-ink-faint">
+                  <span>session context</span>
+                  <span className="font-medium tabular-nums text-ink-muted">
+                    {formatCompactNumber(data.context.tokens)} / {formatCompactNumber(data.context.contextWindow)}{' '}
+                    tokens
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <p className="text-xs text-ink-faint">

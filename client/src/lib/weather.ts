@@ -13,3 +13,10 @@ export function glyph(symbol: string): string {
 }
 
 export const deg = (temp: number) => `${Math.round(temp)}°`;
+
+export function weatherLocation(location: { lat: number; lon: number; name?: string }): string {
+  if (location.name) return location.name;
+  const latitude = `${Math.abs(location.lat).toFixed(2)}° ${location.lat >= 0 ? 'N' : 'S'}`;
+  const longitude = `${Math.abs(location.lon).toFixed(2)}° ${location.lon >= 0 ? 'E' : 'W'}`;
+  return `${latitude} · ${longitude}`;
+}

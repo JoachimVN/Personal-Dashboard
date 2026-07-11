@@ -1,12 +1,14 @@
 import type {
   CalendarData,
   GmailData,
+  HueData,
+  IMessageData,
   NewsData,
   WeatherData,
 } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
-import { deg, glyph } from '../../lib/weather';
+import { deg, glyph, weatherLocation } from '../../lib/weather';
 import { relativeTime } from '../../lib/time';
 import { TodayBrief } from './TodayBrief';
 
@@ -33,6 +35,8 @@ export function PersonalOverview() {
   const calendar = useWidget<CalendarData>('calendar');
   const gmail = useWidget<GmailData>('gmail');
   const news = useWidget<NewsData>('news');
+  const hue = useWidget<HueData>('hue');
+  const imessage = useWidget<IMessageData>('imessage');
 
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-3">
@@ -40,8 +44,9 @@ export function PersonalOverview() {
       <Mini label="Weather">
         <WidgetBody envelope={weather.envelope} offline={weather.offline}>
           {(data) => (
-            <span className="font-semibold">
-              {glyph(data.current.symbol)} {deg(data.current.temperature)}
+            <span className="flex flex-col">
+              <span className="font-semibold">{glyph(data.current.symbol)} {deg(data.current.temperature)}</span>
+              <span className="text-[10px] text-ink-faint">{weatherLocation(data.location)}</span>
             </span>
           )}
         </WidgetBody>
@@ -67,6 +72,34 @@ export function PersonalOverview() {
               </span>
             ) : (
               <span className="text-ink-faint">Nothing scheduled</span>
+            );
+          }}
+        </WidgetBody>
+      </Mini>
+      <Mini label="Lights">
+        <WidgetBody envelope={hue.envelope} offline={hue.offline}>
+          {(data) => {
+            const on = data.lights.filter((light) => light.on).length;
+            return (
+              <span>
+                <span className="font-semibold tabular-nums">{on}</span>{' '}
+                <span className="text-ink-muted">/ {data.lights.length} on</span>
+              </span>
+            );
+          }}
+        </WidgetBody>
+      </Mini>
+      <Mini label="Messages">
+        <WidgetBody envelope={imessage.envelope} offline={imessage.offline}>
+          {(data) => {
+            const unread = data.conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+            return unread > 0 ? (
+              <span>
+                <span className="font-semibold tabular-nums">{unread}</span>{' '}
+                <span className="text-ink-muted">unread</span>
+              </span>
+            ) : (
+              <span className="text-ink-faint">All caught up</span>
             );
           }}
         </WidgetBody>

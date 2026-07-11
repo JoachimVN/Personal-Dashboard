@@ -115,3 +115,79 @@ One-time setup:
 The widget requests only the **`gmail.metadata`** scope — message headers and labels, never bodies.
 
 ⚠️ **Testing-mode expiry**: while the OAuth consent screen is in *Testing* status, Google expires refresh tokens after **7 days** and you'd have to re-run setup weekly. Fix: on the consent screen page, add yourself as a test user, then **publish** the app (it can stay unverified — only your own account uses it); published apps get long-lived refresh tokens.
+
+### Spotify
+
+One-time setup:
+
+1. In [developer.spotify.com](https://developer.spotify.com/dashboard), create an app; put its Client ID/secret in `server/.env` as `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET`.
+2. Run `npm run setup:spotify -w server`. It prints an exact redirect URI (`http://127.0.0.1:8888/callback`) — add that under the app's **Settings → Redirect URIs** and save.
+3. Open the printed authorize URL, approve. The refresh token is saved to `server/.tokens/spotify.json` (owner-only permissions); restart the server.
+
+Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months.
+
+### Philips Hue
+
+One-time pairing:
+
+1. Find your bridge's IP — either via [discovery.meethue.com](https://discovery.meethue.com) or your router's device list.
+2. Press the physical link button on the bridge, then within ~30 seconds run:
+   ```bash
+   curl -k -X POST https://<bridge-ip>/api -d '{"devicetype":"personal-dashboard"}'
+   ```
+   (`-k` skips certificate verification — the bridge's HTTPS cert is self-signed and never leaves your LAN.) The response contains a `username` — that's your API key.
+3. Set in `server/.env`:
+   - `HUE_BRIDGE_IP` — the bridge's IP
+   - `HUE_USERNAME` — the API key from step 2
+4. Restart the server — like every env-configured widget, Hue is only checked at startup.
+
+Control is read + write: toggling a light or dragging its brightness slider sends the change straight to the bridge. Individual lights only for now — no rooms/groups/scenes. If the bridge's IP ever changes (e.g. a new DHCP lease), update `HUE_BRIDGE_IP` and restart.
+
+### iMessage (macOS only)
+
+Reads `~/Library/Messages/chat.db` directly (read-only) — no setup beyond granting **Full Disk Access**:
+
+1. System Settings → Privacy & Security → **Full Disk Access**.
+2. Add the process that actually reads the file, not just "Terminal" in the abstract:
+   - Running via `npm run dev` from Terminal.app or iTerm — add that terminal app.
+   - Running via the `install-launchd.sh` agent — launchd execs `node` directly with no GUI parent, so add the **node binary itself** (find it with `which node`, e.g. `/opt/homebrew/bin/node`).
+3. Restart the server — granting access mid-session doesn't retroactively enable the widget.
+
+Shows the most recent message per conversation and an unread count. Personal chat handles are resolved through the local macOS Contacts database, while group/business display names come from Messages; unresolved handles fall back to their phone number or email. Modern `attributedBody` message text is decoded, and attachment-only messages show as `[attachment]`.
+
+⚠️ **Privacy**: message previews are cached server-side and served to any device that reaches this dashboard, i.e. your phone over Tailscale — not just something read and kept on the Mac.
+
+### Health (Apple Health via Shortcut)
+
+Apple Health can't be read from a server, so the phone pushes to the dashboard instead. There's no
+external setup and no credentials — the widget appears immediately (empty until the first post) and
+is fed by an **Apple Shortcut** you build once.
+
+Build a Shortcut (and, optionally, a Personal Automation that runs it on a schedule) that:
+
+1. Uses **Get Health Sample / Find Health Samples** actions to read today's totals (steps, active
+   energy, exercise minutes, etc.).
+2. Builds a **Dictionary** with any of these keys — all optional, all merged into today's entry so
+   you can post them from separate actions:
+
+   | key | unit |
+   | --- | --- |
+   | `steps` | count |
+   | `activeEnergyKcal` | kcal |
+   | `exerciseMinutes` | minutes |
+   | `standHours` | hours |
+   | `restingHeartRate` | bpm |
+   | `sleepHours` | hours |
+   | `workouts` | array of `{ type, durationMin?, energyKcal?, distanceKm?, start? }` |
+
+   Add `date` (`YYYY-MM-DD`) only to backfill a past day; it defaults to today.
+3. **Gets Contents of URL** — `POST http://<your-tailscale-name>:4821/api/health/ingest`, Request
+   Body **JSON**, set to the dictionary.
+
+Posts through the day overwrite that day's totals (send cumulative values). Step goal, exercise-minute
+goal and history retention live under `health` in `server/config.json` (defaults: 10 000 steps,
+30 min, 30 days).
+
+## Arranging widgets
+
+The Personal section's widget cards can be reordered: open **Personal** → **Arrange** (top-right), then drag a card to its new position. The order is saved server-side (`server/.data/layout.json`, gitignored) and shared across every device that reaches this dashboard.

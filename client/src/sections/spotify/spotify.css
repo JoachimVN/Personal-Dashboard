@@ -1,0 +1,65 @@
+/* Spotify section design tokens + flourishes, kept out of index.css so the
+   section is self-contained. --color-accent-spotify feeds the shared
+   accentStyle()/section-card-aura machinery like every other section accent. */
+:root {
+  --color-accent-spotify: light-dark(#16a34a, #1ed760);
+}
+
+@media (min-width: 1024px) {
+  .dashboard-section-card--spotify {
+    grid-column: span 12;
+  }
+}
+
+/* Small range toggle in the top-artists/tracks card headers. */
+.spotify-range-toggle {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-track);
+}
+.spotify-range-toggle button {
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  transition: color 180ms ease, background 180ms ease;
+}
+.spotify-range-toggle button[data-active='true'] {
+  color: var(--color-ink);
+  background: color-mix(in oklab, var(--color-accent-spotify) 22%, var(--color-card));
+}
+
+/* Animated equalizer bars next to the now-playing state label. */
+.spotify-eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 0.75rem;
+}
+.spotify-eq i {
+  width: 2px;
+  height: 40%;
+  border-radius: 1px;
+  background: var(--color-accent-spotify);
+}
+.spotify-eq--on i {
+  animation: spotify-eq-bounce 0.9s ease-in-out infinite;
+}
+.spotify-eq--on i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.spotify-eq--on i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+@keyframes spotify-eq-bounce {
+  0%, 100% { height: 30%; }
+  50% { height: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spotify-eq--on i { animation: none; }
+}

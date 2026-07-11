@@ -4,6 +4,11 @@ import { z } from 'zod';
 const symbol = z.string();
 
 export const weatherSchema = z.object({
+  location: z.object({
+    lat: z.number(),
+    lon: z.number(),
+    name: z.string(),
+  }),
   current: z.object({
     temperature: z.number(),
     windSpeed: z.number(),

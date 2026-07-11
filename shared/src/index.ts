@@ -6,3 +6,7 @@ export * from './schemas/aiUsage.js';
 export * from './schemas/calendar.js';
 export * from './schemas/gmail.js';
 export * from './schemas/news.js';
+export * from './schemas/hue.js';
+export * from './schemas/imessage.js';
+export * from './schemas/spotify.js';
+export * from './schemas/health.js';

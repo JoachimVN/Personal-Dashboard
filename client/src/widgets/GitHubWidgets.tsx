@@ -13,22 +13,38 @@ export function GitHubActivityWidget() {
   return (
     <WidgetCard title="GitHub activity" envelope={envelope} offline={offline}>
       {(data) => (
-        <ul className="space-y-1.5 text-sm">
+        <ul className="space-y-2 text-sm">
           {data.activity.map((item) => (
-            <li key={item.id} className="flex items-baseline gap-2">
-              <span className="truncate text-ink-muted">
-                {item.repo.split('/')[1] ?? item.repo}
-              </span>
-              {item.url ? (
-                <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
-                  {item.summary}
-                </a>
-              ) : (
-                <span className="truncate">{item.summary}</span>
+            <li key={item.id} className="group rounded-xl border border-transparent bg-track/25 px-3 py-2 transition hover:border-card-border hover:bg-track/45">
+              <div className="flex items-baseline gap-2">
+                <span className="truncate text-ink-muted">
+                  {item.repo.split('/')[1] ?? item.repo}
+                </span>
+                {item.url ? (
+                  <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
+                    {item.summary}
+                  </a>
+                ) : (
+                  <span className="truncate">{item.summary}</span>
+                )}
+                <span className="ml-auto shrink-0 text-xs text-ink-faint">
+                  {relativeTime(item.timestamp)}
+                </span>
+              </div>
+              {item.commits && item.commits.length > 0 && (
+                <ul className="mt-1.5 space-y-1 border-l border-card-border pl-3">
+                  {item.commits.slice(0, 3).map((message) => (
+                    <li key={`${item.id}-${message}`} className="truncate text-xs text-ink-muted">
+                      {message}
+                    </li>
+                  ))}
+                  {item.commits.length > 3 && (
+                    <li className="text-xs text-ink-faint">
+                      +{item.commits.length - 3} more
+                    </li>
+                  )}
+                </ul>
               )}
-              <span className="ml-auto shrink-0 text-xs text-ink-faint">
-                {relativeTime(item.timestamp)}
-              </span>
             </li>
           ))}
           {data.activity.length === 0 && (
@@ -91,9 +107,9 @@ function WorkList({
       {items.length === 0 ? (
         <p className="text-ink-faint">{empty}</p>
       ) : (
-        <ul className="space-y-1">
+        <ul className="space-y-2">
           {items.map((item) => (
-            <li key={item.key} className="leading-tight">
+            <li key={item.key} className="rounded-xl bg-track/25 px-3 py-2 leading-tight transition hover:bg-track/45">
               <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
                 {item.title}
               </a>
@@ -150,15 +166,15 @@ function ContributionGrid({
     <div>
       <div
         ref={scrollRef}
-        className="flex gap-0.5 overflow-x-auto pb-1"
+        className="flex gap-1 overflow-x-auto rounded-2xl bg-track/25 p-3"
         onMouseLeave={() => onHover(null)}
       >
-        {weeks.map((week, i) => (
-          <div key={i} className="flex flex-col gap-0.5">
+        {weeks.map((week) => (
+          <div key={week[0].date} className="flex flex-col gap-1">
             {week.map((day) => (
               <span
                 key={day.date}
-                className="block h-2.5 w-2.5 rounded-[3px]"
+                className="block h-2.5 w-2.5 rounded-[3px] transition-transform hover:scale-125"
                 style={{ backgroundColor: rampColor(day.count, max) }}
                 aria-label={`${day.date}: ${day.count} contributions`}
                 onMouseEnter={() => onHover(day)}
@@ -181,9 +197,9 @@ export function RepoHealthWidget() {
   return (
     <WidgetCard title="Repos" envelope={envelope} offline={offline}>
       {(data) => (
-        <ul className="space-y-1.5 text-sm">
+        <ul className="grid gap-2 text-sm sm:grid-cols-2">
           {data.repoHealth.map((repo) => (
-            <li key={repo.fullName} className="flex items-center gap-2">
+            <li key={repo.fullName} className="flex items-center gap-2 rounded-xl bg-track/25 px-3 py-2.5 transition hover:bg-track/45">
               <a href={repo.url} target="_blank" rel="noreferrer" className={linkClass}>
                 {repo.fullName.split('/')[1]}
               </a>
