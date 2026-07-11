@@ -1,6 +1,7 @@
 import { CalendarWidget } from '../../widgets/CalendarWidget';
 import { GmailWidget } from '../../widgets/GmailWidget';
 import { HueWidget } from '../../widgets/HueWidget';
+import { IMessageWidget } from '../../widgets/IMessageWidget';
 import { NewsWidget } from '../../widgets/NewsWidget';
 import { WeatherWidget } from '../../widgets/WeatherWidget';
 import { SystemFooter } from '../../components/SystemFooter';
@@ -14,6 +15,7 @@ export function PersonalDetail() {
         <GmailWidget />
         <NewsWidget />
         <HueWidget />
+        <IMessageWidget />
       </div>
       <SystemFooter />
     </div>

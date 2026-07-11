@@ -2,6 +2,7 @@ import type {
   CalendarData,
   GmailData,
   HueData,
+  IMessageData,
   NewsData,
   WeatherData,
 } from '@personal-dashboard/shared';
@@ -35,6 +36,7 @@ export function PersonalOverview() {
   const gmail = useWidget<GmailData>('gmail');
   const news = useWidget<NewsData>('news');
   const hue = useWidget<HueData>('hue');
+  const imessage = useWidget<IMessageData>('imessage');
 
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-3">
@@ -82,6 +84,21 @@ export function PersonalOverview() {
                 <span className="font-semibold tabular-nums">{on}</span>{' '}
                 <span className="text-ink-muted">/ {data.lights.length} on</span>
               </span>
+            );
+          }}
+        </WidgetBody>
+      </Mini>
+      <Mini label="Messages">
+        <WidgetBody envelope={imessage.envelope} offline={imessage.offline}>
+          {(data) => {
+            const unread = data.conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+            return unread > 0 ? (
+              <span>
+                <span className="font-semibold tabular-nums">{unread}</span>{' '}
+                <span className="text-ink-muted">unread</span>
+              </span>
+            ) : (
+              <span className="text-ink-faint">All caught up</span>
             );
           }}
         </WidgetBody>

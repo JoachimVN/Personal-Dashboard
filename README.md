@@ -132,3 +132,17 @@ One-time pairing:
 4. Restart the server — like every env-configured widget, Hue is only checked at startup.
 
 Control is read + write: toggling a light or dragging its brightness slider sends the change straight to the bridge. Individual lights only for now — no rooms/groups/scenes. If the bridge's IP ever changes (e.g. a new DHCP lease), update `HUE_BRIDGE_IP` and restart.
+
+### iMessage (macOS only)
+
+Reads `~/Library/Messages/chat.db` directly (read-only) — no setup beyond granting **Full Disk Access**:
+
+1. System Settings → Privacy & Security → **Full Disk Access**.
+2. Add the process that actually reads the file, not just "Terminal" in the abstract:
+   - Running via `npm run dev` from Terminal.app or iTerm — add that terminal app.
+   - Running via the `install-launchd.sh` agent — launchd execs `node` directly with no GUI parent, so add the **node binary itself** (find it with `which node`, e.g. `/opt/homebrew/bin/node`).
+3. Restart the server — granting access mid-session doesn't retroactively enable the widget.
+
+Shows the most recent message per conversation and an unread count; group-chat/contact names fall back to the raw handle (phone/email) when macOS hasn't set a display name, and rich messages without plain text show as `[message]` (Apple stores those in a binary format this doesn't parse).
+
+⚠️ **Privacy**: message previews are cached server-side and served to any device that reaches this dashboard, i.e. your phone over Tailscale — not just something read and kept on the Mac.

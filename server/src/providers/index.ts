@@ -9,6 +9,7 @@ import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
 import { createGmailProvider } from './gmail.js';
 import { createHueProvider, type HueProvider } from './hue.js';
+import { createIMessageProvider } from './imessage.js';
 import { createNewsProvider } from './news.js';
 import { createSystemProvider } from './system.js';
 import { createWeatherProvider, type WeatherProvider } from './weather.js';
@@ -40,6 +41,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
       createNewsProvider(config.news.feeds),
       createSystemProvider(env.timezone),
       hue,
+      createIMessageProvider(),
     ],
   };
 }
