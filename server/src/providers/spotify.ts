@@ -123,11 +123,11 @@ export function createSpotifyProvider(
       const [current, recent, artistsShort, artistsMedium, tracksShort, tracksMedium] =
         await Promise.all([
           get<CurrentlyPlaying>('/me/player/currently-playing'),
-          get<RecentlyPlayed>('/me/player/recently-played?limit=10'),
+          get<RecentlyPlayed>('/me/player/recently-played?limit=50'),
           get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8'),
           get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8'),
-          get<TopResponse<RawTrack>>('/me/top/tracks?time_range=short_term&limit=8'),
-          get<TopResponse<RawTrack>>('/me/top/tracks?time_range=medium_term&limit=8'),
+          get<TopResponse<RawTrack>>('/me/top/tracks?time_range=short_term&limit=50'),
+          get<TopResponse<RawTrack>>('/me/top/tracks?time_range=medium_term&limit=50'),
         ]);
 
       const nowPlaying =

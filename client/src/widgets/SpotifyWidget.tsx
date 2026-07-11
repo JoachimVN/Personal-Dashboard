@@ -1,26 +1,46 @@
 import { useState } from 'react';
 import type { SpotifyData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
-import { WidgetBody, WidgetShell } from '../components/WidgetCard';
-import { StaleBadge } from '../components/WidgetCard';
+import { StaleBadge, WidgetBody, WidgetShell } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
 
 type Range = 'shortTerm' | 'mediumTerm';
 const RANGE_LABEL: Record<Range, string> = { shortTerm: '4 weeks', mediumTerm: '6 months' };
 
-const linkClass = 'truncate font-medium text-ink hover:underline';
+type Track = SpotifyData['topTracks']['shortTerm'][number];
+type Artist = SpotifyData['topArtists']['shortTerm'][number];
 
-function TrackThumb({ url }: { url?: string }) {
+const linkClass = 'truncate font-medium text-ink hover:underline';
+const accent = 'var(--color-accent-spotify)';
+
+function Thumb({ url, size = 'h-10 w-10' }: { url?: string; size?: string }) {
   return url ? (
-    <img src={url} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover" />
+    <img src={url} alt="" className={`${size} shrink-0 rounded-md object-cover`} />
   ) : (
-    <div className="h-10 w-10 shrink-0 rounded-md bg-track" />
+    <div className={`${size} shrink-0 rounded-md bg-track`} />
   );
 }
 
 function Rank({ n }: { n: number }) {
+  return <span className="w-5 shrink-0 text-right text-xs tabular-nums text-ink-faint">{n}</span>;
+}
+
+function TrackRow({ track, rank }: { track: Track; rank: number }) {
   return (
-    <span className="w-4 shrink-0 text-right text-xs tabular-nums text-ink-faint">{n}</span>
+    <li className="flex items-center gap-3 rounded-xl bg-track/25 px-3 py-2 transition hover:bg-track/45">
+      <Rank n={rank} />
+      <Thumb url={track.imageUrl} />
+      <div className="min-w-0">
+        {track.url ? (
+          <a href={track.url} target="_blank" rel="noreferrer" className={linkClass}>
+            {track.track}
+          </a>
+        ) : (
+          <span className="truncate font-medium">{track.track}</span>
+        )}
+        <p className="truncate text-xs text-ink-faint">{track.artist}</p>
+      </div>
+    </li>
   );
 }
 
@@ -68,7 +88,7 @@ export function NowPlaying({ nowPlaying }: { nowPlaying: SpotifyData['nowPlaying
         </p>
         {pct !== null && (
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-track">
-            <div className="h-full rounded-full bg-(--color-accent-spotify)" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
           </div>
         )}
       </div>
@@ -87,7 +107,7 @@ export function NowPlayingWidget() {
   );
 }
 
-// ── Top artists / tracks (with time-range toggle) ───────────────────────────
+// ── Time-range toggle ───────────────────────────────────────────────────────
 
 function RangeToggle({ range, onChange }: { range: Range; onChange: (r: Range) => void }) {
   return (
@@ -101,6 +121,63 @@ function RangeToggle({ range, onChange }: { range: Range; onChange: (r: Range) =
   );
 }
 
+// ── Top artists (grid) + featured #1 track ─────────────────────────────────
+
+function FeaturedTrack({ track, label }: { track: Track; label: string }) {
+  const content = (
+    <>
+      <Thumb url={track.imageUrl} size="h-16 w-16 sm:h-20 sm:w-20" />
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
+          Your #1 track · {label}
+        </p>
+        <p className="mt-0.5 truncate text-base font-semibold text-ink">{track.track}</p>
+        <p className="truncate text-sm text-ink-muted">{track.artist}</p>
+      </div>
+    </>
+  );
+  const className =
+    'col-span-full flex items-center gap-4 rounded-2xl border border-card-border p-3 transition hover:border-white/15 sm:p-4';
+  const style = { background: `color-mix(in oklab, ${accent} 10%, var(--color-card))` };
+  return track.url ? (
+    <a href={track.url} target="_blank" rel="noreferrer" className={`${className} group`} style={style}>
+      {content}
+    </a>
+  ) : (
+    <div className={className} style={style}>
+      {content}
+    </div>
+  );
+}
+
+function ArtistCell({ artist, rank }: { artist: Artist; rank: number }) {
+  const inner = (
+    <>
+      <div className="relative aspect-square overflow-hidden rounded-xl bg-track">
+        {artist.imageUrl && (
+          <img
+            src={artist.imageUrl}
+            alt=""
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          />
+        )}
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-xs font-medium tabular-nums text-white">
+          {rank}
+        </span>
+      </div>
+      <p className="mt-1.5 truncate text-sm font-medium text-ink">{artist.name}</p>
+      {artist.genres[0] && <p className="truncate text-xs text-ink-faint">{artist.genres[0]}</p>}
+    </>
+  );
+  return artist.url ? (
+    <a href={artist.url} target="_blank" rel="noreferrer" className="group block">
+      {inner}
+    </a>
+  ) : (
+    <div className="group block">{inner}</div>
+  );
+}
+
 export function TopArtistsWidget() {
   const { envelope, offline } = useWidget<SpotifyData>('spotify');
   const [range, setRange] = useState<Range>('shortTerm');
@@ -108,35 +185,26 @@ export function TopArtistsWidget() {
     <WidgetShell title="Top artists" badge={<RangeToggle range={range} onChange={setRange} />}>
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) => {
-          const artists = data.topArtists[range];
-          if (artists.length === 0) return <p className="text-sm text-ink-faint">No data yet.</p>;
+          const artists = data.topArtists[range].slice(0, 8);
+          const topTrack = data.topTracks[range][0];
+          if (artists.length === 0 && !topTrack) {
+            return <p className="text-sm text-ink-faint">No data yet.</p>;
+          }
           return (
-            <ol className="space-y-2 text-sm">
+            <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4">
+              {topTrack && <FeaturedTrack track={topTrack} label={RANGE_LABEL[range]} />}
               {artists.map((artist, i) => (
-                <li key={`${artist.name}-${i}`} className="flex items-center gap-3 rounded-xl bg-track/25 px-3 py-2 transition hover:bg-track/45">
-                  <Rank n={i + 1} />
-                  <TrackThumb url={artist.imageUrl} />
-                  <div className="min-w-0">
-                    {artist.url ? (
-                      <a href={artist.url} target="_blank" rel="noreferrer" className={linkClass}>
-                        {artist.name}
-                      </a>
-                    ) : (
-                      <span className="truncate font-medium">{artist.name}</span>
-                    )}
-                    {artist.genres.length > 0 && (
-                      <p className="truncate text-xs text-ink-faint">{artist.genres.slice(0, 2).join(' · ')}</p>
-                    )}
-                  </div>
-                </li>
+                <ArtistCell key={`${artist.name}-${i}`} artist={artist} rank={i + 1} />
               ))}
-            </ol>
+            </div>
           );
         }}
       </WidgetBody>
     </WidgetShell>
   );
 }
+
+// ── Top tracks (up to 50, scrollable) ──────────────────────────────────────
 
 export function TopTracksWidget() {
   const { envelope, offline } = useWidget<SpotifyData>('spotify');
@@ -148,22 +216,9 @@ export function TopTracksWidget() {
           const tracks = data.topTracks[range];
           if (tracks.length === 0) return <p className="text-sm text-ink-faint">No data yet.</p>;
           return (
-            <ol className="space-y-2 text-sm">
+            <ol className="max-h-[34rem] space-y-2 overflow-y-auto pr-1 text-sm">
               {tracks.map((track, i) => (
-                <li key={`${track.track}-${i}`} className="flex items-center gap-3 rounded-xl bg-track/25 px-3 py-2 transition hover:bg-track/45">
-                  <Rank n={i + 1} />
-                  <TrackThumb url={track.imageUrl} />
-                  <div className="min-w-0">
-                    {track.url ? (
-                      <a href={track.url} target="_blank" rel="noreferrer" className={linkClass}>
-                        {track.track}
-                      </a>
-                    ) : (
-                      <span className="truncate font-medium">{track.track}</span>
-                    )}
-                    <p className="truncate text-xs text-ink-faint">{track.artist}</p>
-                  </div>
-                </li>
+                <TrackRow key={`${track.track}-${i}`} track={track} rank={i + 1} />
               ))}
             </ol>
           );
@@ -173,7 +228,7 @@ export function TopTracksWidget() {
   );
 }
 
-// ── Recently played ─────────────────────────────────────────────────────────
+// ── Recently played (up to 50, scrollable) ─────────────────────────────────
 
 export function RecentlyPlayedWidget() {
   const { envelope, offline } = useWidget<SpotifyData>('spotify');
@@ -184,10 +239,10 @@ export function RecentlyPlayedWidget() {
           data.recentlyPlayed.length === 0 ? (
             <p className="text-sm text-ink-faint">No recent listening.</p>
           ) : (
-            <ul className="space-y-2 text-sm">
+            <ul className="max-h-[34rem] space-y-2 overflow-y-auto pr-1 text-sm">
               {data.recentlyPlayed.map((track, i) => (
                 <li key={`${track.playedAt}-${i}`} className="flex items-center gap-3 rounded-xl bg-track/25 px-3 py-2 transition hover:bg-track/45">
-                  <TrackThumb url={track.imageUrl} />
+                  <Thumb url={track.imageUrl} />
                   <div className="min-w-0 flex-1">
                     {track.url ? (
                       <a href={track.url} target="_blank" rel="noreferrer" className={linkClass}>

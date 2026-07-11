@@ -66,11 +66,11 @@ export function SpotifyDetail() {
       </DetailIntro>
       <DetailSectionHeading label="On now" title="What's playing" />
       <NowPlayingWidget />
-      <DetailSectionHeading label="On repeat" title="Your rotation" detail="Toggle each card between the last 4 weeks and the last 6 months." />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <DetailSectionHeading label="On repeat" title="Your rotation" detail="Toggle the top cards between the last 4 weeks and the last 6 months." />
+      <div className="space-y-4">
         <TopArtistsWidget />
-        <TopTracksWidget />
-        <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <TopTracksWidget />
           <RecentlyPlayedWidget />
         </div>
       </div>
