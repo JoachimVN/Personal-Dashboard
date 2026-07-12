@@ -13,6 +13,7 @@ type UsageSnapshot = Omit<AiUsageToolData, 'history'>;
 
 const codexLimitSchema = z.object({
   used_percent: z.number(),
+  window_minutes: z.number(),
   resets_at: z.number(),
 });
 
@@ -56,17 +57,29 @@ function asIso(timestamp: string): string | undefined {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString();
 }
 
+/** 5h = 300 minutes, weekly = 10080 minutes; classify with slack rather than exact-matching. */
+function windowBucket(windowMinutes: number): 'fiveHour' | 'weekly' | undefined {
+  if (windowMinutes > 0 && windowMinutes <= 600) return 'fiveHour';
+  if (windowMinutes >= 5000 && windowMinutes <= 20000) return 'weekly';
+  return undefined;
+}
+
 /**
  * Codex appends the live account limits to its local session event stream. Read only the newest
  * few logs: limits are account-wide and a current session always writes into the latest files.
+ *
+ * Which window rides in `primary` vs `secondary` isn't fixed — Codex has been seen reporting just
+ * the weekly window under `primary` with `secondary: null` when the 5-hour window isn't part of a
+ * given update. So classify each entry by its own `window_minutes` instead of trusting the slot,
+ * and track the newest fiveHour/weekly reading independently — one window being briefly absent from
+ * an event shouldn't blank out the other.
  */
 async function codexSnapshot(): Promise<UsageSnapshot> {
   const sessionsDir = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
   try {
     const files = (await jsonlFiles(sessionsDir)).sort().slice(-12);
-    let newest:
-      | { timestamp: string; primary?: z.infer<typeof codexLimitSchema>; secondary?: z.infer<typeof codexLimitSchema> }
-      | undefined;
+    let newestFiveHour: { timestamp: string; entry: z.infer<typeof codexLimitSchema> } | undefined;
+    let newestWeekly: { timestamp: string; entry: z.infer<typeof codexLimitSchema> } | undefined;
 
     for (const file of files) {
       const lines = (await readFile(file, 'utf8')).trim().split('\n');
@@ -74,13 +87,16 @@ async function codexSnapshot(): Promise<UsageSnapshot> {
         try {
           const event = codexEventSchema.parse(JSON.parse(line));
           const limits = event.payload.rate_limits;
-          if (!limits || (!limits.primary && !limits.secondary)) continue;
-          if (!newest || event.timestamp > newest.timestamp) {
-            newest = {
-              timestamp: event.timestamp,
-              primary: limits.primary ?? undefined,
-              secondary: limits.secondary ?? undefined,
-            };
+          if (!limits) continue;
+          for (const entry of [limits.primary, limits.secondary]) {
+            if (!entry) continue;
+            const bucket = windowBucket(entry.window_minutes);
+            if (bucket === 'fiveHour' && (!newestFiveHour || event.timestamp > newestFiveHour.timestamp)) {
+              newestFiveHour = { timestamp: event.timestamp, entry };
+            }
+            if (bucket === 'weekly' && (!newestWeekly || event.timestamp > newestWeekly.timestamp)) {
+              newestWeekly = { timestamp: event.timestamp, entry };
+            }
           }
         } catch {
           // Session streams also contain unrelated messages; ignore malformed/irrelevant lines.
@@ -88,9 +104,13 @@ async function codexSnapshot(): Promise<UsageSnapshot> {
       }
     }
 
-    const fiveHour = newest?.primary && limit(newest.primary.used_percent, newest.primary.resets_at);
-    const weekly = newest?.secondary && limit(newest.secondary.used_percent, newest.secondary.resets_at);
-    const asOf = newest && asIso(newest.timestamp);
+    const fiveHour = newestFiveHour && limit(newestFiveHour.entry.used_percent, newestFiveHour.entry.resets_at);
+    const weekly = newestWeekly && limit(newestWeekly.entry.used_percent, newestWeekly.entry.resets_at);
+    const newestTimestamp = [newestFiveHour?.timestamp, newestWeekly?.timestamp]
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1);
+    const asOf = newestTimestamp && asIso(newestTimestamp);
     return { available: Boolean(fiveHour || weekly), fiveHour, weekly, asOf };
   } catch {
     return { available: false };
