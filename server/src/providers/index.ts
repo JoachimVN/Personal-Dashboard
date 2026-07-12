@@ -52,7 +52,9 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
       createSpotifyProvider(env.spotify),
       createHealthProvider(health, env.timezone, {
         steps: config.health.stepGoal,
+        activeEnergyKcal: config.health.moveGoalKcal,
         exerciseMinutes: config.health.exerciseGoalMinutes,
+        standHours: config.health.standGoalHours,
       }),
       createSystemProvider(env.timezone),
       hue,

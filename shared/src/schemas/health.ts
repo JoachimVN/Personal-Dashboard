@@ -15,7 +15,15 @@ export const healthDaySchema = z.object({
   activeEnergyKcal: z.number().optional(),
   exerciseMinutes: z.number().optional(),
   standHours: z.number().optional(),
+  /** Average regular (non-resting) heart rate for the day, in BPM. */
+  heartRate: z.number().optional(),
   restingHeartRate: z.number().optional(),
+  /** Time spent outdoors in daylight today, in minutes. */
+  daylightMinutes: z.number().optional(),
+  /** Average blood-oxygen saturation for the day, as a percentage (for example, 98). */
+  bloodOxygenPercent: z.number().optional(),
+  /** Average respiratory rate for the day, in breaths per minute. */
+  respiratoryRate: z.number().optional(),
   sleepHours: z.number().optional(),
   workouts: z.array(healthWorkoutSchema).default([]),
 });
@@ -31,7 +39,11 @@ export const healthIngestSchema = z.object({
   activeEnergyKcal: z.number().nonnegative().optional(),
   exerciseMinutes: z.number().nonnegative().optional(),
   standHours: z.number().nonnegative().optional(),
+  heartRate: z.number().positive().optional(),
   restingHeartRate: z.number().positive().optional(),
+  daylightMinutes: z.number().nonnegative().optional(),
+  bloodOxygenPercent: z.number().positive().max(100).optional(),
+  respiratoryRate: z.number().positive().optional(),
   sleepHours: z.number().nonnegative().optional(),
   workouts: z.array(healthWorkoutSchema).optional(),
 });
@@ -43,7 +55,9 @@ export const healthSchema = z.object({
   updatedAt: z.string().nullable(),
   goals: z.object({
     steps: z.number(),
+    activeEnergyKcal: z.number(),
     exerciseMinutes: z.number(),
+    standHours: z.number(),
   }),
 });
 

@@ -10,7 +10,7 @@ export function todayInZone(timezone: string): string {
 export function createHealthProvider(
   store: HealthStore,
   timezone: string,
-  goals: { steps: number; exerciseMinutes: number },
+  goals: { steps: number; activeEnergyKcal: number; exerciseMinutes: number; standHours: number },
 ): Provider<HealthData> {
   return {
     id: 'health',

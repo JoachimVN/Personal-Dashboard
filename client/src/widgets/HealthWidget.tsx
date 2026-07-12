@@ -35,6 +35,64 @@ function Stat({ value, label }: Readonly<{ value: string; label: string }>) {
   );
 }
 
+function ActivityRings({
+  activeEnergyKcal,
+  exerciseMinutes,
+  standHours,
+  goals,
+}: Readonly<{
+  activeEnergyKcal: number;
+  exerciseMinutes: number;
+  standHours: number;
+  goals: HealthData['goals'];
+}>) {
+  const rings = [
+    { label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', color: '#ff2d55', radius: 44 },
+    { label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', color: '#b8ed32', radius: 33 },
+    { label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', color: '#31c6e8', radius: 22 },
+  ];
+
+  return (
+    <div className="rounded-2xl bg-track/25 p-3">
+      <div className="flex items-center gap-4">
+        <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" aria-label="Daily activity rings" role="img">
+          {rings.map((ring) => {
+            const circumference = 2 * Math.PI * ring.radius;
+            const progress = Math.min(ring.value / ring.goal, 1);
+            return (
+              <g key={ring.label} transform="rotate(-90 60 60)">
+                <circle cx="60" cy="60" r={ring.radius} fill="none" stroke="var(--color-track)" strokeWidth="9" />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r={ring.radius}
+                  fill="none"
+                  stroke={ring.color}
+                  strokeWidth="9"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference * (1 - progress)}
+                  className="transition-[stroke-dashoffset] duration-500"
+                />
+              </g>
+            );
+          })}
+        </svg>
+        <div className="min-w-0 flex-1 space-y-2">
+          {rings.map((ring) => (
+            <div key={ring.label} className="flex items-baseline justify-between gap-2 text-xs">
+              <span className="font-medium" style={{ color: ring.color }}>{ring.label}</span>
+              <span className="tabular-nums text-ink-faint">
+                <span className="font-semibold text-ink">{Math.round(ring.value).toLocaleString()}</span> / {ring.goal.toLocaleString()} {ring.unit}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StepsTrend({ history, goal }: Readonly<{ history: HealthDay[]; goal: number }>) {
   const days = history.slice(-7);
   if (days.length < 2) return null;
@@ -77,17 +135,25 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
   }
 
   const stats: { value: string; label: string }[] = [];
-  if (t?.activeEnergyKcal != null) stats.push({ value: `${Math.round(t.activeEnergyKcal)}`, label: 'kcal' });
   if (t?.sleepHours != null) stats.push({ value: `${t.sleepHours.toFixed(1)}h`, label: 'sleep' });
+  if (t?.heartRate != null) stats.push({ value: `${Math.round(t.heartRate)}`, label: 'avg bpm' });
   if (t?.restingHeartRate != null) stats.push({ value: `${Math.round(t.restingHeartRate)}`, label: 'rest bpm' });
-  if (t?.standHours != null) stats.push({ value: `${Math.round(t.standHours)}`, label: 'stand hrs' });
+  if (t?.daylightMinutes != null) stats.push({ value: `${Math.round(t.daylightMinutes)}m`, label: 'daylight' });
+  if (t?.bloodOxygenPercent != null) stats.push({ value: `${Math.round(t.bloodOxygenPercent)}%`, label: 'avg oxygen' });
+  if (t?.respiratoryRate != null) stats.push({ value: `${t.respiratoryRate.toFixed(1)}`, label: 'avg resp / min' });
 
   return (
     <div className="space-y-4">
       <div className="space-y-3">
         <Bar label="Steps" value={t?.steps ?? 0} goal={data.goals.steps} unit="" />
-        <Bar label="Exercise" value={t?.exerciseMinutes ?? 0} goal={data.goals.exerciseMinutes} unit="min" />
       </div>
+
+      <ActivityRings
+        activeEnergyKcal={t?.activeEnergyKcal ?? 0}
+        exerciseMinutes={t?.exerciseMinutes ?? 0}
+        standHours={t?.standHours ?? 0}
+        goals={data.goals}
+      />
 
       {stats.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
