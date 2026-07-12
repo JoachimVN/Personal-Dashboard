@@ -11,10 +11,27 @@ export interface RawEvent {
     commits?: { sha: string; message: string }[];
     action?: string;
     ref?: string | null;
+    before?: string;
+    head?: string;
     ref_type?: string;
     pull_request?: { number: number; html_url: string };
     issue?: { number: number; html_url: string };
     release?: { tag_name: string; html_url: string };
+  };
+}
+
+type ActivityCommit = { sha: string; title: string; description?: string };
+
+function toActivityCommit(commit: { sha: string; message: string }): ActivityCommit | undefined {
+  const [firstLine, ...remainingLines] = commit.message.split(/\r?\n/);
+  const title = firstLine.trim();
+  if (!title) return undefined;
+
+  const description = remainingLines.join('\n').trim();
+  return {
+    sha: commit.sha,
+    title,
+    ...(description ? { description } : {}),
   };
 }
 
@@ -24,7 +41,7 @@ export function describeEvent(
   summary: string;
   url?: string;
   branch?: string;
-  commits?: { sha: string; title: string; description?: string }[];
+  commits?: ActivityCommit[];
 } | undefined {
   const p = event.payload;
   switch (event.type) {
@@ -32,17 +49,8 @@ export function describeEvent(
       const branch = p.ref?.replace('refs/heads/', '');
       // The events API carries each full commit message inline.
       const commits = (p.commits ?? [])
-        .map((commit) => {
-          const [firstLine, ...remainingLines] = commit.message.split(/\r?\n/);
-          const title = firstLine.trim();
-          const description = remainingLines.join('\n').trim();
-          return {
-            sha: commit.sha,
-            title,
-            ...(description ? { description } : {}),
-          };
-        })
-        .filter((commit) => commit.title);
+        .map(toActivityCommit)
+        .filter((commit): commit is ActivityCommit => commit !== undefined);
       if (commits.length === 0) {
         return { summary: branch ? `pushed to ${branch}` : 'pushed', branch };
       }
@@ -195,22 +203,54 @@ export function createGitHubProvider(
         }),
       );
 
-      const activity = (events.data as RawEvent[])
+      const activityCandidates = (events.data as RawEvent[])
         .map((event) => {
           const described = describeEvent(event);
-          if (!described || !event.created_at) return undefined;
+          return { event, described };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            event: RawEvent & { created_at: string };
+            described: NonNullable<ReturnType<typeof describeEvent>>;
+          } => entry.described !== undefined && entry.event.created_at !== null,
+        )
+        .slice(0, 12);
+
+      const activity = await Promise.all(
+        activityCandidates.map(async ({ event, described }) => {
+          let commits = described.commits;
+          if (!commits && event.type === 'PushEvent' && event.payload.before && event.payload.head) {
+            const [owner, repo] = event.repo.name.split('/');
+            if (owner && repo) {
+              const comparison = await octokit
+                .request('GET /repos/{owner}/{repo}/compare/{basehead}', {
+                  owner,
+                  repo,
+                  basehead: `${event.payload.before}...${event.payload.head}`,
+                  request,
+                })
+                .catch(() => undefined);
+              commits = comparison?.data.commits
+                .map((commit) => toActivityCommit({ sha: commit.sha, message: commit.commit.message }))
+                .filter((commit): commit is ActivityCommit => commit !== undefined);
+            }
+          }
+
           return {
             id: event.id,
-            summary: described.summary,
+            summary: commits?.length
+              ? `${commits.length} commit${commits.length === 1 ? '' : 's'}`
+              : described.summary,
             repo: event.repo.name,
             timestamp: event.created_at,
             url: described.url,
             branch: described.branch,
-            commits: described.commits,
+            commits,
           };
-        })
-        .filter((entry) => entry !== undefined)
-        .slice(0, 12);
+        }),
+      );
 
       const toPr = (item: SearchItem, role: 'author' | 'review-requested') => ({
         title: item.title,
