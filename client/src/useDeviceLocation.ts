@@ -1,18 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 /** Roughly 1km — avoids re-reporting on GPS jitter while still tracking real movement. */
 const MIN_DELTA_DEG = 0.01;
+
+/** Fired once the server has a fresh location so any mounted `useWidget('weather')` can refetch. */
+export const WEATHER_LOCATION_UPDATED_EVENT = 'dashboard:weather-location-updated';
 
 /**
  * Reports the browser's geolocation to the server on mount and whenever the tab
  * regains visibility, skipping the request if the device hasn't moved meaningfully.
  * Silently no-ops if geolocation is unavailable or permission is denied — the
  * server keeps using its configured fallback location.
+ *
+ * Call this once near the app root, not per-widget — geolocation permission
+ * prompts and reports should happen regardless of which page is showing.
  */
-export function useDeviceLocation(onReported?: () => void): void {
-  const onReportedRef = useRef(onReported);
-  onReportedRef.current = onReported;
-
+export function useDeviceLocation(): void {
   useEffect(() => {
     if (!('geolocation' in navigator)) return;
 
@@ -39,7 +42,7 @@ export function useDeviceLocation(onReported?: () => void): void {
             .then((res) => {
               if (!res.ok) return;
               lastSent.current = { lat, lon };
-              onReportedRef.current?.();
+              window.dispatchEvent(new Event(WEATHER_LOCATION_UPDATED_EVENT));
             })
             .catch(() => {});
         },

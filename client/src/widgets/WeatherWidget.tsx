@@ -1,12 +1,10 @@
 import type { WeatherData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
-import { useDeviceLocation } from '../useDeviceLocation';
 import { WidgetCard } from '../components/WidgetCard';
 import { deg, glyph, weatherLocation } from '../lib/weather';
 
 export function WeatherWidget() {
-  const { envelope, offline, refetch } = useWidget<WeatherData>('weather');
-  useDeviceLocation(refetch);
+  const { envelope, offline } = useWidget<WeatherData>('weather');
 
   return (
     <WidgetCard title="Weather" envelope={envelope} offline={offline}>

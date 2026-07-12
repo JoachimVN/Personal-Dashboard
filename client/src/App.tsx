@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { useHashRoute } from './router';
+import { useDeviceLocation } from './useDeviceLocation';
 import { SECTIONS, sectionById } from './sections/registry';
 import { SectionCard } from './sections/SectionCard';
 import { SectionView } from './sections/SectionView';
@@ -108,6 +109,7 @@ function Overview() {
 
 export default function App() {
   const route = useHashRoute();
+  useDeviceLocation();
 
   return (
     <div className="min-h-screen bg-canvas text-ink selection:bg-(--color-accent-ai)/25">
