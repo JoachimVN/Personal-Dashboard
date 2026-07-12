@@ -7,12 +7,13 @@ interface WidgetCardProps<T> {
   envelope: WidgetEnvelope<T> | null;
   offline: boolean;
   children: (data: T) => ReactNode;
+  errorFallback?: (envelope: WidgetEnvelope<T>) => ReactNode | undefined;
 }
 
-export function WidgetCard<T>({ title, envelope, offline, children }: WidgetCardProps<T>) {
+export function WidgetCard<T>({ title, envelope, offline, children, errorFallback }: WidgetCardProps<T>) {
   return (
     <WidgetShell title={title} badge={<StaleBadge envelope={envelope} />}>
-      <WidgetBody envelope={envelope} offline={offline}>
+      <WidgetBody envelope={envelope} offline={offline} errorFallback={errorFallback}>
         {children}
       </WidgetBody>
     </WidgetShell>
@@ -57,6 +58,7 @@ export function WidgetBody<T>({
   envelope,
   offline,
   children,
+  errorFallback,
 }: Omit<WidgetCardProps<T>, 'title'>) {
   if (offline && !envelope) {
     return <p className="text-sm text-rose-500">Can’t reach the dashboard server.</p>;
@@ -77,6 +79,8 @@ export function WidgetBody<T>({
     );
   }
   if (envelope.status === 'error' || envelope.data === undefined) {
+    const fallback = errorFallback?.(envelope);
+    if (fallback) return fallback;
     return <p className="text-sm text-rose-500">Couldn’t load ({envelope.error ?? 'unknown'}).</p>;
   }
   return <>{children(envelope.data)}</>;

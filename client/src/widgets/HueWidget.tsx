@@ -78,7 +78,16 @@ export function HueWidget() {
   const { envelope, offline, refetch } = useWidget<HueData>('hue');
 
   return (
-    <WidgetCard title="Lights" envelope={envelope} offline={offline}>
+    <WidgetCard
+      title="Lights"
+      envelope={envelope}
+      offline={offline}
+      errorFallback={(entry) =>
+        entry.error === 'timeout' ? (
+          <p className="text-sm text-ink-faint">Hue bridge is offline — lights will reconnect automatically.</p>
+        ) : undefined
+      }
+    >
       {(data) =>
         data.lights.length === 0 ? (
           <p className="text-sm text-ink-faint">No lights found on the bridge.</p>
