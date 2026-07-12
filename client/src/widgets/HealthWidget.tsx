@@ -47,33 +47,55 @@ function ActivityRings({
   goals: HealthData['goals'];
 }>) {
   const rings = [
-    { label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', color: '#ff2d55', track: '#4c0717', radius: 49 },
-    { label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', color: '#b8f400', track: '#173c0a', radius: 33 },
-    { label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', color: '#00d5ee', track: '#063940', radius: 17 },
+    { id: 'move', label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', start: '#d91f3b', end: '#ff5a8b', track: '#4c0717', radius: 48 },
+    { id: 'exercise', label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', start: '#70cc00', end: '#d4ff00', track: '#173c0a', radius: 33 },
+    { id: 'stand', label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', start: '#00b7cb', end: '#48def4', track: '#063940', radius: 18 },
   ];
 
   return (
     <div className="rounded-2xl bg-track/25 p-3">
       <div className="flex items-center gap-4">
         <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" aria-label="Daily activity rings" role="img">
+          <defs>
+            {rings.map((ring) => (
+              <linearGradient key={ring.id} id={`${ring.id}-ring-gradient`} x1="20" y1="20" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stopColor={ring.start} />
+                <stop offset="1" stopColor={ring.end} />
+              </linearGradient>
+            ))}
+          </defs>
           {rings.map((ring) => {
             const circumference = 2 * Math.PI * ring.radius;
             const progress = Math.min(Math.max(ring.value / ring.goal, 0), 1);
+            const endAngle = Math.PI * 2 * progress;
+            const endX = 60 + ring.radius * Math.cos(endAngle);
+            const endY = 60 + ring.radius * Math.sin(endAngle);
             return (
               <g key={ring.label} transform="rotate(-90 60 60)">
-                <circle cx="60" cy="60" r={ring.radius} fill="none" stroke={ring.track} strokeWidth="16" />
+                <circle cx="60" cy="60" r={ring.radius} fill="none" stroke="#090c10" strokeWidth="14" />
+                <circle cx="60" cy="60" r={ring.radius} fill="none" stroke={ring.track} strokeWidth="12" />
                 <circle
                   cx="60"
                   cy="60"
                   r={ring.radius}
                   fill="none"
-                  stroke={ring.color}
-                  strokeWidth="16"
+                  stroke={`url(#${ring.id}-ring-gradient)`}
+                  strokeWidth="12"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
                   strokeDashoffset={circumference * (1 - progress)}
                   className="transition-[stroke-dashoffset] duration-500"
                 />
+                {progress > 0 && <circle cx={60 + ring.radius} cy="60" r="6" fill={ring.start} />}
+                {progress > 0.95 && (
+                  <circle
+                    cx={endX}
+                    cy={endY}
+                    r="6"
+                    fill={ring.end}
+                    style={{ filter: 'drop-shadow(2px 2px 2px rgb(0 0 0 / 0.35))' }}
+                  />
+                )}
               </g>
             );
           })}
@@ -81,7 +103,7 @@ function ActivityRings({
         <div className="min-w-0 flex-1 space-y-2">
           {rings.map((ring) => (
             <div key={ring.label} className="flex items-baseline justify-between gap-2 text-xs">
-              <span className="font-medium" style={{ color: ring.color }}>{ring.label}</span>
+              <span className="font-medium" style={{ color: ring.end }}>{ring.label}</span>
               <span className="tabular-nums text-ink-faint">
                 <span className="font-semibold text-ink">{Math.round(ring.value).toLocaleString()}</span> / {ring.goal.toLocaleString()} {ring.unit}
               </span>
