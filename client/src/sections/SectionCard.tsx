@@ -42,6 +42,13 @@ function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
       </svg>
     );
   }
+  if (id === 'health') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
+        <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 12.5 10 17l9-10" /><path d="M19 13v6H5V5h9" />

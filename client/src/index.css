@@ -20,6 +20,7 @@
   --color-accent-ai: light-dark(#7456e8, #a995ff);
   --color-accent-github: light-dark(#2d72d9, #65a7ff);
   --color-accent-personal: light-dark(#108879, #45d7be);
+  --color-accent-health: light-dark(#d9385a, #ff6f91);
 
   /* Brand accents */
   --color-claude: light-dark(#2a78d6, #3987e5);
@@ -660,6 +661,10 @@ a {
   }
 
   .dashboard-section-card--personal {
+    grid-column: span 12;
+  }
+
+  .dashboard-section-card--health {
     grid-column: span 12;
   }
 

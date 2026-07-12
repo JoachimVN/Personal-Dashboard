@@ -51,7 +51,7 @@ export class HealthStore {
   snapshot(today: string): { today: HealthDay | null; history: HealthDay[]; updatedAt: string | null } {
     return {
       today: this.days.find((day) => day.date === today) ?? null,
-      history: this.days.slice(-14),
+      history: this.days,
       updatedAt: this.updatedAt,
     };
   }

@@ -199,7 +199,7 @@ function StepsTrend({ history, goal }: Readonly<{ history: HealthDay[]; goal: nu
           const met = steps >= goal;
           const weekday = new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'narrow' });
           return (
-            <div key={day.date} className="flex flex-1 flex-col items-center gap-1">
+            <div key={day.date} className="flex h-full flex-1 flex-col items-center gap-1">
               <div className="flex w-full flex-1 items-end">
                 <div
                   className="w-full rounded-t-[3px]"

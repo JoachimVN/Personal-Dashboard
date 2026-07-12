@@ -72,6 +72,7 @@ export function DailyCommandCenter() {
         </div>
         <nav className="command-nav" aria-label="Dashboard sections">
           <a href="#/personal">Day</a>
+          <a href="#/health">Health</a>
           <a href="#/github">Code</a>
           <a href="#/ai">AI</a>
         </nav>
