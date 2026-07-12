@@ -22,8 +22,6 @@ export const healthDaySchema = z.object({
   daylightMinutes: z.number().optional(),
   /** Average blood-oxygen saturation for the day, as a percentage (for example, 98). */
   bloodOxygenPercent: z.number().optional(),
-  /** Average respiratory rate for the day, in breaths per minute. */
-  respiratoryRate: z.number().optional(),
   sleepHours: z.number().optional(),
   workouts: z.array(healthWorkoutSchema).default([]),
 });
@@ -43,7 +41,6 @@ export const healthIngestSchema = z.object({
   restingHeartRate: z.number().positive().optional(),
   daylightMinutes: z.number().nonnegative().optional(),
   bloodOxygenPercent: z.number().positive().max(100).optional(),
-  respiratoryRate: z.number().positive().optional(),
   sleepHours: z.number().nonnegative().optional(),
   workouts: z.array(healthWorkoutSchema).optional(),
 });

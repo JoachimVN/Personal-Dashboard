@@ -35,6 +35,76 @@ function Stat({ value, label }: Readonly<{ value: string; label: string }>) {
   );
 }
 
+function HeartRate({ average, resting }: Readonly<{ average?: number; resting?: number }>) {
+  if (average == null && resting == null) return null;
+  const readings = [
+    { label: 'Average', value: average },
+    { label: 'Resting', value: resting },
+  ].filter((reading): reading is { label: string; value: number } => reading.value != null);
+
+  return (
+    <div className="rounded-2xl bg-track/25 px-3 py-2.5">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="grid h-6 w-6 place-items-center rounded-lg bg-rose-500/15 text-rose-400" aria-hidden>
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor">
+            <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
+          </svg>
+        </span>
+        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">Heart rate</p>
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-white/10">
+        {readings.map((reading) => (
+          <div key={reading.label} className="px-3 first:pl-0 last:pr-0">
+            <p className="flex items-baseline gap-1 tabular-nums leading-none">
+              <span className="text-2xl font-semibold text-rose-300">{Math.round(reading.value)}</span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-ink-faint">bpm</span>
+            </p>
+            <p className="mt-1 text-xs text-ink-muted">{reading.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RecoveryMetrics({ sleepHours, bloodOxygenPercent }: Readonly<{ sleepHours?: number; bloodOxygenPercent?: number }>) {
+  const metrics = [
+    {
+      id: 'sleep',
+      label: 'Sleep',
+      value: sleepHours == null ? null : `${sleepHours.toFixed(1)} h`,
+      tone: 'bg-indigo-400/15 text-indigo-300',
+      icon: <path d="M19.8 15.4A8 8 0 0 1 8.6 4.2 8 8 0 1 0 19.8 15.4Z" />,
+    },
+    {
+      id: 'oxygen',
+      label: 'Blood oxygen',
+      value: bloodOxygenPercent == null ? null : `${Math.round(bloodOxygenPercent)}%`,
+      tone: 'bg-cyan-400/15 text-cyan-300',
+      icon: <path d="M12 3.5S6.5 9.2 6.5 13a5.5 5.5 0 1 0 11 0c0-3.8-5.5-9.5-5.5-9.5Z" />,
+    },
+  ].filter((metric): metric is { id: string; label: string; value: string; tone: string; icon: React.JSX.Element } => metric.value != null);
+
+  if (metrics.length === 0) return null;
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {metrics.map((metric) => (
+        <div key={metric.id} className={`rounded-2xl bg-track/25 px-3 py-2.5 ${metrics.length === 1 ? 'col-span-2' : ''}`}>
+          <div className="flex items-center gap-2">
+            <span className={`grid h-6 w-6 place-items-center rounded-lg ${metric.tone}`} aria-hidden>
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                {metric.icon}
+              </svg>
+            </span>
+            <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-ink-faint">{metric.label}</p>
+          </div>
+          <p className="mt-2 text-2xl font-semibold tabular-nums leading-none">{metric.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ActivityRings({
   activeEnergyKcal,
   exerciseMinutes,
@@ -157,12 +227,7 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
   }
 
   const stats: { value: string; label: string }[] = [];
-  if (t?.sleepHours != null) stats.push({ value: `${t.sleepHours.toFixed(1)}h`, label: 'sleep' });
-  if (t?.heartRate != null) stats.push({ value: `${Math.round(t.heartRate)}`, label: 'avg bpm' });
-  if (t?.restingHeartRate != null) stats.push({ value: `${Math.round(t.restingHeartRate)}`, label: 'rest bpm' });
   if (t?.daylightMinutes != null) stats.push({ value: `${Math.round(t.daylightMinutes)}m`, label: 'daylight' });
-  if (t?.bloodOxygenPercent != null) stats.push({ value: `${Math.round(t.bloodOxygenPercent)}%`, label: 'avg oxygen' });
-  if (t?.respiratoryRate != null) stats.push({ value: `${t.respiratoryRate.toFixed(1)}`, label: 'avg resp / min' });
 
   return (
     <div className="space-y-4">
@@ -176,6 +241,10 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
         standHours={t?.standHours ?? 0}
         goals={data.goals}
       />
+
+      <HeartRate average={t?.heartRate} resting={t?.restingHeartRate} />
+
+      <RecoveryMetrics sleepHours={t?.sleepHours} bloodOxygenPercent={t?.bloodOxygenPercent} />
 
       {stats.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
