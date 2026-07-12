@@ -105,84 +105,72 @@ async function codexSnapshot(): Promise<UsageSnapshot> {
   }
 }
 
-/**
- * Context window per model, for turning raw token counts into a percentage. Anthropic doesn't
- * expose this locally, so it's a hand-maintained table — keep in sync with currently-released
- * Claude models. Unlisted/legacy models fall back to the smallest current window (200K, Haiku's)
- * rather than the 1M models' window: under-estimating the window overstates usage, which is the
- * safer failure direction than silently under-reporting how full the context actually is.
- */
-const CLAUDE_CONTEXT_WINDOWS: Record<string, number> = {
-  'claude-fable-5': 1_000_000,
-  'claude-mythos-5': 1_000_000,
-  'claude-opus-4-8': 1_000_000,
-  'claude-opus-4-7': 1_000_000,
-  'claude-opus-4-6': 1_000_000,
-  'claude-sonnet-5': 1_000_000,
-  'claude-sonnet-4-6': 1_000_000,
-  'claude-haiku-4-5': 200_000,
-};
-const DEFAULT_CLAUDE_CONTEXT_WINDOW = 200_000;
-
 const claudeTranscriptEntrySchema = z.object({
   type: z.literal('assistant'),
   timestamp: z.string(),
   message: z.object({
-    model: z.string(),
     usage: z.object({
       input_tokens: z.number(),
+      output_tokens: z.number().optional(),
       cache_creation_input_tokens: z.number().optional(),
       cache_read_input_tokens: z.number().optional(),
     }),
   }),
 });
 
+const FIVE_HOUR_MS = 5 * 60 * 60_000;
+const WEEKLY_MS = 7 * 24 * 60 * 60_000;
+
 /**
  * Claude Code writes every turn's token usage into local session transcripts
  * (`~/.claude/projects/**\/*.jsonl`) as it works — reading those locally gives a genuinely live,
- * zero-network reading of the *current* session's context-window fill. This is separate from (and
- * a lot cheaper than) the account-wide 5-hour/weekly quota below, which only exists behind a
- * tightly rate-limited Anthropic endpoint.
+ * zero-network total of tokens actually used in the same rolling 5-hour/weekly windows the
+ * account-wide quota below tracks, without an extra rate-limited network call. Only files modified
+ * within the weekly window are read at all: an untouched file's newest entry can't be newer than
+ * its own mtime, so anything older is guaranteed out of range.
  */
-async function claudeSessionSnapshot(): Promise<UsageSnapshot> {
+async function claudeTokenTotals(): Promise<{ fiveHour: number; weekly: number }> {
   const projectsDir = path.join(
     process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'),
     'projects',
   );
+  const now = Date.now();
+  let fiveHour = 0;
+  let weekly = 0;
   try {
     const files = await jsonlFiles(projectsDir);
-    const stats = await Promise.all(files.map(async (file) => ({ file, mtime: (await stat(file)).mtimeMs })));
-    const newest = stats.sort((a, b) => b.mtime - a.mtime)[0]?.file;
-    if (!newest) return { available: false };
+    const recentFiles = (
+      await Promise.all(files.map(async (file) => ({ file, mtime: (await stat(file)).mtimeMs })))
+    ).filter(({ mtime }) => now - mtime < WEEKLY_MS);
 
-    const lines = (await readFile(newest, 'utf8')).trim().split('\n');
-    for (let i = lines.length - 1; i >= 0; i--) {
-      let entry;
-      try {
-        entry = claudeTranscriptEntrySchema.parse(JSON.parse(lines[i]));
-      } catch {
-        continue; // Transcripts also contain non-assistant / tool entries; skip anything else.
-      }
-      const { model, usage } = entry.message;
-      const tokens = usage.input_tokens + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0);
-      const contextWindow = CLAUDE_CONTEXT_WINDOWS[model] ?? DEFAULT_CLAUDE_CONTEXT_WINDOW;
-      const asOf = asIso(entry.timestamp);
-      if (!asOf) continue;
-      return {
-        available: true,
-        context: {
-          usedPercent: Math.max(0, Math.min(100, (tokens / contextWindow) * 100)),
-          tokens,
-          contextWindow,
-          model,
-        },
-        asOf,
-      };
-    }
-    return { available: false };
+    await Promise.all(
+      recentFiles.map(async ({ file }) => {
+        const lines = (await readFile(file, 'utf8')).trim().split('\n');
+        for (const line of lines) {
+          let entry;
+          try {
+            entry = claudeTranscriptEntrySchema.parse(JSON.parse(line));
+          } catch {
+            continue; // Transcripts also contain non-assistant / tool entries; skip anything else.
+          }
+          const at = Date.parse(entry.timestamp);
+          const age = now - at;
+          if (!Number.isFinite(at) || age > WEEKLY_MS) continue;
+          const { usage } = entry.message;
+          const tokens =
+            usage.input_tokens +
+            (usage.output_tokens ?? 0) +
+            (usage.cache_creation_input_tokens ?? 0) +
+            (usage.cache_read_input_tokens ?? 0);
+          weekly += tokens;
+          if (age <= FIVE_HOUR_MS) fiveHour += tokens;
+        }
+      }),
+    );
   } catch {
-    return { available: false };
+    // No local transcripts available; totals stay at zero.
   }
+  return { fiveHour, weekly };
 }
 
 type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'asOf'>;
@@ -284,16 +272,16 @@ export function createClaudeUsageProvider(
     timeoutMs: 15_000,
     isConfigured: () => true,
     fetch: async (signal, force) => {
-      const [context, quota] = await Promise.all([
-        claudeSessionSnapshot(),
+      const [tokenTotals, quota] = await Promise.all([
+        claudeTokenTotals(),
         claudeQuotaSnapshot(claudeOauthToken, signal, quotaState, force, history),
       ]);
       const snapshot: UsageSnapshot = {
-        available: Boolean(context.context || quota.fiveHour || quota.weekly),
-        context: context.context,
+        available: Boolean(quota.fiveHour || quota.weekly || tokenTotals.fiveHour || tokenTotals.weekly),
         fiveHour: quota.fiveHour,
         weekly: quota.weekly,
-        asOf: context.asOf ?? quota.asOf,
+        tokens: tokenTotals,
+        asOf: quota.asOf ?? new Date().toISOString(),
       };
       const rateLimitedUntil =
         quotaState.rateLimitedUntil > Date.now() ? new Date(quotaState.rateLimitedUntil).toISOString() : undefined;

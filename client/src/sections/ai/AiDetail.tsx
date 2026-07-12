@@ -12,6 +12,16 @@ import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
 const DAY_MS = 24 * 60 * 60_000;
 
+/** Fallback for when the account-wide quota (behind a flaky, tightly rate-limited endpoint) isn't available. */
+function TokenRow({ label, tokens }: Readonly<{ label: string; tokens: number }>) {
+  return (
+    <div className="flex items-baseline text-xs">
+      <span className="text-ink-muted">{label}</span>
+      <span className="ml-auto font-semibold tabular-nums">{formatCompactNumber(tokens)} tokens</span>
+    </div>
+  );
+}
+
 function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
@@ -35,11 +45,27 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
         {(data) =>
           data.available ? (
             <div className="space-y-4">
-              {data.fiveHour && (
-                <UsageMeter label="5 hours" limit={data.fiveHour} color={color} windowMs={FIVE_HOUR_MS} />
+              {data.fiveHour ? (
+                <UsageMeter
+                  label="5 hours"
+                  limit={data.fiveHour}
+                  tokens={data.tokens?.fiveHour}
+                  color={color}
+                  windowMs={FIVE_HOUR_MS}
+                />
+              ) : (
+                data.tokens && <TokenRow label="5 hours" tokens={data.tokens.fiveHour} />
               )}
-              {data.weekly && (
-                <UsageMeter label="Weekly" limit={data.weekly} color={color} windowMs={WEEKLY_MS} />
+              {data.weekly ? (
+                <UsageMeter
+                  label="Weekly"
+                  limit={data.weekly}
+                  tokens={data.tokens?.weekly}
+                  color={color}
+                  windowMs={WEEKLY_MS}
+                />
+              ) : (
+                data.tokens && <TokenRow label="Weekly" tokens={data.tokens.weekly} />
               )}
               {(data.fiveHour || data.weekly) && (
                 <>
@@ -58,32 +84,6 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
                     caption="Weekly window · last 7 d"
                   />
                 </>
-              )}
-              {data.context && (
-                <div>
-                  <div className="mb-1 flex items-baseline text-xs">
-                    <span className="text-ink-muted">
-                      Session context{data.context.model ? ` · ${data.context.model}` : ''}
-                    </span>
-                    <span className="ml-auto font-semibold tabular-nums">
-                      {formatCompactNumber(data.context.tokens)} / {formatCompactNumber(data.context.contextWindow)}{' '}
-                      tokens
-                    </span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-track">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${data.context.usedPercent}%`, backgroundColor: color }}
-                    />
-                  </div>
-                  <UsageHistoryChart
-                    points={data.history}
-                    metric="contextUsedPercent"
-                    windowMs={DAY_MS}
-                    color={color}
-                    caption="Context fill · last 24 h"
-                  />
-                </div>
               )}
               {data.asOf && (
                 <p className="text-[11px] text-ink-faint">

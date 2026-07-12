@@ -56,12 +56,11 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                 windowMs={DAY_MS}
                 color={color}
               />
-              {data.context && (
+              {data.tokens && (
                 <div className="flex items-baseline justify-between pt-0.5 text-[11px] text-ink-faint">
-                  <span>session context</span>
+                  <span>tokens used</span>
                   <span className="font-medium tabular-nums text-ink-muted">
-                    {formatCompactNumber(data.context.tokens)} / {formatCompactNumber(data.context.contextWindow)}{' '}
-                    tokens
+                    5h {formatCompactNumber(data.tokens.fiveHour)} · week {formatCompactNumber(data.tokens.weekly)}
                   </span>
                 </div>
               )}

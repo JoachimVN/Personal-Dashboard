@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
+import { formatCompactNumber } from '../../lib/format';
 
 export const FIVE_HOUR_MS = 5 * 60 * 60_000;
 export const WEEKLY_MS = 7 * 24 * 60 * 60_000;
@@ -27,11 +28,13 @@ export function UsageMeter({
   limit,
   color,
   windowMs,
+  tokens,
 }: Readonly<{
   label: string;
   limit: RateLimit;
   color: string;
   windowMs: number;
+  tokens?: number;
 }>) {
   const pace = paceElapsedPercent(limit.resetsAt, windowMs);
   const aheadOfPace = limit.usedPercent > pace;
@@ -60,7 +63,10 @@ export function UsageMeter({
           }}
         />
       </div>
-      <p className="mt-1 text-[11px] text-ink-faint">Resets {resetLabel(limit.resetsAt)}</p>
+      <p className="mt-1 text-[11px] text-ink-faint">
+        Resets {resetLabel(limit.resetsAt)}
+        {tokens !== undefined && ` · ${formatCompactNumber(tokens)} tokens`}
+      </p>
     </div>
   );
 }

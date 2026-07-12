@@ -5,7 +5,7 @@ import type { UsageHistoryPoint } from '@personal-dashboard/shared';
 const W = 100;
 const H = 32;
 
-type Metric = 'fiveHourUsedPercent' | 'weeklyUsedPercent' | 'contextUsedPercent';
+type Metric = 'fiveHourUsedPercent' | 'weeklyUsedPercent';
 
 interface ChartPoint {
   x: number;
