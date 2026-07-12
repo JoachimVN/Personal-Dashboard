@@ -19,12 +19,14 @@ const configSchema = z.object({
     .object({
       /** How often to re-read Codex's local session files, in ms. Cheap — no external API call. */
       codexRefreshMs: z.number().int().min(5_000).default(30_000),
+      /** How often to shell out to `claude -p "/usage"`, in ms. Each call writes a small local session file, so this stays coarser than Codex's file-read cadence. */
+      claudeRefreshMs: z.number().int().min(60_000).default(15 * 60_000),
       /** Minimum spacing between recorded usage-history points, in ms. */
       historySampleMs: z.number().int().min(60_000).default(15 * 60_000),
       /** How long recorded usage-history points are kept. */
       historyRetentionDays: z.number().int().min(1).default(7),
     })
-    .default({ codexRefreshMs: 30_000, historySampleMs: 15 * 60_000, historyRetentionDays: 7 }),
+    .default({ codexRefreshMs: 30_000, claudeRefreshMs: 15 * 60_000, historySampleMs: 15 * 60_000, historyRetentionDays: 7 }),
   health: z
     .object({
       /** Daily step goal the widget's progress bar fills toward. */

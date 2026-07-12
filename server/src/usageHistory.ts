@@ -16,8 +16,6 @@ const fileSchema = z.object({
   tools: z.record(z.string(), z.array(usageHistoryPointSchema)),
   /** Last sampled snapshot per tool; absent in files written before this field existed. */
   snapshots: z.record(z.string(), persistedSnapshotSchema).default({}),
-  /** Provider-specific retry deadlines, persisted so a restart cannot bypass an upstream cooldown. */
-  backoffs: z.record(z.string(), z.string().datetime()).default({}),
 });
 
 /** The provider snapshot fields the store samples from — AiUsageToolData minus the history it produces. */
@@ -31,7 +29,6 @@ export type UsageSnapshot = z.infer<typeof persistedSnapshotSchema>;
 export class UsageHistoryStore {
   private tools: Record<string, UsageHistoryPoint[]>;
   private snapshots: Record<string, UsageSnapshot>;
-  private backoffs: Record<string, string>;
   private readonly lastAsOf = new Map<string, string>();
 
   constructor(
@@ -42,7 +39,6 @@ export class UsageHistoryStore {
     const loaded = this.load();
     this.tools = loaded.tools;
     this.snapshots = loaded.snapshots;
-    this.backoffs = loaded.backoffs;
   }
 
   /**
@@ -81,23 +77,13 @@ export class UsageHistoryStore {
     return this.snapshots[toolId];
   }
 
-  getBackoff(toolId: string): string | undefined {
-    return this.backoffs[toolId];
-  }
-
-  setBackoff(toolId: string, retryAt: string | undefined): void {
-    if (retryAt) this.backoffs[toolId] = retryAt;
-    else delete this.backoffs[toolId];
-    this.save();
-  }
-
-  private load(): { tools: Record<string, UsageHistoryPoint[]>; snapshots: Record<string, UsageSnapshot>; backoffs: Record<string, string> } {
+  private load(): { tools: Record<string, UsageHistoryPoint[]>; snapshots: Record<string, UsageSnapshot> } {
     try {
       const parsed = fileSchema.parse(JSON.parse(readFileSync(this.filePath, 'utf8')));
-      return { tools: parsed.tools, snapshots: parsed.snapshots, backoffs: parsed.backoffs };
+      return { tools: parsed.tools, snapshots: parsed.snapshots };
     } catch {
       // Missing or corrupt file — start fresh rather than failing provider registration.
-      return { tools: {}, snapshots: {}, backoffs: {} };
+      return { tools: {}, snapshots: {} };
     }
   }
 
@@ -108,7 +94,7 @@ export class UsageHistoryStore {
       const tmpPath = `${this.filePath}.tmp`;
       writeFileSync(
         tmpPath,
-        JSON.stringify({ version: 1, tools: this.tools, snapshots: this.snapshots, backoffs: this.backoffs }),
+        JSON.stringify({ version: 1, tools: this.tools, snapshots: this.snapshots }),
         { mode: 0o600 },
       );
       renameSync(tmpPath, this.filePath);

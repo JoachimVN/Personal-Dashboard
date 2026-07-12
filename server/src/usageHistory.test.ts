@@ -113,19 +113,6 @@ describe('UsageHistoryStore', () => {
     expect(reloaded.getSnapshot('tool')).toEqual(snap);
   });
 
-  it('persists provider backoffs across restarts', () => {
-    const store = new UsageHistoryStore(filePath, SAMPLE_MS, RETENTION_MS);
-    const retryAt = '2026-07-10T13:00:00.000Z';
-
-    store.setBackoff('ai-usage-claude', retryAt);
-    expect(new UsageHistoryStore(filePath, SAMPLE_MS, RETENTION_MS).getBackoff('ai-usage-claude')).toBe(
-      retryAt,
-    );
-
-    store.setBackoff('ai-usage-claude', undefined);
-    expect(new UsageHistoryStore(filePath, SAMPLE_MS, RETENTION_MS).getBackoff('ai-usage-claude')).toBeUndefined();
-  });
-
   it('loads history files written before snapshots existed', () => {
     writeFileSync(
       filePath,

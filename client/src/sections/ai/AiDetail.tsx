@@ -1,6 +1,6 @@
 import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { motion } from 'motion/react';
-import { relativeFutureTime, relativeTime } from '../../lib/time';
+import { relativeTime } from '../../lib/time';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../../components/WidgetCard';
@@ -85,20 +85,10 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
                   />
                 </>
               )}
-              {data.asOf && (
-                <p className="text-[11px] text-ink-faint">
-                  As of {relativeTime(data.asOf)}
-                  {data.rateLimitedUntil &&
-                    ` · account quota rate limited, retrying ${relativeFutureTime(data.rateLimitedUntil)}`}
-                </p>
-              )}
+              {data.asOf && <p className="text-[11px] text-ink-faint">As of {relativeTime(data.asOf)}</p>}
             </div>
           ) : (
-            <p className="text-xs text-ink-faint">
-              {data.rateLimitedUntil
-                ? `Rate limited by Anthropic — retrying ${relativeFutureTime(data.rateLimitedUntil)}.`
-                : 'No current limit snapshot available on this machine.'}
-            </p>
+            <p className="text-xs text-ink-faint">No current limit snapshot available on this machine.</p>
           )
         }
         </WidgetBody>

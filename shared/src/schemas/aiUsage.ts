@@ -7,11 +7,7 @@ const rateLimitSchema = z.object({
   resetsAt: z.string().datetime(),
 });
 
-/**
- * Total tokens consumed in each rolling window, read live from local CLI transcripts — independent
- * of (and much more reliable than) the account-wide `fiveHour`/`weekly` quota below, which sits
- * behind a tightly rate-limited Anthropic endpoint that may never return a good reading at all.
- */
+/** Total tokens consumed in each rolling window, read live from local CLI transcripts. */
 const localTokenUsageSchema = z.object({
   fiveHour: z.number(),
   weekly: z.number(),
@@ -34,8 +30,6 @@ export const aiUsageToolSchema = z.object({
   tokens: localTokenUsageSchema.optional(),
   /** When this snapshot was actually captured — may lag `fetchedAt` when serving a cached reading. */
   asOf: z.string().datetime().optional(),
-  /** Set while backed off from an upstream 429; ISO timestamp of when the next attempt is allowed. */
-  rateLimitedUntil: z.string().datetime().optional(),
   /** Server-sampled usage snapshots, oldest first. Empty until the server has recorded some. */
   history: z.array(usageHistoryPointSchema).default([]),
 });

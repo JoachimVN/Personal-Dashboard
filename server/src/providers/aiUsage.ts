@@ -1,6 +1,8 @@
+import { execFile } from 'node:child_process';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { z } from 'zod';
 import { aiUsageToolSchema, type AiUsageToolData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
@@ -25,16 +27,6 @@ const codexEventSchema = z.object({
       })
       .nullish(),
   }),
-});
-
-const claudeLimitSchema = z.object({
-  utilization: z.number(),
-  resets_at: z.string(),
-});
-
-const claudeUsageSchema = z.object({
-  five_hour: claudeLimitSchema.nullish(),
-  seven_day: claudeLimitSchema.nullish(),
 });
 
 function limit(usedPercent: number, resetsAt: number | string) {
@@ -175,107 +167,86 @@ async function claudeTokenTotals(): Promise<{ fiveHour: number; weekly: number }
 
 type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'asOf'>;
 
-/**
- * Floor between background attempts even after a success. `/api/oauth/usage`'s real quota is
- * roughly hourly per account — observed real Retry-After values have run 35–40 min, and every
- * request (including our own) counts against the same shared budget, so this must sit safely
- * above that or the scheduler re-trips the real limit on its own. This is what a manual `/usage`
- * check in the CLI *doesn't* have to worry about — it's a single on-demand request, not a
- * recurring poller — so the dashboard's Refresh button (`force`) bypasses this floor the same way,
- * but never bypasses an actual 429 (`rateLimitedUntil`).
- */
-const MIN_QUOTA_POLL_INTERVAL_MS = 65 * 60_000;
-const DEFAULT_QUOTA_COOLDOWN_MS = 65 * 60_000;
-/** Don't re-serve a persisted quota reading older than this across restarts. */
-const MAX_QUOTA_SEED_AGE_MS = 24 * 60 * 60_000;
+const execFileAsync = promisify(execFile);
 
-interface ClaudeQuotaState {
-  /** Set only on a real 429 from Anthropic; surfaced to the client as `rateLimitedUntil`. */
-  rateLimitedUntil: number;
-  /** Self-imposed pacing floor, set after every attempt so background polling can't outrun the real quota. */
-  nextAttemptAt: number;
-  /** Last successfully fetched reading, served during cooldowns/pacing instead of going blank. */
-  lastGood?: ClaudeQuota;
+const MONTH_ABBREVIATIONS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/** `claude -p "/usage"` prints e.g. "Current session: 41% used · resets Jul 13 at 1:59am (Europe/Oslo)". */
+const SESSION_LINE = /Current session:\s*(\d+)%\s*used.*?resets\s+([A-Za-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
+const WEEKLY_LINE = /Current week \(all models\):\s*(\d+)%\s*used.*?resets\s+([A-Za-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
+
+const cliResultSchema = z.object({
+  is_error: z.boolean(),
+  result: z.string().optional(),
+});
+
+/**
+ * The CLI reports reset times in the machine's own local time with no year, e.g. "Jul 13 at
+ * 1:59am" — both windows reset within days, so resolving against the current year and rolling
+ * forward if that lands in the past handles the one edge case (a Dec→Jan reset) correctly.
+ */
+function parseResetsAt(match: RegExpMatchArray): string | undefined {
+  const [, , monthAbbr, day, hour, minute, meridiem] = match;
+  const monthIndex = MONTH_ABBREVIATIONS.indexOf(monthAbbr.toLowerCase());
+  if (monthIndex === -1) return undefined;
+  let hour24 = Number(hour) % 12;
+  if (meridiem.toLowerCase() === 'pm') hour24 += 12;
+  const now = new Date();
+  const candidate = new Date(now.getFullYear(), monthIndex, Number(day), hour24, minute ? Number(minute) : 0);
+  if (candidate.getTime() < now.getTime() - 24 * 60 * 60_000) candidate.setFullYear(candidate.getFullYear() + 1);
+  return Number.isNaN(candidate.getTime()) ? undefined : candidate.toISOString();
+}
+
+function parseLine(result: string, pattern: RegExp) {
+  const match = result.match(pattern);
+  if (!match) return undefined;
+  const resetsAt = parseResetsAt(match);
+  return resetsAt ? limit(Number(match[1]), resetsAt) : undefined;
 }
 
 /**
- * Mirrors the account-wide 5-hour/weekly percentages shown by the `claude` CLI's own `/usage`
- * command — same endpoint, same OAuth token. The OAuth token is intentionally opt-in: API keys
- * don't carry subscription-limit data.
+ * `claude -p "/usage"` is a local command the CLI short-circuits before it ever reaches the
+ * model — zero token cost, and it doesn't touch the `/api/oauth/usage` endpoint this used to call
+ * directly, which turned out to be rate-limited to the point of never returning a good reading on
+ * this machine (see git history). It does write a small local session transcript per invocation,
+ * which is why this provider's refresh cadence stays coarse (see `aiUsage.claudeRefreshMs`).
  */
-async function claudeQuotaSnapshot(
-  oauthToken: string | undefined,
-  signal: AbortSignal,
-  state: ClaudeQuotaState,
-  force: boolean,
-  history: Pick<UsageHistoryStore, 'setBackoff'>,
-): Promise<ClaudeQuota> {
-  if (!oauthToken) return {};
-  if (Date.now() < state.rateLimitedUntil) return state.lastGood ?? {};
-  if (!force && Date.now() < state.nextAttemptAt) return state.lastGood ?? {};
+async function claudeCliUsageSnapshot(): Promise<ClaudeQuota> {
   try {
-    const response = await fetch('https://api.anthropic.com/api/oauth/usage', {
-      headers: {
-        Authorization: `Bearer ${oauthToken}`,
-        'anthropic-beta': 'oauth-2025-04-20',
-      },
-      signal,
+    // The native installer puts `claude` in ~/.local/bin, which interactive-shell-only PATH
+    // customizations (.zshrc etc.) may add but a non-interactive launchd process won't inherit.
+    const localBin = path.join(os.homedir(), '.local/bin');
+    // Strip any Anthropic auth env vars this server process happens to carry (e.g. a leftover
+    // CLAUDE_CODE_OAUTH_TOKEN in server/.env): inheriting one makes the child authenticate
+    // differently than an interactive `claude` session and switches /usage to a different,
+    // non-percentage report.
+    const { CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, ...cleanEnv } = process.env;
+    const { stdout } = await execFileAsync('claude', ['-p', '/usage', '--output-format', 'json'], {
+      timeout: 20_000,
+      killSignal: 'SIGKILL',
+      env: { ...cleanEnv, PATH: `${localBin}:${cleanEnv.PATH ?? ''}` },
     });
-    if (response.status === 429) {
-      const retryAfterSec = Number(response.headers.get('retry-after'));
-      state.rateLimitedUntil =
-        Date.now() + (Number.isFinite(retryAfterSec) ? retryAfterSec * 1_000 : DEFAULT_QUOTA_COOLDOWN_MS);
-      state.nextAttemptAt = state.rateLimitedUntil;
-      history.setBackoff('ai-usage-claude', new Date(state.rateLimitedUntil).toISOString());
-      history.setBackoff('ai-usage-claude-pacing', new Date(state.nextAttemptAt).toISOString());
-      return state.lastGood ?? {};
-    }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const usage = claudeUsageSchema.parse(await response.json());
-    const quota: ClaudeQuota = {
-      fiveHour: usage.five_hour ? limit(usage.five_hour.utilization, usage.five_hour.resets_at) : undefined,
-      weekly: usage.seven_day ? limit(usage.seven_day.utilization, usage.seven_day.resets_at) : undefined,
-      asOf: new Date().toISOString(),
-    };
-    state.lastGood = quota;
-    state.rateLimitedUntil = 0;
-    state.nextAttemptAt = Date.now() + MIN_QUOTA_POLL_INTERVAL_MS;
-    history.setBackoff('ai-usage-claude', undefined);
-    history.setBackoff('ai-usage-claude-pacing', new Date(state.nextAttemptAt).toISOString());
-    return quota;
+    const parsed = cliResultSchema.parse(JSON.parse(stdout));
+    if (parsed.is_error || !parsed.result) return {};
+    const fiveHour = parseLine(parsed.result, SESSION_LINE);
+    const weekly = parseLine(parsed.result, WEEKLY_LINE);
+    return { fiveHour, weekly, asOf: fiveHour || weekly ? new Date().toISOString() : undefined };
   } catch {
-    // Do not log a response body: it can include account-specific information.
-    console.warn('[ai-usage] Claude quota snapshot unavailable');
-    return state.lastGood ?? {};
+    // Do not log stdout: the usage report includes account-specific numbers.
+    console.warn('[ai-usage] Claude CLI usage snapshot unavailable');
+    return {};
   }
 }
 
-export function createClaudeUsageProvider(
-  claudeOauthToken: string | undefined,
-  history: UsageHistoryStore,
-): Provider<AiUsageToolData> {
-  // Seed the quota's lastGood from disk so a restart mid-cooldown still serves the previous
-  // reading (with its honest asOf age) instead of blanking that half of the widget.
-  const persisted = history.getSnapshot('ai-usage-claude');
-  const isFresh = persisted?.asOf !== undefined && Date.now() - Date.parse(persisted.asOf) < MAX_QUOTA_SEED_AGE_MS;
-  const savedBackoff = Date.parse(history.getBackoff('ai-usage-claude') ?? '');
-  const savedPacing = Date.parse(history.getBackoff('ai-usage-claude-pacing') ?? '');
-  const quotaState: ClaudeQuotaState = {
-    rateLimitedUntil: Number.isFinite(savedBackoff) ? Math.max(0, savedBackoff) : 0,
-    nextAttemptAt: Number.isFinite(savedPacing) ? Math.max(0, savedPacing) : 0,
-    lastGood: isFresh && (persisted.fiveHour || persisted.weekly) ? { fiveHour: persisted.fiveHour, weekly: persisted.weekly, asOf: persisted.asOf } : undefined,
-  };
+export function createClaudeUsageProvider(refreshMs: number, history: UsageHistoryStore): Provider<AiUsageToolData> {
   return {
     id: 'ai-usage-claude',
     schema: aiUsageToolSchema,
-    refreshMs: 60_000,
-    timeoutMs: 15_000,
+    refreshMs,
+    timeoutMs: 25_000,
     isConfigured: () => true,
-    fetch: async (signal, force) => {
-      const [tokenTotals, quota] = await Promise.all([
-        claudeTokenTotals(),
-        claudeQuotaSnapshot(claudeOauthToken, signal, quotaState, force, history),
-      ]);
+    fetch: async () => {
+      const [tokenTotals, quota] = await Promise.all([claudeTokenTotals(), claudeCliUsageSnapshot()]);
       const snapshot: UsageSnapshot = {
         available: Boolean(quota.fiveHour || quota.weekly || tokenTotals.fiveHour || tokenTotals.weekly),
         fiveHour: quota.fiveHour,
@@ -283,9 +254,7 @@ export function createClaudeUsageProvider(
         tokens: tokenTotals,
         asOf: quota.asOf ?? new Date().toISOString(),
       };
-      const rateLimitedUntil =
-        quotaState.rateLimitedUntil > Date.now() ? new Date(quotaState.rateLimitedUntil).toISOString() : undefined;
-      return { ...snapshot, rateLimitedUntil, history: history.record('ai-usage-claude', snapshot) };
+      return { ...snapshot, history: history.record('ai-usage-claude', snapshot) };
     },
   };
 }
