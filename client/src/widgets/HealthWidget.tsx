@@ -5,7 +5,7 @@ import { relativeTime } from '../lib/time';
 
 const accent = 'var(--color-accent-personal)';
 
-function Bar({ label, value, goal, unit }: { label: string; value: number; goal: number; unit: string }) {
+function Bar({ label, value, goal, unit }: Readonly<{ label: string; value: number; goal: number; unit: string }>) {
   const pct = Math.min(100, goal > 0 ? (value / goal) * 100 : 0);
   const met = value >= goal;
   return (
@@ -26,7 +26,7 @@ function Bar({ label, value, goal, unit }: { label: string; value: number; goal:
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label }: Readonly<{ value: string; label: string }>) {
   return (
     <div className="rounded-xl bg-track/25 px-3 py-2">
       <p className="text-lg font-semibold tabular-nums leading-tight">{value}</p>
@@ -35,7 +35,7 @@ function Stat({ value, label }: { value: string; label: string }) {
   );
 }
 
-function StepsTrend({ history, goal }: { history: HealthDay[]; goal: number }) {
+function StepsTrend({ history, goal }: Readonly<{ history: HealthDay[]; goal: number }>) {
   const days = history.slice(-7);
   if (days.length < 2) return null;
   const max = Math.max(goal, ...days.map((d) => d.steps ?? 0), 1);
@@ -66,7 +66,7 @@ function StepsTrend({ history, goal }: { history: HealthDay[]; goal: number }) {
   );
 }
 
-function HealthBody({ data }: { data: HealthData }) {
+function HealthBody({ data }: Readonly<{ data: HealthData }>) {
   const t = data.today;
   if (!t && data.history.length === 0) {
     return (
@@ -99,8 +99,11 @@ function HealthBody({ data }: { data: HealthData }) {
 
       {t?.workouts && t.workouts.length > 0 && (
         <ul className="space-y-1.5 text-sm">
-          {t.workouts.map((w, i) => (
-            <li key={i} className="flex items-baseline gap-2 rounded-xl bg-track/25 px-3 py-2">
+          {t.workouts.map((w) => (
+            <li
+              key={`${w.type}-${w.durationMin ?? ''}-${w.distanceKm ?? ''}-${w.energyKcal ?? ''}`}
+              className="flex items-baseline gap-2 rounded-xl bg-track/25 px-3 py-2"
+            >
               <span className="font-medium">{w.type}</span>
               <span className="ml-auto text-xs text-ink-faint">
                 {[

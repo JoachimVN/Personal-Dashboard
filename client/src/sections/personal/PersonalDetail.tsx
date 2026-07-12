@@ -27,6 +27,10 @@ function PersonalSignals() {
   const calendar = useWidget<CalendarData>('calendar').envelope?.data;
   const gmail = useWidget<GmailData>('gmail').envelope?.data;
   const next = calendar?.events[0];
+  let nextEventDetail = 'Nothing scheduled next';
+  if (next) {
+    nextEventDetail = next.allDay ? 'All day' : next.startLabel;
+  }
 
   return (
     <div className="detail-signal-panel grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-3">
@@ -38,7 +42,7 @@ function PersonalSignals() {
       </div>
       <div className="min-w-0 border-l border-card-border pl-5">
         <p className="truncate text-sm font-medium">{next?.title ?? 'A clear horizon'}</p>
-        <p className="mt-0.5 text-[11px] text-ink-faint">{next ? (next.allDay ? 'All day' : next.startLabel) : 'Nothing scheduled next'}</p>
+        <p className="mt-0.5 text-[11px] text-ink-faint">{nextEventDetail}</p>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-l border-card-border pl-5 text-xs text-ink-muted">
         <span>{weather ? `${glyph(weather.current.symbol)} ${deg(weather.current.temperature)}` : 'Weather syncing'}</span>

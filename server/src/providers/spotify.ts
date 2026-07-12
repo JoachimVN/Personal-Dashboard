@@ -131,7 +131,7 @@ export function createSpotifyProvider(
         ]);
 
       const nowPlaying =
-        current && current.item
+        current?.item
           ? {
               ...mapTrack(current.item),
               isPlaying: current.is_playing,

@@ -224,8 +224,8 @@ function ContributionGrid({
         className="flex gap-1 overflow-x-auto rounded-2xl bg-track/25 p-3"
         onMouseLeave={() => onHover(null)}
       >
-        {weeks.map((week, i) => (
-          <div key={i} className="flex flex-col gap-1">
+        {weeks.map((week) => (
+          <div key={week[0].date} className="flex flex-col gap-1">
             {week.map((day) => (
               <span
                 key={day.date}

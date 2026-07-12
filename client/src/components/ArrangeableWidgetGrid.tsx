@@ -33,11 +33,82 @@ async function persistLayout(sectionId: string, order: string[]): Promise<void> 
   }
 }
 
+function cardStateClass(isDragging: boolean, isDropTarget: boolean): string {
+  if (isDragging) return 'scale-[0.985] opacity-35';
+  if (isDropTarget) return 'rounded-2xl outline-2 -outline-offset-2 outline-(--color-accent-personal)';
+  return '';
+}
+
+interface ArrangeableCardProps {
+  item: ArrangeableItem;
+  index: number;
+  arranging: boolean;
+  isDragging: boolean;
+  isDropTarget: boolean;
+  onMoveWithKeyboard: (index: number, event: KeyboardEvent<HTMLDivElement>) => void;
+  onDragStart: (id: string, event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+  onDragOver: (id: string, event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (id: string, event: DragEvent<HTMLDivElement>) => void;
+}
+
+interface ArrangeableCardDragProps {
+  tabIndex?: number;
+  'aria-label'?: string;
+  'aria-keyshortcuts'?: string;
+  onKeyDown?: (event: KeyboardEvent<HTMLDivElement>) => void;
+  onDragStartCapture?: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEndCapture?: () => void;
+  onDragOver?: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop?: (event: DragEvent<HTMLDivElement>) => void;
+}
+
+function arrangeableCardDragProps({
+  item,
+  index,
+  arranging,
+  onMoveWithKeyboard,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+}: Readonly<ArrangeableCardProps>): ArrangeableCardDragProps {
+  if (!arranging) return {};
+  return {
+    tabIndex: 0,
+    'aria-label': `Reorder ${item.label}`,
+    'aria-keyshortcuts': 'Shift+ArrowUp Shift+ArrowDown',
+    onKeyDown: (event) => onMoveWithKeyboard(index, event),
+    onDragStartCapture: (event) => onDragStart(item.id, event),
+    onDragEndCapture: onDragEnd,
+    onDragOver: (event) => onDragOver(item.id, event),
+    onDrop: (event) => onDrop(item.id, event),
+  };
+}
+
+function ArrangeableCard(props: Readonly<ArrangeableCardProps>) {
+  const { item, arranging, isDragging, isDropTarget } = props;
+  const arrangingClass = arranging
+    ? 'cursor-grab focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--color-accent-personal) active:cursor-grabbing'
+    : '';
+  return (
+    <motion.div
+      layout="position"
+      transition={{ type: 'spring', stiffness: 520, damping: 38 }}
+      draggable={arranging}
+      {...arrangeableCardDragProps(props)}
+      className={`relative transition duration-150 ${arrangingClass} ${cardStateClass(isDragging, isDropTarget)}`}
+    >
+      {item.render()}
+    </motion.div>
+  );
+}
+
 /**
  * A section's widget cards, directly reorderable in their responsive grid. The uncluttered
  * arrange mode uses the cards themselves as drag targets, with keyboard movement as a fallback.
  */
-export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGridProps) {
+export function ArrangeableWidgetGrid({ sectionId, items }: Readonly<ArrangeableWidgetGridProps>) {
   const [order, setOrder] = useState<string[]>(() => items.map((item) => item.id));
   const orderRef = useRef(order);
   orderRef.current = order;
@@ -148,33 +219,21 @@ export function ArrangeableWidgetGrid({ sectionId, items }: ArrangeableWidgetGri
         </button>
       </div>
       <div className={`arrangeable-grid arrangeable-grid--${sectionId} grid grid-cols-1 gap-4 sm:grid-cols-2`}>
-        {orderedItems.map((item, index) => {
-          const isDragging = draggingId === item.id;
-          const isDropTarget = dropTargetId === item.id;
-          return (
-            <motion.div
-              key={item.id}
-              layout="position"
-              transition={{ type: 'spring', stiffness: 520, damping: 38 }}
-              draggable={arranging}
-              tabIndex={arranging ? 0 : undefined}
-              aria-label={arranging ? `Reorder ${item.label}` : undefined}
-              aria-keyshortcuts={arranging ? 'Shift+ArrowUp Shift+ArrowDown' : undefined}
-              onKeyDown={arranging ? (event) => moveWithKeyboard(index, event) : undefined}
-              onDragStartCapture={arranging ? (event) => startDrag(item.id, event) : undefined}
-              onDragEndCapture={arranging ? finishDrag : undefined}
-              onDragOver={arranging ? (event) => dragOver(item.id, event) : undefined}
-              onDrop={arranging ? (event) => drop(item.id, event) : undefined}
-              className={`relative transition duration-150 ${
-                arranging ? 'cursor-grab focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--color-accent-personal) active:cursor-grabbing' : ''
-              } ${
-                isDragging ? 'scale-[0.985] opacity-35' : isDropTarget ? 'rounded-2xl outline-2 -outline-offset-2 outline-(--color-accent-personal)' : ''
-              }`}
-            >
-              {item.render()}
-            </motion.div>
-          );
-        })}
+        {orderedItems.map((item, index) => (
+          <ArrangeableCard
+            key={item.id}
+            item={item}
+            index={index}
+            arranging={arranging}
+            isDragging={draggingId === item.id}
+            isDropTarget={dropTargetId === item.id}
+            onMoveWithKeyboard={moveWithKeyboard}
+            onDragStart={startDrag}
+            onDragEnd={finishDrag}
+            onDragOver={dragOver}
+            onDrop={drop}
+          />
+        ))}
       </div>
     </div>
   );

@@ -10,7 +10,7 @@ interface DetailIntroProps {
 }
 
 /** Editorial opening block shared by the three section detail pages. */
-export function DetailIntro({ eyebrow, title, description, accent, children }: DetailIntroProps) {
+export function DetailIntro({ eyebrow, title, description, accent, children }: Readonly<DetailIntroProps>) {
   return (
     <motion.section
       className="detail-intro relative mb-5 overflow-hidden rounded-[2rem] p-6 sm:mb-6 sm:p-8 lg:p-10"
@@ -44,11 +44,11 @@ export function DetailSectionHeading({
   label,
   title,
   detail,
-}: {
+}: Readonly<{
   label: string;
   title: string;
   detail?: string;
-}) {
+}>) {
   return (
     <div className="mb-4 mt-8 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
       <div>

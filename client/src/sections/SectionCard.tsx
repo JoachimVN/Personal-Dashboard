@@ -17,7 +17,7 @@ export function AccentDot() {
   );
 }
 
-function SectionIcon({ id }: { id: SectionDef['id'] }) {
+function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
   if (id === 'ai') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6">
