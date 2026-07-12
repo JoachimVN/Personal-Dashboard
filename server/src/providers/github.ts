@@ -2,7 +2,7 @@ import { Octokit } from 'octokit';
 import { githubSchema, type GitHubData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 
-interface RawEvent {
+export interface RawEvent {
   id: string;
   type: string | null;
   repo: { name: string };
@@ -18,23 +18,37 @@ interface RawEvent {
   };
 }
 
-function describeEvent(
+export function describeEvent(
   event: RawEvent,
-): { summary: string; url?: string; commits?: string[] } | undefined {
+): {
+  summary: string;
+  url?: string;
+  branch?: string;
+  commits?: { sha: string; title: string; description?: string }[];
+} | undefined {
   const p = event.payload;
   switch (event.type) {
     case 'PushEvent': {
       const branch = p.ref?.replace('refs/heads/', '');
-      // The events API carries each commit's message inline — surface them
-      // instead of collapsing a push to a bare "pushed N commits".
+      // The events API carries each full commit message inline.
       const commits = (p.commits ?? [])
-        .map((commit) => commit.message.split('\n', 1)[0].trim())
-        .filter(Boolean);
+        .map((commit) => {
+          const [firstLine, ...remainingLines] = commit.message.split(/\r?\n/);
+          const title = firstLine.trim();
+          const description = remainingLines.join('\n').trim();
+          return {
+            sha: commit.sha,
+            title,
+            ...(description ? { description } : {}),
+          };
+        })
+        .filter((commit) => commit.title);
       if (commits.length === 0) {
-        return { summary: branch ? `pushed to ${branch}` : 'pushed' };
+        return { summary: branch ? `pushed to ${branch}` : 'pushed', branch };
       }
       return {
-        summary: branch ? `pushed to ${branch}` : 'pushed',
+        summary: `${commits.length} commit${commits.length === 1 ? '' : 's'}`,
+        branch,
         commits,
       };
     }
@@ -191,6 +205,7 @@ export function createGitHubProvider(
             repo: event.repo.name,
             timestamp: event.created_at,
             url: described.url,
+            branch: described.branch,
             commits: described.commits,
           };
         })

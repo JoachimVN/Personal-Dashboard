@@ -20,7 +20,11 @@ export function GitHubActivityWidget() {
                 <span className="truncate text-ink-muted">
                   {item.repo.split('/')[1] ?? item.repo}
                 </span>
-                {item.url ? (
+                {item.commits && item.commits.length > 0 ? (
+                  <span className="truncate text-ink-faint">
+                    {item.branch ?? item.summary}
+                  </span>
+                ) : item.url ? (
                   <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
                     {item.summary}
                   </a>
@@ -32,18 +36,7 @@ export function GitHubActivityWidget() {
                 </span>
               </div>
               {item.commits && item.commits.length > 0 && (
-                <ul className="mt-1.5 space-y-1 border-l border-card-border pl-3">
-                  {item.commits.slice(0, 3).map((message, i) => (
-                    <li key={i} className="truncate text-xs text-ink-muted">
-                      {message}
-                    </li>
-                  ))}
-                  {item.commits.length > 3 && (
-                    <li className="text-xs text-ink-faint">
-                      +{item.commits.length - 3} more
-                    </li>
-                  )}
-                </ul>
+                <CommitList commits={item.commits} repo={item.repo} />
               )}
             </li>
           ))}
@@ -53,6 +46,68 @@ export function GitHubActivityWidget() {
         </ul>
       )}
     </WidgetCard>
+  );
+}
+
+function CommitList({
+  commits,
+  repo,
+}: {
+  commits: NonNullable<GitHubData['activity'][number]['commits']>;
+  repo: string;
+}) {
+  const visibleCommits = commits.slice(0, 5);
+  const remainingCommits = commits.slice(5);
+
+  return (
+    <div className="mt-1.5 border-l border-card-border pl-3">
+      <ul className="space-y-1.5">
+        {visibleCommits.map((commit) => (
+          <CommitItem key={commit.sha} commit={commit} repo={repo} />
+        ))}
+      </ul>
+      {remainingCommits.length > 0 && (
+        <details className="mt-1.5 text-xs">
+          <summary className="cursor-pointer text-ink-faint hover:text-ink-muted">
+            Show {remainingCommits.length} more commit{remainingCommits.length === 1 ? '' : 's'}
+          </summary>
+          <ul className="mt-1.5 space-y-1.5">
+            {remainingCommits.map((commit) => (
+              <CommitItem key={commit.sha} commit={commit} repo={repo} />
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function CommitItem({
+  commit,
+  repo,
+}: {
+  commit: NonNullable<GitHubData['activity'][number]['commits']>[number];
+  repo: string;
+}) {
+  const commitUrl = `https://github.com/${repo}/commit/${commit.sha}`;
+  const title = (
+    <a href={commitUrl} target="_blank" rel="noreferrer" className="block truncate text-xs text-ink-muted hover:underline">
+      {commit.title}
+    </a>
+  );
+
+  if (!commit.description) return <li>{title}</li>;
+
+  return (
+    <li>
+      {title}
+      <details className="mt-0.5">
+        <summary className="cursor-pointer text-xs text-ink-faint hover:text-ink-muted">
+          Show description
+        </summary>
+        <p className="mt-1 whitespace-pre-wrap text-xs text-ink-faint">{commit.description}</p>
+      </details>
+    </li>
   );
 }
 
