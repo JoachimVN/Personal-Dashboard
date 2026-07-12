@@ -47,9 +47,9 @@ function ActivityRings({
   goals: HealthData['goals'];
 }>) {
   const rings = [
-    { label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', color: '#ff2d55', radius: 44 },
-    { label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', color: '#b8ed32', radius: 33 },
-    { label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', color: '#31c6e8', radius: 22 },
+    { label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', color: '#ff2d55', track: '#4c0717', radius: 49 },
+    { label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', color: '#b8f400', track: '#173c0a', radius: 33 },
+    { label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', color: '#00d5ee', track: '#063940', radius: 17 },
   ];
 
   return (
@@ -58,17 +58,17 @@ function ActivityRings({
         <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" aria-label="Daily activity rings" role="img">
           {rings.map((ring) => {
             const circumference = 2 * Math.PI * ring.radius;
-            const progress = Math.min(ring.value / ring.goal, 1);
+            const progress = Math.min(Math.max(ring.value / ring.goal, 0), 1);
             return (
               <g key={ring.label} transform="rotate(-90 60 60)">
-                <circle cx="60" cy="60" r={ring.radius} fill="none" stroke="var(--color-track)" strokeWidth="9" />
+                <circle cx="60" cy="60" r={ring.radius} fill="none" stroke={ring.track} strokeWidth="16" />
                 <circle
                   cx="60"
                   cy="60"
                   r={ring.radius}
                   fill="none"
                   stroke={ring.color}
-                  strokeWidth="9"
+                  strokeWidth="16"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
                   strokeDashoffset={circumference * (1 - progress)}
