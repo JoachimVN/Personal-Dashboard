@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { motion } from 'motion/react';
 import type { HealthData, HealthDay } from '@personal-dashboard/shared';
 
 const W = 100;
@@ -160,14 +159,21 @@ function BarTrend({
 }
 
 interface ChartPoint {
+  index: number;
   x: number;
   y: number;
   value: number;
 }
 
+interface ChartSegment {
+  start: ChartPoint;
+  end: ChartPoint;
+  spansMissingDays: boolean;
+}
+
 /**
- * One-or-more line series on a shared time axis. Lines break over unsynced days
- * instead of interpolating across them; a lone day renders as a dot.
+ * One-or-more line series on a shared time axis. Gaps between measurements use a
+ * dashed join so sparse metrics remain readable without implying daily samples.
  */
 function LineTrend({
   title,
@@ -198,19 +204,17 @@ function LineTrend({
   const yAt = (v: number) => H - ((v - min) / (max - min)) * H;
 
   const lines = series.map((s) => {
-    const segments: ChartPoint[][] = [];
-    let current: ChartPoint[] = [];
+    const points: ChartPoint[] = [];
     slots.forEach((slot, i) => {
       const value = slot.day?.[s.key];
-      if (value == null) {
-        if (current.length > 0) segments.push(current);
-        current = [];
-      } else {
-        current.push({ x: xAt(i), y: yAt(value), value });
-      }
+      if (value != null) points.push({ index: i, x: xAt(i), y: yAt(value), value });
     });
-    if (current.length > 0) segments.push(current);
-    return { ...s, segments };
+    const segments: ChartSegment[] = points.slice(1).map((point, i) => ({
+      start: points[i],
+      end: point,
+      spansMissingDays: point.index - points[i].index > 1,
+    }));
+    return { ...s, points, segments };
   });
 
   const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
@@ -278,34 +282,33 @@ function LineTrend({
             />
           ))}
           {lines.map((line) =>
-            line.segments.map((segment) =>
-              segment.length === 1 ? (
-                // A zero-length round-capped stroke renders as a circular dot even
-                // though preserveAspectRatio="none" would distort a <circle>.
+            <g key={line.key}>
+              {line.segments.map((segment) => (
                 <path
-                  key={`${line.key}-${segment[0].x}`}
-                  d={`M${segment[0].x},${segment[0].y} l0.01,0`}
+                  key={`${segment.start.index}-${segment.end.index}`}
+                  d={`M${segment.start.x},${segment.start.y} L${segment.end.x},${segment.end.y}`}
+                  fill="none"
+                  stroke={line.color}
+                  strokeWidth={2}
+                  strokeDasharray={segment.spansMissingDays ? '3 3' : undefined}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ))}
+              {line.points.map((point) => (
+                <path
+                  key={point.index}
+                  // A zero-length round-capped stroke renders as a circular dot even
+                  // though preserveAspectRatio="none" would distort a <circle>.
+                  d={`M${point.x},${point.y} l0.01,0`}
                   stroke={line.color}
                   strokeWidth={4}
                   strokeLinecap="round"
                   vectorEffect="non-scaling-stroke"
                 />
-              ) : (
-                <motion.path
-                  key={`${line.key}-${segment[0].x}`}
-                  d={segment.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')}
-                  fill="none"
-                  stroke={line.color}
-                  strokeWidth={2}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  vectorEffect="non-scaling-stroke"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                />
-              ),
-            ),
+              ))}
+            </g>,
           )}
         </svg>
         {active != null &&
