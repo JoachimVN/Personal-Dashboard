@@ -40,7 +40,7 @@ const configSchema = z.object({
       /** How many recent days of samples to retain for the trend chart. */
       historyRetentionDays: z.number().int().min(1).default(30),
     })
-    .default({ stepGoal: 10_000, moveGoalKcal: 500, exerciseGoalMinutes: 30, standGoalHours: 12, historyRetentionDays: 30 }),
+    .default({ stepGoal: 10_000, moveGoalKcal: 290, exerciseGoalMinutes: 30, standGoalHours: 12, historyRetentionDays: 30 }),
   code: z
     .object({
       /** Local parent directory to scan for git repos, per OS. Each immediate subdirectory with a .git and a GitHub-remote origin becomes a launchable project. */
