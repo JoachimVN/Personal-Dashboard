@@ -75,14 +75,9 @@ No key needed — set `WEATHER_LAT` / `WEATHER_LON` in `server/.env`.
 
 ### GitHub
 
-Set `GITHUB_USERNAME` and `GITHUB_TOKEN` in `server/.env`. Create a **fine-grained PAT** (github.com → Settings → Developer settings) with:
+Set `GITHUB_USERNAME` and `GITHUB_TOKEN` in `server/.env`. Create a **classic PAT** (github.com → Settings → Developer settings) with the `repo` scope. A fine-grained PAT does not work here — `GET /users/{username}/events` (used for the activity feed) doesn't support fine-grained PATs at all, so private-repo activity silently never shows up.
 
-- **Repository access**: All repositories (or at least your pinned ones)
-- **Repository permissions**: Contents *read*, Actions *read*, Issues *read*, Pull requests *read* (Metadata read is added automatically)
-
-If the contribution graph errors with a fine-grained PAT, fall back to a classic PAT with `repo` + `read:user` scopes.
-
-Pinned repos for the repo-health card live in `server/config.json`.
+The repo-health card shows all your owned, non-fork, non-archived repos, fetched live from the GitHub API — there's no pinned-repo list to maintain in `server/config.json`.
 
 Note: the activity feed uses GitHub's events API, which is **delayed** (typically minutes) — it is not real-time.
 
