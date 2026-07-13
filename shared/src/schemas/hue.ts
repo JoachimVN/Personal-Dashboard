@@ -18,11 +18,20 @@ export const hueSceneSchema = z.object({
   colors: z.array(z.string()),
 });
 
+export const hueRoomSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  /** Whether any light in the room is currently on (the bridge's `any_on`). */
+  anyOn: z.boolean(),
+});
+
 export const hueDataSchema = z.object({
   lights: z.array(hueLightSchema),
+  rooms: z.array(hueRoomSchema),
   scenes: z.array(hueSceneSchema),
 });
 
 export type HueLight = z.infer<typeof hueLightSchema>;
+export type HueRoom = z.infer<typeof hueRoomSchema>;
 export type HueScene = z.infer<typeof hueSceneSchema>;
 export type HueData = z.infer<typeof hueDataSchema>;

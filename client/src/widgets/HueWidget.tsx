@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { HueData, HueLight, HueScene, WidgetEnvelope } from '@personal-dashboard/shared';
+import type { HueData, HueLight, HueRoom, HueScene, WidgetEnvelope } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 
@@ -165,16 +165,55 @@ function SceneChip({ scene, refetch }: Readonly<{ scene: HueScene; refetch: () =
   );
 }
 
-/** Scenes grouped by room, rooms in the server's (alphabetical) order. */
-function groupScenesByRoom(scenes: HueScene[]): [string, HueScene[]][] {
-  const rooms = new Map<string, HueScene[]>();
-  for (const scene of scenes) {
-    const room = scene.room ?? 'Other';
-    const list = rooms.get(room) ?? [];
-    list.push(scene);
-    rooms.set(room, list);
+function RoomToggle({ room, refetch }: Readonly<{ room: HueRoom; refetch: () => void }>) {
+  const [override, setOverride] = useState<boolean | null>(null);
+  const on = override ?? room.anyOn;
+
+  async function toggle() {
+    const next = !on;
+    setOverride(next);
+    try {
+      const res = await fetch(`/api/hue/groups/${room.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ on: next }),
+      });
+      if (!res.ok) setOverride(null);
+      else refetch();
+    } catch {
+      setOverride(null);
+    }
   }
-  return [...rooms.entries()];
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={`Turn ${room.name} ${on ? 'off' : 'on'}`}
+      onClick={() => void toggle()}
+      className={`h-4 w-7 shrink-0 rounded-full transition-colors ${
+        on ? 'bg-(--color-accent-personal)' : 'bg-track'
+      }`}
+    >
+      <span
+        className={`block h-3 w-3 translate-x-0.5 rounded-full bg-white shadow transition-transform ${
+          on ? 'translate-x-[14px]' : ''
+        }`}
+      />
+    </button>
+  );
+}
+
+function SceneGrid({ scenes, refetch }: Readonly<{ scenes: HueScene[]; refetch: () => void }>) {
+  if (scenes.length === 0) return null;
+  return (
+    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+      {scenes.map((scene) => (
+        <SceneChip key={scene.id} scene={scene} refetch={refetch} />
+      ))}
+    </div>
+  );
 }
 
 function hueErrorFallback(entry: WidgetEnvelope<HueData>) {
@@ -202,18 +241,33 @@ export function HueWidget() {
                 <LightBar key={light.id} light={light} refetch={refetch} />
               ))}
             </div>
-            {data.scenes.length > 0 && (
+            {(data.rooms.length > 0 || data.scenes.length > 0) && (
               <div className="mt-3 space-y-2.5 border-t border-card-border pt-3">
-                {groupScenesByRoom(data.scenes).map(([room, scenes]) => (
-                  <div key={room}>
-                    <p className="text-xs uppercase tracking-wider text-ink-faint">{room}</p>
-                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-                      {scenes.map((scene) => (
-                        <SceneChip key={scene.id} scene={scene} refetch={refetch} />
-                      ))}
+                {data.rooms.map((room) => (
+                  <div key={room.id}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs uppercase tracking-wider text-ink-faint">{room.name}</p>
+                      <RoomToggle room={room} refetch={refetch} />
                     </div>
+                    <SceneGrid
+                      scenes={data.scenes.filter((scene) => scene.room === room.name)}
+                      refetch={refetch}
+                    />
                   </div>
                 ))}
+                {(() => {
+                  const roomNames = new Set(data.rooms.map((room) => room.name));
+                  const orphans = data.scenes.filter(
+                    (scene) => scene.room === null || !roomNames.has(scene.room),
+                  );
+                  if (orphans.length === 0) return null;
+                  return (
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-ink-faint">Other</p>
+                      <SceneGrid scenes={orphans} refetch={refetch} />
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </>

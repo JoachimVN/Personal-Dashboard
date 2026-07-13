@@ -3,6 +3,7 @@ import {
   hueDataSchema,
   type HueData,
   type HueLight,
+  type HueRoom,
   type HueScene,
 } from '@personal-dashboard/shared';
 import { readHueToken, writeHueToken, type HueToken } from '../hueToken.js';
@@ -22,6 +23,7 @@ export interface HueConfig {
 export interface HueProvider extends Provider<HueData> {
   /** Talks to the remote API directly — the Express route just calls this, no duplicated logic. */
   setLightState(id: string, state: { on?: boolean; brightness?: number }): Promise<void>;
+  setGroupState(id: string, on: boolean): Promise<void>;
   activateScene(id: string): Promise<void>;
 }
 
@@ -42,10 +44,16 @@ const bridgeSceneSchema = z.object({
   recycle: z.boolean().optional(),
 });
 
+const bridgeGroupSchema = z.object({
+  name: z.string(),
+  type: z.string().optional(),
+  state: z.object({ any_on: z.boolean().optional() }).optional(),
+});
+
 // One full-state request per poll (lights + groups + scenes) instead of three cloud round trips.
 const bridgeFullStateSchema = z.object({
   lights: bridgeLightsSchema,
-  groups: z.record(z.string(), z.object({ name: z.string() })),
+  groups: z.record(z.string(), bridgeGroupSchema),
   scenes: z.record(z.string(), bridgeSceneSchema),
 });
 
@@ -241,6 +249,16 @@ export function mapPalettes(v2Scenes: z.infer<typeof v2ScenesSchema>): Record<st
   return palettes;
 }
 
+/** Rooms only — Entertainment/Zone groups would duplicate the same lights. */
+export function mapRooms(
+  groups: Record<string, { name: string; type?: string; state?: { any_on?: boolean } }>,
+): HueRoom[] {
+  return Object.entries(groups)
+    .filter(([, group]) => group.type === 'Room')
+    .map(([id, group]) => ({ id, name: group.name, anyOn: group.state?.any_on ?? false }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Only scenes created in the Hue app (GroupScenes) — recycled/utility scenes are internal. */
 export function mapScenes(
   scenes: Record<string, { name: string; type?: string; group?: string; recycle?: boolean }>,
@@ -309,10 +327,17 @@ export function createHueProvider(hue: HueConfig | undefined): HueProvider {
         brightness: normalizeBrightness(light.state.bri),
         reachable: light.state.reachable ?? true,
       }));
-      return { lights, scenes: mapScenes(state.scenes, state.groups, palettes) };
+      return {
+        lights,
+        rooms: mapRooms(state.groups),
+        scenes: mapScenes(state.scenes, state.groups, palettes),
+      };
     },
     async setLightState(id, state): Promise<void> {
       await controlRequest(`/lights/${id}/state`, buildLightStateBody(state));
+    },
+    async setGroupState(id, on): Promise<void> {
+      await controlRequest(`/groups/${id}/action`, { on });
     },
     async activateScene(id): Promise<void> {
       // Group 0 is the built-in all-lights group; recalling a scene through it

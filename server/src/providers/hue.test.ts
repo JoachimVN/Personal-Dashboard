@@ -4,6 +4,7 @@ import {
   buildLightStateBody,
   denormalizeBrightness,
   mapPalettes,
+  mapRooms,
   mapScenes,
   normalizeBrightness,
   xyToHex,
@@ -40,6 +41,21 @@ describe('buildLightStateBody', () => {
 
   it('sends brightness alone when the light is already on', () => {
     expect(buildLightStateBody({ brightness: 40 })).toEqual({ bri: 102 });
+  });
+});
+
+describe('mapRooms', () => {
+  it('keeps only Room groups, sorted by name, defaulting any_on to false', () => {
+    expect(
+      mapRooms({
+        '81': { name: 'Bedroom', type: 'Room', state: { any_on: true } },
+        '83': { name: 'Bathroom', type: 'Room' },
+        '200': { name: 'Music area', type: 'Entertainment', state: { any_on: true } },
+      }),
+    ).toEqual([
+      { id: '83', name: 'Bathroom', anyOn: false },
+      { id: '81', name: 'Bedroom', anyOn: true },
+    ]);
   });
 });
 
