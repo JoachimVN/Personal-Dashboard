@@ -8,6 +8,7 @@ import { FIVE_HOUR_MS, UsageMeter, WEEKLY_MS } from './UsageMeter';
 import { UsageHistoryChart } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
+import type { ToolIconProps } from './ToolIcons';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -43,7 +44,12 @@ function WindowUnavailable({
   return tokens !== undefined ? <TokenRow label={label} tokens={tokens} /> : null;
 }
 
-function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
+function ToolCard({
+  id,
+  label,
+  color,
+  icon: Icon,
+}: Readonly<{ id: string; label: string; color: string; icon: React.ComponentType<ToolIconProps> }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   return (
@@ -55,6 +61,7 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
     >
       <WidgetShell
         title={label}
+        icon={<Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} />}
         badge={
           <div className="flex items-center gap-2">
             <StaleBadge envelope={envelope} />
@@ -88,23 +95,42 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
               ) : (
                 <WindowUnavailable label="Weekly" status={data.weeklyStatus} tokens={data.tokens?.weekly} />
               )}
-              {(data.fiveHour || data.weekly) && (
-                <>
-                  <UsageHistoryChart
-                    points={data.history}
-                    metric="fiveHourUsedPercent"
-                    windowMs={DAY_MS}
-                    color={color}
-                    caption="5-hour window · last 24 h"
-                  />
-                  <UsageHistoryChart
-                    points={data.history}
-                    metric="weeklyUsedPercent"
-                    windowMs={WEEKLY_MS}
-                    color={color}
-                    caption="Weekly window · last 7 d"
-                  />
-                </>
+              {data.modelWeekly && (
+                <UsageMeter
+                  label={`Weekly (${data.modelWeekly.model})`}
+                  limit={data.modelWeekly}
+                  color={color}
+                  windowMs={WEEKLY_MS}
+                />
+              )}
+              {/* Each trend is gated on its window being currently enforced, so a lifted
+                  limit (e.g. Codex's 5-hour) doesn't keep charting stale history. */}
+              {data.fiveHour && (
+                <UsageHistoryChart
+                  points={data.history}
+                  metric="fiveHourUsedPercent"
+                  windowMs={DAY_MS}
+                  color={color}
+                  caption="5-hour window · last 24 h"
+                />
+              )}
+              {data.weekly && (
+                <UsageHistoryChart
+                  points={data.history}
+                  metric="weeklyUsedPercent"
+                  windowMs={WEEKLY_MS}
+                  color={color}
+                  caption="Weekly window · last 7 d"
+                />
+              )}
+              {data.modelWeekly && (
+                <UsageHistoryChart
+                  points={data.history}
+                  metric="modelWeeklyUsedPercent"
+                  windowMs={WEEKLY_MS}
+                  color={color}
+                  caption={`${data.modelWeekly.model} weekly · last 7 d`}
+                />
               )}
               {data.asOf && <p className="text-[11px] text-ink-faint">As of {relativeTime(data.asOf)}</p>}
             </div>

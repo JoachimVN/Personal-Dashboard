@@ -223,16 +223,24 @@ async function claudeTokenTotals(): Promise<{ fiveHour: number; weekly: number }
   return { fiveHour, weekly };
 }
 
-type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>;
+type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'modelWeekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>;
 
 const execFileAsync = promisify(execFile);
 
 const MONTH_ABBREVIATIONS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 /** `claude -p "/usage"` prints e.g. "Current session: 41% used · resets Jul 13 at 1:59am (Europe/Oslo)". */
-const SESSION_LINE = /Current session:\s*(\d+)%\s*used.*?resets\s+([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
-const WEEKLY_LINE = /Current week \(all models\):\s*(\d+)%\s*used.*?resets\s+([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
-const NO_LIMITS_LINE = /(?:no\s+(?:active\s+)?(?:usage\s+)?limits?|unlimited|limits?\s+(?:are\s+)?(?:not\s+(?:currently\s+)?enforced|temporarily\s+(?:disabled|removed|lifted)))/i;
+const QUOTA_TAIL = String.raw`(\d+)%\s*used.*?resets\s+([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)`;
+const SESSION_LINE = new RegExp(String.raw`Current session:\s*${QUOTA_TAIL}`, 'i');
+const WEEKLY_LINE = new RegExp(String.raw`Current week \(all models\):\s*${QUOTA_TAIL}`, 'i');
+/** Model-specific weekly cap, e.g. "Current week (Fable): 49% used · …" — the model name varies by plan/era. */
+const MODEL_WEEK_LINE = new RegExp(String.raw`Current week \((?!all models)([^)]+)\):\s*${QUOTA_TAIL}`, 'i');
+const NO_LIMITS_PATTERNS = [
+  /no\s+(?:active\s+)?(?:usage\s+)?limits?/i,
+  /unlimited/i,
+  /limits?\s+(?:are\s+)?not\s+(?:currently\s+)?enforced/i,
+  /limits?\s+(?:are\s+)?temporarily\s+(?:disabled|removed|lifted)/i,
+];
 
 const cliResultSchema = z.object({
   is_error: z.boolean(),
@@ -244,8 +252,7 @@ const cliResultSchema = z.object({
  * 1:59am" — both windows reset within days, so resolving against the current year and rolling
  * forward if that lands in the past handles the one edge case (a Dec→Jan reset) correctly.
  */
-function parseResetsAt(match: RegExpMatchArray): string | undefined {
-  const [, , monthAbbr, day, hour, minute, meridiem] = match;
+function parseResetsAt(monthAbbr: string, day: string, hour: string, minute: string | undefined, meridiem: string): string | undefined {
   const monthIndex = MONTH_ABBREVIATIONS.indexOf(monthAbbr.toLowerCase());
   if (monthIndex === -1) return undefined;
   let hour24 = Number(hour) % 12;
@@ -256,11 +263,23 @@ function parseResetsAt(match: RegExpMatchArray): string | undefined {
   return Number.isNaN(candidate.getTime()) ? undefined : candidate.toISOString();
 }
 
+/** `groups` is the QUOTA_TAIL captures: percent, month, day, hour, minute?, am/pm. */
+function parseQuota(groups: string[]) {
+  const [percent, monthAbbr, day, hour, minute, meridiem] = groups;
+  const resetsAt = parseResetsAt(monthAbbr, day, hour, minute, meridiem);
+  return resetsAt ? limit(Number(percent), resetsAt) : undefined;
+}
+
 function parseLine(result: string, pattern: RegExp) {
   const match = pattern.exec(result);
+  return match ? parseQuota(match.slice(1)) : undefined;
+}
+
+function parseModelWeekLine(result: string) {
+  const match = MODEL_WEEK_LINE.exec(result);
   if (!match) return undefined;
-  const resetsAt = parseResetsAt(match);
-  return resetsAt ? limit(Number(match[1]), resetsAt) : undefined;
+  const quota = parseQuota(match.slice(2));
+  return quota && { ...quota, model: match[1].trim() };
 }
 
 /**
@@ -289,14 +308,21 @@ async function claudeCliUsageSnapshot(): Promise<ClaudeQuota> {
     if (parsed.is_error || !parsed.result) {
       return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
     }
-    const fiveHour = parseLine(parsed.result, SESSION_LINE);
-    const weekly = parseLine(parsed.result, WEEKLY_LINE);
-    const hasQuotaReport = Boolean(fiveHour || weekly || NO_LIMITS_LINE.test(parsed.result));
+    const result = parsed.result;
+    const fiveHour = parseLine(result, SESSION_LINE);
+    const weekly = parseLine(result, WEEKLY_LINE);
+    const modelWeekly = parseModelWeekLine(result);
+    // Unlike Codex (where the latest rate-limit event is authoritative about which windows
+    // exist), Claude's /usage simply omits "Current session" when no 5-hour session is active —
+    // so only an explicit no-limits line justifies reporting a window as unlimited.
+    const noLimits = NO_LIMITS_PATTERNS.some((pattern) => pattern.test(result));
+    const hasQuotaReport = Boolean(fiveHour || weekly || modelWeekly || noLimits);
     return {
       fiveHour,
       weekly,
-      fiveHourStatus: limitStatus(Boolean(fiveHour), hasQuotaReport),
-      weeklyStatus: limitStatus(Boolean(weekly), hasQuotaReport),
+      modelWeekly,
+      fiveHourStatus: limitStatus(Boolean(fiveHour), noLimits),
+      weeklyStatus: limitStatus(Boolean(weekly), noLimits),
       asOf: hasQuotaReport ? new Date().toISOString() : undefined,
     };
   } catch {
@@ -319,6 +345,7 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
         available: Boolean(quota.asOf || tokenTotals.fiveHour || tokenTotals.weekly),
         fiveHour: quota.fiveHour,
         weekly: quota.weekly,
+        modelWeekly: quota.modelWeekly,
         fiveHourStatus: quota.fiveHourStatus,
         weeklyStatus: quota.weeklyStatus,
         tokens: tokenTotals,

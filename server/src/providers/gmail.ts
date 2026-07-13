@@ -39,10 +39,12 @@ export function createGmailProvider(
       const gmail = google.gmail({ version: 'v1', auth });
 
       // gmail.metadata scope forbids `q` — list by label and use label counters.
-      const [inboxLabel, threadList] = await Promise.all([
-        gmail.users.labels.get({ userId: 'me', id: 'INBOX' }, { signal }),
+      // INBOX + CATEGORY_PERSONAL (ANDed) mirrors the Gmail app's Primary tab: promotions,
+      // social, updates and forums are other CATEGORY_* labels, and spam isn't in INBOX.
+      const [personalLabel, threadList] = await Promise.all([
+        gmail.users.labels.get({ userId: 'me', id: 'CATEGORY_PERSONAL' }, { signal }),
         gmail.users.threads.list(
-          { userId: 'me', labelIds: ['INBOX'], maxResults: THREAD_COUNT },
+          { userId: 'me', labelIds: ['INBOX', 'CATEGORY_PERSONAL'], maxResults: THREAD_COUNT },
           { signal },
         ),
       ]);
@@ -62,7 +64,9 @@ export function createGmailProvider(
       );
 
       return {
-        unreadThreads: inboxLabel.data.threadsUnread ?? 0,
+        // Closest available counter to "unread in Primary" — it also counts archived unread
+        // personal threads, but a Primary-scoped counter would need `q`, which our scope forbids.
+        unreadThreads: personalLabel.data.threadsUnread ?? 0,
         threads: threads.map(({ data }) => {
           const messages = data.messages ?? [];
           const last = messages[messages.length - 1];

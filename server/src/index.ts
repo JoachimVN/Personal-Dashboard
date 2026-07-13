@@ -78,6 +78,35 @@ app.post('/api/hue/lights/:id', async (req, res) => {
   res.json(scheduler.getEnvelope('hue'));
 });
 
+const hueGroupSchema = z.object({ on: z.boolean() });
+
+app.post('/api/hue/groups/:id', async (req, res) => {
+  const parsed = hueGroupSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid-hue-state' });
+    return;
+  }
+  try {
+    await providers.hue.setGroupState(req.params.id, parsed.data.on);
+  } catch {
+    res.status(502).json({ error: 'hue-control-failed' });
+    return;
+  }
+  await scheduler.refresh('hue', true);
+  res.json(scheduler.getEnvelope('hue'));
+});
+
+app.post('/api/hue/scenes/:id', async (req, res) => {
+  try {
+    await providers.hue.activateScene(req.params.id);
+  } catch {
+    res.status(502).json({ error: 'hue-control-failed' });
+    return;
+  }
+  await scheduler.refresh('hue', true);
+  res.json(scheduler.getEnvelope('hue'));
+});
+
 // Ingest endpoint for an Apple Health Shortcut running on the user's phone (over Tailscale).
 // Same trust model as the rest of the dashboard: loopback + `tailscale serve`, no separate auth.
 // Accepts either a single day sample or `{ days: [...] }` covering a multi-day window.

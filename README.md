@@ -75,14 +75,9 @@ No key needed — set `WEATHER_LAT` / `WEATHER_LON` in `server/.env`.
 
 ### GitHub
 
-Set `GITHUB_USERNAME` and `GITHUB_TOKEN` in `server/.env`. Create a **fine-grained PAT** (github.com → Settings → Developer settings) with:
+Set `GITHUB_USERNAME` and `GITHUB_TOKEN` in `server/.env`. Create a **classic PAT** (github.com → Settings → Developer settings) with the `repo` scope. A fine-grained PAT does not work here — `GET /users/{username}/events` (used for the activity feed) doesn't support fine-grained PATs at all, so private-repo activity silently never shows up.
 
-- **Repository access**: All repositories (or at least your pinned ones)
-- **Repository permissions**: Contents *read*, Actions *read*, Issues *read*, Pull requests *read* (Metadata read is added automatically)
-
-If the contribution graph errors with a fine-grained PAT, fall back to a classic PAT with `repo` + `read:user` scopes.
-
-Pinned repos for the repo-health card live in `server/config.json`.
+The repo-health card shows all your owned, non-fork, non-archived repos, fetched live from the GitHub API — there's no pinned-repo list to maintain in `server/config.json`.
 
 Note: the activity feed uses GitHub's events API, which is **delayed** (typically minutes) — it is not real-time.
 
@@ -128,20 +123,16 @@ Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `u
 
 ### Philips Hue
 
-One-time pairing:
+Lights go through Philips' cloud (the official [Remote API](https://developers.meethue.com)), the same path the Hue phone app uses — so the widget works no matter what network the Mac is on. The bridge's LAN IP is not involved.
 
-1. Find your bridge's IP — either via [discovery.meethue.com](https://discovery.meethue.com) or your router's device list.
-2. Press the physical link button on the bridge, then within ~30 seconds run:
-   ```bash
-   curl -k -X POST https://<bridge-ip>/api -d '{"devicetype":"personal-dashboard"}'
-   ```
-   (`-k` skips certificate verification — the bridge's HTTPS cert is self-signed and never leaves your LAN.) The response contains a `username` — that's your API key.
-3. Set in `server/.env`:
-   - `HUE_BRIDGE_IP` — the bridge's IP
-   - `HUE_USERNAME` — the API key from step 2
+One-time setup:
+
+1. Create a free developer account at [developers.meethue.com](https://developers.meethue.com), then under **My Apps** create a new Remote Hue API app. Set the **Callback URL** to exactly `http://127.0.0.1:8842/callback`.
+2. Put the app's credentials in `server/.env` as `HUE_CLIENT_ID` / `HUE_CLIENT_SECRET`.
+3. Run `npm run setup:hue -w server`, open the printed URL, log in with your Philips Hue account and approve. The script exchanges the OAuth code and remotely provisions a bridge allowlist user (the cloud equivalent of pressing the link button), saving both to `server/.tokens/hue.json` (owner-only permissions).
 4. Restart the server — like every env-configured widget, Hue is only checked at startup.
 
-Control is read + write: toggling a light or dragging its brightness slider sends the change straight to the bridge. Individual lights only for now — no rooms/groups/scenes. If the bridge's IP ever changes (e.g. a new DHCP lease), update `HUE_BRIDGE_IP` and restart.
+Control is read + write: toggling a light, dragging its brightness slider, or tapping one of your Hue app scenes (shown as chips grouped by room) sends the change through the cloud to the bridge. Access tokens auto-refresh; if the widget stops working after months of the server being off, the refresh token has expired — re-run step 3.
 
 ### iMessage (macOS only)
 

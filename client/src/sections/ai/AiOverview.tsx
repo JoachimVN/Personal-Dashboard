@@ -3,9 +3,11 @@ import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
+import { WEEKLY_MS } from './UsageMeter';
 import { UsageSparkline } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
+import type { ToolIconProps } from './ToolIcons';
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -19,13 +21,26 @@ function limitLabel(
   return status === 'unlimited' ? 'No limit' : '—';
 }
 
-function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
+/** The bar tracks the tighter of the weekly caps (all-models vs model-specific), else the 5h window. */
+function barPercent(data: AiUsageToolData) {
+  if (data.weekly || data.modelWeekly) {
+    return Math.max(data.weekly?.usedPercent ?? 0, data.modelWeekly?.usedPercent ?? 0);
+  }
+  return data.fiveHour?.usedPercent ?? 0;
+}
+
+function ToolRow({
+  id,
+  label,
+  color,
+  icon: Icon,
+}: Readonly<{ id: string; label: string; color: string; icon: React.ComponentType<ToolIconProps> }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-2 text-sm">
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} />
         <span className="font-medium">{label}</span>
         <span className="ml-auto">
           <UsageRefreshButton label={label} refreshing={refreshing} onRefresh={refresh} />
@@ -48,23 +63,31 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                     {limitLabel(data.weekly, data.weeklyStatus, data.tokens?.weekly)}
                   </span>
                 </span>
+                {data.modelWeekly && (
+                  <span>
+                    {data.modelWeekly.model.toLowerCase()}{' '}
+                    <span className="font-semibold tabular-nums text-ink">
+                      {Math.round(data.modelWeekly.usedPercent)}%
+                    </span>
+                  </span>
+                )}
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-track">
                 <motion.div
                   className="h-full rounded-full"
                   initial={{ width: 0 }}
-                  animate={{
-                    width: `${data.weekly?.usedPercent ?? data.fiveHour?.usedPercent ?? 0}%`,
-                  }}
+                  animate={{ width: `${barPercent(data)}%` }}
                   style={{ backgroundColor: color }}
                 />
               </div>
-              <UsageSparkline
-                points={data.history}
-                metric="fiveHourUsedPercent"
-                windowMs={DAY_MS}
-                color={color}
-              />
+              {(data.fiveHour || data.weekly) && (
+                <UsageSparkline
+                  points={data.history}
+                  metric={data.fiveHour ? 'fiveHourUsedPercent' : 'weeklyUsedPercent'}
+                  windowMs={data.fiveHour ? DAY_MS : WEEKLY_MS}
+                  color={color}
+                />
+              )}
               {data.tokens && (
                 <div className="flex items-baseline justify-between pt-0.5 text-[11px] text-ink-faint">
                   <span>tokens used</span>
