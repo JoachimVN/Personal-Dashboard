@@ -75,8 +75,8 @@ function LightRow({ light, refetch }: Readonly<{ light: HueLight; refetch: () =>
 }
 
 function hueErrorFallback(entry: WidgetEnvelope<HueData>) {
-  if (entry.error !== 'timeout') return undefined;
-  return <p className="text-sm text-ink-faint">Hue bridge is offline — lights will reconnect automatically.</p>;
+  if (entry.error !== 'timeout' && entry.error !== 'fetch-failed') return undefined;
+  return <p className="text-sm text-ink-faint">Can't reach Philips Hue's cloud — lights will reconnect automatically.</p>;
 }
 
 export function HueWidget() {

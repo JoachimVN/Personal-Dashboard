@@ -128,20 +128,16 @@ Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `u
 
 ### Philips Hue
 
-One-time pairing:
+Lights go through Philips' cloud (the official [Remote API](https://developers.meethue.com)), the same path the Hue phone app uses — so the widget works no matter what network the Mac is on. The bridge's LAN IP is not involved.
 
-1. Find your bridge's IP — either via [discovery.meethue.com](https://discovery.meethue.com) or your router's device list.
-2. Press the physical link button on the bridge, then within ~30 seconds run:
-   ```bash
-   curl -k -X POST https://<bridge-ip>/api -d '{"devicetype":"personal-dashboard"}'
-   ```
-   (`-k` skips certificate verification — the bridge's HTTPS cert is self-signed and never leaves your LAN.) The response contains a `username` — that's your API key.
-3. Set in `server/.env`:
-   - `HUE_BRIDGE_IP` — the bridge's IP
-   - `HUE_USERNAME` — the API key from step 2
+One-time setup:
+
+1. Create a free developer account at [developers.meethue.com](https://developers.meethue.com), then under **My Apps** create a new Remote Hue API app. Set the **Callback URL** to exactly `http://127.0.0.1:8842/callback`.
+2. Put the app's credentials in `server/.env` as `HUE_CLIENT_ID` / `HUE_CLIENT_SECRET`.
+3. Run `npm run setup:hue -w server`, open the printed URL, log in with your Philips Hue account and approve. The script exchanges the OAuth code and remotely provisions a bridge allowlist user (the cloud equivalent of pressing the link button), saving both to `server/.tokens/hue.json` (owner-only permissions).
 4. Restart the server — like every env-configured widget, Hue is only checked at startup.
 
-Control is read + write: toggling a light or dragging its brightness slider sends the change straight to the bridge. Individual lights only for now — no rooms/groups/scenes. If the bridge's IP ever changes (e.g. a new DHCP lease), update `HUE_BRIDGE_IP` and restart.
+Control is read + write: toggling a light or dragging its brightness slider sends the change through the cloud to the bridge. Individual lights only for now — no rooms/groups/scenes. Access tokens auto-refresh; if the widget stops working after months of the server being off, the refresh token has expired — re-run step 3.
 
 ### iMessage (macOS only)
 

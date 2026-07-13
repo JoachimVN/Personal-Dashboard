@@ -12,6 +12,7 @@
     "test": "vitest run",
     "setup:gmail": "tsx scripts/setupGmail.ts",
     "setup:spotify": "tsx scripts/setupSpotify.ts",
+    "setup:hue": "tsx scripts/setupHue.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
