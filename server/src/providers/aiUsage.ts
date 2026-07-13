@@ -291,12 +291,16 @@ async function claudeCliUsageSnapshot(): Promise<ClaudeQuota> {
     }
     const fiveHour = parseLine(parsed.result, SESSION_LINE);
     const weekly = parseLine(parsed.result, WEEKLY_LINE);
-    const hasQuotaReport = Boolean(fiveHour || weekly || NO_LIMITS_LINE.test(parsed.result));
+    // Unlike Codex (where the latest rate-limit event is authoritative about which windows
+    // exist), Claude's /usage simply omits "Current session" when no 5-hour session is active —
+    // so only an explicit no-limits line justifies reporting a window as unlimited.
+    const noLimits = NO_LIMITS_LINE.test(parsed.result);
+    const hasQuotaReport = Boolean(fiveHour || weekly || noLimits);
     return {
       fiveHour,
       weekly,
-      fiveHourStatus: limitStatus(Boolean(fiveHour), hasQuotaReport),
-      weeklyStatus: limitStatus(Boolean(weekly), hasQuotaReport),
+      fiveHourStatus: limitStatus(Boolean(fiveHour), noLimits),
+      weeklyStatus: limitStatus(Boolean(weekly), noLimits),
       asOf: hasQuotaReport ? new Date().toISOString() : undefined,
     };
   } catch {
