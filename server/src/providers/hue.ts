@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { hueDataSchema, type HueData, type HueLight } from '@personal-dashboard/shared';
+import {
+  hueDataSchema,
+  type HueData,
+  type HueLight,
+  type HueScene,
+} from '@personal-dashboard/shared';
 import { readHueToken, writeHueToken, type HueToken } from '../hueToken.js';
 import type { Provider } from '../scheduler.js';
 
@@ -17,6 +22,7 @@ export interface HueConfig {
 export interface HueProvider extends Provider<HueData> {
   /** Talks to the remote API directly — the Express route just calls this, no duplicated logic. */
   setLightState(id: string, state: { on?: boolean; brightness?: number }): Promise<void>;
+  activateScene(id: string): Promise<void>;
 }
 
 const bridgeLightSchema = z.object({
@@ -28,6 +34,20 @@ const bridgeLightSchema = z.object({
   }),
 });
 const bridgeLightsSchema = z.record(z.string(), bridgeLightSchema);
+
+const bridgeSceneSchema = z.object({
+  name: z.string(),
+  type: z.string().optional(),
+  group: z.string().optional(),
+  recycle: z.boolean().optional(),
+});
+
+// One full-state request per poll (lights + groups + scenes) instead of three cloud round trips.
+const bridgeFullStateSchema = z.object({
+  lights: bridgeLightsSchema,
+  groups: z.record(z.string(), z.object({ name: z.string() })),
+  scenes: z.record(z.string(), bridgeSceneSchema),
+});
 
 const bridgeResultEntrySchema = z.union([
   z.object({ success: z.record(z.string(), z.unknown()) }),
@@ -115,6 +135,23 @@ export function denormalizeBrightness(percent: number): number {
   return Math.min(254, Math.max(1, Math.round((percent / 100) * 254)));
 }
 
+/** Only scenes created in the Hue app (GroupScenes) — recycled/utility scenes are internal. */
+export function mapScenes(
+  scenes: Record<string, { name: string; type?: string; group?: string; recycle?: boolean }>,
+  groups: Record<string, { name: string }>,
+): HueScene[] {
+  return Object.entries(scenes)
+    .filter(([, scene]) => scene.type === 'GroupScene' && !scene.recycle)
+    .map(([id, scene]) => ({
+      id,
+      name: scene.name,
+      room: (scene.group && groups[scene.group]?.name) || null,
+    }))
+    .sort(
+      (a, b) => (a.room ?? '').localeCompare(b.room ?? '') || a.name.localeCompare(b.name),
+    );
+}
+
 /** Brightness is left untouched when only toggling off, so the light remembers its level. */
 export function buildLightStateBody(state: { on?: boolean; brightness?: number }): {
   on?: boolean;
@@ -129,6 +166,18 @@ export function buildLightStateBody(state: { on?: boolean; brightness?: number }
 }
 
 export function createHueProvider(hue: HueConfig | undefined): HueProvider {
+  async function controlRequest(path: string, body: unknown): Promise<void> {
+    if (!hue) throw new Error('hue is not configured');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const raw = await remoteRequest(hue, 'PUT', path, body, controller.signal);
+      assertNoBridgeError(raw);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   return {
     id: 'hue',
     schema: hueDataSchema,
@@ -139,29 +188,25 @@ export function createHueProvider(hue: HueConfig | undefined): HueProvider {
     isConfigured: () => hue !== undefined && readHueToken() !== undefined,
     async fetch(signal): Promise<HueData> {
       if (!hue) throw new Error('hue is not configured');
-      const raw = await remoteRequest(hue, 'GET', '/lights', undefined, signal);
+      const raw = await remoteRequest(hue, 'GET', '', undefined, signal);
       assertNoBridgeError(raw);
-      const bridgeLights = bridgeLightsSchema.parse(raw);
-      const lights: HueLight[] = Object.entries(bridgeLights).map(([id, light]) => ({
+      const state = bridgeFullStateSchema.parse(raw);
+      const lights: HueLight[] = Object.entries(state.lights).map(([id, light]) => ({
         id,
         name: light.name,
         on: light.state.on,
         brightness: normalizeBrightness(light.state.bri),
         reachable: light.state.reachable ?? true,
       }));
-      return { lights };
+      return { lights, scenes: mapScenes(state.scenes, state.groups) };
     },
     async setLightState(id, state): Promise<void> {
-      if (!hue) throw new Error('hue is not configured');
-      const body = buildLightStateBody(state);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10_000);
-      try {
-        const raw = await remoteRequest(hue, 'PUT', `/lights/${id}/state`, body, controller.signal);
-        assertNoBridgeError(raw);
-      } finally {
-        clearTimeout(timeout);
-      }
+      await controlRequest(`/lights/${id}/state`, buildLightStateBody(state));
+    },
+    async activateScene(id): Promise<void> {
+      // Group 0 is the built-in all-lights group; recalling a scene through it
+      // applies the scene to the lights stored in the scene itself.
+      await controlRequest('/groups/0/action', { scene: id });
     },
   };
 }

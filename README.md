@@ -137,7 +137,7 @@ One-time setup:
 3. Run `npm run setup:hue -w server`, open the printed URL, log in with your Philips Hue account and approve. The script exchanges the OAuth code and remotely provisions a bridge allowlist user (the cloud equivalent of pressing the link button), saving both to `server/.tokens/hue.json` (owner-only permissions).
 4. Restart the server — like every env-configured widget, Hue is only checked at startup.
 
-Control is read + write: toggling a light or dragging its brightness slider sends the change through the cloud to the bridge. Individual lights only for now — no rooms/groups/scenes. Access tokens auto-refresh; if the widget stops working after months of the server being off, the refresh token has expired — re-run step 3.
+Control is read + write: toggling a light, dragging its brightness slider, or tapping one of your Hue app scenes (shown as chips grouped by room) sends the change through the cloud to the bridge. Access tokens auto-refresh; if the widget stops working after months of the server being off, the refresh token has expired — re-run step 3.
 
 ### iMessage (macOS only)
 

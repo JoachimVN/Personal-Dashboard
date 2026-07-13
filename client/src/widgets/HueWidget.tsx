@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { HueData, HueLight, WidgetEnvelope } from '@personal-dashboard/shared';
+import type { HueData, HueLight, HueScene, WidgetEnvelope } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 
@@ -74,6 +74,45 @@ function LightRow({ light, refetch }: Readonly<{ light: HueLight; refetch: () =>
   );
 }
 
+function SceneChip({ scene, refetch }: Readonly<{ scene: HueScene; refetch: () => void }>) {
+  const [busy, setBusy] = useState(false);
+
+  async function activate() {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/hue/scenes/${scene.id}`, { method: 'POST' });
+      if (res.ok) refetch();
+    } catch {
+      // Widget polling will surface the real state.
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void activate()}
+      disabled={busy}
+      className="rounded-full bg-track px-2.5 py-1 text-xs transition-opacity hover:opacity-80 disabled:opacity-40"
+    >
+      {scene.name}
+    </button>
+  );
+}
+
+/** Scenes grouped by room, rooms in the server's (alphabetical) order. */
+function groupScenesByRoom(scenes: HueScene[]): [string, HueScene[]][] {
+  const rooms = new Map<string, HueScene[]>();
+  for (const scene of scenes) {
+    const room = scene.room ?? 'Other';
+    const list = rooms.get(room) ?? [];
+    list.push(scene);
+    rooms.set(room, list);
+  }
+  return [...rooms.entries()];
+}
+
 function hueErrorFallback(entry: WidgetEnvelope<HueData>) {
   if (entry.error !== 'timeout' && entry.error !== 'fetch-failed') return undefined;
   return <p className="text-sm text-ink-faint">Can't reach Philips Hue's cloud — lights will reconnect automatically.</p>;
@@ -93,11 +132,27 @@ export function HueWidget() {
         data.lights.length === 0 ? (
           <p className="text-sm text-ink-faint">No lights found on the bridge.</p>
         ) : (
-          <ul className="divide-y divide-card-border">
-            {data.lights.map((light) => (
-              <LightRow key={light.id} light={light} refetch={refetch} />
-            ))}
-          </ul>
+          <>
+            <ul className="divide-y divide-card-border">
+              {data.lights.map((light) => (
+                <LightRow key={light.id} light={light} refetch={refetch} />
+              ))}
+            </ul>
+            {data.scenes.length > 0 && (
+              <div className="mt-3 space-y-2.5 border-t border-card-border pt-3">
+                {groupScenesByRoom(data.scenes).map(([room, scenes]) => (
+                  <div key={room}>
+                    <p className="text-xs uppercase tracking-wider text-ink-faint">{room}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {scenes.map((scene) => (
+                        <SceneChip key={scene.id} scene={scene} refetch={refetch} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )
       }
     </WidgetCard>

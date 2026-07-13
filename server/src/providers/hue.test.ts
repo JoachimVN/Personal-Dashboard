@@ -3,6 +3,7 @@ import {
   assertNoBridgeError,
   buildLightStateBody,
   denormalizeBrightness,
+  mapScenes,
   normalizeBrightness,
 } from './hue.js';
 
@@ -37,6 +38,42 @@ describe('buildLightStateBody', () => {
 
   it('sends brightness alone when the light is already on', () => {
     expect(buildLightStateBody({ brightness: 40 })).toEqual({ bri: 102 });
+  });
+});
+
+describe('mapScenes', () => {
+  const groups = { '81': { name: 'Bedroom' }, '83': { name: 'Bathroom' } };
+
+  it('keeps only non-recycled GroupScenes and resolves their room names', () => {
+    expect(
+      mapScenes(
+        {
+          a: { name: 'Blue', type: 'GroupScene', group: '81', recycle: false },
+          b: { name: 'Internal', type: 'GroupScene', group: '81', recycle: true },
+          c: { name: 'Legacy', type: 'LightScene' },
+        },
+        groups,
+      ),
+    ).toEqual([{ id: 'a', name: 'Blue', room: 'Bedroom' }]);
+  });
+
+  it('sorts by room then name, and nulls the room of scenes whose group is gone', () => {
+    expect(
+      mapScenes(
+        {
+          a: { name: 'White', type: 'GroupScene', group: '81' },
+          b: { name: 'Pines', type: 'GroupScene', group: '83' },
+          c: { name: 'Blue', type: 'GroupScene', group: '81' },
+          d: { name: 'Orphan', type: 'GroupScene', group: '99' },
+        },
+        groups,
+      ),
+    ).toEqual([
+      { id: 'd', name: 'Orphan', room: null },
+      { id: 'b', name: 'Pines', room: 'Bathroom' },
+      { id: 'c', name: 'Blue', room: 'Bedroom' },
+      { id: 'a', name: 'White', room: 'Bedroom' },
+    ]);
   });
 });
 
