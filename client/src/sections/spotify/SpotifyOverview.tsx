@@ -58,7 +58,7 @@ function TopSong({ track }: Readonly<{ track: Track }>) {
         </p>
         <p className="mt-1 truncate text-lg font-semibold text-ink">{track.track}</p>
         <p className="truncate text-sm text-ink-muted">{track.artist}</p>
-        {year && <p className="mt-0.5 text-xs text-ink-faint">Released {year}</p>}
+        {year && <p className="mt-0.5 text-xs text-ink-faint">{year}</p>}
       </div>
     </div>
   );
