@@ -301,15 +301,21 @@ a {
 .command-signals {
   display: grid;
   border-radius: 1.4rem;
-  padding: 0.25rem 1.15rem;
+  padding: 0.25rem 0.55rem;
 }
 
 .command-signal {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.8rem;
-  padding: 1rem 0;
+  padding: 1rem 0.6rem;
+  border-radius: 1rem;
+  transition: background 160ms ease;
+}
+
+.command-signal:hover {
+  background: color-mix(in oklab, var(--color-track) 55%, transparent);
 }
 
 .command-signal + .command-signal {
@@ -324,9 +330,40 @@ a {
   box-shadow: 0 0 10px color-mix(in oklab, var(--signal-color) 55%, transparent);
 }
 
-.command-signal-dot--personal { --signal-color: var(--color-accent-personal); }
-.command-signal-dot--github { --signal-color: var(--color-accent-github); }
-.command-signal-dot--ai { --signal-color: var(--color-accent-ai); }
+.command-signal--personal { --signal-color: var(--color-accent-personal); }
+.command-signal--github { --signal-color: var(--color-accent-github); }
+.command-signal--ai { --signal-color: var(--color-accent-ai); }
+
+.command-signal-arrow {
+  font-size: 0.85rem;
+  color: var(--color-ink-faint);
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.command-signal:hover .command-signal-arrow {
+  color: var(--color-ink);
+  transform: translate(1px, -1px);
+}
+
+.command-meter {
+  display: block;
+  height: 3px;
+  margin-top: 0.55rem;
+  border-radius: 999px;
+  background: var(--color-track);
+  overflow: hidden;
+}
+
+.command-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--signal-color);
+}
+
+.command-meter--low span {
+  background: var(--color-accent-health);
+}
 
 .command-agenda {
   position: relative;

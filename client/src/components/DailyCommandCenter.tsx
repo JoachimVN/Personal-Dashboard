@@ -17,32 +17,93 @@ function formatEventDay(event: CalendarData['events'][number]): string {
   });
 }
 
-type RemainingCapacity = number | 'unlimited' | null;
+const SOON_MS = 6 * 60 * 60_000;
 
-function remainingCapacity(data: AiUsageToolData | undefined): RemainingCapacity {
-  if (!data?.available) return null;
-  const limits = [data.fiveHour, data.weekly].filter(
-    (limit): limit is NonNullable<AiUsageToolData['fiveHour']> => limit != null,
-  );
-  if (limits.length > 0) return Math.min(...limits.map((limit) => Math.max(0, Math.round(100 - limit.usedPercent))));
-  return data.fiveHourStatus === 'unlimited' && data.weeklyStatus === 'unlimited' ? 'unlimited' : null;
+function startsIn(ms: number): string {
+  const mins = Math.max(1, Math.round(ms / 60_000));
+  if (mins < 60) return `in ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  const rest = mins % 60;
+  return rest ? `in ${hours} h ${rest} min` : `in ${hours} h`;
 }
 
-function Signal({ label, value, detail, tone }: Readonly<{
+/** Kicker above the hero event: live "now" state, a countdown when imminent, else the day. */
+function eventTiming(event: CalendarData['events'][number], now: number): string {
+  const start = Date.parse(event.start);
+  if (start <= now && now < Date.parse(event.end)) {
+    return event.allDay ? 'Today · all day' : `Now · until ${event.endLabel}`;
+  }
+  if (!event.allDay && start - now < SOON_MS) return `${startsIn(start - now)} · ${event.startLabel}`;
+  return formatEventDay(event);
+}
+
+interface AiConstraint {
+  provider: string;
+  window: '5h' | 'weekly';
+  remaining: number;
+  resetsAt: string;
+}
+
+/** Every enforced allowance window across providers, so the tightest one can be surfaced. */
+function aiConstraints(
+  tools: ReadonlyArray<{ provider: string; data: AiUsageToolData | undefined }>,
+): AiConstraint[] {
+  return tools.flatMap(({ provider, data }) => {
+    if (!data?.available) return [];
+    const windows: AiConstraint[] = [];
+    if (data.fiveHour) {
+      windows.push({
+        provider,
+        window: '5h',
+        remaining: Math.max(0, Math.round(100 - data.fiveHour.usedPercent)),
+        resetsAt: data.fiveHour.resetsAt,
+      });
+    }
+    if (data.weekly) {
+      windows.push({
+        provider,
+        window: 'weekly',
+        remaining: Math.max(0, Math.round(100 - data.weekly.usedPercent)),
+        resetsAt: data.weekly.resetsAt,
+      });
+    }
+    return windows;
+  });
+}
+
+function resetLabel(iso: string): string {
+  const date = new Date(iso);
+  const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const sameDay = date.toLocaleDateString('en-CA') === new Date().toLocaleDateString('en-CA');
+  return sameDay
+    ? `resets ${time}`
+    : `resets ${date.toLocaleDateString('en-GB', { weekday: 'short' })} ${time}`;
+}
+
+function Signal({ label, value, detail, tone, href, meter }: Readonly<{
   label: string;
   value: string;
   detail: string;
   tone: 'personal' | 'github' | 'ai';
+  href: string;
+  /** Remaining-capacity bar, 0–100. Omit for signals without a natural meter. */
+  meter?: number;
 }>) {
   return (
-    <div className="command-signal">
-      <span className={`command-signal-dot command-signal-dot--${tone}`} aria-hidden />
+    <a href={href} className={`command-signal command-signal--${tone}`}>
+      <span className="command-signal-dot" aria-hidden />
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{label}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{value}</p>
         <p className="mt-0.5 truncate text-[11px] text-ink-muted">{detail}</p>
+        {meter !== undefined && (
+          <span className={`command-meter${meter <= 15 ? ' command-meter--low' : ''}`}>
+            <span style={{ width: `${Math.min(100, Math.max(0, meter))}%` }} />
+          </span>
+        )}
       </div>
-    </div>
+      <span className="command-signal-arrow" aria-hidden>↗</span>
+    </a>
   );
 }
 
@@ -57,21 +118,29 @@ export function DailyCommandCenter() {
   const now = Date.now();
   const upcoming = calendar?.events
     .filter((event) => new Date(event.end).getTime() >= now)
-    .slice(0, 3) ?? [];
+    .slice(0, 4) ?? [];
   const next = upcoming[0];
+  const agenda = upcoming.slice(1);
   const unreadThreads = gmail?.threads.filter((thread) => thread.unread) ?? [];
   const reviewRequests = github?.pullRequests.filter((pr) => pr.role === 'review-requested') ?? [];
   const todayContributions = github?.contributions.days.at(-1)?.count ?? 0;
-  const providerCapacities = [remainingCapacity(codex), remainingCapacity(claude)];
-  const aiCapacity = providerCapacities.filter(
-    (value): value is number => typeof value === 'number',
+  const queueClear = github && reviewRequests.length === 0 && github.pullRequests.length === 0;
+
+  const constraints = aiConstraints([
+    { provider: 'Claude', data: claude },
+    { provider: 'Codex', data: codex },
+  ]);
+  const tightest = constraints.length
+    ? constraints.reduce((min, c) => (c.remaining < min.remaining ? c : min))
+    : null;
+  const aiLimitsLifted = [claude, codex].some(
+    (data) => data?.available && data.fiveHourStatus === 'unlimited' && data.weeklyStatus === 'unlimited',
   );
-  const lowestAiCapacity = aiCapacity.length ? Math.min(...aiCapacity) : null;
-  const aiLimitsLifted = providerCapacities.some((value) => value === 'unlimited');
   let aiRunwayValue = 'Awaiting snapshot';
   let aiRunwayDetail = 'Lowest remaining provider allowance';
-  if (lowestAiCapacity !== null) {
-    aiRunwayValue = `${lowestAiCapacity}% available`;
+  if (tightest) {
+    aiRunwayValue = `${tightest.remaining}% available`;
+    aiRunwayDetail = `${tightest.provider} ${tightest.window} · ${resetLabel(tightest.resetsAt)}`;
   } else if (aiLimitsLifted) {
     aiRunwayValue = 'No active limits';
     aiRunwayDetail = 'A provider has temporarily lifted its allowance';
@@ -101,7 +170,7 @@ export function DailyCommandCenter() {
           </div>
           {next ? (
             <div className="mt-5">
-              <p className="command-event-time">{formatEventDay(next)}</p>
+              <p className="command-event-time">{eventTiming(next, now)}</p>
               <p className="command-event-title">{next.title}</p>
               <p className="mt-2 text-sm text-ink-muted">
                 {next.location || (next.allDay ? 'An all-day marker on your calendar' : `${next.startLabel}–${next.endLabel}`)}
@@ -141,18 +210,26 @@ export function DailyCommandCenter() {
             value={gmail ? `${gmail.unreadThreads} unread` : 'Syncing mail'}
             detail={unreadThreads[0]?.subject ?? 'No unread thread needs attention'}
             tone="personal"
+            href="#/personal"
           />
           <Signal
             label="Code queue"
-            value={github ? `${reviewRequests.length} reviews · ${github.pullRequests.length} PRs` : 'Syncing GitHub'}
+            value={github
+              ? queueClear
+                ? 'Queue clear'
+                : `${reviewRequests.length} reviews · ${github.pullRequests.length} PRs`
+              : 'Syncing GitHub'}
             detail={reviewRequests[0]?.title ?? `${todayContributions} contributions today`}
             tone="github"
+            href="#/github"
           />
           <Signal
             label="AI runway"
             value={aiRunwayValue}
             detail={aiRunwayDetail}
             tone="ai"
+            href="#/ai"
+            meter={tightest?.remaining}
           />
         </div>
       </div>
@@ -163,13 +240,15 @@ export function DailyCommandCenter() {
           <a href="#/personal">Full day <span aria-hidden>↗</span></a>
         </div>
         <div className="command-agenda-list">
-          {upcoming.length ? upcoming.map((event) => (
+          {agenda.length ? agenda.map((event) => (
             <div key={event.id} className="command-agenda-item">
               <time dateTime={event.start}>{formatEventDay(event)}</time>
               <span>{event.title}</span>
             </div>
           )) : (
-            <p className="text-sm text-ink-faint">No upcoming calendar items.</p>
+            <p className="text-sm text-ink-faint">
+              {next ? 'Nothing more after this.' : 'No upcoming calendar items.'}
+            </p>
           )}
         </div>
       </div>
