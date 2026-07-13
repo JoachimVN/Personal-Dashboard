@@ -96,32 +96,34 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
                   windowMs={WEEKLY_MS}
                 />
               )}
-              {(data.fiveHour || data.weekly) && (
-                <>
-                  <UsageHistoryChart
-                    points={data.history}
-                    metric="fiveHourUsedPercent"
-                    windowMs={DAY_MS}
-                    color={color}
-                    caption="5-hour window · last 24 h"
-                  />
-                  <UsageHistoryChart
-                    points={data.history}
-                    metric="weeklyUsedPercent"
-                    windowMs={WEEKLY_MS}
-                    color={color}
-                    caption="Weekly window · last 7 d"
-                  />
-                  {data.modelWeekly && (
-                    <UsageHistoryChart
-                      points={data.history}
-                      metric="modelWeeklyUsedPercent"
-                      windowMs={WEEKLY_MS}
-                      color={color}
-                      caption={`${data.modelWeekly.model} weekly · last 7 d`}
-                    />
-                  )}
-                </>
+              {/* Each trend is gated on its window being currently enforced, so a lifted
+                  limit (e.g. Codex's 5-hour) doesn't keep charting stale history. */}
+              {data.fiveHour && (
+                <UsageHistoryChart
+                  points={data.history}
+                  metric="fiveHourUsedPercent"
+                  windowMs={DAY_MS}
+                  color={color}
+                  caption="5-hour window · last 24 h"
+                />
+              )}
+              {data.weekly && (
+                <UsageHistoryChart
+                  points={data.history}
+                  metric="weeklyUsedPercent"
+                  windowMs={WEEKLY_MS}
+                  color={color}
+                  caption="Weekly window · last 7 d"
+                />
+              )}
+              {data.modelWeekly && (
+                <UsageHistoryChart
+                  points={data.history}
+                  metric="modelWeeklyUsedPercent"
+                  windowMs={WEEKLY_MS}
+                  color={color}
+                  caption={`${data.modelWeekly.model} weekly · last 7 d`}
+                />
               )}
               {data.asOf && <p className="text-[11px] text-ink-faint">As of {relativeTime(data.asOf)}</p>}
             </div>

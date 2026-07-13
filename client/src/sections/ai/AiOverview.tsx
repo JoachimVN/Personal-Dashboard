@@ -3,6 +3,7 @@ import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
+import { WEEKLY_MS } from './UsageMeter';
 import { UsageSparkline } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
@@ -73,12 +74,14 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                   style={{ backgroundColor: color }}
                 />
               </div>
-              <UsageSparkline
-                points={data.history}
-                metric="fiveHourUsedPercent"
-                windowMs={DAY_MS}
-                color={color}
-              />
+              {(data.fiveHour || data.weekly) && (
+                <UsageSparkline
+                  points={data.history}
+                  metric={data.fiveHour ? 'fiveHourUsedPercent' : 'weeklyUsedPercent'}
+                  windowMs={data.fiveHour ? DAY_MS : WEEKLY_MS}
+                  color={color}
+                />
+              )}
               {data.tokens && (
                 <div className="flex items-baseline justify-between pt-0.5 text-[11px] text-ink-faint">
                   <span>tokens used</span>
