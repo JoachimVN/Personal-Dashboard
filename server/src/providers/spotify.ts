@@ -22,7 +22,7 @@ interface RawTrack {
   name: string;
   duration_ms?: number;
   artists: { name: string }[];
-  album?: { name?: string; images?: RawImage[] };
+  album?: { name?: string; images?: RawImage[]; release_date?: string };
   external_urls?: { spotify?: string };
 }
 interface CurrentlyPlaying {
@@ -51,6 +51,7 @@ function mapTrack(track: RawTrack) {
     track: track.name,
     artist: track.artists.map((a) => a.name).join(', '),
     album: track.album?.name,
+    releaseDate: track.album?.release_date,
     imageUrl: firstImage(track.album?.images),
     url: track.external_urls?.spotify,
   };

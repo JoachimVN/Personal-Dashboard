@@ -4,6 +4,8 @@ const trackSchema = z.object({
   track: z.string(),
   artist: z.string(),
   album: z.string().optional(),
+  /** Album release date as Spotify reports it: 'YYYY', 'YYYY-MM' or 'YYYY-MM-DD'. */
+  releaseDate: z.string().optional(),
   imageUrl: z.string().optional(),
   url: z.string().optional(),
 });
