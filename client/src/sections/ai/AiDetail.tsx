@@ -88,6 +88,14 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
               ) : (
                 <WindowUnavailable label="Weekly" status={data.weeklyStatus} tokens={data.tokens?.weekly} />
               )}
+              {data.modelWeekly && (
+                <UsageMeter
+                  label={`Weekly (${data.modelWeekly.model})`}
+                  limit={data.modelWeekly}
+                  color={color}
+                  windowMs={WEEKLY_MS}
+                />
+              )}
               {(data.fiveHour || data.weekly) && (
                 <>
                   <UsageHistoryChart
@@ -104,6 +112,15 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
                     color={color}
                     caption="Weekly window · last 7 d"
                   />
+                  {data.modelWeekly && (
+                    <UsageHistoryChart
+                      points={data.history}
+                      metric="modelWeeklyUsedPercent"
+                      windowMs={WEEKLY_MS}
+                      color={color}
+                      caption={`${data.modelWeekly.model} weekly · last 7 d`}
+                    />
+                  )}
                 </>
               )}
               {data.asOf && <p className="text-[11px] text-ink-faint">As of {relativeTime(data.asOf)}</p>}

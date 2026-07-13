@@ -20,6 +20,7 @@ export const usageHistoryPointSchema = z.object({
   at: z.string().datetime(),
   fiveHourUsedPercent: z.number().min(0).max(100).optional(),
   weeklyUsedPercent: z.number().min(0).max(100).optional(),
+  modelWeeklyUsedPercent: z.number().min(0).max(100).optional(),
 });
 
 export type UsageHistoryPoint = z.infer<typeof usageHistoryPointSchema>;
@@ -29,6 +30,8 @@ export const aiUsageToolSchema = z.object({
   available: z.boolean(),
   fiveHour: rateLimitSchema.optional(),
   weekly: rateLimitSchema.optional(),
+  /** Model-specific weekly cap (e.g. "Current week (Fable)") reported alongside the all-models weekly. */
+  modelWeekly: rateLimitSchema.extend({ model: z.string() }).optional(),
   /** Whether each quota window is enforced, temporarily absent, or not reported. */
   fiveHourStatus: limitStatusSchema.default('unknown'),
   weeklyStatus: limitStatusSchema.default('unknown'),

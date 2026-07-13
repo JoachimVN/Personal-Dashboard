@@ -19,6 +19,14 @@ function limitLabel(
   return status === 'unlimited' ? 'No limit' : '—';
 }
 
+/** The bar tracks the tighter of the weekly caps (all-models vs model-specific), else the 5h window. */
+function barPercent(data: AiUsageToolData) {
+  if (data.weekly || data.modelWeekly) {
+    return Math.max(data.weekly?.usedPercent ?? 0, data.modelWeekly?.usedPercent ?? 0);
+  }
+  return data.fiveHour?.usedPercent ?? 0;
+}
+
 function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
@@ -48,14 +56,20 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                     {limitLabel(data.weekly, data.weeklyStatus, data.tokens?.weekly)}
                   </span>
                 </span>
+                {data.modelWeekly && (
+                  <span>
+                    {data.modelWeekly.model.toLowerCase()}{' '}
+                    <span className="font-semibold tabular-nums text-ink">
+                      {Math.round(data.modelWeekly.usedPercent)}%
+                    </span>
+                  </span>
+                )}
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-track">
                 <motion.div
                   className="h-full rounded-full"
                   initial={{ width: 0 }}
-                  animate={{
-                    width: `${data.weekly?.usedPercent ?? data.fiveHour?.usedPercent ?? 0}%`,
-                  }}
+                  animate={{ width: `${barPercent(data)}%` }}
                   style={{ backgroundColor: color }}
                 />
               </div>
