@@ -27,15 +27,6 @@ function Bar({ label, value, goal, unit }: Readonly<{ label: string; value: numb
   );
 }
 
-function Stat({ value, label }: Readonly<{ value: string; label: string }>) {
-  return (
-    <div className="rounded-xl bg-track/25 px-3 py-2">
-      <p className="text-lg font-semibold tabular-nums leading-tight">{value}</p>
-      <p className="text-[10px] uppercase tracking-[0.12em] text-ink-faint">{label}</p>
-    </div>
-  );
-}
-
 function HeartRate({ average, resting }: Readonly<{ average?: number; resting?: number }>) {
   if (average == null && resting == null) return null;
   const readings = [
@@ -240,9 +231,6 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
     );
   }
 
-  const stats: { value: string; label: string }[] = [];
-  if (t?.daylightMinutes != null) stats.push({ value: `${Math.round(t.daylightMinutes)}m`, label: 'daylight' });
-
   return (
     <div className="space-y-4">
       <div className="space-y-3">
@@ -259,14 +247,6 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
       <HeartRate average={t?.heartRate} resting={t?.restingHeartRate} />
 
       <RecoveryMetrics bloodOxygenPercent={t?.bloodOxygenPercent} />
-
-      {stats.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {stats.map((s) => (
-            <Stat key={s.label} value={s.value} label={s.label} />
-          ))}
-        </div>
-      )}
 
       <StepsTrend history={data.history} goal={data.goals.steps} />
 
