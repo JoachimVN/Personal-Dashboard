@@ -103,9 +103,9 @@ function ActivityRings({
   goals: HealthData['goals'];
 }>) {
   const rings = [
-    { id: 'move', label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', start: '#d91f3b', end: '#ff5a8b', track: '#4c0717', radius: 48 },
-    { id: 'exercise', label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', start: '#70cc00', end: '#d4ff00', track: '#173c0a', radius: 33 },
-    { id: 'stand', label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', start: '#00b7cb', end: '#48def4', track: '#063940', radius: 18 },
+    { id: 'move', label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', start: '#d91f3b', end: '#ff5a8b', track: 'light-dark(#f6c7d2, #4c0717)', radius: 48 },
+    { id: 'exercise', label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', start: '#70cc00', end: '#d4ff00', track: 'light-dark(#d8efc4, #173c0a)', radius: 33 },
+    { id: 'stand', label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', start: '#00b7cb', end: '#48def4', track: 'light-dark(#c3e9ee, #063940)', radius: 18 },
   ];
 
   return (
@@ -123,13 +123,10 @@ function ActivityRings({
           {rings.map((ring) => {
             const circumference = 2 * Math.PI * ring.radius;
             const progress = Math.min(Math.max(ring.value / ring.goal, 0), 1);
-            const endAngle = Math.PI * 2 * progress;
-            const endX = 60 + ring.radius * Math.cos(endAngle);
-            const endY = 60 + ring.radius * Math.sin(endAngle);
             return (
               <g key={ring.label} transform="rotate(-90 60 60)">
-                <circle cx="60" cy="60" r={ring.radius} fill="none" stroke="#090c10" strokeWidth="14" />
-                <circle cx="60" cy="60" r={ring.radius} fill="none" stroke={ring.track} strokeWidth="12" />
+                <circle cx="60" cy="60" r={ring.radius} fill="none" strokeWidth="14" style={{ stroke: 'light-dark(transparent, #090c10)' }} />
+                <circle cx="60" cy="60" r={ring.radius} fill="none" strokeWidth="12" style={{ stroke: ring.track }} />
                 <circle
                   cx="60"
                   cy="60"
@@ -141,17 +138,8 @@ function ActivityRings({
                   strokeDasharray={circumference}
                   strokeDashoffset={circumference * (1 - progress)}
                   className="transition-[stroke-dashoffset] duration-500"
+                  style={{ filter: 'drop-shadow(1px 2px 1.5px light-dark(rgb(15 23 42 / 0.22), rgb(0 0 0 / 0.42)))' }}
                 />
-                {progress > 0 && <circle cx={60 + ring.radius} cy="60" r="6" fill={ring.start} />}
-                {progress > 0.95 && (
-                  <circle
-                    cx={endX}
-                    cy={endY}
-                    r="6"
-                    fill={ring.end}
-                    style={{ filter: 'drop-shadow(2px 2px 2px rgb(0 0 0 / 0.35))' }}
-                  />
-                )}
               </g>
             );
           })}

@@ -41,6 +41,14 @@ export class HealthStore {
       ...defined,
       date,
     };
+    // Watch and iPhone report independent cumulative day totals. Their time ranges can
+    // overlap, so summing would double-count. Keep both sources and use the higher total
+    // as the conservative dashboard value; legacy `steps` remains untouched when neither
+    // source has been supplied.
+    const sourceSteps = [merged.watchSteps, merged.phoneSteps].filter(
+      (value): value is number => value != null,
+    );
+    if (sourceSteps.length > 0) merged.steps = Math.max(...sourceSteps);
     this.days = this.days.filter((day) => day.date !== date);
     this.days.push(merged);
     this.days.sort((a, b) => a.date.localeCompare(b.date));

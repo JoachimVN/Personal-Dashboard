@@ -166,13 +166,16 @@ is fed by an **Apple Shortcut** you build once.
 Build a Shortcut (and, optionally, a Personal Automation that runs it on a schedule) that:
 
 1. Uses **Get Health Sample / Find Health Samples** actions to read today's totals (steps, active
-   energy, exercise minutes, etc.).
+   energy, exercise minutes, etc.). For steps, use one action filtered to **Apple Watch** and one
+   filtered to **iPhone** when possible.
 2. Builds a **Dictionary** with any of these keys — all optional, all merged into today's entry so
    you can post them from separate actions:
 
    | key | unit |
    | --- | --- |
-   | `steps` | count |
+   | `watchSteps` | count, from Apple Watch |
+   | `phoneSteps` | count, from iPhone |
+   | `steps` | count, legacy fallback only |
    | `activeEnergyKcal` | kcal |
    | `exerciseMinutes` | minutes |
    | `standHours` | hours |
@@ -185,9 +188,11 @@ Build a Shortcut (and, optionally, a Personal Automation that runs it on a sched
 3. **Gets Contents of URL** — `POST http://<your-tailscale-name>:4821/api/health/ingest`, Request
    Body **JSON**, set to the dictionary.
 
-Posts through the day overwrite that day's totals (send cumulative values). Step goal, exercise-minute
-goal and history retention live under `health` in `server/config.json` (defaults: 10 000 steps,
-30 min, 30 days).
+Posts through the day overwrite that day's totals (send cumulative values). The dashboard keeps both
+step sources and uses the higher one for the daily goal and trends—rather than adding them—because
+the same walk may be recorded by both devices. The raw values are retained only to calculate that
+single normalized step total. Step goal, exercise-minute goal and history retention live under
+`health` in `server/config.json` (defaults: 10 000 steps, 30 min, 30 days).
 
 To survive the server being off/asleep when the Shortcut fires, post a rolling window instead of a
 single day: send `{ "days": [ ... ] }` where each entry is the dictionary above with its `date` set

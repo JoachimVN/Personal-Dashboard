@@ -3,7 +3,12 @@ import { z } from 'zod';
 /** One day's Apple Health rollup. Every metric is optional — the Shortcut sends what it can gather. */
 export const healthDaySchema = z.object({
   date: z.string(), // YYYY-MM-DD
+  /** The conservative dashboard total: the larger of watchSteps and phoneSteps when available. */
   steps: z.number().optional(),
+  /** Daily cumulative steps recorded specifically by Apple Watch. */
+  watchSteps: z.number().optional(),
+  /** Daily cumulative steps recorded specifically by iPhone. */
+  phoneSteps: z.number().optional(),
   activeEnergyKcal: z.number().optional(),
   exerciseMinutes: z.number().optional(),
   standHours: z.number().optional(),
@@ -32,6 +37,8 @@ const readingOrMissing = (schema: z.ZodNumber) =>
 export const healthIngestSchema = z.object({
   date: z.string().optional(),
   steps: readingOrMissing(z.number().nonnegative()),
+  watchSteps: readingOrMissing(z.number().nonnegative()),
+  phoneSteps: readingOrMissing(z.number().nonnegative()),
   activeEnergyKcal: readingOrMissing(z.number().nonnegative()),
   exerciseMinutes: readingOrMissing(z.number().nonnegative()),
   standHours: readingOrMissing(z.number().nonnegative()),
