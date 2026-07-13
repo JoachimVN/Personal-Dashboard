@@ -136,7 +136,7 @@ export function UsageHistoryChart({
         <svg
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
-          className="h-16 w-full touch-none"
+          className="h-16 w-full touch-none overflow-visible"
           aria-label={`${caption}: ${chartPoints.length} samples, currently ${Math.round(chartPoints.at(-1)!.percent)}%`}
           onPointerMove={readNearest}
           onPointerDown={readNearest}
@@ -178,8 +178,11 @@ export function UsageHistoryChart({
               strokeWidth={2}
               strokeLinejoin="round"
               vectorEffect="non-scaling-stroke"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
+              // Not a pathLength draw-on: framer's end state keeps a normalized dasharray
+              // (dash 1 / gap 1) on the path, which Chrome mis-scales under
+              // non-scaling-stroke and leaves chunks of the line unpainted.
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ duration: 0.8, ease: 'easeOut' }}
             />
           )}
@@ -233,7 +236,7 @@ export function UsageSparkline({
   if (!geometry) return null;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-6 w-full" aria-hidden>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-6 w-full overflow-visible" aria-hidden>
       {geometry.gapPath && (
         <path
           d={geometry.gapPath}
