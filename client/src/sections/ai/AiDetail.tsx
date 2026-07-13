@@ -8,6 +8,7 @@ import { FIVE_HOUR_MS, UsageMeter, WEEKLY_MS } from './UsageMeter';
 import { UsageHistoryChart } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
+import type { ToolIconProps } from './ToolIcons';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -43,7 +44,12 @@ function WindowUnavailable({
   return tokens !== undefined ? <TokenRow label={label} tokens={tokens} /> : null;
 }
 
-function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
+function ToolCard({
+  id,
+  label,
+  color,
+  icon: Icon,
+}: Readonly<{ id: string; label: string; color: string; icon: React.ComponentType<ToolIconProps> }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   return (
@@ -55,6 +61,7 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
     >
       <WidgetShell
         title={label}
+        icon={<Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} />}
         badge={
           <div className="flex items-center gap-2">
             <StaleBadge envelope={envelope} />

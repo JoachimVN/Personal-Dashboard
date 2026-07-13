@@ -33,17 +33,20 @@ export function StaleBadge({ envelope }: Readonly<{ envelope: WidgetEnvelope<unk
 /** Card chrome (border/header) without the single-envelope status machine — for cards that combine multiple independently-polled sections. */
 export function WidgetShell({
   title,
+  icon,
   badge,
   children,
 }: Readonly<{
   title: string;
+  icon?: ReactNode;
   badge?: ReactNode;
   children: ReactNode;
 }>) {
   return (
     <section className="glass rounded-[1.5rem] p-5 transition-[border-color,box-shadow] duration-300 hover:border-white/15 sm:p-6">
       <header className="mb-4 flex items-baseline justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-muted">
+        <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-ink-muted">
+          {icon}
           {title}
         </h2>
         {badge}

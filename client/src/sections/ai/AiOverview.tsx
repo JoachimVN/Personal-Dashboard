@@ -7,6 +7,7 @@ import { WEEKLY_MS } from './UsageMeter';
 import { UsageSparkline } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
+import type { ToolIconProps } from './ToolIcons';
 
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -28,13 +29,18 @@ function barPercent(data: AiUsageToolData) {
   return data.fiveHour?.usedPercent ?? 0;
 }
 
-function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
+function ToolRow({
+  id,
+  label,
+  color,
+  icon: Icon,
+}: Readonly<{ id: string; label: string; color: string; icon: React.ComponentType<ToolIconProps> }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-2 text-sm">
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} />
         <span className="font-medium">{label}</span>
         <span className="ml-auto">
           <UsageRefreshButton label={label} refreshing={refreshing} onRefresh={refresh} />
