@@ -3,11 +3,11 @@ import type { WidgetEnvelope } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
 interface WidgetCardProps<T> {
-  title: string;
-  envelope: WidgetEnvelope<T> | null;
-  offline: boolean;
-  children: (data: T) => ReactNode;
-  errorFallback?: (envelope: WidgetEnvelope<T>) => ReactNode | undefined;
+  readonly title: string;
+  readonly envelope: WidgetEnvelope<T> | null;
+  readonly offline: boolean;
+  readonly children: (data: T) => ReactNode;
+  readonly errorFallback?: (envelope: WidgetEnvelope<T>) => ReactNode | undefined;
 }
 
 export function WidgetCard<T>({ title, envelope, offline, children, errorFallback }: WidgetCardProps<T>) {
@@ -21,7 +21,7 @@ export function WidgetCard<T>({ title, envelope, offline, children, errorFallbac
 }
 
 /** Amber "updated Xm ago" pill shown while a widget serves cached data after a failed refresh. */
-export function StaleBadge({ envelope }: { envelope: WidgetEnvelope<unknown> | null }) {
+export function StaleBadge({ envelope }: Readonly<{ envelope: WidgetEnvelope<unknown> | null }>) {
   if (envelope?.status !== 'stale' || !envelope.fetchedAt) return null;
   return (
     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
@@ -35,11 +35,11 @@ export function WidgetShell({
   title,
   badge,
   children,
-}: {
+}: Readonly<{
   title: string;
   badge?: ReactNode;
   children: ReactNode;
-}) {
+}>) {
   return (
     <section className="glass rounded-[1.5rem] p-5 transition-[border-color,box-shadow] duration-300 hover:border-white/15 sm:p-6">
       <header className="mb-4 flex items-baseline justify-between gap-2">

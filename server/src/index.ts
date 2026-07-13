@@ -17,6 +17,7 @@ import { todayInZone } from './providers/health.js';
 const env = loadEnv();
 const config = loadConfig();
 const app = express();
+app.disable('x-powered-by');
 app.use(express.json());
 
 const scheduler = new ProviderScheduler();

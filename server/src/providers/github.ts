@@ -69,8 +69,10 @@ export function describeEvent(
       return { summary: `${p.action} issue #${p.issue?.number}`, url: p.issue?.html_url };
     case 'IssueCommentEvent':
       return { summary: `commented on #${p.issue?.number}`, url: p.issue?.html_url };
-    case 'CreateEvent':
-      return { summary: `created ${p.ref_type}${p.ref ? ` ${p.ref}` : ''}` };
+    case 'CreateEvent': {
+      const reference = p.ref ? ` ${p.ref}` : '';
+      return { summary: `created ${p.ref_type}${reference}` };
+    }
     case 'ReleaseEvent':
       return { summary: `released ${p.release?.tag_name}`, url: p.release?.html_url };
     default:
@@ -129,6 +131,18 @@ interface ContributionsResponse {
   };
 }
 
+function ciStatusFor(run: { status: string | null; conclusion: string | null } | undefined) {
+  if (!run) return 'none' as const;
+  if (run.status !== 'completed') return 'running' as const;
+  return run.conclusion === 'success' ? 'success' as const : 'failure' as const;
+}
+
+function activitySummary(commits: ActivityCommit[] | undefined, fallback: string): string {
+  if (!commits?.length) return fallback;
+  const suffix = commits.length === 1 ? '' : 's';
+  return `${commits.length} commit${suffix}`;
+}
+
 export function createGitHubProvider(
   auth: { token: string; username: string } | undefined,
 ): Provider<GitHubData> {
@@ -185,13 +199,7 @@ export function createGitHubProvider(
               .catch(() => undefined),
           ]);
           const run = runs.data.workflow_runs[0];
-          const ciStatus = !run
-            ? ('none' as const)
-            : run.status !== 'completed'
-              ? ('running' as const)
-              : run.conclusion === 'success'
-                ? ('success' as const)
-                : ('failure' as const);
+          const ciStatus = ciStatusFor(run);
           return {
             fullName,
             stars: repoInfo.data.stargazers_count,
@@ -240,9 +248,7 @@ export function createGitHubProvider(
 
           return {
             id: event.id,
-            summary: commits?.length
-              ? `${commits.length} commit${commits.length === 1 ? '' : 's'}`
-              : described.summary,
+            summary: activitySummary(commits, described.summary),
             repo: event.repo.name,
             timestamp: event.created_at,
             url: described.url,

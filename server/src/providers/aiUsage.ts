@@ -64,6 +64,37 @@ function windowBucket(windowMinutes: number): 'fiveHour' | 'weekly' | undefined 
   return undefined;
 }
 
+type TimestampedCodexLimit = { timestamp: string; entry: z.infer<typeof codexLimitSchema> };
+
+interface CodexLimits {
+  fiveHour?: TimestampedCodexLimit;
+  weekly?: TimestampedCodexLimit;
+}
+
+function recordLatestLimit(limits: CodexLimits, timestamp: string, entry: z.infer<typeof codexLimitSchema>): void {
+  const bucket = windowBucket(entry.window_minutes);
+  if (bucket === 'fiveHour' && (!limits.fiveHour || timestamp > limits.fiveHour.timestamp)) {
+    limits.fiveHour = { timestamp, entry };
+  }
+  if (bucket === 'weekly' && (!limits.weekly || timestamp > limits.weekly.timestamp)) {
+    limits.weekly = { timestamp, entry };
+  }
+}
+
+function readCodexLimits(lines: string[], limits: CodexLimits): void {
+  for (const line of lines) {
+    try {
+      const event = codexEventSchema.parse(JSON.parse(line));
+      const entries = [event.payload.rate_limits?.primary, event.payload.rate_limits?.secondary];
+      for (const entry of entries) {
+        if (entry) recordLatestLimit(limits, event.timestamp, entry);
+      }
+    } catch {
+      // Session streams also contain unrelated messages; ignore malformed/irrelevant lines.
+    }
+  }
+}
+
 /**
  * Codex appends the live account limits to its local session event stream. Read only the newest
  * few logs: limits are account-wide and a current session always writes into the latest files.
@@ -77,38 +108,19 @@ function windowBucket(windowMinutes: number): 'fiveHour' | 'weekly' | undefined 
 async function codexSnapshot(): Promise<UsageSnapshot> {
   const sessionsDir = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
   try {
-    const files = (await jsonlFiles(sessionsDir)).sort().slice(-12);
-    let newestFiveHour: { timestamp: string; entry: z.infer<typeof codexLimitSchema> } | undefined;
-    let newestWeekly: { timestamp: string; entry: z.infer<typeof codexLimitSchema> } | undefined;
+    const files = (await jsonlFiles(sessionsDir)).sort((a, b) => a.localeCompare(b)).slice(-12);
+    const latest: CodexLimits = {};
 
     for (const file of files) {
       const lines = (await readFile(file, 'utf8')).trim().split('\n');
-      for (const line of lines) {
-        try {
-          const event = codexEventSchema.parse(JSON.parse(line));
-          const limits = event.payload.rate_limits;
-          if (!limits) continue;
-          for (const entry of [limits.primary, limits.secondary]) {
-            if (!entry) continue;
-            const bucket = windowBucket(entry.window_minutes);
-            if (bucket === 'fiveHour' && (!newestFiveHour || event.timestamp > newestFiveHour.timestamp)) {
-              newestFiveHour = { timestamp: event.timestamp, entry };
-            }
-            if (bucket === 'weekly' && (!newestWeekly || event.timestamp > newestWeekly.timestamp)) {
-              newestWeekly = { timestamp: event.timestamp, entry };
-            }
-          }
-        } catch {
-          // Session streams also contain unrelated messages; ignore malformed/irrelevant lines.
-        }
-      }
+      readCodexLimits(lines, latest);
     }
 
-    const fiveHour = newestFiveHour && limit(newestFiveHour.entry.used_percent, newestFiveHour.entry.resets_at);
-    const weekly = newestWeekly && limit(newestWeekly.entry.used_percent, newestWeekly.entry.resets_at);
-    const newestTimestamp = [newestFiveHour?.timestamp, newestWeekly?.timestamp]
+    const fiveHour = latest.fiveHour && limit(latest.fiveHour.entry.used_percent, latest.fiveHour.entry.resets_at);
+    const weekly = latest.weekly && limit(latest.weekly.entry.used_percent, latest.weekly.entry.resets_at);
+    const newestTimestamp = [latest.fiveHour?.timestamp, latest.weekly?.timestamp]
       .filter((value): value is string => Boolean(value))
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .at(-1);
     const asOf = newestTimestamp && asIso(newestTimestamp);
     return { available: Boolean(fiveHour || weekly), fiveHour, weekly, asOf };
@@ -192,8 +204,8 @@ const execFileAsync = promisify(execFile);
 const MONTH_ABBREVIATIONS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
 /** `claude -p "/usage"` prints e.g. "Current session: 41% used · resets Jul 13 at 1:59am (Europe/Oslo)". */
-const SESSION_LINE = /Current session:\s*(\d+)%\s*used.*?resets\s+([A-Za-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
-const WEEKLY_LINE = /Current week \(all models\):\s*(\d+)%\s*used.*?resets\s+([A-Za-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
+const SESSION_LINE = /Current session:\s*(\d+)%\s*used.*?resets\s+([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
+const WEEKLY_LINE = /Current week \(all models\):\s*(\d+)%\s*used.*?resets\s+([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
 
 const cliResultSchema = z.object({
   is_error: z.boolean(),
@@ -218,7 +230,7 @@ function parseResetsAt(match: RegExpMatchArray): string | undefined {
 }
 
 function parseLine(result: string, pattern: RegExp) {
-  const match = result.match(pattern);
+  const match = pattern.exec(result);
   if (!match) return undefined;
   const resetsAt = parseResetsAt(match);
   return resetsAt ? limit(Number(match[1]), resetsAt) : undefined;

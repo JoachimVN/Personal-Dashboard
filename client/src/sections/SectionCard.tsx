@@ -62,7 +62,7 @@ export const sectionCardVariants = {
 };
 
 /** Overview block for one section — the whole card is a link into the section's full view. */
-export function SectionCard({ section }: { section: SectionDef }) {
+export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
   return (
     <motion.a
       href={sectionHref(section.id)}

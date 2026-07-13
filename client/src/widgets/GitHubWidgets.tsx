@@ -53,8 +53,8 @@ function CommitList({
   commits,
   repo,
 }: {
-  commits: NonNullable<GitHubData['activity'][number]['commits']>;
-  repo: string;
+  readonly commits: NonNullable<GitHubData['activity'][number]['commits']>;
+  readonly repo: string;
 }) {
   const visibleCommits = commits.slice(0, 5);
   const remainingCommits = commits.slice(5);
@@ -86,8 +86,8 @@ function CommitItem({
   commit,
   repo,
 }: {
-  commit: NonNullable<GitHubData['activity'][number]['commits']>[number];
-  repo: string;
+  readonly commit: NonNullable<GitHubData['activity'][number]['commits']>[number];
+  readonly repo: string;
 }) {
   const commitUrl = `https://github.com/${repo}/commit/${commit.sha}`;
   const title = (
@@ -152,9 +152,9 @@ function WorkList({
   empty,
   items,
 }: {
-  label: string;
-  empty: string;
-  items: { key: string; url: string; title: string; meta: string; time: string }[];
+  readonly label: string;
+  readonly empty: string;
+  readonly items: { key: string; url: string; title: string; meta: string; time: string }[];
 }) {
   return (
     <div>
@@ -196,9 +196,9 @@ function ContributionGrid({
   hovered,
   onHover,
 }: {
-  data: GitHubData;
-  hovered: { date: string; count: number } | null;
-  onHover: (day: { date: string; count: number } | null) => void;
+  readonly data: GitHubData;
+  readonly hovered: { date: string; count: number } | null;
+  readonly onHover: (day: { date: string; count: number } | null) => void;
 }) {
   const weeks = useMemo(() => {
     const all: GitHubData['contributions']['days'][] = [];
@@ -276,16 +276,13 @@ export function RepoHealthWidget() {
 }
 
 // Status colors reserved for state, shipped with icon + label, never color alone.
-function CiBadge({ status, url }: { status: string; url?: string }) {
+function CiBadge({ status, url }: Readonly<{ status: string; url?: string }>) {
   if (status === 'none') {
     return <span className="text-ink-faint">no CI</span>;
   }
-  const look =
-    status === 'success'
-      ? { icon: '✓', label: 'CI', color: '#0ca30c' }
-      : status === 'failure'
-        ? { icon: '✕', label: 'CI', color: '#d03b3b' }
-        : { icon: '●', label: 'running', color: undefined };
+  let look: { icon: string; label: string; color?: string } = { icon: '●', label: 'running' };
+  if (status === 'success') look = { icon: '✓', label: 'CI', color: '#0ca30c' };
+  if (status === 'failure') look = { icon: '✕', label: 'CI', color: '#d03b3b' };
   const badge = (
     <span className="inline-flex items-center gap-1" style={{ color: look.color }}>
       <span aria-hidden>{look.icon}</span>

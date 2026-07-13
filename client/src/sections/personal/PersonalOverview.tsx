@@ -12,7 +12,7 @@ import { deg, glyph, weatherLocation } from '../../lib/weather';
 import { relativeTime } from '../../lib/time';
 import { TodayBrief } from './TodayBrief';
 
-function Mini({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
+function Mini({ label, children, wide }: Readonly<{ label: string; children: React.ReactNode; wide?: boolean }>) {
   return (
     <div className={wide ? 'col-span-2' : undefined}>
       <div className="mb-0.5 text-[11px] text-ink-faint">{label}</div>
@@ -23,10 +23,9 @@ function Mini({ label, children, wide }: { label: string; children: React.ReactN
 
 function eventLabel(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
-  const day =
-    event.date === today
-      ? ''
-      : `${new Date(`${event.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short' })} `;
+  if (event.date === today) return event.allDay ? 'all day' : event.startLabel;
+  const dateAtMidday = `${event.date}T12:00:00`;
+  const day = `${new Date(dateAtMidday).toLocaleDateString('en-GB', { weekday: 'short' })} `;
   return `${day}${event.allDay ? 'all day' : event.startLabel}`;
 }
 

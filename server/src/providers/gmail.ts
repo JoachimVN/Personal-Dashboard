@@ -7,8 +7,16 @@ const THREAD_COUNT = 20;
 
 /** "Some Name <a@b.c>" → "Some Name"; bare addresses pass through. */
 function fromDisplay(raw: string): string {
-  const match = raw.match(/^\s*"?([^"<]+?)"?\s*</);
-  return (match ? match[1] : raw).trim();
+  const addressStart = raw.indexOf('<');
+  const display = (addressStart === -1 ? raw : raw.slice(0, addressStart)).trim();
+  return display.replaceAll('"', '') || raw;
+}
+
+function headerValue(
+  message: { payload?: { headers?: { name?: string | null; value?: string | null }[] } } | undefined,
+  name: string,
+): string {
+  return message?.payload?.headers?.find((header) => header.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
 
 export function createGmailProvider(
@@ -58,14 +66,10 @@ export function createGmailProvider(
         threads: threads.map(({ data }) => {
           const messages = data.messages ?? [];
           const last = messages[messages.length - 1];
-          const header = (name: string) =>
-            last?.payload?.headers?.find(
-              (h) => h.name?.toLowerCase() === name.toLowerCase(),
-            )?.value ?? '';
           return {
             id: data.id ?? '',
-            from: fromDisplay(header('From')) || '(unknown sender)',
-            subject: header('Subject') || '(no subject)',
+            from: fromDisplay(headerValue(last, 'From')) || '(unknown sender)',
+            subject: headerValue(last, 'Subject') || '(no subject)',
             date: last?.internalDate
               ? new Date(Number(last.internalDate)).toISOString()
               : new Date(0).toISOString(),

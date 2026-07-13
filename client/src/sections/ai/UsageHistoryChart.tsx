@@ -84,7 +84,6 @@ export function UsageHistoryChart({
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
           className="h-16 w-full touch-none"
-          role="img"
           aria-label={`${caption}: ${chartPoints.length} samples, currently ${Math.round(chartPoints.at(-1)!.percent)}%`}
           onPointerMove={readNearest}
           onPointerDown={readNearest}

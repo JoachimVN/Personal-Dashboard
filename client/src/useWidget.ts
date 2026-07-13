@@ -38,7 +38,7 @@ export function useWidget<T>(id: string): WidgetState<T> {
   }, []);
 
   const refetch = useCallback(() => {
-    void request(`/api/widgets/${id}`);
+    return request(`/api/widgets/${id}`);
   }, [id, request]);
 
   const refresh = useCallback(async () => {

@@ -6,6 +6,8 @@ import type { Provider } from '../scheduler.js';
 const RANGE_DAYS = 7;
 
 type CalendarEvent = CalendarData['events'][number];
+type ExpandedEvent = { event: VEvent; start: Date; end: Date };
+type DateFormatter = Intl.DateTimeFormat;
 
 /** Minutes-offset of a timezone at a given instant. */
 function tzOffsetMs(instant: Date, timeZone: string): number {
@@ -75,7 +77,7 @@ function expandEvent(
   calendarName: string,
   rangeStart: Date,
   rangeEnd: Date,
-): { event: VEvent; start: Date; end: Date }[] {
+): ExpandedEvent[] {
   const durationMs = (event.end?.getTime() ?? event.start.getTime()) - event.start.getTime();
 
   if (!event.rrule) {
@@ -91,26 +93,73 @@ function expandEvent(
     new Date(rangeEnd.getTime() + 86_400_000),
     true,
   );
-  const results: { event: VEvent; start: Date; end: Date }[] = [];
+  const results: ExpandedEvent[] = [];
   for (const raw of occurrences) {
     const dateKey = raw.toISOString().slice(0, 10);
     if (event.exdate?.[dateKey]) continue;
 
     const override = event.recurrences?.[dateKey];
     const start = override ? override.start : fixOccurrence(raw, event);
-    const end = override?.end
-      ? override.end
-      : new Date(
-          start.getTime() +
-            (override
-              ? (override.end?.getTime() ?? start.getTime()) - override.start.getTime()
-              : durationMs),
-        );
+    const overrideDuration = override
+      ? (override.end?.getTime() ?? start.getTime()) - override.start.getTime()
+      : durationMs;
+    const end = override?.end ?? new Date(start.getTime() + overrideDuration);
     if (end > rangeStart && start < rangeEnd) {
       results.push({ event: override ?? event, start, end });
     }
   }
   return results;
+}
+
+function eventFromOccurrence(
+  occurrence: ExpandedEvent,
+  calendarName: string,
+  dateFmt: DateFormatter,
+  timeFmt: DateFormatter,
+): CalendarEvent {
+  const { event, start, end } = occurrence;
+  const allDay = event.datetype === 'date';
+  return {
+    id: `${event.uid}-${start.toISOString()}`,
+    title: text(event.summary) || '(untitled)',
+    calendar: calendarName,
+    allDay,
+    location: event.location ? text(event.location) : undefined,
+    start: start.toISOString(),
+    end: end.toISOString(),
+    // All-day DTSTARTs are date-only (midnight UTC) — read the date
+    // straight off them instead of shifting through the timezone.
+    date: allDay ? start.toISOString().slice(0, 10) : dateFmt.format(start),
+    startLabel: allDay ? 'all day' : timeFmt.format(start),
+    endLabel: allDay ? '' : timeFmt.format(end),
+  };
+}
+
+function eventsForComponent(
+  component: VEvent,
+  calendarName: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+  dateFmt: DateFormatter,
+  timeFmt: DateFormatter,
+): CalendarEvent[] {
+  if (component.type !== 'VEVENT' || component.status === 'CANCELLED') return [];
+  return expandEvent(component, calendarName, rangeStart, rangeEnd)
+    .map((occurrence) => eventFromOccurrence(occurrence, calendarName, dateFmt, timeFmt));
+}
+
+function eventsForCalendarObject(
+  data: string | undefined,
+  calendarName: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+  dateFmt: DateFormatter,
+  timeFmt: DateFormatter,
+): CalendarEvent[] {
+  if (!data) return [];
+  const parsed = ical.sync.parseICS(data) as Record<string, VEvent>;
+  return Object.values(parsed).flatMap((component) =>
+    eventsForComponent(component, calendarName, rangeStart, rangeEnd, dateFmt, timeFmt));
 }
 
 export function createCalendarProvider(
@@ -163,46 +212,16 @@ export function createCalendarProvider(
         return holdsEvents && (allowlist.length === 0 || allowlist.includes(name));
       });
 
-      const events: CalendarEvent[] = [];
-      for (const calendar of calendars) {
+      const eventGroups = await Promise.all(calendars.map(async (calendar) => {
         const calendarName = text(calendar.displayName as string | undefined) || 'Calendar';
-        const objects = await race(
-          client.fetchCalendarObjects({
-            calendar,
-            timeRange: { start: rangeStart.toISOString(), end: rangeEnd.toISOString() },
-          }),
-        );
-        for (const object of objects) {
-          if (!object.data) continue;
-          const parsed = ical.sync.parseICS(object.data) as Record<string, VEvent>;
-          for (const component of Object.values(parsed)) {
-            if (component.type !== 'VEVENT') continue;
-            if (component.status === 'CANCELLED') continue;
-            for (const { event, start, end } of expandEvent(
-              component,
-              calendarName,
-              rangeStart,
-              rangeEnd,
-            )) {
-              const allDay = event.datetype === 'date';
-              events.push({
-                id: `${event.uid}-${start.toISOString()}`,
-                title: text(event.summary) || '(untitled)',
-                calendar: calendarName,
-                allDay,
-                location: event.location ? text(event.location) : undefined,
-                start: start.toISOString(),
-                end: end.toISOString(),
-                // All-day DTSTARTs are date-only (midnight UTC) — read the date
-                // straight off them instead of shifting through the timezone.
-                date: allDay ? start.toISOString().slice(0, 10) : dateFmt.format(start),
-                startLabel: allDay ? 'all day' : timeFmt.format(start),
-                endLabel: allDay ? '' : timeFmt.format(end),
-              });
-            }
-          }
-        }
-      }
+        const objects = await race(client.fetchCalendarObjects({
+          calendar,
+          timeRange: { start: rangeStart.toISOString(), end: rangeEnd.toISOString() },
+        }));
+        return objects.flatMap((object) =>
+          eventsForCalendarObject(object.data, calendarName, rangeStart, rangeEnd, dateFmt, timeFmt));
+      }));
+      const events = eventGroups.flat();
 
       events.sort((a, b) => a.start.localeCompare(b.start));
       return { events: events.slice(0, 50) };

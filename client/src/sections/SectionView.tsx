@@ -8,7 +8,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
  * Expanded full view of one section. The header bar shares layoutIds with the overview's
  * SectionCard, so opening a section morphs the card into this header.
  */
-export function SectionView({ section }: { section: SectionDef }) {
+export function SectionView({ section }: Readonly<{ section: SectionDef }>) {
   return (
     <motion.div
       className="col-start-1 row-start-1"
