@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import type { HueData, HueLight, HueScene, WidgetEnvelope } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
@@ -68,7 +68,8 @@ function LightRow({ light, refetch }: Readonly<{ light: HueLight; refetch: () =>
         disabled={!effective.on}
         onChange={(event) => changeBrightness(Number(event.target.value))}
         aria-label={`${light.name} brightness`}
-        className="w-20 shrink-0 accent-(--color-accent-personal) disabled:opacity-40"
+        className="hue-slider w-20 shrink-0 disabled:opacity-40"
+        style={{ '--fill': `${effective.brightness}%` } as CSSProperties}
       />
     </li>
   );
