@@ -17,10 +17,15 @@ function formatEventDay(event: CalendarData['events'][number]): string {
   });
 }
 
-function remainingCapacity(data: AiUsageToolData | undefined): number | null {
+type RemainingCapacity = number | 'unlimited' | null;
+
+function remainingCapacity(data: AiUsageToolData | undefined): RemainingCapacity {
   if (!data?.available) return null;
-  const used = data.weekly?.usedPercent ?? data.fiveHour?.usedPercent;
-  return used === undefined ? null : Math.max(0, Math.round(100 - used));
+  const limits = [data.fiveHour, data.weekly].filter(
+    (limit): limit is NonNullable<AiUsageToolData['fiveHour']> => limit != null,
+  );
+  if (limits.length > 0) return Math.min(...limits.map((limit) => Math.max(0, Math.round(100 - limit.usedPercent))));
+  return data.fiveHourStatus === 'unlimited' && data.weeklyStatus === 'unlimited' ? 'unlimited' : null;
 }
 
 function Signal({ label, value, detail, tone }: Readonly<{
@@ -57,10 +62,20 @@ export function DailyCommandCenter() {
   const unreadThreads = gmail?.threads.filter((thread) => thread.unread) ?? [];
   const reviewRequests = github?.pullRequests.filter((pr) => pr.role === 'review-requested') ?? [];
   const todayContributions = github?.contributions.days.at(-1)?.count ?? 0;
-  const aiCapacity = [remainingCapacity(codex), remainingCapacity(claude)].filter(
-    (value): value is number => value !== null,
+  const providerCapacities = [remainingCapacity(codex), remainingCapacity(claude)];
+  const aiCapacity = providerCapacities.filter(
+    (value): value is number => typeof value === 'number',
   );
   const lowestAiCapacity = aiCapacity.length ? Math.min(...aiCapacity) : null;
+  const aiLimitsLifted = providerCapacities.some((value) => value === 'unlimited');
+  let aiRunwayValue = 'Awaiting snapshot';
+  let aiRunwayDetail = 'Lowest remaining provider allowance';
+  if (lowestAiCapacity !== null) {
+    aiRunwayValue = `${lowestAiCapacity}% available`;
+  } else if (aiLimitsLifted) {
+    aiRunwayValue = 'No active limits';
+    aiRunwayDetail = 'A provider has temporarily lifted its allowance';
+  }
   const todayWeather = weather?.days[0];
 
   return (
@@ -72,6 +87,7 @@ export function DailyCommandCenter() {
         </div>
         <nav className="command-nav" aria-label="Dashboard sections">
           <a href="#/personal">Day</a>
+          <a href="#/health">Health</a>
           <a href="#/github">Code</a>
           <a href="#/ai">AI</a>
         </nav>
@@ -134,8 +150,8 @@ export function DailyCommandCenter() {
           />
           <Signal
             label="AI runway"
-            value={lowestAiCapacity === null ? 'Awaiting snapshot' : `${lowestAiCapacity}% available`}
-            detail="Lowest remaining provider allowance"
+            value={aiRunwayValue}
+            detail={aiRunwayDetail}
             tone="ai"
           />
         </div>

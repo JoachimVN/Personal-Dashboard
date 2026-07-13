@@ -2,7 +2,7 @@ import { Octokit } from 'octokit';
 import { githubSchema, type GitHubData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 
-interface RawEvent {
+export interface RawEvent {
   id: string;
   type: string | null;
   repo: { name: string };
@@ -11,6 +11,8 @@ interface RawEvent {
     commits?: { sha: string; message: string }[];
     action?: string;
     ref?: string | null;
+    before?: string;
+    head?: string;
     ref_type?: string;
     pull_request?: { number: number; html_url: string };
     issue?: { number: number; html_url: string };
@@ -18,23 +20,43 @@ interface RawEvent {
   };
 }
 
-function describeEvent(
+type ActivityCommit = { sha: string; title: string; description?: string };
+
+function toActivityCommit(commit: { sha: string; message: string }): ActivityCommit | undefined {
+  const [firstLine, ...remainingLines] = commit.message.split(/\r?\n/);
+  const title = firstLine.trim();
+  if (!title) return undefined;
+
+  const description = remainingLines.join('\n').trim();
+  return {
+    sha: commit.sha,
+    title,
+    ...(description ? { description } : {}),
+  };
+}
+
+export function describeEvent(
   event: RawEvent,
-): { summary: string; url?: string; commits?: string[] } | undefined {
+): {
+  summary: string;
+  url?: string;
+  branch?: string;
+  commits?: ActivityCommit[];
+} | undefined {
   const p = event.payload;
   switch (event.type) {
     case 'PushEvent': {
       const branch = p.ref?.replace('refs/heads/', '');
-      // The events API carries each commit's message inline — surface them
-      // instead of collapsing a push to a bare "pushed N commits".
+      // The events API carries each full commit message inline.
       const commits = (p.commits ?? [])
-        .map((commit) => commit.message.split('\n', 1)[0].trim())
-        .filter(Boolean);
+        .map(toActivityCommit)
+        .filter((commit): commit is ActivityCommit => commit !== undefined);
       if (commits.length === 0) {
-        return { summary: branch ? `pushed to ${branch}` : 'pushed' };
+        return { summary: branch ? `pushed to ${branch}` : 'pushed', branch };
       }
       return {
-        summary: branch ? `pushed to ${branch}` : 'pushed',
+        summary: `${commits.length} commit${commits.length === 1 ? '' : 's'}`,
+        branch,
         commits,
       };
     }
@@ -47,8 +69,10 @@ function describeEvent(
       return { summary: `${p.action} issue #${p.issue?.number}`, url: p.issue?.html_url };
     case 'IssueCommentEvent':
       return { summary: `commented on #${p.issue?.number}`, url: p.issue?.html_url };
-    case 'CreateEvent':
-      return { summary: `created ${p.ref_type}${p.ref ? ` ${p.ref}` : ''}` };
+    case 'CreateEvent': {
+      const reference = p.ref ? ` ${p.ref}` : '';
+      return { summary: `created ${p.ref_type}${reference}` };
+    }
     case 'ReleaseEvent':
       return { summary: `released ${p.release?.tag_name}`, url: p.release?.html_url };
     default:
@@ -107,6 +131,18 @@ interface ContributionsResponse {
   };
 }
 
+function ciStatusFor(run: { status: string | null; conclusion: string | null } | undefined) {
+  if (!run) return 'none' as const;
+  if (run.status !== 'completed') return 'running' as const;
+  return run.conclusion === 'success' ? 'success' as const : 'failure' as const;
+}
+
+function activitySummary(commits: ActivityCommit[] | undefined, fallback: string): string {
+  if (!commits?.length) return fallback;
+  const suffix = commits.length === 1 ? '' : 's';
+  return `${commits.length} commit${suffix}`;
+}
+
 export function createGitHubProvider(
   auth: { token: string; username: string } | undefined,
 ): Provider<GitHubData> {
@@ -163,13 +199,7 @@ export function createGitHubProvider(
               .catch(() => undefined),
           ]);
           const run = runs.data.workflow_runs[0];
-          const ciStatus = !run
-            ? ('none' as const)
-            : run.status !== 'completed'
-              ? ('running' as const)
-              : run.conclusion === 'success'
-                ? ('success' as const)
-                : ('failure' as const);
+          const ciStatus = ciStatusFor(run);
           return {
             fullName,
             stars: repoInfo.data.stargazers_count,
@@ -181,21 +211,52 @@ export function createGitHubProvider(
         }),
       );
 
-      const activity = (events.data as RawEvent[])
+      const activityCandidates = (events.data as RawEvent[])
         .map((event) => {
           const described = describeEvent(event);
-          if (!described || !event.created_at) return undefined;
+          return { event, described };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            event: RawEvent & { created_at: string };
+            described: NonNullable<ReturnType<typeof describeEvent>>;
+          } => entry.described !== undefined && entry.event.created_at !== null,
+        )
+        .slice(0, 12);
+
+      const activity = await Promise.all(
+        activityCandidates.map(async ({ event, described }) => {
+          let commits = described.commits;
+          if (!commits && event.type === 'PushEvent' && event.payload.before && event.payload.head) {
+            const [owner, repo] = event.repo.name.split('/');
+            if (owner && repo) {
+              const comparison = await octokit
+                .request('GET /repos/{owner}/{repo}/compare/{basehead}', {
+                  owner,
+                  repo,
+                  basehead: `${event.payload.before}...${event.payload.head}`,
+                  request,
+                })
+                .catch(() => undefined);
+              commits = comparison?.data.commits
+                .map((commit) => toActivityCommit({ sha: commit.sha, message: commit.commit.message }))
+                .filter((commit): commit is ActivityCommit => commit !== undefined);
+            }
+          }
+
           return {
             id: event.id,
-            summary: described.summary,
+            summary: activitySummary(commits, described.summary),
             repo: event.repo.name,
             timestamp: event.created_at,
             url: described.url,
-            commits: described.commits,
+            branch: described.branch,
+            commits,
           };
-        })
-        .filter((entry) => entry !== undefined)
-        .slice(0, 12);
+        }),
+      );
 
       const toPr = (item: SearchItem, role: 'author' | 'review-requested') => ({
         title: item.title,

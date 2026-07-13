@@ -10,7 +10,7 @@ export function IssueCapture() {
 
   useEffect(() => {
     fetch('/api/github/repos')
-      .then((response) => response.ok ? response.json() as Promise<{ repos: string[] }> : Promise.reject())
+      .then((response) => response.ok ? response.json() as Promise<{ repos: string[] }> : Promise.reject(new Error('Could not load repositories.')))
       .then(({ repos: next }) => { setRepos(next); setRepo(next[0] ?? ''); })
       .catch(() => setMessage('Could not load repositories.'));
   }, []);

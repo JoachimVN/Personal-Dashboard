@@ -6,7 +6,7 @@ import { WidgetCard } from '../components/WidgetCard';
 /** Stable per-calendar dot color derived from the calendar's name; readable in both modes. */
 function calendarColor(name: string): string {
   let hash = 0;
-  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+  for (const char of name) hash = Math.trunc(hash * 31 + (char.codePointAt(0) ?? 0));
   const hue = Math.abs(hash) % 360;
   return `light-dark(hsl(${hue} 55% 42%), hsl(${hue} 55% 65%))`;
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { WidgetEnvelope } from '@personal-dashboard/shared';
+import { WEATHER_LOCATION_UPDATED_EVENT } from './useDeviceLocation';
 
 const MIN_POLL_MS = 15_000;
 const MAX_POLL_MS = 300_000;
@@ -37,7 +38,7 @@ export function useWidget<T>(id: string): WidgetState<T> {
   }, []);
 
   const refetch = useCallback(() => {
-    void request(`/api/widgets/${id}`);
+    return request(`/api/widgets/${id}`);
   }, [id, request]);
 
   const refresh = useCallback(async () => {
@@ -63,11 +64,16 @@ export function useWidget<T>(id: string): WidgetState<T> {
     };
     document.addEventListener('visibilitychange', onVisible);
 
+    // The weather provider's cache updates as soon as the device reports a new
+    // location, ahead of this widget's own poll interval — refetch right away.
+    if (id === 'weather') window.addEventListener(WEATHER_LOCATION_UPDATED_EVENT, refetch);
+
     return () => {
       clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisible);
+      if (id === 'weather') window.removeEventListener(WEATHER_LOCATION_UPDATED_EVENT, refetch);
     };
-  }, [refetch, envelope?.refreshMs]);
+  }, [id, refetch, envelope?.refreshMs]);
 
   return { envelope, offline, refetch, refresh, refreshing };
 }

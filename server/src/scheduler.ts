@@ -33,7 +33,7 @@ function sanitizeError(err: unknown): string {
 }
 
 export class ProviderScheduler {
-  private entries = new Map<string, Entry>();
+  private readonly entries = new Map<string, Entry>();
 
   register(provider: Provider): void {
     if (this.entries.has(provider.id)) {

@@ -8,6 +8,16 @@ import { rampColor } from '../lib/contributions';
 const linkClass =
   'truncate font-medium text-ink hover:underline';
 
+function ActivitySummary({ item }: Readonly<{ item: GitHubData['activity'][number] }>) {
+  if (item.commits && item.commits.length > 0) {
+    return <span className="truncate text-ink-faint">{item.branch ?? item.summary}</span>;
+  }
+  if (item.url) {
+    return <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>{item.summary}</a>;
+  }
+  return <span className="truncate">{item.summary}</span>;
+}
+
 export function GitHubActivityWidget() {
   const { envelope, offline } = useWidget<GitHubData>('github');
   return (
@@ -20,30 +30,13 @@ export function GitHubActivityWidget() {
                 <span className="truncate text-ink-muted">
                   {item.repo.split('/')[1] ?? item.repo}
                 </span>
-                {item.url ? (
-                  <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
-                    {item.summary}
-                  </a>
-                ) : (
-                  <span className="truncate">{item.summary}</span>
-                )}
+                <ActivitySummary item={item} />
                 <span className="ml-auto shrink-0 text-xs text-ink-faint">
                   {relativeTime(item.timestamp)}
                 </span>
               </div>
               {item.commits && item.commits.length > 0 && (
-                <ul className="mt-1.5 space-y-1 border-l border-card-border pl-3">
-                  {item.commits.slice(0, 3).map((message) => (
-                    <li key={`${item.id}-${message}`} className="truncate text-xs text-ink-muted">
-                      {message}
-                    </li>
-                  ))}
-                  {item.commits.length > 3 && (
-                    <li className="text-xs text-ink-faint">
-                      +{item.commits.length - 3} more
-                    </li>
-                  )}
-                </ul>
+                <CommitList commits={item.commits} repo={item.repo} />
               )}
             </li>
           ))}
@@ -53,6 +46,68 @@ export function GitHubActivityWidget() {
         </ul>
       )}
     </WidgetCard>
+  );
+}
+
+function CommitList({
+  commits,
+  repo,
+}: {
+  readonly commits: NonNullable<GitHubData['activity'][number]['commits']>;
+  readonly repo: string;
+}) {
+  const visibleCommits = commits.slice(0, 5);
+  const remainingCommits = commits.slice(5);
+
+  return (
+    <div className="mt-1.5 border-l border-card-border pl-3">
+      <ul className="space-y-1.5">
+        {visibleCommits.map((commit) => (
+          <CommitItem key={commit.sha} commit={commit} repo={repo} />
+        ))}
+      </ul>
+      {remainingCommits.length > 0 && (
+        <details className="mt-1.5 text-xs">
+          <summary className="cursor-pointer text-ink-faint hover:text-ink-muted">
+            Show {remainingCommits.length} more commit{remainingCommits.length === 1 ? '' : 's'}
+          </summary>
+          <ul className="mt-1.5 space-y-1.5">
+            {remainingCommits.map((commit) => (
+              <CommitItem key={commit.sha} commit={commit} repo={repo} />
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function CommitItem({
+  commit,
+  repo,
+}: {
+  readonly commit: NonNullable<GitHubData['activity'][number]['commits']>[number];
+  readonly repo: string;
+}) {
+  const commitUrl = `https://github.com/${repo}/commit/${commit.sha}`;
+  const title = (
+    <a href={commitUrl} target="_blank" rel="noreferrer" className="block truncate text-xs text-ink-muted hover:underline">
+      {commit.title}
+    </a>
+  );
+
+  if (!commit.description) return <li>{title}</li>;
+
+  return (
+    <li>
+      {title}
+      <details className="mt-0.5">
+        <summary className="cursor-pointer text-xs text-ink-faint hover:text-ink-muted">
+          Show description
+        </summary>
+        <p className="mt-1 whitespace-pre-wrap text-xs text-ink-faint">{commit.description}</p>
+      </details>
+    </li>
   );
 }
 
@@ -97,9 +152,9 @@ function WorkList({
   empty,
   items,
 }: {
-  label: string;
-  empty: string;
-  items: { key: string; url: string; title: string; meta: string; time: string }[];
+  readonly label: string;
+  readonly empty: string;
+  readonly items: { key: string; url: string; title: string; meta: string; time: string }[];
 }) {
   return (
     <div>
@@ -141,9 +196,9 @@ function ContributionGrid({
   hovered,
   onHover,
 }: {
-  data: GitHubData;
-  hovered: { date: string; count: number } | null;
-  onHover: (day: { date: string; count: number } | null) => void;
+  readonly data: GitHubData;
+  readonly hovered: { date: string; count: number } | null;
+  readonly onHover: (day: { date: string; count: number } | null) => void;
 }) {
   const weeks = useMemo(() => {
     const all: GitHubData['contributions']['days'][] = [];
@@ -221,16 +276,13 @@ export function RepoHealthWidget() {
 }
 
 // Status colors reserved for state, shipped with icon + label, never color alone.
-function CiBadge({ status, url }: { status: string; url?: string }) {
+function CiBadge({ status, url }: Readonly<{ status: string; url?: string }>) {
   if (status === 'none') {
     return <span className="text-ink-faint">no CI</span>;
   }
-  const look =
-    status === 'success'
-      ? { icon: '✓', label: 'CI', color: '#0ca30c' }
-      : status === 'failure'
-        ? { icon: '✕', label: 'CI', color: '#d03b3b' }
-        : { icon: '●', label: 'running', color: undefined };
+  let look: { icon: string; label: string; color?: string } = { icon: '●', label: 'running' };
+  if (status === 'success') look = { icon: '✓', label: 'CI', color: '#0ca30c' };
+  if (status === 'failure') look = { icon: '✕', label: 'CI', color: '#d03b3b' };
   const badge = (
     <span className="inline-flex items-center gap-1" style={{ color: look.color }}>
       <span aria-hidden>{look.icon}</span>

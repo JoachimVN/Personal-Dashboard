@@ -15,7 +15,11 @@ export function CodeLauncher() {
     if (!repo) return;
     setMessage('Starting…');
     const response = await fetch('/api/code/actions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ repo, action }) });
-    setMessage(response.ok ? (action === 'session' ? 'VS Code session started.' : 'GitHub Desktop opened.') : 'Could not start this action.');
+    let nextMessage = 'Could not start this action.';
+    if (response.ok) {
+      nextMessage = action === 'session' ? 'VS Code session started.' : 'GitHub Desktop opened.';
+    }
+    setMessage(nextMessage);
   }
 
   return (

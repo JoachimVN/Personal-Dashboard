@@ -2,12 +2,13 @@ import { motion } from 'motion/react';
 import type { SectionDef } from './registry';
 import { OVERVIEW_HREF } from '../router';
 import { AccentDot, accentStyle } from './SectionCard';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 /**
  * Expanded full view of one section. The header bar shares layoutIds with the overview's
  * SectionCard, so opening a section morphs the card into this header.
  */
-export function SectionView({ section }: { section: SectionDef }) {
+export function SectionView({ section }: Readonly<{ section: SectionDef }>) {
   return (
     <motion.div
       className="col-start-1 row-start-1"
@@ -31,9 +32,12 @@ export function SectionView({ section }: { section: SectionDef }) {
             {section.title}
           </motion.p>
         </div>
-        <div className="ml-auto flex items-center gap-2 text-[11px] text-ink-faint">
-          <AccentDot />
-          <span>Live</span>
+        <div className="ml-auto flex items-center gap-3 text-[11px] text-ink-faint">
+          <span className="flex items-center gap-2">
+            <AccentDot />
+            <span>Live</span>
+          </span>
+          <ThemeToggle />
         </div>
       </motion.header>
       <motion.div

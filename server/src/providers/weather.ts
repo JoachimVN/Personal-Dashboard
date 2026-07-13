@@ -86,6 +86,15 @@ function symbolOf(entry: MetEntry): string {
   );
 }
 
+function closestToMidday(entries: MetEntry[], hourFmt: Intl.DateTimeFormat): MetEntry {
+  const [first, ...rest] = entries;
+  return rest.reduce((best, entry) => {
+    const bestDistance = Math.abs(Number(hourFmt.format(new Date(best.time))) - 12);
+    const entryDistance = Math.abs(Number(hourFmt.format(new Date(entry.time))) - 12);
+    return entryDistance < bestDistance ? entry : best;
+  }, first);
+}
+
 export interface WeatherProvider extends Provider<WeatherData> {
   /** Overrides the env-configured location, e.g. with the client's device geolocation. */
   setCoords(next: { lat: number; lon: number }): void;
@@ -165,10 +174,7 @@ export function createWeatherProvider(
           0,
         );
         // Represent the day by the entry nearest 12:00 local.
-        const midday = entries.reduce((best, entry) => {
-          const dist = (time: string) => Math.abs(Number(hourFmt.format(new Date(time))) - 12);
-          return dist(entry.time) < dist(best.time) ? entry : best;
-        });
+        const midday = closestToMidday(entries, hourFmt);
         return {
           date,
           dayLabel: weekdayFmt.format(new Date(`${date}T12:00:00Z`)),

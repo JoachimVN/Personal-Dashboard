@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { useHashRoute } from './router';
+import { useDeviceLocation } from './useDeviceLocation';
 import { SECTIONS, sectionById } from './sections/registry';
 import { SectionCard } from './sections/SectionCard';
 import { SectionView } from './sections/SectionView';
 import { SystemFooter } from './components/SystemFooter';
 import { DailyCommandCenter } from './components/DailyCommandCenter';
+import { ThemeToggle } from './components/ThemeToggle';
 
 /** Fixed decorative layer the glass cards blur against — accent-tinted glow blobs on the canvas. */
 function BackgroundGlow() {
@@ -63,6 +65,7 @@ function Overview() {
           <span>Personal system</span>
           <span className="text-ink-faint">/</span>
           <span className="text-ink-faint">Oslo</span>
+          <span className="ml-auto"><ThemeToggle /></span>
         </div>
         <div className="mt-6 grid items-end gap-5 sm:mt-8 sm:grid-cols-[1fr_auto]">
           <div>
@@ -108,6 +111,7 @@ function Overview() {
 
 export default function App() {
   const route = useHashRoute();
+  useDeviceLocation();
 
   return (
     <div className="min-h-screen bg-canvas text-ink selection:bg-(--color-accent-ai)/25">

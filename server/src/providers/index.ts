@@ -5,6 +5,7 @@ import type { ServerEnv } from '../env.js';
 import type { Provider } from '../scheduler.js';
 import { HealthStore } from '../healthStore.js';
 import { UsageHistoryStore } from '../usageHistory.js';
+import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
@@ -37,6 +38,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
     config.aiUsage.historySampleMs,
     config.aiUsage.historyRetentionDays * 24 * 60 * 60_000,
   );
+  const spotifySnapshot = new SpotifySnapshotStore(path.join(dataDir, 'spotify-cache.json'));
   return {
     weather,
     hue,
@@ -46,13 +48,15 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
       createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
       createGmailProvider(env.google),
       createGitHubProvider(env.github),
-      createClaudeUsageProvider(env.claudeOauthToken, usageHistory),
+      createClaudeUsageProvider(config.aiUsage.claudeRefreshMs, usageHistory),
       createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
       createNewsProvider(config.news.feeds),
-      createSpotifyProvider(env.spotify),
+      createSpotifyProvider(env.spotify, spotifySnapshot),
       createHealthProvider(health, env.timezone, {
         steps: config.health.stepGoal,
+        activeEnergyKcal: config.health.moveGoalKcal,
         exerciseMinutes: config.health.exerciseGoalMinutes,
+        standHours: config.health.standGoalHours,
       }),
       createSystemProvider(env.timezone),
       hue,

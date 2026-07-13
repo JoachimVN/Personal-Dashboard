@@ -31,12 +31,24 @@ export class HealthStore {
   ingest(sample: HealthIngest, today: string): HealthDay {
     const date = sample.date ?? today;
     const existing = this.days.find((day) => day.date === date);
+    // The ingest schema turns zero readings into explicit `undefined`s; spreading those
+    // as-is would clobber an earlier real reading for the same day.
+    const defined = Object.fromEntries(
+      Object.entries(sample).filter(([, value]) => value !== undefined),
+    ) as HealthIngest;
     const merged: HealthDay = {
-      ...(existing ?? { date, workouts: [] }),
-      ...sample,
+      ...(existing ?? { date }),
+      ...defined,
       date,
-      workouts: sample.workouts ?? existing?.workouts ?? [],
     };
+    // Watch and iPhone report independent cumulative day totals. Their time ranges can
+    // overlap, so summing would double-count. Keep both sources and use the higher total
+    // as the conservative dashboard value; legacy `steps` remains untouched when neither
+    // source has been supplied.
+    const sourceSteps = [merged.watchSteps, merged.phoneSteps].filter(
+      (value): value is number => value != null,
+    );
+    if (sourceSteps.length > 0) merged.steps = Math.max(...sourceSteps);
     this.days = this.days.filter((day) => day.date !== date);
     this.days.push(merged);
     this.days.sort((a, b) => a.date.localeCompare(b.date));
@@ -51,7 +63,7 @@ export class HealthStore {
   snapshot(today: string): { today: HealthDay | null; history: HealthDay[]; updatedAt: string | null } {
     return {
       today: this.days.find((day) => day.date === today) ?? null,
-      history: this.days.slice(-14),
+      history: this.days,
       updatedAt: this.updatedAt,
     };
   }

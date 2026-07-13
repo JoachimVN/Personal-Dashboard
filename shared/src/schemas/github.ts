@@ -4,13 +4,23 @@ export const githubSchema = z.object({
   activity: z.array(
     z.object({
       id: z.string(),
-      /** Human summary, e.g. "pushed to main". */
+      /** Human summary for non-push activity and push counts. */
       summary: z.string(),
       repo: z.string(),
       timestamp: z.string(),
       url: z.string().optional(),
-      /** First line of each commit message for push events; absent for other event types. */
-      commits: z.array(z.string()).optional(),
+      /** Push target branch; absent for other event types. */
+      branch: z.string().optional(),
+      /** Commits included in a push event; absent for other event types. */
+      commits: z
+        .array(
+          z.object({
+            sha: z.string(),
+            title: z.string(),
+            description: z.string().optional(),
+          }),
+        )
+        .optional(),
     }),
   ),
   pullRequests: z.array(

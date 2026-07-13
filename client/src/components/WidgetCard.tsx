@@ -3,16 +3,17 @@ import type { WidgetEnvelope } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
 interface WidgetCardProps<T> {
-  title: string;
-  envelope: WidgetEnvelope<T> | null;
-  offline: boolean;
-  children: (data: T) => ReactNode;
+  readonly title: string;
+  readonly envelope: WidgetEnvelope<T> | null;
+  readonly offline: boolean;
+  readonly children: (data: T) => ReactNode;
+  readonly errorFallback?: (envelope: WidgetEnvelope<T>) => ReactNode | undefined;
 }
 
-export function WidgetCard<T>({ title, envelope, offline, children }: WidgetCardProps<T>) {
+export function WidgetCard<T>({ title, envelope, offline, children, errorFallback }: WidgetCardProps<T>) {
   return (
     <WidgetShell title={title} badge={<StaleBadge envelope={envelope} />}>
-      <WidgetBody envelope={envelope} offline={offline}>
+      <WidgetBody envelope={envelope} offline={offline} errorFallback={errorFallback}>
         {children}
       </WidgetBody>
     </WidgetShell>
@@ -20,7 +21,7 @@ export function WidgetCard<T>({ title, envelope, offline, children }: WidgetCard
 }
 
 /** Amber "updated Xm ago" pill shown while a widget serves cached data after a failed refresh. */
-export function StaleBadge({ envelope }: { envelope: WidgetEnvelope<unknown> | null }) {
+export function StaleBadge({ envelope }: Readonly<{ envelope: WidgetEnvelope<unknown> | null }>) {
   if (envelope?.status !== 'stale' || !envelope.fetchedAt) return null;
   return (
     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
@@ -34,11 +35,11 @@ export function WidgetShell({
   title,
   badge,
   children,
-}: {
+}: Readonly<{
   title: string;
   badge?: ReactNode;
   children: ReactNode;
-}) {
+}>) {
   return (
     <section className="glass rounded-[1.5rem] p-5 transition-[border-color,box-shadow] duration-300 hover:border-white/15 sm:p-6">
       <header className="mb-4 flex items-baseline justify-between gap-2">
@@ -57,6 +58,7 @@ export function WidgetBody<T>({
   envelope,
   offline,
   children,
+  errorFallback,
 }: Omit<WidgetCardProps<T>, 'title'>) {
   if (offline && !envelope) {
     return <p className="text-sm text-rose-500">Can’t reach the dashboard server.</p>;
@@ -77,6 +79,8 @@ export function WidgetBody<T>({
     );
   }
   if (envelope.status === 'error' || envelope.data === undefined) {
+    const fallback = errorFallback?.(envelope);
+    if (fallback) return fallback;
     return <p className="text-sm text-rose-500">Couldn’t load ({envelope.error ?? 'unknown'}).</p>;
   }
   return <>{children(envelope.data)}</>;

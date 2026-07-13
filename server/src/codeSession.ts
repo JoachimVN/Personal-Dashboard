@@ -7,6 +7,14 @@ import { z } from 'zod';
 import type { AppConfig } from './config.js';
 
 const actionSchema = z.object({ repo: z.string(), action: z.enum(['session', 'github-desktop']) });
+const GITHUB_REMOTE_PATTERN = /github\.com[:/]([^/]+\/[^/]+?)(\.git)?\/?$/;
+const BINARY_DIRECTORIES = [
+  path.join(os.homedir(), '.local/bin'),
+  '/opt/homebrew/bin',
+  '/usr/local/bin',
+  '/usr/bin',
+  '/bin',
+];
 
 function reposRootFor(config: AppConfig, platform: NodeJS.Platform) {
   const key = platform === 'win32' ? 'win32' : 'darwin';
@@ -15,7 +23,7 @@ function reposRootFor(config: AppConfig, platform: NodeJS.Platform) {
 
 /** github.com owner/repo parsed out of an origin remote (git@ or https:// form), or undefined for non-GitHub remotes. */
 function repoFromRemote(url: string): string | undefined {
-  const match = url.trim().match(/github\.com[:/]([^/]+\/[^/]+?)(\.git)?\/?$/);
+  const match = GITHUB_REMOTE_PATTERN.exec(url.trim());
   return match?.[1];
 }
 
@@ -34,7 +42,7 @@ function discoverProjects(reposRoot: string): { repo: string; path: string }[] {
       const dir = path.join(reposRoot, name);
       if (!existsSync(path.join(dir, '.git'))) return undefined;
       try {
-        const remote = execFileSync('git', ['-C', dir, 'remote', 'get-url', 'origin'], {
+        const remote = execFileSync('/usr/bin/git', ['-C', dir, 'remote', 'get-url', 'origin'], {
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'ignore'],
         });
@@ -63,11 +71,7 @@ export function availableProjects(config: AppConfig, platform: NodeJS.Platform =
  * binary — is checked explicitly rather than trusting process.env.PATH alone.
  */
 function resolveBinary(name: string): string {
-  const dirs = [
-    path.join(os.homedir(), '.local/bin'),
-    ...(process.env.PATH ?? '').split(path.delimiter),
-  ];
-  for (const dir of dirs) {
+  for (const dir of BINARY_DIRECTORIES) {
     const candidate = path.join(dir, name);
     try {
       accessSync(candidate, constants.X_OK);

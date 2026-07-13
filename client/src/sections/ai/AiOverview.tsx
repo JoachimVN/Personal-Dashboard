@@ -1,6 +1,5 @@
 import { motion } from 'motion/react';
 import type { AiUsageToolData } from '@personal-dashboard/shared';
-import { relativeFutureTime } from '../../lib/time';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
@@ -9,6 +8,16 @@ import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
 
 const DAY_MS = 24 * 60 * 60_000;
+
+function limitLabel(
+  limit: AiUsageToolData['fiveHour'],
+  status: AiUsageToolData['fiveHourStatus'],
+  tokens?: number,
+) {
+  if (limit) return `${Math.round(limit.usedPercent)}%`;
+  if (tokens !== undefined) return `${formatCompactNumber(tokens)} tok`;
+  return status === 'unlimited' ? 'No limit' : '—';
+}
 
 function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
@@ -30,13 +39,13 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                 <span>
                   5h{' '}
                   <span className="font-semibold tabular-nums text-ink">
-                    {data.fiveHour ? `${Math.round(data.fiveHour.usedPercent)}%` : '—'}
+                    {limitLabel(data.fiveHour, data.fiveHourStatus, data.tokens?.fiveHour)}
                   </span>
                 </span>
                 <span>
                   week{' '}
                   <span className="font-semibold tabular-nums text-ink">
-                    {data.weekly ? `${Math.round(data.weekly.usedPercent)}%` : '—'}
+                    {limitLabel(data.weekly, data.weeklyStatus, data.tokens?.weekly)}
                   </span>
                 </span>
               </div>
@@ -56,22 +65,17 @@ function ToolRow({ id, label, color }: Readonly<{ id: string; label: string; col
                 windowMs={DAY_MS}
                 color={color}
               />
-              {data.context && (
+              {data.tokens && (
                 <div className="flex items-baseline justify-between pt-0.5 text-[11px] text-ink-faint">
-                  <span>session context</span>
+                  <span>tokens used</span>
                   <span className="font-medium tabular-nums text-ink-muted">
-                    {formatCompactNumber(data.context.tokens)} / {formatCompactNumber(data.context.contextWindow)}{' '}
-                    tokens
+                    5h {formatCompactNumber(data.tokens.fiveHour)} · week {formatCompactNumber(data.tokens.weekly)}
                   </span>
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-xs text-ink-faint">
-              {data.rateLimitedUntil
-                ? `Rate limited — retrying ${relativeFutureTime(data.rateLimitedUntil)}.`
-                : 'No snapshot on this machine.'}
-            </p>
+            <p className="text-xs text-ink-faint">No snapshot on this machine.</p>
           )
         }
       </WidgetBody>

@@ -1,6 +1,6 @@
 import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { motion } from 'motion/react';
-import { relativeFutureTime, relativeTime } from '../../lib/time';
+import { relativeTime } from '../../lib/time';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../../components/WidgetCard';
@@ -11,6 +11,37 @@ import { AI_TOOLS } from './tools';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
 const DAY_MS = 24 * 60 * 60_000;
+
+/** Fallback for when the account-wide quota (behind a flaky, tightly rate-limited endpoint) isn't available. */
+function TokenRow({ label, tokens }: Readonly<{ label: string; tokens: number }>) {
+  return (
+    <div className="flex items-baseline text-xs">
+      <span className="text-ink-muted">{label}</span>
+      <span className="ml-auto font-semibold tabular-nums">{formatCompactNumber(tokens)} tokens</span>
+    </div>
+  );
+}
+
+function WindowUnavailable({
+  label,
+  status,
+  tokens,
+}: Readonly<{
+  label: string;
+  status: AiUsageToolData['fiveHourStatus'];
+  tokens?: number;
+}>) {
+  if (status === 'unlimited') {
+    return (
+      <div className="flex items-baseline text-xs">
+        <span className="text-ink-muted">{label}</span>
+        <span className="ml-auto font-semibold text-emerald-400">Temporarily unlimited</span>
+        {tokens !== undefined && <span className="ml-2 tabular-nums text-ink-faint">{formatCompactNumber(tokens)} tokens</span>}
+      </div>
+    );
+  }
+  return tokens !== undefined ? <TokenRow label={label} tokens={tokens} /> : null;
+}
 
 function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
@@ -35,11 +66,27 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
         {(data) =>
           data.available ? (
             <div className="space-y-4">
-              {data.fiveHour && (
-                <UsageMeter label="5 hours" limit={data.fiveHour} color={color} windowMs={FIVE_HOUR_MS} />
+              {data.fiveHour ? (
+                <UsageMeter
+                  label="5 hours"
+                  limit={data.fiveHour}
+                  tokens={data.tokens?.fiveHour}
+                  color={color}
+                  windowMs={FIVE_HOUR_MS}
+                />
+              ) : (
+                <WindowUnavailable label="5 hours" status={data.fiveHourStatus} tokens={data.tokens?.fiveHour} />
               )}
-              {data.weekly && (
-                <UsageMeter label="Weekly" limit={data.weekly} color={color} windowMs={WEEKLY_MS} />
+              {data.weekly ? (
+                <UsageMeter
+                  label="Weekly"
+                  limit={data.weekly}
+                  tokens={data.tokens?.weekly}
+                  color={color}
+                  windowMs={WEEKLY_MS}
+                />
+              ) : (
+                <WindowUnavailable label="Weekly" status={data.weeklyStatus} tokens={data.tokens?.weekly} />
               )}
               {(data.fiveHour || data.weekly) && (
                 <>
@@ -59,46 +106,10 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
                   />
                 </>
               )}
-              {data.context && (
-                <div>
-                  <div className="mb-1 flex items-baseline text-xs">
-                    <span className="text-ink-muted">
-                      Session context{data.context.model ? ` · ${data.context.model}` : ''}
-                    </span>
-                    <span className="ml-auto font-semibold tabular-nums">
-                      {formatCompactNumber(data.context.tokens)} / {formatCompactNumber(data.context.contextWindow)}{' '}
-                      tokens
-                    </span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-track">
-                    <div
-                      className="h-full rounded-full"
-                      style={{ width: `${data.context.usedPercent}%`, backgroundColor: color }}
-                    />
-                  </div>
-                  <UsageHistoryChart
-                    points={data.history}
-                    metric="contextUsedPercent"
-                    windowMs={DAY_MS}
-                    color={color}
-                    caption="Context fill · last 24 h"
-                  />
-                </div>
-              )}
-              {data.asOf && (
-                <p className="text-[11px] text-ink-faint">
-                  As of {relativeTime(data.asOf)}
-                  {data.rateLimitedUntil &&
-                    ` · account quota rate limited, retrying ${relativeFutureTime(data.rateLimitedUntil)}`}
-                </p>
-              )}
+              {data.asOf && <p className="text-[11px] text-ink-faint">As of {relativeTime(data.asOf)}</p>}
             </div>
           ) : (
-            <p className="text-xs text-ink-faint">
-              {data.rateLimitedUntil
-                ? `Rate limited by Anthropic — retrying ${relativeFutureTime(data.rateLimitedUntil)}.`
-                : 'No current limit snapshot available on this machine.'}
-            </p>
+            <p className="text-xs text-ink-faint">No current limit snapshot available on this machine.</p>
           )
         }
         </WidgetBody>

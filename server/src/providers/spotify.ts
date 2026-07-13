@@ -1,9 +1,12 @@
 import { spotifySchema, type SpotifyData } from '@personal-dashboard/shared';
 import { readSpotifyToken, writeSpotifyToken } from '../spotifyToken.js';
+import { SpotifySnapshotStore } from '../spotifyCache.js';
 import type { Provider } from '../scheduler.js';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const API = 'https://api.spotify.com/v1';
+const TOP_DATA_REFRESH_MS = 15 * 60_000;
+const DEFAULT_RATE_LIMIT_RETRY_MS = 30_000;
 
 // Raw Spotify shapes (only the fields we read).
 interface RawImage {
@@ -34,6 +37,13 @@ interface TopResponse<T> {
   items: T[];
 }
 
+interface TopData {
+  artistsShort: RawArtist[];
+  artistsMedium: RawArtist[];
+  tracksShort: RawTrack[];
+  tracksMedium: RawTrack[];
+}
+
 const firstImage = (images?: RawImage[]) => images?.[0]?.url;
 
 function mapTrack(track: RawTrack) {
@@ -53,6 +63,10 @@ function mapArtist(artist: RawArtist) {
     url: artist.external_urls?.spotify,
     genres: artist.genres ?? [],
   };
+}
+
+function isRateLimitError(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith('spotify rate limited');
 }
 
 /**
@@ -99,7 +113,11 @@ async function accessToken(
 
 export function createSpotifyProvider(
   oauth: { clientId: string; clientSecret: string } | undefined,
+  snapshotStore: SpotifySnapshotStore,
 ): Provider<SpotifyData> {
+  let topData: TopData | undefined;
+  let topDataFetchedAt = 0;
+
   return {
     id: 'spotify',
     schema: spotifySchema,
@@ -108,53 +126,85 @@ export function createSpotifyProvider(
     isConfigured: () => oauth !== undefined && readSpotifyToken() !== undefined,
     async fetch(signal) {
       if (!oauth) throw new Error('spotify is not configured');
-      const bearer = await accessToken(oauth, signal);
+      try {
+        const bearer = await accessToken(oauth, signal);
 
-      const get = async <T>(path: string): Promise<T | null> => {
-        const res = await fetch(`${API}${path}`, {
-          headers: { Authorization: `Bearer ${bearer}` },
-          signal,
-        });
-        if (res.status === 204) return null; // e.g. nothing currently playing
-        if (!res.ok) throw new Error(`spotify ${path} failed: ${res.status}`);
-        return (await res.json()) as T;
-      };
+        const get = async <T>(path: string): Promise<T | null> => {
+          const retryInMs = snapshotStore.getRateLimitedUntil() - Date.now();
+          if (retryInMs > 0) {
+            throw new Error(`spotify rate limited; retry in ${Math.ceil(retryInMs / 1000)} seconds`);
+          }
+          const res = await fetch(`${API}${path}`, {
+            headers: { Authorization: `Bearer ${bearer}` },
+            signal,
+          });
+          if (res.status === 204) return null; // e.g. nothing currently playing
+          if (res.status === 429) {
+            const retryAfterSeconds = Number(res.headers.get('retry-after'));
+            const retryAfterMs =
+              Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+                ? retryAfterSeconds * 1000
+                : DEFAULT_RATE_LIMIT_RETRY_MS;
+            snapshotStore.setRateLimitedUntil(Date.now() + retryAfterMs);
+            throw new Error(`spotify rate limited; retry in ${Math.ceil(retryAfterMs / 1000)} seconds`);
+          }
+          if (!res.ok) throw new Error(`spotify ${path} failed: ${res.status}`);
+          return (await res.json()) as T;
+        };
 
-      const [current, recent, artistsShort, artistsMedium, tracksShort, tracksMedium] =
-        await Promise.all([
+        const [current, recent] = await Promise.all([
           get<CurrentlyPlaying>('/me/player/currently-playing'),
           get<RecentlyPlayed>('/me/player/recently-played?limit=50'),
-          get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8'),
-          get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8'),
-          get<TopResponse<RawTrack>>('/me/top/tracks?time_range=short_term&limit=50'),
-          get<TopResponse<RawTrack>>('/me/top/tracks?time_range=medium_term&limit=50'),
         ]);
 
-      const nowPlaying =
-        current?.item
-          ? {
-              ...mapTrack(current.item),
-              isPlaying: current.is_playing,
-              progressMs: current.progress_ms,
-              durationMs: current.item.duration_ms ?? null,
-            }
-          : null;
+        if (!topData || Date.now() - topDataFetchedAt >= TOP_DATA_REFRESH_MS) {
+          const [artistsShort, artistsMedium, tracksShort, tracksMedium] = await Promise.all([
+            get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8'),
+            get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8'),
+            get<TopResponse<RawTrack>>('/me/top/tracks?time_range=short_term&limit=50'),
+            get<TopResponse<RawTrack>>('/me/top/tracks?time_range=medium_term&limit=50'),
+          ]);
+          topData = {
+            artistsShort: artistsShort?.items ?? [],
+            artistsMedium: artistsMedium?.items ?? [],
+            tracksShort: tracksShort?.items ?? [],
+            tracksMedium: tracksMedium?.items ?? [],
+          };
+          topDataFetchedAt = Date.now();
+        }
 
-      return {
-        nowPlaying,
-        recentlyPlayed: (recent?.items ?? []).map((entry) => ({
-          ...mapTrack(entry.track),
-          playedAt: entry.played_at,
-        })),
-        topArtists: {
-          shortTerm: (artistsShort?.items ?? []).map(mapArtist),
-          mediumTerm: (artistsMedium?.items ?? []).map(mapArtist),
-        },
-        topTracks: {
-          shortTerm: (tracksShort?.items ?? []).map(mapTrack),
-          mediumTerm: (tracksMedium?.items ?? []).map(mapTrack),
-        },
-      };
+        const nowPlaying =
+          current?.item
+            ? {
+                ...mapTrack(current.item),
+                isPlaying: current.is_playing,
+                progressMs: current.progress_ms,
+                durationMs: current.item.duration_ms ?? null,
+              }
+            : null;
+
+        const snapshot = {
+          nowPlaying,
+          recentlyPlayed: (recent?.items ?? []).map((entry) => ({
+            ...mapTrack(entry.track),
+            playedAt: entry.played_at,
+          })),
+          topArtists: {
+            shortTerm: topData.artistsShort.map(mapArtist),
+            mediumTerm: topData.artistsMedium.map(mapArtist),
+          },
+          topTracks: {
+            shortTerm: topData.tracksShort.map(mapTrack),
+            mediumTerm: topData.tracksMedium.map(mapTrack),
+          },
+        };
+        snapshotStore.setSnapshot(snapshot);
+        return snapshot;
+      } catch (error) {
+        const lastGoodSnapshot = snapshotStore.getSnapshot();
+        if (lastGoodSnapshot && isRateLimitError(error)) return lastGoodSnapshot;
+        throw error;
+      }
     },
   };
 }

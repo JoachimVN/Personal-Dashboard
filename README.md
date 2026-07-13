@@ -91,7 +91,7 @@ Note: the activity feed uses GitHub's events API, which is **delayed** (typicall
 Each service has its own card showing its current rolling allowance: **five-hour** and **weekly** percentages, with reset times — not token totals or estimated costs. A thin marker on each bar shows where usage "should" be if it tracked evenly with the window's elapsed time; the marker turns amber when usage is running ahead of that pace.
 
 - **Codex:** no setup when Codex is signed in locally; its local session snapshots contain the current account limits. This card polls those local files only (no network call), so it refreshes independently and much more often than Claude — tune the interval with `aiUsage.codexRefreshMs` (ms, default `30000`) in `server/config.json`.
-- **Claude Code:** set `CLAUDE_CODE_OAUTH_TOKEN` in `server/.env` to the OAuth access token used by your signed-in Claude Code account (run `claude setup-token`). This is not an Anthropic API key. The Claude endpoint is an internal CLI integration with a tight rate limit, so this card stays on a fixed 5-minute refresh regardless of the Codex setting; the dashboard leaves Claude unavailable if the token expires or Anthropic changes it.
+- **Claude Code:** no setup beyond having the `claude` CLI signed in locally on this machine. The card shells out to `claude -p "/usage"` (the same local command `/usage` runs inside an interactive session) and parses its report — this is free and reliable, unlike the account-wide quota endpoint, which turned out to be rate-limited to the point of never returning a usable reading from server-side automation. Each call writes a small local session transcript file, so this card refreshes on a coarser cadence than Codex — tune it with `aiUsage.claudeRefreshMs` (ms, default `900000` / 15 min) in `server/config.json`.
 
 Each machine's dashboard reports that machine's signed-in accounts only. News feeds are configured in `server/config.json`.
 
@@ -166,27 +166,39 @@ is fed by an **Apple Shortcut** you build once.
 Build a Shortcut (and, optionally, a Personal Automation that runs it on a schedule) that:
 
 1. Uses **Get Health Sample / Find Health Samples** actions to read today's totals (steps, active
-   energy, exercise minutes, etc.).
+   energy, exercise minutes, etc.). For steps, use one action filtered to **Apple Watch** and one
+   filtered to **iPhone** when possible.
 2. Builds a **Dictionary** with any of these keys — all optional, all merged into today's entry so
    you can post them from separate actions:
 
    | key | unit |
    | --- | --- |
-   | `steps` | count |
+   | `watchSteps` | count, from Apple Watch |
+   | `phoneSteps` | count, from iPhone |
+   | `steps` | count, legacy fallback only |
    | `activeEnergyKcal` | kcal |
    | `exerciseMinutes` | minutes |
    | `standHours` | hours |
+   | `heartRate` | bpm |
    | `restingHeartRate` | bpm |
-   | `sleepHours` | hours |
-   | `workouts` | array of `{ type, durationMin?, energyKcal?, distanceKm?, start? }` |
+   | `walkingHeartRate` | bpm |
+   | `bloodOxygenPercent` | percent |
 
    Add `date` (`YYYY-MM-DD`) only to backfill a past day; it defaults to today.
 3. **Gets Contents of URL** — `POST http://<your-tailscale-name>:4821/api/health/ingest`, Request
    Body **JSON**, set to the dictionary.
 
-Posts through the day overwrite that day's totals (send cumulative values). Step goal, exercise-minute
-goal and history retention live under `health` in `server/config.json` (defaults: 10 000 steps,
-30 min, 30 days).
+Posts through the day overwrite that day's totals (send cumulative values). The dashboard keeps both
+step sources and uses the higher one for the daily goal and trends—rather than adding them—because
+the same walk may be recorded by both devices. The raw values are retained only to calculate that
+single normalized step total. Step goal, exercise-minute goal and history retention live under
+`health` in `server/config.json` (defaults: 10 000 steps, 30 min, 30 days).
+
+To survive the server being off/asleep when the Shortcut fires, post a rolling window instead of a
+single day: send `{ "days": [ ... ] }` where each entry is the dictionary above with its `date` set
+(up to 31 entries). Every day in the window is merged like a normal post, so the first successful
+run after an outage backfills the gap automatically — e.g. always sending the last 7 days makes any
+outage shorter than a week self-healing.
 
 ## Arranging widgets
 

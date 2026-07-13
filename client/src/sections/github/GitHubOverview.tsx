@@ -7,7 +7,7 @@ import { AnimatedNumber } from '../../components/AnimatedNumber';
 
 const STRIP_WEEKS = 12;
 
-function Stat({ value, label }: { value: number; label: string }) {
+function Stat({ value, label }: Readonly<{ value: number; label: string }>) {
   return (
     <div>
       <div className="text-xl font-bold tabular-nums">
@@ -18,7 +18,7 @@ function Stat({ value, label }: { value: number; label: string }) {
   );
 }
 
-function MiniContributionStrip({ days }: { days: GitHubData['contributions']['days'] }) {
+function MiniContributionStrip({ days }: Readonly<{ days: GitHubData['contributions']['days'] }>) {
   const weeks = useMemo(() => {
     const all: GitHubData['contributions']['days'][] = [];
     for (let i = 0; i < days.length; i += 7) {
@@ -30,8 +30,8 @@ function MiniContributionStrip({ days }: { days: GitHubData['contributions']['da
 
   return (
     <div className="flex gap-0.5">
-      {weeks.map((week, i) => (
-        <div key={i} className="flex flex-col gap-0.5">
+      {weeks.map((week) => (
+        <div key={week[0]?.date ?? 'empty-week'} className="flex flex-col gap-0.5">
           {week.map((day) => (
             <span
               key={day.date}
