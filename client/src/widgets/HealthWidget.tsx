@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { HealthData, HealthDay } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
@@ -179,28 +180,48 @@ function ActivityRings({
 }
 
 function StepsTrend({ history, goal }: Readonly<{ history: HealthDay[]; goal: number }>) {
+  const [active, setActive] = useState<number | null>(null);
   const days = history.slice(-7);
   if (days.length < 2) return null;
   const max = Math.max(goal, ...days.map((d) => d.steps ?? 0), 1);
+  const activeDay = active == null ? null : days[active];
   return (
     <div>
-      <p className="mb-1.5 text-[10px] uppercase tracking-[0.12em] text-ink-faint">Steps · last {days.length} days</p>
-      <div className="flex h-14 items-end gap-1.5">
-        {days.map((day) => {
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <p className="text-[10px] uppercase tracking-[0.12em] text-ink-faint">Steps · last {days.length} days</p>
+        {activeDay && (
+          <p className="text-[11px] tabular-nums text-ink-muted">
+            {new Date(`${activeDay.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} ·{' '}
+            <span className="font-semibold text-ink">{(activeDay.steps ?? 0).toLocaleString()}</span> steps
+          </p>
+        )}
+      </div>
+      <div
+        className="flex h-28 items-end gap-1.5"
+        onPointerLeave={(e) => {
+          if (e.pointerType === 'mouse') setActive(null);
+        }}
+      >
+        {days.map((day, i) => {
           const steps = day.steps ?? 0;
           const height = (steps / max) * 100;
           const met = steps >= goal;
           const weekday = new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'narrow' });
           return (
-            <div key={day.date} className="flex h-full flex-1 flex-col items-center gap-1">
+            <div
+              key={day.date}
+              className="flex h-full flex-1 cursor-pointer flex-col items-center gap-1"
+              onPointerEnter={() => setActive(i)}
+              onPointerDown={() => setActive(i)}
+            >
               <div className="flex w-full flex-1 items-end">
                 <div
-                  className="w-full rounded-t-[3px]"
-                  style={{ height: `${Math.max(height, 3)}%`, background: accent, opacity: met ? 1 : 0.4 }}
+                  className="w-full rounded-t-[3px] transition-opacity"
+                  style={{ height: `${Math.max(height, 3)}%`, background: accent, opacity: active === i ? 1 : met ? 0.9 : 0.4 }}
                   aria-label={`${day.date}: ${steps.toLocaleString()} steps`}
                 />
               </div>
-              <span className="text-[9px] text-ink-faint">{weekday}</span>
+              <span className={`text-[9px] ${active === i ? 'font-semibold text-ink' : 'text-ink-faint'}`}>{weekday}</span>
             </div>
           );
         })}
