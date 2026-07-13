@@ -3,7 +3,7 @@ import { gmailSchema, type GmailData } from '@personal-dashboard/shared';
 import { readGmailToken, writeGmailToken } from '../gmailToken.js';
 import type { Provider } from '../scheduler.js';
 
-const THREAD_COUNT = 8;
+const THREAD_COUNT = 20;
 
 /** "Some Name <a@b.c>" → "Some Name"; bare addresses pass through. */
 function fromDisplay(raw: string): string {

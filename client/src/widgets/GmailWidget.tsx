@@ -17,7 +17,7 @@ export function GmailWidget() {
             </span>{' '}
             <span className="text-ink-muted">unread</span>
           </p>
-          <ul className="space-y-1.5 text-sm">
+          <ul className="max-h-[19rem] space-y-1.5 overflow-y-auto pr-1 text-sm">
             {data.threads.map((thread) => (
               <li key={thread.id}>
                 <a
