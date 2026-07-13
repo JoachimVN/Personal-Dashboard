@@ -192,13 +192,15 @@ function RoomToggle({ room, refetch }: Readonly<{ room: HueRoom; refetch: () => 
       aria-checked={on}
       aria-label={`Turn ${room.name} ${on ? 'off' : 'on'}`}
       onClick={() => void toggle()}
-      className={`h-4 w-7 shrink-0 rounded-full transition-colors ${
-        on ? 'bg-(--color-accent-personal)' : 'bg-track'
+      className={`relative h-5 w-9 shrink-0 rounded-full border transition-all duration-200 ${
+        on
+          ? 'border-transparent bg-(--color-accent-personal) shadow-[0_0_10px] shadow-(color:--color-accent-personal)/35'
+          : 'border-card-border bg-track'
       }`}
     >
       <span
-        className={`block h-3 w-3 translate-x-0.5 rounded-full bg-white shadow transition-transform ${
-          on ? 'translate-x-[14px]' : ''
+        className={`absolute top-1/2 left-0.5 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow-[0_1px_2px_rgb(0_0_0/0.35)] transition-transform duration-200 ${
+          on ? 'translate-x-[18px]' : ''
         }`}
       />
     </button>
