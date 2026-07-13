@@ -194,7 +194,7 @@ function RoomToggle({ room, refetch }: Readonly<{ room: HueRoom; refetch: () => 
       onClick={() => void toggle()}
       className={`relative h-5 w-9 shrink-0 rounded-full border transition-all duration-200 ${
         on
-          ? 'border-transparent bg-(--color-accent-personal) shadow-[0_0_10px] shadow-(color:--color-accent-personal)/35'
+          ? 'border-transparent bg-(--color-accent-personal) shadow-[0_0_10px] shadow-(color:--color-accent-personal)/25'
           : 'border-card-border bg-track'
       }`}
     >
