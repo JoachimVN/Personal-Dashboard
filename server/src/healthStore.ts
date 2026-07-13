@@ -32,10 +32,9 @@ export class HealthStore {
     const date = sample.date ?? today;
     const existing = this.days.find((day) => day.date === date);
     const merged: HealthDay = {
-      ...(existing ?? { date, workouts: [] }),
+      ...(existing ?? { date }),
       ...sample,
       date,
-      workouts: sample.workouts ?? existing?.workouts ?? [],
     };
     this.days = this.days.filter((day) => day.date !== date);
     this.days.push(merged);

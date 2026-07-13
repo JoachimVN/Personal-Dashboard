@@ -17,7 +17,7 @@ function HistoryTable({ days }: Readonly<{ days: HealthDay[] }>) {
       <table className="w-full min-w-[68rem] border-separate border-spacing-0 text-left text-xs">
         <thead className="text-[10px] uppercase tracking-[0.12em] text-ink-faint">
           <tr>
-            {['Date', 'Steps', 'Move', 'Exercise', 'Stand', 'Avg bpm', 'Rest bpm', 'Sleep', 'Daylight', 'Oxygen', 'Workouts'].map((heading) => (
+            {['Date', 'Steps', 'Move', 'Exercise', 'Stand', 'Avg bpm', 'Rest bpm', 'Daylight', 'Oxygen'].map((heading) => (
               <th key={heading} className="border-b border-card-border px-3 py-2.5 font-medium first:pl-0">{heading}</th>
             ))}
           </tr>
@@ -34,10 +34,8 @@ function HistoryTable({ days }: Readonly<{ days: HealthDay[] }>) {
               <td className="border-b border-card-border px-3 py-3">{value(day.standHours, ' h')}</td>
               <td className="border-b border-card-border px-3 py-3">{value(day.heartRate)}</td>
               <td className="border-b border-card-border px-3 py-3">{value(day.restingHeartRate)}</td>
-              <td className="border-b border-card-border px-3 py-3">{value(day.sleepHours, ' h', 1)}</td>
               <td className="border-b border-card-border px-3 py-3">{value(day.daylightMinutes, ' min')}</td>
               <td className="border-b border-card-border px-3 py-3">{value(day.bloodOxygenPercent, '%')}</td>
-              <td className="border-b border-card-border px-3 py-3">{day.workouts.length || '—'}</td>
             </tr>
           ))}
         </tbody>

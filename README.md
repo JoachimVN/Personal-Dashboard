@@ -177,8 +177,6 @@ Build a Shortcut (and, optionally, a Personal Automation that runs it on a sched
    | `exerciseMinutes` | minutes |
    | `standHours` | hours |
    | `restingHeartRate` | bpm |
-   | `sleepHours` | hours |
-   | `workouts` | array of `{ type, durationMin?, energyKcal?, distanceKm?, start? }` |
 
    Add `date` (`YYYY-MM-DD`) only to backfill a past day; it defaults to today.
 3. **Gets Contents of URL** — `POST http://<your-tailscale-name>:4821/api/health/ingest`, Request

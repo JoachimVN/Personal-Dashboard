@@ -1,13 +1,5 @@
 import { z } from 'zod';
 
-export const healthWorkoutSchema = z.object({
-  type: z.string(),
-  durationMin: z.number().optional(),
-  energyKcal: z.number().optional(),
-  distanceKm: z.number().optional(),
-  start: z.string().optional(),
-});
-
 /** One day's Apple Health rollup. Every metric is optional — the Shortcut sends what it can gather. */
 export const healthDaySchema = z.object({
   date: z.string(), // YYYY-MM-DD
@@ -22,8 +14,6 @@ export const healthDaySchema = z.object({
   daylightMinutes: z.number().optional(),
   /** Average blood-oxygen saturation for the day, as a percentage (for example, 98). */
   bloodOxygenPercent: z.number().optional(),
-  sleepHours: z.number().optional(),
-  workouts: z.array(healthWorkoutSchema).default([]),
 });
 
 /**
@@ -41,8 +31,6 @@ export const healthIngestSchema = z.object({
   restingHeartRate: z.number().positive().optional(),
   daylightMinutes: z.number().nonnegative().optional(),
   bloodOxygenPercent: z.number().positive().max(100).optional(),
-  sleepHours: z.number().nonnegative().optional(),
-  workouts: z.array(healthWorkoutSchema).optional(),
 });
 
 export const healthSchema = z.object({
@@ -58,7 +46,6 @@ export const healthSchema = z.object({
   }),
 });
 
-export type HealthWorkout = z.infer<typeof healthWorkoutSchema>;
 export type HealthDay = z.infer<typeof healthDaySchema>;
 export type HealthIngest = z.infer<typeof healthIngestSchema>;
 export type HealthData = z.infer<typeof healthSchema>;

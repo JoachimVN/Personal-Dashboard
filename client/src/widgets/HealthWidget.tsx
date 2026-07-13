@@ -67,15 +67,8 @@ function HeartRate({ average, resting }: Readonly<{ average?: number; resting?: 
   );
 }
 
-function RecoveryMetrics({ sleepHours, bloodOxygenPercent }: Readonly<{ sleepHours?: number; bloodOxygenPercent?: number }>) {
+function RecoveryMetrics({ bloodOxygenPercent }: Readonly<{ bloodOxygenPercent?: number }>) {
   const metrics = [
-    {
-      id: 'sleep',
-      label: 'Sleep',
-      value: sleepHours == null ? null : `${sleepHours.toFixed(1)} h`,
-      tone: 'bg-indigo-400/15 text-indigo-300',
-      icon: <path d="M19.8 15.4A8 8 0 0 1 8.6 4.2 8 8 0 1 0 19.8 15.4Z" />,
-    },
     {
       id: 'oxygen',
       label: 'Blood oxygen',
@@ -244,7 +237,7 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
 
       <HeartRate average={t?.heartRate} resting={t?.restingHeartRate} />
 
-      <RecoveryMetrics sleepHours={t?.sleepHours} bloodOxygenPercent={t?.bloodOxygenPercent} />
+      <RecoveryMetrics bloodOxygenPercent={t?.bloodOxygenPercent} />
 
       {stats.length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -252,28 +245,6 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
             <Stat key={s.label} value={s.value} label={s.label} />
           ))}
         </div>
-      )}
-
-      {t?.workouts && t.workouts.length > 0 && (
-        <ul className="space-y-1.5 text-sm">
-          {t.workouts.map((w) => (
-            <li
-              key={`${w.type}-${w.durationMin ?? ''}-${w.distanceKm ?? ''}-${w.energyKcal ?? ''}`}
-              className="flex items-baseline gap-2 rounded-xl bg-track/25 px-3 py-2"
-            >
-              <span className="font-medium">{w.type}</span>
-              <span className="ml-auto text-xs text-ink-faint">
-                {[
-                  w.durationMin != null ? `${Math.round(w.durationMin)} min` : null,
-                  w.distanceKm != null ? `${w.distanceKm.toFixed(1)} km` : null,
-                  w.energyKcal != null ? `${Math.round(w.energyKcal)} kcal` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-            </li>
-          ))}
-        </ul>
       )}
 
       <StepsTrend history={data.history} goal={data.goals.steps} />
