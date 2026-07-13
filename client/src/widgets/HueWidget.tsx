@@ -89,26 +89,25 @@ function SceneChip({ scene, refetch }: Readonly<{ scene: HueScene; refetch: () =
     }
   }
 
-  // Palette gradient under a dark scrim, so white text stays readable on any colors.
-  const colored = scene.colors.length > 0;
-  const stops = colored ? scene.colors.concat(scene.colors.length === 1 ? scene.colors : []) : [];
-
   return (
     <button
       type="button"
       onClick={() => void activate()}
       disabled={busy}
-      className={`rounded-full px-2.5 py-1 text-xs transition-opacity hover:opacity-80 disabled:opacity-40 ${
-        colored ? 'text-white ring-1 ring-white/10 ring-inset' : 'bg-track'
-      }`}
-      style={
-        colored
-          ? {
-              backgroundImage: `linear-gradient(rgba(10,12,16,0.55), rgba(10,12,16,0.55)), linear-gradient(90deg, ${stops.join(', ')})`,
-            }
-          : undefined
-      }
+      className="flex items-center gap-1.5 rounded-full bg-track px-2.5 py-1 text-xs transition-opacity hover:opacity-80 disabled:opacity-40"
     >
+      {scene.colors.length > 0 && (
+        <span aria-hidden className="flex -space-x-1">
+          {scene.colors.map((color, i) => (
+            <span
+              // Palette order is stable and colors can repeat — index is the identity here.
+              key={i}
+              className="h-2.5 w-2.5 rounded-full ring-1 ring-black/25"
+              style={{ background: color }}
+            />
+          ))}
+        </span>
+      )}
       {scene.name}
     </button>
   );
