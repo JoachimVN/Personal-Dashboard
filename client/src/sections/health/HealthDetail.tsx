@@ -13,13 +13,24 @@ function value(value: number | undefined, suffix = '', precision = 0) {
 function HistoryTable({ days }: Readonly<{ days: HealthDay[] }>) {
   if (days.length === 0) return <p className="text-sm text-ink-faint">No health days have been synced yet.</p>;
   const rows = days.slice().reverse();
+  const headings = [
+    { label: 'Date', tone: 'text-ink-faint' },
+    { label: 'Steps', tone: 'text-(--color-accent-personal)' },
+    { label: 'Move', tone: 'text-rose-400' },
+    { label: 'Exercise', tone: 'text-lime-300' },
+    { label: 'Stand', tone: 'text-cyan-300' },
+    { label: 'Avg bpm', tone: 'text-rose-300' },
+    { label: 'Rest bpm', tone: 'text-blue-400' },
+    { label: 'Walk bpm', tone: 'text-amber-400' },
+    { label: 'Oxygen', tone: 'text-cyan-300' },
+  ];
   return (
     <div className="overflow-x-auto pb-1">
       <table className="w-full min-w-[68rem] border-separate border-spacing-0 text-left text-xs">
         <thead className="text-[10px] uppercase tracking-[0.12em] text-ink-faint">
           <tr>
-            {['Date', 'Steps', 'Move', 'Exercise', 'Stand', 'Avg bpm', 'Rest bpm', 'Walk bpm', 'Oxygen'].map((heading) => (
-              <th key={heading} className="border-b border-card-border px-3 py-2.5 font-medium first:pl-0">{heading}</th>
+            {headings.map((heading) => (
+              <th key={heading.label} className={`border-b border-card-border px-3 py-2.5 font-medium first:pl-0 ${heading.tone}`}>{heading.label}</th>
             ))}
           </tr>
         </thead>
