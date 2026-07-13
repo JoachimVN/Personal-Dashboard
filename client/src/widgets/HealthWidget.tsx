@@ -188,7 +188,7 @@ function StepsTrend({ history, goal }: Readonly<{ history: HealthDay[]; goal: nu
         )}
       </div>
       <div
-        className="flex h-28 items-end gap-1.5"
+        className="flex h-42 items-end gap-1.5"
         onPointerLeave={(e) => {
           if (e.pointerType === 'mouse') setActive(null);
         }}
