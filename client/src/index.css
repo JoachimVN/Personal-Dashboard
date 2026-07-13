@@ -631,58 +631,24 @@ a {
   opacity: 0.4;
 }
 
-/* Hue brightness slider — slim accent-filled track with a compact thumb.
-   The component sets --fill to the current brightness percentage. */
-.hue-slider {
-  appearance: none;
-  height: 16px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.hue-slider::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 9999px;
+/* Hue light bar — the whole row is the dimmer; the fill's width is the brightness. */
+.hue-bar-fill {
   background: linear-gradient(
-    to right,
-    var(--color-accent-personal) var(--fill, 50%),
-    var(--color-track) var(--fill, 50%)
+    90deg,
+    color-mix(in oklab, #ffd9a0 45%, transparent),
+    color-mix(in oklab, #f7b955 60%, transparent)
   );
+  border-radius: inherit;
+  transition: width 140ms ease;
 }
 
-.hue-slider::-webkit-slider-thumb {
-  appearance: none;
-  margin-top: -4px;
-  height: 12px;
-  width: 12px;
-  border-radius: 9999px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+.hue-bar--on {
+  box-shadow: 0 0 18px color-mix(in oklab, #f7b955 28%, transparent);
 }
 
-.hue-slider::-moz-range-track {
-  height: 4px;
-  border-radius: 9999px;
-  background: var(--color-track);
-}
-
-.hue-slider::-moz-range-progress {
-  height: 4px;
-  border-radius: 9999px;
-  background: var(--color-accent-personal);
-}
-
-.hue-slider::-moz-range-thumb {
-  height: 12px;
-  width: 12px;
-  border: none;
-  border-radius: 9999px;
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
-}
-
-.hue-slider:disabled {
-  cursor: default;
+.hue-bar:focus-visible {
+  outline: 2px solid var(--color-accent-personal);
+  outline-offset: 2px;
 }
 
 @keyframes detail-orb-breathe {

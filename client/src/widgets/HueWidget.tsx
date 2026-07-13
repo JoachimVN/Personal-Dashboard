@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useRef, useState } from 'react';
 import type { HueData, HueLight, HueScene, WidgetEnvelope } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
@@ -16,62 +16,113 @@ async function postLightState(id: string, state: { on?: boolean; brightness?: nu
   }
 }
 
-function LightRow({ light, refetch }: Readonly<{ light: HueLight; refetch: () => void }>) {
+function BulbIcon({ on }: Readonly<{ on: boolean }>) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className={`relative h-5 w-5 shrink-0 ${on ? 'text-[#f7b955]' : 'text-ink-faint'}`}
+      fill={on ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9.5 18.5h5M10.5 21h3M12 3a6 6 0 0 1 3.7 10.7c-.5.4-.7 1-.7 1.6v.7h-6v-.7c0-.6-.2-1.2-.7-1.6A6 6 0 0 1 12 3z" />
+    </svg>
+  );
+}
+
+/**
+ * The whole bar is the dimmer, Hue-app style: the fill width is the
+ * brightness, dragging anywhere slides it (turning the light on), a plain
+ * tap toggles. Only the release posts to the server — the drag itself just
+ * moves the optimistic override.
+ */
+function LightBar({ light, refetch }: Readonly<{ light: HueLight; refetch: () => void }>) {
   const [override, setOverride] = useState<Partial<HueLight> | null>(null);
-  const brightnessTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const barRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ startX: number; moved: boolean } | null>(null);
   const effective = { ...light, ...override };
 
-  async function toggle() {
-    const on = !effective.on;
-    setOverride({ on });
-    const ok = await postLightState(light.id, { on });
+  async function apply(state: { on?: boolean; brightness?: number }) {
+    setOverride((prev) => ({ ...prev, ...state }));
+    const ok = await postLightState(light.id, state);
     if (!ok) setOverride(null);
     else refetch();
   }
 
-  function changeBrightness(brightness: number) {
-    setOverride((prev) => ({ ...prev, brightness }));
-    clearTimeout(brightnessTimer.current);
-    brightnessTimer.current = setTimeout(async () => {
-      const ok = await postLightState(light.id, { brightness });
-      if (!ok) setOverride(null);
-      else refetch();
-    }, 300);
+  function brightnessAt(clientX: number): number {
+    const rect = barRef.current!.getBoundingClientRect();
+    return Math.min(100, Math.max(1, Math.round(((clientX - rect.left) / rect.width) * 100)));
+  }
+
+  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    drag.current = { startX: event.clientX, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!drag.current) return;
+    if (!drag.current.moved && Math.abs(event.clientX - drag.current.startX) < 6) return;
+    drag.current.moved = true;
+    setOverride((prev) => ({ ...prev, on: true, brightness: brightnessAt(event.clientX) }));
+  }
+
+  function onPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (!drag.current) return;
+    const { moved } = drag.current;
+    drag.current = null;
+    if (moved) void apply({ on: true, brightness: brightnessAt(event.clientX) });
+    else void apply({ on: !effective.on });
+  }
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      void apply({ on: true, brightness: Math.min(100, effective.brightness + 5) });
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      void apply({ on: true, brightness: Math.max(1, effective.brightness - 5) });
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      void apply({ on: !effective.on });
+    }
   }
 
   return (
-    <li className="flex items-center gap-3 py-1.5">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={effective.on}
-        aria-label={`Turn ${light.name} ${effective.on ? 'off' : 'on'}`}
-        onClick={() => void toggle()}
-        className={`h-5 w-9 shrink-0 rounded-full transition-colors ${
-          effective.on ? 'bg-(--color-accent-personal)' : 'bg-track'
-        }`}
+    <div
+      ref={barRef}
+      role="slider"
+      tabIndex={0}
+      aria-label={`${light.name} brightness`}
+      aria-valuemin={1}
+      aria-valuemax={100}
+      aria-valuenow={effective.on ? effective.brightness : 0}
+      aria-valuetext={effective.on ? `${effective.brightness}%` : 'off'}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onKeyDown={onKeyDown}
+      className={`hue-bar relative flex h-11 cursor-pointer touch-pan-y items-center gap-2.5 overflow-hidden rounded-xl bg-track px-3 select-none ${
+        effective.on ? 'hue-bar--on' : ''
+      }`}
+    >
+      <span
+        aria-hidden
+        className="hue-bar-fill absolute inset-y-0 left-0"
+        style={{ width: effective.on ? `${effective.brightness}%` : 0 }}
+      />
+      <BulbIcon on={effective.on} />
+      <span
+        className={`relative min-w-0 flex-1 truncate text-sm ${effective.reachable ? '' : 'text-ink-faint'}`}
       >
-        <span
-          className={`block h-4 w-4 translate-x-0.5 rounded-full bg-white shadow transition-transform ${
-            effective.on ? 'translate-x-[18px]' : ''
-          }`}
-        />
-      </button>
-      <span className={`min-w-0 flex-1 truncate text-sm ${effective.reachable ? '' : 'text-ink-faint'}`}>
         {light.name}
       </span>
-      <input
-        type="range"
-        min={1}
-        max={100}
-        value={effective.brightness}
-        disabled={!effective.on}
-        onChange={(event) => changeBrightness(Number(event.target.value))}
-        aria-label={`${light.name} brightness`}
-        className="hue-slider w-20 shrink-0 disabled:opacity-40"
-        style={{ '--fill': `${effective.brightness}%` } as CSSProperties}
-      />
-    </li>
+      <span className="relative text-xs tabular-nums text-ink-faint">
+        {effective.on ? `${effective.brightness}%` : 'Off'}
+      </span>
+    </div>
   );
 }
 
@@ -146,11 +197,11 @@ export function HueWidget() {
           <p className="text-sm text-ink-faint">No lights found on the bridge.</p>
         ) : (
           <>
-            <ul className="divide-y divide-card-border">
+            <div className="space-y-2">
               {data.lights.map((light) => (
-                <LightRow key={light.id} light={light} refetch={refetch} />
+                <LightBar key={light.id} light={light} refetch={refetch} />
               ))}
-            </ul>
+            </div>
             {data.scenes.length > 0 && (
               <div className="mt-3 space-y-2.5 border-t border-card-border pt-3">
                 {groupScenesByRoom(data.scenes).map(([room, scenes]) => (
