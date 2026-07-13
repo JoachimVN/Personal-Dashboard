@@ -71,6 +71,18 @@ function aiConstraints(
   });
 }
 
+/** Location if set, else a hint about all-day vs timed. */
+function nextEventDetail(event: CalendarData['events'][number]): string {
+  return event.location || (event.allDay
+    ? 'An all-day marker on your calendar'
+    : `${event.startLabel}–${event.endLabel}`);
+}
+
+function codeQueueValue(github: GitHubData | undefined, queueClear: boolean | undefined, reviewCount: number): string {
+  if (!github) return 'Syncing GitHub';
+  return queueClear ? 'Queue clear' : `${reviewCount} reviews · ${github.pullRequests.length} PRs`;
+}
+
 function resetLabel(iso: string): string {
   const date = new Date(iso);
   const time = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -131,7 +143,7 @@ export function DailyCommandCenter() {
     { provider: 'Codex', data: codex },
   ]);
   const tightest = constraints.length
-    ? constraints.reduce((min, c) => (c.remaining < min.remaining ? c : min))
+    ? constraints.reduce((min, c) => (c.remaining < min.remaining ? c : min), constraints[0])
     : null;
   const aiLimitsLifted = [claude, codex].some(
     (data) => data?.available && data.fiveHourStatus === 'unlimited' && data.weeklyStatus === 'unlimited',
@@ -173,7 +185,7 @@ export function DailyCommandCenter() {
               <p className="command-event-time">{eventTiming(next, now)}</p>
               <p className="command-event-title">{next.title}</p>
               <p className="mt-2 text-sm text-ink-muted">
-                {next.location || (next.allDay ? 'An all-day marker on your calendar' : `${next.startLabel}–${next.endLabel}`)}
+                {nextEventDetail(next)}
               </p>
             </div>
           ) : (
@@ -214,11 +226,7 @@ export function DailyCommandCenter() {
           />
           <Signal
             label="Code queue"
-            value={github
-              ? queueClear
-                ? 'Queue clear'
-                : `${reviewRequests.length} reviews · ${github.pullRequests.length} PRs`
-              : 'Syncing GitHub'}
+            value={codeQueueValue(github, queueClear, reviewRequests.length)}
             detail={reviewRequests[0]?.title ?? `${todayContributions} contributions today`}
             tone="github"
             href="#/github"

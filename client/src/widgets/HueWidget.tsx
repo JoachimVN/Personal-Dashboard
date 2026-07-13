@@ -152,8 +152,7 @@ function SceneChip({ scene, refetch }: Readonly<{ scene: HueScene; refetch: () =
         <span aria-hidden className="flex shrink-0 -space-x-1">
           {scene.colors.map((color, i) => (
             <span
-              // Palette order is stable and colors can repeat — index is the identity here.
-              key={i}
+              key={`${color}-${i}`}
               className="h-2.5 w-2.5 rounded-full ring-1 ring-black/25"
               style={{ background: color }}
             />
