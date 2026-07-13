@@ -94,10 +94,10 @@ function SceneChip({ scene, refetch }: Readonly<{ scene: HueScene; refetch: () =
       type="button"
       onClick={() => void activate()}
       disabled={busy}
-      className="flex items-center gap-1.5 rounded-full bg-track px-2.5 py-1 text-xs transition-opacity hover:opacity-80 disabled:opacity-40"
+      className="flex min-w-0 items-center gap-1.5 rounded-lg bg-track px-2.5 py-1.5 text-xs transition-opacity hover:opacity-80 disabled:opacity-40"
     >
       {scene.colors.length > 0 && (
-        <span aria-hidden className="flex -space-x-1">
+        <span aria-hidden className="flex shrink-0 -space-x-1">
           {scene.colors.map((color, i) => (
             <span
               // Palette order is stable and colors can repeat — index is the identity here.
@@ -108,7 +108,7 @@ function SceneChip({ scene, refetch }: Readonly<{ scene: HueScene; refetch: () =
           ))}
         </span>
       )}
-      {scene.name}
+      <span className="truncate">{scene.name}</span>
     </button>
   );
 }
@@ -155,7 +155,7 @@ export function HueWidget() {
                 {groupScenesByRoom(data.scenes).map(([room, scenes]) => (
                   <div key={room}>
                     <p className="text-xs uppercase tracking-wider text-ink-faint">{room}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                       {scenes.map((scene) => (
                         <SceneChip key={scene.id} scene={scene} refetch={refetch} />
                       ))}
