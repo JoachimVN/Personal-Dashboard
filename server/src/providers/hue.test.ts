@@ -3,8 +3,10 @@ import {
   assertNoBridgeError,
   buildLightStateBody,
   denormalizeBrightness,
+  mapPalettes,
   mapScenes,
   normalizeBrightness,
+  xyToHex,
 } from './hue.js';
 
 describe('normalizeBrightness', () => {
@@ -54,7 +56,7 @@ describe('mapScenes', () => {
         },
         groups,
       ),
-    ).toEqual([{ id: 'a', name: 'Blue', room: 'Bedroom' }]);
+    ).toEqual([{ id: 'a', name: 'Blue', room: 'Bedroom', colors: [] }]);
   });
 
   it('sorts by room then name, and nulls the room of scenes whose group is gone', () => {
@@ -69,11 +71,56 @@ describe('mapScenes', () => {
         groups,
       ),
     ).toEqual([
-      { id: 'd', name: 'Orphan', room: null },
-      { id: 'b', name: 'Pines', room: 'Bathroom' },
-      { id: 'c', name: 'Blue', room: 'Bedroom' },
-      { id: 'a', name: 'White', room: 'Bedroom' },
+      { id: 'd', name: 'Orphan', room: null, colors: [] },
+      { id: 'b', name: 'Pines', room: 'Bathroom', colors: [] },
+      { id: 'c', name: 'Blue', room: 'Bedroom', colors: [] },
+      { id: 'a', name: 'White', room: 'Bedroom', colors: [] },
     ]);
+  });
+
+  it('attaches palette swatches by scene id', () => {
+    expect(
+      mapScenes(
+        { a: { name: 'Blue', type: 'GroupScene', group: '81' } },
+        groups,
+        { a: ['#0000ff'] },
+      ),
+    ).toEqual([{ id: 'a', name: 'Blue', room: 'Bedroom', colors: ['#0000ff'] }]);
+  });
+});
+
+describe('xyToHex', () => {
+  it('maps Hue red primary to a red-dominant color', () => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(xyToHex(0.675, 0.322).slice(i, i + 2), 16));
+    expect(r).toBe(255);
+    expect(g).toBeLessThan(80);
+    expect(b).toBeLessThan(80);
+  });
+
+  it('maps D65-ish white to a near-neutral color', () => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(xyToHex(0.3161, 0.3271).slice(i, i + 2), 16));
+    expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeLessThan(60);
+  });
+});
+
+describe('mapPalettes', () => {
+  it('keys swatches by v1 scene id, combining xy and color-temperature entries', () => {
+    const palettes = mapPalettes({
+      data: [
+        {
+          id_v1: '/scenes/abc',
+          palette: {
+            color: [{ color: { xy: { x: 0.675, y: 0.322 } } }],
+            color_temperature: [{ color_temperature: { mirek: 365 } }],
+          },
+        },
+        { id_v1: '/scenes/empty', palette: { color: [], color_temperature: [] } },
+        { palette: { color: [{ color: { xy: { x: 0.3, y: 0.3 } } }] } },
+      ],
+    });
+    expect(Object.keys(palettes)).toEqual(['abc']);
+    expect(palettes.abc).toHaveLength(2);
+    expect(palettes.abc[0]).toMatch(/^#[0-9a-f]{6}$/);
   });
 });
 

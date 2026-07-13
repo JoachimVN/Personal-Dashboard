@@ -14,6 +14,8 @@ export const hueSceneSchema = z.object({
   name: z.string(),
   /** Room the scene belongs to, resolved from the bridge's groups; null if the group is gone. */
   room: z.string().nullable(),
+  /** Palette swatches as hex colors (from the CLIP v2 scene palette); empty when unavailable. */
+  colors: z.array(z.string()),
 });
 
 export const hueDataSchema = z.object({
