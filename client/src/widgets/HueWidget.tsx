@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { HueData, HueLight } from '@personal-dashboard/shared';
+import type { HueData, HueLight, WidgetEnvelope } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 
@@ -74,6 +74,11 @@ function LightRow({ light, refetch }: Readonly<{ light: HueLight; refetch: () =>
   );
 }
 
+function hueErrorFallback(entry: WidgetEnvelope<HueData>) {
+  if (entry.error !== 'timeout') return undefined;
+  return <p className="text-sm text-ink-faint">Hue bridge is offline — lights will reconnect automatically.</p>;
+}
+
 export function HueWidget() {
   const { envelope, offline, refetch } = useWidget<HueData>('hue');
 
@@ -82,11 +87,7 @@ export function HueWidget() {
       title="Lights"
       envelope={envelope}
       offline={offline}
-      errorFallback={(entry) =>
-        entry.error === 'timeout' ? (
-          <p className="text-sm text-ink-faint">Hue bridge is offline — lights will reconnect automatically.</p>
-        ) : undefined
-      }
+      errorFallback={hueErrorFallback}
     >
       {(data) =>
         data.lights.length === 0 ? (

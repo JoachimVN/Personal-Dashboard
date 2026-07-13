@@ -120,6 +120,9 @@ function StepsTrend({ history, goal }: Readonly<{ history: HealthDay[]; goal: nu
           const height = (steps / max) * 100;
           const met = steps >= goal;
           const weekday = new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'narrow' });
+          let opacity = 0.4;
+          if (met) opacity = 0.9;
+          if (active === i) opacity = 1;
           return (
             <div
               key={day.date}
@@ -130,7 +133,7 @@ function StepsTrend({ history, goal }: Readonly<{ history: HealthDay[]; goal: nu
               <div className="flex w-full flex-1 items-end">
                 <div
                   className="w-full rounded-t-[3px] transition-opacity"
-                  style={{ height: `${Math.max(height, 3)}%`, background: accent, opacity: active === i ? 1 : met ? 0.9 : 0.4 }}
+                  style={{ height: `${Math.max(height, 3)}%`, background: accent, opacity }}
                   aria-label={`${day.date}: ${steps.toLocaleString()} steps`}
                 />
               </div>

@@ -130,6 +130,9 @@ function BarTrend({
           {slots.map((slot, i) => {
             const value = values[i];
             const met = goal != null && value != null && value >= goal;
+            let opacity = 0.45;
+            if (met || goal == null) opacity = 0.85;
+            if (active === i) opacity = 1;
             return (
               <div
                 key={slot.date}
@@ -143,7 +146,7 @@ function BarTrend({
                     style={{
                       height: `${Math.max((value / max) * 100, 2)}%`,
                       background: color,
-                      opacity: active === i ? 1 : met || goal == null ? 0.85 : 0.45,
+                      opacity,
                     }}
                     aria-label={`${slot.date}: ${fmt(value)}${unit}`}
                   />
@@ -235,12 +238,12 @@ function LineTrend({
       .filter((part): part is string => part != null)
       .join(' · ');
   const latest = [...slots].reverse().find((slot) => series.some((s) => slot.day?.[s.key] != null));
-  const readout =
-    active != null
-      ? `${valuesAt(active)} · ${fullDate(slots[active].date)}`
-      : latest
-        ? `latest: ${valuesAt(slots.indexOf(latest))}`
-        : '';
+  let readout = '';
+  if (active != null) {
+    readout = `${valuesAt(active)} · ${fullDate(slots[active].date)}`;
+  } else if (latest) {
+    readout = `latest: ${valuesAt(slots.indexOf(latest))}`;
+  }
 
   return (
     <div>
@@ -263,7 +266,6 @@ function LineTrend({
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
           className="h-28 w-full touch-none"
-          role="img"
           aria-label={`${title}, last ${slots.length} days`}
           onPointerMove={readNearest}
           onPointerDown={readNearest}

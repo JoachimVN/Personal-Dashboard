@@ -14,7 +14,7 @@ export function ActivityRings({
   standHours,
   goals,
 }: Readonly<ActivityRingsProps>) {
-  const gradientPrefix = useId().replace(/:/g, '');
+  const gradientPrefix = useId().replaceAll(':', '');
   const rings = [
     { id: 'move', label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', start: '#d91f3b', end: '#ff5a8b', track: 'light-dark(#f6c7d2, #4c0717)', radius: 48 },
     { id: 'exercise', label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', start: '#70cc00', end: '#d4ff00', track: 'light-dark(#d8efc4, #173c0a)', radius: 33 },

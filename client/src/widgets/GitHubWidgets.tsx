@@ -8,6 +8,16 @@ import { rampColor } from '../lib/contributions';
 const linkClass =
   'truncate font-medium text-ink hover:underline';
 
+function ActivitySummary({ item }: Readonly<{ item: GitHubData['activity'][number] }>) {
+  if (item.commits && item.commits.length > 0) {
+    return <span className="truncate text-ink-faint">{item.branch ?? item.summary}</span>;
+  }
+  if (item.url) {
+    return <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>{item.summary}</a>;
+  }
+  return <span className="truncate">{item.summary}</span>;
+}
+
 export function GitHubActivityWidget() {
   const { envelope, offline } = useWidget<GitHubData>('github');
   return (
@@ -20,17 +30,7 @@ export function GitHubActivityWidget() {
                 <span className="truncate text-ink-muted">
                   {item.repo.split('/')[1] ?? item.repo}
                 </span>
-                {item.commits && item.commits.length > 0 ? (
-                  <span className="truncate text-ink-faint">
-                    {item.branch ?? item.summary}
-                  </span>
-                ) : item.url ? (
-                  <a href={item.url} target="_blank" rel="noreferrer" className={linkClass}>
-                    {item.summary}
-                  </a>
-                ) : (
-                  <span className="truncate">{item.summary}</span>
-                )}
+                <ActivitySummary item={item} />
                 <span className="ml-auto shrink-0 text-xs text-ink-faint">
                   {relativeTime(item.timestamp)}
                 </span>
