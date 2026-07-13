@@ -27,11 +27,12 @@ function Bar({ label, value, goal, unit }: Readonly<{ label: string; value: numb
   );
 }
 
-function HeartRate({ average, resting }: Readonly<{ average?: number; resting?: number }>) {
-  if (average == null && resting == null) return null;
+function HeartRate({ average, resting, walking }: Readonly<{ average?: number; resting?: number; walking?: number }>) {
+  if (average == null && resting == null && walking == null) return null;
   const readings = [
     { label: 'Average', value: average },
     { label: 'Resting', value: resting },
+    { label: 'Walking', value: walking },
   ].filter((reading): reading is { label: string; value: number } => reading.value != null);
 
   return (
@@ -44,7 +45,7 @@ function HeartRate({ average, resting }: Readonly<{ average?: number; resting?: 
         </span>
         <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">Heart rate</p>
       </div>
-      <div className="grid grid-cols-2 divide-x divide-white/10">
+      <div className={`grid divide-x divide-white/10 ${readings.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
         {readings.map((reading) => (
           <div key={reading.label} className="px-3 first:pl-0 last:pr-0">
             <p className="flex items-baseline gap-1 tabular-nums leading-none">
@@ -244,7 +245,7 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
         goals={data.goals}
       />
 
-      <HeartRate average={t?.heartRate} resting={t?.restingHeartRate} />
+      <HeartRate average={t?.heartRate} resting={t?.restingHeartRate} walking={t?.walkingHeartRate} />
 
       <RecoveryMetrics bloodOxygenPercent={t?.bloodOxygenPercent} />
 

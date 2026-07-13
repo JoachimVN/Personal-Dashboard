@@ -10,6 +10,8 @@ export const healthDaySchema = z.object({
   /** Average regular (non-resting) heart rate for the day, in BPM. */
   heartRate: z.number().optional(),
   restingHeartRate: z.number().optional(),
+  /** Average heart rate while walking for the day, in BPM. */
+  walkingHeartRate: z.number().optional(),
   /** Average blood-oxygen saturation for the day, as a percentage (for example, 98). */
   bloodOxygenPercent: z.number().optional(),
 });
@@ -27,6 +29,7 @@ export const healthIngestSchema = z.object({
   standHours: z.number().nonnegative().optional(),
   heartRate: z.number().positive().optional(),
   restingHeartRate: z.number().positive().optional(),
+  walkingHeartRate: z.number().positive().optional(),
   bloodOxygenPercent: z.number().positive().max(100).optional(),
 });
 
