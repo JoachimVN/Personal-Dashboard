@@ -17,20 +17,28 @@ export const healthDaySchema = z.object({
 });
 
 /**
+ * Metrics arrive as 0 on days the phone has no data. Treat 0 as "no reading" everywhere
+ * rather than storing it (or failing validation), so a stray 0 never shows up as a real
+ * value or invalidates a batched day's other metrics.
+ */
+const readingOrMissing = (schema: z.ZodNumber) =>
+  schema.optional().transform((value) => (value === 0 ? undefined : value));
+
+/**
  * Body the Apple Shortcut POSTs to /api/health/ingest. Metrics are optional and additive:
  * a partial post (e.g. only steps) merges into that day rather than replacing it. `date`
  * defaults to the server's today; posts through the day overwrite the same date's totals.
  */
 export const healthIngestSchema = z.object({
   date: z.string().optional(),
-  steps: z.number().nonnegative().optional(),
-  activeEnergyKcal: z.number().nonnegative().optional(),
-  exerciseMinutes: z.number().nonnegative().optional(),
-  standHours: z.number().nonnegative().optional(),
-  heartRate: z.number().positive().optional(),
-  restingHeartRate: z.number().positive().optional(),
-  walkingHeartRate: z.number().positive().optional(),
-  bloodOxygenPercent: z.number().positive().max(100).optional(),
+  steps: readingOrMissing(z.number().nonnegative()),
+  activeEnergyKcal: readingOrMissing(z.number().nonnegative()),
+  exerciseMinutes: readingOrMissing(z.number().nonnegative()),
+  standHours: readingOrMissing(z.number().nonnegative()),
+  heartRate: readingOrMissing(z.number().nonnegative()),
+  restingHeartRate: readingOrMissing(z.number().nonnegative()),
+  walkingHeartRate: readingOrMissing(z.number().nonnegative()),
+  bloodOxygenPercent: readingOrMissing(z.number().nonnegative().max(100)),
 });
 
 /**

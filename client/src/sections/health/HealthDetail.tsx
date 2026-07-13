@@ -4,6 +4,7 @@ import { relativeTime } from '../../lib/time';
 import { useWidget } from '../../useWidget';
 import { HealthWidget } from '../../widgets/HealthWidget';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
+import { HealthTrendCharts } from './HealthTrendCharts';
 
 function value(value: number | undefined, suffix = '', precision = 0) {
   return value == null ? '—' : `${value.toFixed(precision)}${suffix}`;
@@ -77,6 +78,15 @@ export function HealthDetail() {
 
       <DetailSectionHeading label="Today" title="Your current signals" detail="Live values from your Apple Health Shortcut." />
       <HealthWidget />
+
+      <div className="mt-6">
+        <DetailSectionHeading label="Trends" title="Your last 30 days, charted" detail="Daily activity totals against their goals, plus heart-rate and blood-oxygen trends. Tap a day to read its exact values." />
+        <WidgetShell title="Health trends">
+          <WidgetBody envelope={envelope} offline={offline}>
+            {(data) => <HealthTrendCharts history={data.history} goals={data.goals} />}
+          </WidgetBody>
+        </WidgetShell>
+      </div>
 
       <div className="mt-6">
         <DetailSectionHeading label="History" title="Your last 30 days" detail="Each row is a daily rollup, so activity totals and recovery readings stay in context." />

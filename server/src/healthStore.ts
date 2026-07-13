@@ -31,9 +31,14 @@ export class HealthStore {
   ingest(sample: HealthIngest, today: string): HealthDay {
     const date = sample.date ?? today;
     const existing = this.days.find((day) => day.date === date);
+    // The ingest schema turns zero readings into explicit `undefined`s; spreading those
+    // as-is would clobber an earlier real reading for the same day.
+    const defined = Object.fromEntries(
+      Object.entries(sample).filter(([, value]) => value !== undefined),
+    ) as HealthIngest;
     const merged: HealthDay = {
       ...(existing ?? { date }),
-      ...sample,
+      ...defined,
       date,
     };
     this.days = this.days.filter((day) => day.date !== date);
