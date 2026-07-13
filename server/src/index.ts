@@ -229,6 +229,18 @@ if (env.isProduction) {
   });
 }
 
-app.listen(env.port, env.host, () => {
+const server = app.listen(env.port, env.host, () => {
   console.log(`Dashboard server on http://${env.host}:${env.port} (${env.timezone})`);
+});
+
+server.on('error', (err: NodeJS.ErrnoException) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(
+      `Port ${env.port} is already in use — a stale server process is likely still running. ` +
+        `Run \`lsof -ti tcp:${env.port} | xargs kill\` and restart.`,
+    );
+  } else {
+    console.error(err);
+  }
+  process.exit(1);
 });
