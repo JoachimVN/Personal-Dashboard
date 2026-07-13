@@ -235,7 +235,12 @@ const SESSION_LINE = new RegExp(String.raw`Current session:\s*${QUOTA_TAIL}`, 'i
 const WEEKLY_LINE = new RegExp(String.raw`Current week \(all models\):\s*${QUOTA_TAIL}`, 'i');
 /** Model-specific weekly cap, e.g. "Current week (Fable): 49% used · …" — the model name varies by plan/era. */
 const MODEL_WEEK_LINE = new RegExp(String.raw`Current week \((?!all models)([^)]+)\):\s*${QUOTA_TAIL}`, 'i');
-const NO_LIMITS_LINE = /(?:no\s+(?:active\s+)?(?:usage\s+)?limits?|unlimited|limits?\s+(?:are\s+)?(?:not\s+(?:currently\s+)?enforced|temporarily\s+(?:disabled|removed|lifted)))/i;
+const NO_LIMITS_PATTERNS = [
+  /no\s+(?:active\s+)?(?:usage\s+)?limits?/i,
+  /unlimited/i,
+  /limits?\s+(?:are\s+)?not\s+(?:currently\s+)?enforced/i,
+  /limits?\s+(?:are\s+)?temporarily\s+(?:disabled|removed|lifted)/i,
+];
 
 const cliResultSchema = z.object({
   is_error: z.boolean(),
@@ -303,13 +308,14 @@ async function claudeCliUsageSnapshot(): Promise<ClaudeQuota> {
     if (parsed.is_error || !parsed.result) {
       return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
     }
-    const fiveHour = parseLine(parsed.result, SESSION_LINE);
-    const weekly = parseLine(parsed.result, WEEKLY_LINE);
-    const modelWeekly = parseModelWeekLine(parsed.result);
+    const result = parsed.result;
+    const fiveHour = parseLine(result, SESSION_LINE);
+    const weekly = parseLine(result, WEEKLY_LINE);
+    const modelWeekly = parseModelWeekLine(result);
     // Unlike Codex (where the latest rate-limit event is authoritative about which windows
     // exist), Claude's /usage simply omits "Current session" when no 5-hour session is active —
     // so only an explicit no-limits line justifies reporting a window as unlimited.
-    const noLimits = NO_LIMITS_LINE.test(parsed.result);
+    const noLimits = NO_LIMITS_PATTERNS.some((pattern) => pattern.test(result));
     const hasQuotaReport = Boolean(fiveHour || weekly || modelWeekly || noLimits);
     return {
       fiveHour,
