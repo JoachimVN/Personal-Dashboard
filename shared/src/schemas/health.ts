@@ -33,6 +33,17 @@ export const healthIngestSchema = z.object({
   bloodOxygenPercent: z.number().positive().max(100).optional(),
 });
 
+/**
+ * Multi-day variant: `{ days: [...] }` lets one POST carry a window of days (e.g. the last week),
+ * so a Shortcut run after the server was offline backfills the gap in a single request. Entries
+ * should each carry `date`; ones without it merge into the server's today. Bodies with a `days`
+ * key must be validated against this schema only — falling back to the all-optional single-sample
+ * schema would silently accept an invalid batch as an empty `{}` sample.
+ */
+export const healthIngestBatchSchema = z.object({
+  days: z.array(healthIngestSchema).min(1).max(31),
+});
+
 export const healthSchema = z.object({
   today: healthDaySchema.nullable(),
   /** Recent days, oldest first, for the week-trend chart. */

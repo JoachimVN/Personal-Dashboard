@@ -1,8 +1,9 @@
+import { appendFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { z } from 'zod';
-import { healthIngestSchema } from '@personal-dashboard/shared';
+import { healthIngestBatchSchema, healthIngestSchema } from '@personal-dashboard/shared';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { LayoutStore } from './layoutStore.js';
@@ -78,14 +79,27 @@ app.post('/api/hue/lights/:id', async (req, res) => {
 
 // Ingest endpoint for an Apple Health Shortcut running on the user's phone (over Tailscale).
 // Same trust model as the rest of the dashboard: loopback + `tailscale serve`, no separate auth.
+// Accepts either a single day sample or `{ days: [...] }` covering a multi-day window.
 app.post('/api/health/ingest', async (req, res) => {
-  const parsed = healthIngestSchema.safeParse(req.body);
+  // TEMP: debugging Shortcut payloads — remove once the Shortcut is stable.
+  appendFileSync(
+    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.data/ingest-debug.log'),
+    `${JSON.stringify({ at: new Date().toISOString(), body: req.body })}\n`,
+  );
+  const isBatch = typeof req.body === 'object' && req.body !== null && 'days' in req.body;
+  const parsed = isBatch
+    ? healthIngestBatchSchema.safeParse(req.body)
+    : healthIngestSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'invalid-health-sample' });
     return;
   }
-  providers.health.ingest(parsed.data, todayInZone(env.timezone));
-  await scheduler.refresh('health'); // reflect the new sample immediately, not on the next 5-min poll
+  const today = todayInZone(env.timezone);
+  const samples = 'days' in parsed.data ? parsed.data.days : [parsed.data];
+  for (const sample of samples) {
+    providers.health.ingest(sample, today);
+  }
+  await scheduler.refresh('health'); // reflect the new samples immediately, not on the next 5-min poll
   res.json({ ok: true });
 });
 

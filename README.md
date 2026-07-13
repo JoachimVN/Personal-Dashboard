@@ -186,6 +186,12 @@ Posts through the day overwrite that day's totals (send cumulative values). Step
 goal and history retention live under `health` in `server/config.json` (defaults: 10 000 steps,
 30 min, 30 days).
 
+To survive the server being off/asleep when the Shortcut fires, post a rolling window instead of a
+single day: send `{ "days": [ ... ] }` where each entry is the dictionary above with its `date` set
+(up to 31 entries). Every day in the window is merged like a normal post, so the first successful
+run after an outage backfills the gap automatically — e.g. always sending the last 7 days makes any
+outage shorter than a week self-healing.
+
 ## Arranging widgets
 
 The Personal section's widget cards can be reordered: open **Personal** → **Arrange** (top-right), then drag a card to its new position. The order is saved server-side (`server/.data/layout.json`, gitignored) and shared across every device that reaches this dashboard.
