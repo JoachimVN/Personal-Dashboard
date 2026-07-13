@@ -100,9 +100,17 @@ export async function launchCodeAction(input: unknown, config: AppConfig, platfo
   return launch('code', [workspace]);
 }
 
+// This server's own .env secrets (GitHub widget credentials) have no business
+// reaching spawned processes — VS Code and anything it launches (e.g. a
+// Claude Code task) would otherwise inherit them and silently shadow the
+// user's own `gh` CLI auth for every git operation in that window.
+const LEAKED_ENV_KEYS = ['GITHUB_TOKEN', 'GITHUB_ISSUES_TOKEN', 'GITHUB_USERNAME'];
+
 function launch(command: string, args: string[]) {
+  const env = { ...process.env };
+  for (const key of LEAKED_ENV_KEYS) delete env[key];
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+    const child = spawn(command, args, { detached: true, stdio: 'ignore', env });
     child.once('error', reject);
     child.once('spawn', () => { child.unref(); resolve(); });
   });
