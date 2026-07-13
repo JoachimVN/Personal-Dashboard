@@ -7,6 +7,8 @@ const rateLimitSchema = z.object({
   resetsAt: z.string().datetime(),
 });
 
+const limitStatusSchema = z.enum(['limited', 'unlimited', 'unknown']);
+
 /** Total tokens consumed in each rolling window, read live from local CLI transcripts. */
 const localTokenUsageSchema = z.object({
   fiveHour: z.number(),
@@ -23,10 +25,13 @@ export const usageHistoryPointSchema = z.object({
 export type UsageHistoryPoint = z.infer<typeof usageHistoryPointSchema>;
 
 export const aiUsageToolSchema = z.object({
-  /** False when the local CLI has not supplied a current limit snapshot. */
+  /** False when neither a current quota report nor local usage data is available. */
   available: z.boolean(),
   fiveHour: rateLimitSchema.optional(),
   weekly: rateLimitSchema.optional(),
+  /** Whether each quota window is enforced, temporarily absent, or not reported. */
+  fiveHourStatus: limitStatusSchema.default('unknown'),
+  weeklyStatus: limitStatusSchema.default('unknown'),
   tokens: localTokenUsageSchema.optional(),
   /** When this snapshot was actually captured — may lag `fetchedAt` when serving a cached reading. */
   asOf: z.string().datetime().optional(),

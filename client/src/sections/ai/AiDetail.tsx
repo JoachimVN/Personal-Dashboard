@@ -22,6 +22,27 @@ function TokenRow({ label, tokens }: Readonly<{ label: string; tokens: number }>
   );
 }
 
+function WindowUnavailable({
+  label,
+  status,
+  tokens,
+}: Readonly<{
+  label: string;
+  status: AiUsageToolData['fiveHourStatus'];
+  tokens?: number;
+}>) {
+  if (status === 'unlimited') {
+    return (
+      <div className="flex items-baseline text-xs">
+        <span className="text-ink-muted">{label}</span>
+        <span className="ml-auto font-semibold text-emerald-400">Temporarily unlimited</span>
+        {tokens !== undefined && <span className="ml-2 tabular-nums text-ink-faint">{formatCompactNumber(tokens)} tokens</span>}
+      </div>
+    );
+  }
+  return tokens !== undefined ? <TokenRow label={label} tokens={tokens} /> : null;
+}
+
 function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; color: string }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
@@ -54,7 +75,7 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
                   windowMs={FIVE_HOUR_MS}
                 />
               ) : (
-                data.tokens && <TokenRow label="5 hours" tokens={data.tokens.fiveHour} />
+                <WindowUnavailable label="5 hours" status={data.fiveHourStatus} tokens={data.tokens?.fiveHour} />
               )}
               {data.weekly ? (
                 <UsageMeter
@@ -65,7 +86,7 @@ function ToolCard({ id, label, color }: Readonly<{ id: string; label: string; co
                   windowMs={WEEKLY_MS}
                 />
               ) : (
-                data.tokens && <TokenRow label="Weekly" tokens={data.tokens.weekly} />
+                <WindowUnavailable label="Weekly" status={data.weeklyStatus} tokens={data.tokens?.weekly} />
               )}
               {(data.fiveHour || data.weekly) && (
                 <>

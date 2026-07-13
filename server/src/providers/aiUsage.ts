@@ -10,6 +10,7 @@ import type { UsageHistoryStore } from '../usageHistory.js';
 
 /** What the snapshot readers produce; the provider fetch adds the store-managed `history`. */
 type UsageSnapshot = Omit<AiUsageToolData, 'history'>;
+type LimitStatus = AiUsageToolData['fiveHourStatus'];
 
 const codexLimitSchema = z.object({
   used_percent: z.number(),
@@ -38,6 +39,11 @@ function limit(usedPercent: number, resetsAt: number | string) {
     usedPercent: Math.max(0, Math.min(100, usedPercent)),
     resetsAt: reset.toISOString(),
   };
+}
+
+export function limitStatus(hasLimit: boolean, hasQuotaReport: boolean): LimitStatus {
+  if (hasLimit) return 'limited';
+  return hasQuotaReport ? 'unlimited' : 'unknown';
 }
 
 async function jsonlFiles(directory: string): Promise<string[]> {
@@ -69,9 +75,14 @@ type TimestampedCodexLimit = { timestamp: string; entry: z.infer<typeof codexLim
 interface CodexLimits {
   fiveHour?: TimestampedCodexLimit;
   weekly?: TimestampedCodexLimit;
+  latestReport?: { timestamp: string; buckets: Array<'fiveHour' | 'weekly'> };
 }
 
-function recordLatestLimit(limits: CodexLimits, timestamp: string, entry: z.infer<typeof codexLimitSchema>): void {
+function recordLatestLimit(
+  limits: CodexLimits,
+  timestamp: string,
+  entry: z.infer<typeof codexLimitSchema>,
+): 'fiveHour' | 'weekly' | undefined {
   const bucket = windowBucket(entry.window_minutes);
   if (bucket === 'fiveHour' && (!limits.fiveHour || timestamp > limits.fiveHour.timestamp)) {
     limits.fiveHour = { timestamp, entry };
@@ -79,15 +90,23 @@ function recordLatestLimit(limits: CodexLimits, timestamp: string, entry: z.infe
   if (bucket === 'weekly' && (!limits.weekly || timestamp > limits.weekly.timestamp)) {
     limits.weekly = { timestamp, entry };
   }
+  return bucket;
 }
 
 function readCodexLimits(lines: string[], limits: CodexLimits): void {
   for (const line of lines) {
     try {
       const event = codexEventSchema.parse(JSON.parse(line));
-      const entries = [event.payload.rate_limits?.primary, event.payload.rate_limits?.secondary];
-      for (const entry of entries) {
-        if (entry) recordLatestLimit(limits, event.timestamp, entry);
+      const rateLimits = event.payload.rate_limits;
+      if (!rateLimits) continue;
+      const entries = [rateLimits.primary, rateLimits.secondary];
+      const buckets = entries.flatMap((entry) => {
+        if (!entry) return [];
+        const bucket = recordLatestLimit(limits, event.timestamp, entry);
+        return bucket ? [bucket] : [];
+      });
+      if (!limits.latestReport || event.timestamp > limits.latestReport.timestamp) {
+        limits.latestReport = { timestamp: event.timestamp, buckets };
       }
     } catch {
       // Session streams also contain unrelated messages; ignore malformed/irrelevant lines.
@@ -99,11 +118,10 @@ function readCodexLimits(lines: string[], limits: CodexLimits): void {
  * Codex appends the live account limits to its local session event stream. Read only the newest
  * few logs: limits are account-wide and a current session always writes into the latest files.
  *
- * Which window rides in `primary` vs `secondary` isn't fixed — Codex has been seen reporting just
- * the weekly window under `primary` with `secondary: null` when the 5-hour window isn't part of a
- * given update. So classify each entry by its own `window_minutes` instead of trusting the slot,
- * and track the newest fiveHour/weekly reading independently — one window being briefly absent from
- * an event shouldn't blank out the other.
+ * Which window rides in `primary` vs `secondary` isn't fixed, so classify entries by
+ * `window_minutes` rather than trusting the slot. The latest rate-limit event is authoritative:
+ * if it omits a window, the dashboard reports that window as temporarily unlimited instead of
+ * showing a stale cap from an older session event.
  */
 async function codexSnapshot(): Promise<UsageSnapshot> {
   const sessionsDir = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
@@ -116,16 +134,24 @@ async function codexSnapshot(): Promise<UsageSnapshot> {
       readCodexLimits(lines, latest);
     }
 
-    const fiveHour = latest.fiveHour && limit(latest.fiveHour.entry.used_percent, latest.fiveHour.entry.resets_at);
-    const weekly = latest.weekly && limit(latest.weekly.entry.used_percent, latest.weekly.entry.resets_at);
-    const newestTimestamp = [latest.fiveHour?.timestamp, latest.weekly?.timestamp]
-      .filter((value): value is string => Boolean(value))
-      .sort((a, b) => a.localeCompare(b))
-      .at(-1);
-    const asOf = newestTimestamp && asIso(newestTimestamp);
-    return { available: Boolean(fiveHour || weekly), fiveHour, weekly, asOf };
+    const hasQuotaReport = Boolean(latest.latestReport);
+    const fiveHour = latest.latestReport?.buckets.includes('fiveHour')
+      ? latest.fiveHour && limit(latest.fiveHour.entry.used_percent, latest.fiveHour.entry.resets_at)
+      : undefined;
+    const weekly = latest.latestReport?.buckets.includes('weekly')
+      ? latest.weekly && limit(latest.weekly.entry.used_percent, latest.weekly.entry.resets_at)
+      : undefined;
+    const asOf = latest.latestReport && asIso(latest.latestReport.timestamp);
+    return {
+      available: hasQuotaReport,
+      fiveHour,
+      weekly,
+      fiveHourStatus: limitStatus(Boolean(fiveHour), hasQuotaReport),
+      weeklyStatus: limitStatus(Boolean(weekly), hasQuotaReport),
+      asOf,
+    };
   } catch {
-    return { available: false };
+    return { available: false, fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
   }
 }
 
@@ -197,7 +223,7 @@ async function claudeTokenTotals(): Promise<{ fiveHour: number; weekly: number }
   return { fiveHour, weekly };
 }
 
-type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'asOf'>;
+type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>;
 
 const execFileAsync = promisify(execFile);
 
@@ -206,6 +232,7 @@ const MONTH_ABBREVIATIONS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'a
 /** `claude -p "/usage"` prints e.g. "Current session: 41% used · resets Jul 13 at 1:59am (Europe/Oslo)". */
 const SESSION_LINE = /Current session:\s*(\d+)%\s*used.*?resets\s+([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
 const WEEKLY_LINE = /Current week \(all models\):\s*(\d+)%\s*used.*?resets\s+([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
+const NO_LIMITS_LINE = /(?:no\s+(?:active\s+)?(?:usage\s+)?limits?|unlimited|limits?\s+(?:are\s+)?(?:not\s+(?:currently\s+)?enforced|temporarily\s+(?:disabled|removed|lifted)))/i;
 
 const cliResultSchema = z.object({
   is_error: z.boolean(),
@@ -259,14 +286,23 @@ async function claudeCliUsageSnapshot(): Promise<ClaudeQuota> {
       env: { ...cleanEnv, PATH: `${localBin}:${cleanEnv.PATH ?? ''}` },
     });
     const parsed = cliResultSchema.parse(JSON.parse(stdout));
-    if (parsed.is_error || !parsed.result) return {};
+    if (parsed.is_error || !parsed.result) {
+      return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+    }
     const fiveHour = parseLine(parsed.result, SESSION_LINE);
     const weekly = parseLine(parsed.result, WEEKLY_LINE);
-    return { fiveHour, weekly, asOf: fiveHour || weekly ? new Date().toISOString() : undefined };
+    const hasQuotaReport = Boolean(fiveHour || weekly || NO_LIMITS_LINE.test(parsed.result));
+    return {
+      fiveHour,
+      weekly,
+      fiveHourStatus: limitStatus(Boolean(fiveHour), hasQuotaReport),
+      weeklyStatus: limitStatus(Boolean(weekly), hasQuotaReport),
+      asOf: hasQuotaReport ? new Date().toISOString() : undefined,
+    };
   } catch {
     // Do not log stdout: the usage report includes account-specific numbers.
     console.warn('[ai-usage] Claude CLI usage snapshot unavailable');
-    return {};
+    return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
   }
 }
 
@@ -280,9 +316,11 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
     fetch: async () => {
       const [tokenTotals, quota] = await Promise.all([claudeTokenTotals(), claudeCliUsageSnapshot()]);
       const snapshot: UsageSnapshot = {
-        available: Boolean(quota.fiveHour || quota.weekly || tokenTotals.fiveHour || tokenTotals.weekly),
+        available: Boolean(quota.asOf || tokenTotals.fiveHour || tokenTotals.weekly),
         fiveHour: quota.fiveHour,
         weekly: quota.weekly,
+        fiveHourStatus: quota.fiveHourStatus,
+        weeklyStatus: quota.weeklyStatus,
         tokens: tokenTotals,
         asOf: quota.asOf ?? new Date().toISOString(),
       };

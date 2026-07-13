@@ -7,6 +7,8 @@ const persistedSnapshotSchema = z.object({
   available: z.boolean(),
   fiveHour: z.object({ usedPercent: z.number(), resetsAt: z.string() }).optional(),
   weekly: z.object({ usedPercent: z.number(), resetsAt: z.string() }).optional(),
+  fiveHourStatus: z.enum(['limited', 'unlimited', 'unknown']).optional(),
+  weeklyStatus: z.enum(['limited', 'unlimited', 'unknown']).optional(),
   tokens: z.object({ fiveHour: z.number(), weekly: z.number() }).optional(),
   asOf: z.string().optional(),
 });
