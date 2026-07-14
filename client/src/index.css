@@ -234,6 +234,15 @@ a {
   background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
 }
 
+.command-agenda {
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.command-agenda:hover {
+  background: light-dark(rgb(255 255 255 / 0.52), rgb(2 5 10 / 0.34));
+  border-color: color-mix(in oklab, var(--color-ink) 12%, var(--color-card-border));
+}
+
 .command-primary {
   min-width: 0;
   border-radius: 1.4rem;
@@ -360,6 +369,11 @@ a {
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-ink-muted);
+  transition: color 160ms ease;
+}
+
+.command-agenda-heading a:hover {
+  color: var(--color-ink);
 }
 
 .command-agenda-list {
