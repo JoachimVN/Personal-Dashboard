@@ -14,7 +14,7 @@
   /* Text hierarchy */
   --color-ink: light-dark(#111827, #f1f3f7);
   --color-ink-muted: light-dark(#667085, #9ba3b4);
-  --color-ink-faint: light-dark(#94a3b8, #64748b);
+  --color-ink-faint: light-dark(#718096, #64748b);
 
   /* Section accents */
   --color-accent-ai: light-dark(#7456e8, #a995ff);
@@ -131,8 +131,15 @@ a {
   opacity: 0.6;
 }
 
+/* The hero text sits directly on the sky wash with no card behind it — unlike everywhere
+   else, so contrast against it varies with the time-of-day color. A soft halo (no-op in
+   dark mode, where light text on the wash already contrasts fine regardless of hue) keeps
+   it legible without touching the wash colors themselves. */
 .dashboard-hero {
   padding: 0.25rem 0.25rem 1.75rem;
+  text-shadow:
+    0 1px 3px light-dark(rgb(255 255 255 / 0.85), transparent),
+    0 0 22px light-dark(rgb(255 255 255 / 0.65), transparent);
 }
 
 .hero-title {
