@@ -233,10 +233,10 @@ export class SpotifyHistoryStore {
     if (changed) this.save();
   }
 
-  /** Album ids missing a full duration — one fetch per id (see providers/spotify.ts). One-time per album; static metadata never needs refetching. */
+  /** Album ids missing duration or track count — one fetch per id (see providers/spotify.ts). Gated on both fields so an album enriched before totalTracks existed still gets revisited once. */
   getAlbumIdsNeedingDurations(limit: number): string[] {
     return Object.values(this.albums)
-      .filter((album) => album.totalDurationMs === undefined)
+      .filter((album) => album.totalDurationMs === undefined || album.totalTracks === undefined)
       .slice(0, limit)
       .map((album) => album.id);
   }

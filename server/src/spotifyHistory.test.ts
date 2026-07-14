@@ -141,6 +141,15 @@ describe('SpotifyHistoryStore', () => {
     expect(album).toMatchObject({ totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day' });
   });
 
+  it('keeps an album pending if it has a duration but is still missing totalTracks', () => {
+    const { store } = createStore();
+    store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]);
+    // Duration-only enrichment (as if from an older code path) leaves totalTracks unset.
+    store.enrichAlbumDetails([{ id: 'al1', totalDurationMs: 2_400_000, trackIds: [] }]);
+
+    expect(store.getAlbumIdsNeedingDurations(20)).toEqual(['al1']);
+  });
+
   it('self-heals albumId on stale track records via enrichAlbumDetails\' tracklist', () => {
     const { store } = createStore();
     // Simulate a pre-existing track record written before albumId existed.
