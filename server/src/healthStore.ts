@@ -16,19 +16,21 @@ interface HealthDayRow {
   updated_at: string;
 }
 
+// postgres.js returns SQL NULL as `null`, but the wire schema's metrics are optional
+// (undefined-only), not nullable — coalesce so an unset metric round-trips as absent.
 function toHealthDay(row: HealthDayRow): HealthDay {
   return {
     date: row.date,
-    steps: row.steps,
-    watchSteps: row.watch_steps,
-    phoneSteps: row.phone_steps,
-    activeEnergyKcal: row.active_energy_kcal,
-    exerciseMinutes: row.exercise_minutes,
-    standHours: row.stand_hours,
-    heartRate: row.heart_rate,
-    restingHeartRate: row.resting_heart_rate,
-    walkingHeartRate: row.walking_heart_rate,
-    bloodOxygenPercent: row.blood_oxygen_percent,
+    steps: row.steps ?? undefined,
+    watchSteps: row.watch_steps ?? undefined,
+    phoneSteps: row.phone_steps ?? undefined,
+    activeEnergyKcal: row.active_energy_kcal ?? undefined,
+    exerciseMinutes: row.exercise_minutes ?? undefined,
+    standHours: row.stand_hours ?? undefined,
+    heartRate: row.heart_rate ?? undefined,
+    restingHeartRate: row.resting_heart_rate ?? undefined,
+    walkingHeartRate: row.walking_heart_rate ?? undefined,
+    bloodOxygenPercent: row.blood_oxygen_percent ?? undefined,
   };
 }
 
