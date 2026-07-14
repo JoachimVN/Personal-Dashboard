@@ -9,26 +9,36 @@ import { SystemFooter } from './components/SystemFooter';
 import { DailyCommandCenter } from './components/DailyCommandCenter';
 import { ThemeToggle } from './components/ThemeToggle';
 
-/** Fixed decorative layer the glass cards blur against — accent-tinted glow blobs on the canvas. */
+type DayPart = 'night' | 'morning' | 'day' | 'evening';
+
+function dayPartFor(hour: number): DayPart {
+  if (hour < 6) return 'night';
+  if (hour < 11) return 'morning';
+  if (hour < 18) return 'day';
+  if (hour < 22) return 'evening';
+  return 'night';
+}
+
+/** Fixed decorative layer the glass cards blur against — a sky wash that shifts with the actual
+    time of day, so the color has a reason to be there instead of just sitting for decoration. */
 function BackgroundGlow() {
+  const now = useCurrentTime();
   return (
-    <div aria-hidden className="ambient-canvas pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas">
-      <div className="ambient-orb ambient-orb--one" />
-      <div className="ambient-orb ambient-orb--two" />
-      <div className="ambient-orb ambient-orb--three" />
-      <div className="ambient-grid" />
-      <div className="ambient-noise" />
+    <div
+      aria-hidden
+      data-daypart={dayPartFor(now.getHours())}
+      className="ambient-canvas pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas"
+    >
+      <div className="ambient-aurora" />
     </div>
   );
 }
 
-/** Green gradient wash + spotlights behind the whole page, only while the Spotify section is open. */
+/** Green color wash behind the whole page, only while the Spotify section is open. */
 function SpotifyGlow() {
   return (
     <div aria-hidden className="spotify-page-glow">
-      <div className="spotify-page-orb spotify-page-orb--one" />
-      <div className="spotify-page-orb spotify-page-orb--two" />
-      <div className="spotify-page-orb spotify-page-orb--three" />
+      <div className="spotify-page-aurora" />
     </div>
   );
 }
