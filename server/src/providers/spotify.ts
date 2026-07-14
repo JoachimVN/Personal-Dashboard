@@ -7,6 +7,7 @@ import type { Provider } from '../scheduler.js';
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const API = 'https://api.spotify.com/v1';
 const TOP_DATA_REFRESH_MS = 15 * 60_000;
+const TOP_TRACK_HISTORY_LIMIT = 500;
 const DEFAULT_RATE_LIMIT_RETRY_MS = 30_000;
 
 // Raw Spotify shapes (only the fields we read).
@@ -61,6 +62,7 @@ interface TopData {
   artistsMedium: RawArtist[];
   tracksShort: RawTrack[];
   tracksMedium: RawTrack[];
+  tracksLong: RawTrack[];
 }
 
 const firstImage = (images?: RawImage[]) => images?.[0]?.url;
@@ -233,17 +235,19 @@ export function createSpotifyProvider(
 
         let topDataRefreshed = false;
         if (!topData || Date.now() - topDataFetchedAt >= TOP_DATA_REFRESH_MS) {
-          const [artistsShort, artistsMedium, tracksShort, tracksMedium] = await Promise.all([
+          const [artistsShort, artistsMedium, tracksShort, tracksMedium, tracksLong] = await Promise.all([
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8'),
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8'),
-            getTopTracks(get, 'short_term', 100),
-            getTopTracks(get, 'medium_term', 100),
+            getTopTracks(get, 'short_term', TOP_TRACK_HISTORY_LIMIT),
+            getTopTracks(get, 'medium_term', TOP_TRACK_HISTORY_LIMIT),
+            getTopTracks(get, 'long_term', TOP_TRACK_HISTORY_LIMIT),
           ]);
           topData = {
             artistsShort: artistsShort?.items ?? [],
             artistsMedium: artistsMedium?.items ?? [],
             tracksShort,
             tracksMedium,
+            tracksLong,
           };
           topDataFetchedAt = Date.now();
           topDataRefreshed = true;
@@ -252,13 +256,17 @@ export function createSpotifyProvider(
         // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
         // aren't empty on day one — real observed plays accrue on top from here.
         if (!await historyStore.isSeeded()) {
-          const [artistsLong, tracksLong] = await Promise.all([
+          const [artistsLong] = await Promise.all([
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50'),
-            getTopTracks(get, 'long_term', 100),
           ]);
           await historyStore.seedIfNeeded({
             artists: (artistsLong?.items ?? []).map(mapArtist),
-            tracks: tracksLong.map(toPlayedTrackInput).filter((t): t is PlayedTrackInput => t !== undefined),
+            // The existing all-time view intentionally starts with a bounded rank-weighted seed.
+            // The remaining long-term top items are catalogued below at playCount 0 instead.
+            tracks: topData.tracksLong
+              .slice(0, 100)
+              .map(toPlayedTrackInput)
+              .filter((t): t is PlayedTrackInput => t !== undefined),
           });
         }
 
@@ -305,7 +313,12 @@ export function createSpotifyProvider(
             [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
           );
           await historyStore.healTrackMetadata(
-            [...topData.tracksShort, ...topData.tracksMedium]
+            [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
+              .map(toPlayedTrackInput)
+              .filter((t): t is PlayedTrackInput => t !== undefined),
+          );
+          await historyStore.discoverTracks(
+            [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
               .map(toPlayedTrackInput)
               .filter((t): t is PlayedTrackInput => t !== undefined),
           );
@@ -332,8 +345,10 @@ export function createSpotifyProvider(
             mediumTerm: topData.artistsMedium.map(mapArtist),
           },
           topTracks: {
-            shortTerm: topData.tracksShort.map(mapTrack),
-            mediumTerm: topData.tracksMedium.map(mapTrack),
+            // The UI remains a focused top-100 view; the full 500-per-window catalogue persists
+            // server-side and never inflates every widget response.
+            shortTerm: topData.tracksShort.slice(0, 100).map(mapTrack),
+            mediumTerm: topData.tracksMedium.slice(0, 100).map(mapTrack),
           },
           allTime: await historyStore.getAllTime(),
         };

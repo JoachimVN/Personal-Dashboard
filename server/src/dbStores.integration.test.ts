@@ -8,7 +8,10 @@ import { SpotifyHistoryStore } from './spotifyHistory.js';
 import { SignalHistoryStore } from './signalHistory.js';
 
 const databaseUrl = process.env.DATABASE_URL_TEST;
-const describeDatabase = databaseUrl ? describe : describe.skip;
+// These tests truncate their database between cases. Refuse to run if a shell has pointed the
+// test URL at the dashboard's live DATABASE_URL (for example via a broad `source .env`).
+const isIsolatedDatabase = Boolean(databaseUrl) && databaseUrl !== process.env.DATABASE_URL;
+const describeDatabase = isIsolatedDatabase ? describe : describe.skip;
 let database: Database;
 
 async function clearDatabase() {
@@ -56,6 +59,16 @@ describeDatabase('Postgres stores', () => {
     await history.recordPlays([{ playedAt: '2026-07-13T12:00:00.000Z', track }]);
     expect((await new SpotifyHistoryStore(database).getAllTime(10, 0)).tracks[0]).toMatchObject({ id: 'track-1', playCount: 1 });
   }, 20_000);
+
+  it('stores discovered top-list tracks without treating affinity as a play', async () => {
+    const history = new SpotifyHistoryStore(database);
+    const discovered = { id: 'track-top', name: 'Top song', artists: [{ id: 'artist-top', name: 'Top artist' }], album: { id: 'album-top', name: 'Top album' } };
+    await history.discoverTracks([discovered]);
+    expect(await database.client`select id, play_count from spotify_tracks`).toEqual([
+      { id: 'track-top', play_count: 0 },
+    ]);
+    expect((await history.getAllTime(10, 0)).tracks).toEqual([]);
+  });
 
   it('records signal history only when a value genuinely changes', async () => {
     const signals = new SignalHistoryStore(database);

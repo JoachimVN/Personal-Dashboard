@@ -261,6 +261,50 @@ export class SpotifyHistoryStore {
     this.save();
   }
 
+  /**
+   * Records tracks Spotify identifies as a current top-item without treating that affinity ranking
+   * as a real play. This keeps the catalogue complete across the API's top-list windows while the
+   * all-time leaderboard remains based only on observed plays, the long-term seed, or verified
+   * stream counts.
+   */
+  async discoverTracks(tracks: PlayedTrackInput[]): Promise<void> {
+    await this.withWrite(() => this.discoverTracksInMemory(tracks));
+  }
+
+  private discoverTracksInMemory(tracks: PlayedTrackInput[]): void {
+    let changed = false;
+    for (const track of tracks) {
+      if (this.tracks[track.id]) continue;
+      this.tracks[track.id] = {
+        id: track.id,
+        track: track.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        artistIds: track.artists.map((a) => a.id),
+        album: track.album.name,
+        albumId: track.album.id,
+        releaseDate: track.album.releaseDate,
+        durationMs: track.durationMs,
+        imageUrl: track.album.imageUrl,
+        url: track.url,
+        playCount: 0,
+      };
+      for (const artist of track.artists) this.upsertArtistMetadata(artist);
+      this.upsertAlbumMetadata({
+        id: track.album.id,
+        name: track.album.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        imageUrl: track.album.imageUrl,
+        url: track.album.url,
+        releaseDate: track.album.releaseDate,
+        releaseDatePrecision: track.album.releaseDatePrecision,
+        totalTracks: track.album.totalTracks,
+        albumType: track.album.albumType,
+      });
+      changed = true;
+    }
+    if (changed) this.save();
+  }
+
   /** Records newly-observed plays (played_at newer than the last one processed) from a recentlyPlayed page. */
   async recordPlays(entries: { playedAt: string; track: PlayedTrackInput }[]): Promise<void> {
     await this.withWrite(() => this.recordPlaysInMemory(entries));
@@ -551,7 +595,7 @@ export class SpotifyHistoryStore {
           groupTracks,
         };
       })
-      .filter(({ trackedCount }) => trackedCount >= minTrackedTracksPerAlbum)
+      .filter(({ trackedCount, playCount }) => trackedCount >= minTrackedTracksPerAlbum && playCount > 0)
       .sort((a, b) => b.playCount - a.playCount)
       .slice(0, limit)
       .map(({ canonical, playCount, groupTracks }) => ({
@@ -571,7 +615,9 @@ export class SpotifyHistoryStore {
         .filter((artist) => artist.playCount > 0)
         .sort(byPlayCountDesc)
         .slice(0, limit),
-      tracks: allTracks.sort(byPlayCountDesc).slice(0, limit),
+      // A discovered top-item has no play count until we observe it or import a verified count.
+      // Keep it in Postgres, but never present affinity as a fabricated all-time play.
+      tracks: allTracks.filter((track) => track.playCount > 0).sort(byPlayCountDesc).slice(0, limit),
       albums,
     };
   }
