@@ -17,6 +17,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:import-json": "tsx scripts/importJsonToPostgres.ts",
     "seed:spotify-streams": "tsx scripts/seedSpotifyStreams.ts",
+    "screenshots": "tsx scripts/screenshots.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
