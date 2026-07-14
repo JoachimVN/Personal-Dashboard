@@ -309,7 +309,7 @@ function AlbumRow({ album, rank }: Readonly<{ album: Album; rank: number }>) {
     .join(' · ');
 
   return (
-    <li className="flex items-stretch gap-3 overflow-hidden rounded-2xl border border-card-border bg-track/25 transition hover:bg-track/45">
+    <li className="flex items-stretch gap-3 overflow-hidden rounded-r-2xl border border-card-border bg-track/25 transition hover:bg-track/45">
       <div className="relative w-20 shrink-0 sm:w-24">
         {album.imageUrl ? (
           <img src={album.imageUrl} alt="" className="h-full w-full object-cover" />
