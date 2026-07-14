@@ -163,8 +163,8 @@ a {
   margin-bottom: -0.14em;
   background: linear-gradient(
     115deg,
-    color-mix(in oklab, var(--sky-a) 24%, var(--color-ink)),
-    color-mix(in oklab, var(--sky-b) 24%, var(--color-ink))
+    color-mix(in oklab, var(--sky-a) 24%, light-dark(#000, var(--color-ink))),
+    color-mix(in oklab, var(--sky-b) 24%, light-dark(#000, var(--color-ink)))
   );
   background-clip: text;
   -webkit-background-clip: text;
