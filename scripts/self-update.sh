@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Fast-forwards the deploy clone to origin/main and restarts the dashboard, but only
 # when main actually moved — so the phone picks up a merge to main without anyone
-# touching the Mac. Polled by the dev.joavn.personal-dashboard-update launchd agent.
+# touching the Mac. Polled by the local.personal-dashboard-update launchd agent.
 #
 # install-launchd.sh copies this next to the deploy clone and points launchd at the
 # copy, not at this file: a run that git-resets the checkout out from under the shell
@@ -11,7 +11,7 @@ set -euo pipefail
 
 ROOT="${PD_ROOT:-$HOME/.local/share/personal-dashboard}"
 DEPLOY_DIR="$ROOT/repo"
-LABEL="dev.joavn.personal-dashboard"
+LABEL="local.personal-dashboard"
 
 cd "$DEPLOY_DIR"
 
