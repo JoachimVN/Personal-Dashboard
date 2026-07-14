@@ -152,25 +152,7 @@ export function AiDetail() {
         title={<>Context and<br /><span className="text-ink-faint">usage limits.</span></>}
         description="How much of your AI usage allowance is left, and how fast you're using it."
         accent="var(--color-accent-ai)"
-      >
-        <div className="detail-signal-panel">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-ink-muted">Context</span>
-          </div>
-          <div className="mt-6 flex items-end gap-1.5" aria-hidden>
-            {[32, 54, 40, 72, 58, 88, 64, 78, 46, 68, 52, 82].map((height, index) => (
-              <motion.span
-                key={index}
-                className="flex-1 rounded-full bg-(--color-accent-ai)"
-                initial={{ height: 4 }}
-                animate={{ height }}
-                transition={{ delay: 0.18 + index * 0.025, type: 'spring', stiffness: 180, damping: 20 }}
-                style={{ opacity: 0.22 + index * 0.035 }}
-              />
-            ))}
-          </div>
-        </div>
-      </DetailIntro>
+      />
       <DetailSectionHeading label="Allowance" title="Usage by tool" detail="Context usage is read locally. Account quota updates on a slower cadence." />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {AI_TOOLS.map((tool) => <ToolCard key={tool.id} {...tool} />)}
