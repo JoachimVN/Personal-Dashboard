@@ -1,6 +1,13 @@
 # Personal Dashboard
 
-One glanceable page for life + dev: weather, calendar, email, GitHub, and AI usage. Runs locally on your own machine (Mac or Windows); your phone reaches it privately over [Tailscale](https://tailscale.com).
+One glanceable page for life + dev: weather, calendar, email, GitHub, and AI usage. Runs locally on
+your own machine (macOS or Windows) and is just a web app at `localhost:4821` — open it in a browser
+and you're done.
+
+Everything beyond that is optional. [Tailscale](https://tailscale.com) is only needed to reach it
+*from your phone*; without it the dashboard works fine on the machine it runs on. Individual widgets
+have their own requirements — iMessage is macOS-only, Health needs an iPhone Shortcut — and any
+widget you don't configure simply shows as "not configured" rather than breaking the page.
 
 ## Stack
 
@@ -34,11 +41,29 @@ npm start
 
 ## Run at login
 
-**macOS** — installs (or refreshes) a launchd agent that builds the client and keeps `npm start` running:
+**macOS** — installs a launchd agent that keeps `npm start` running and restarts it at login:
 
 ```bash
 ./scripts/install-launchd.sh
 ```
+
+Production runs from its own **deploy clone** (`~/.local/share/personal-dashboard/repo`), not from
+your working copy, so a dirty tree or a WIP branch can't take down the dashboard your phone is
+looking at. Credentials and fetched data (`.env`, `config.json`, `.tokens/`, `.data/`) are moved once
+into `~/.local/share/personal-dashboard/state` and symlinked into both checkouts, so the two share a
+single set of OAuth tokens — keeping two copies would mean two clients refreshing the same grant, and
+Spotify and Hue rotate refresh tokens on use, so one copy would eventually be left with a dead token.
+
+Opt in to auto-update and a second agent polls your `origin/main` every 5 minutes, fast-forwards the
+deploy clone and restarts — so merging to `main` updates the dashboard on your phone by itself:
+
+```bash
+PD_AUTO_UPDATE=1 ./scripts/install-launchd.sh     # PD_UPDATE_INTERVAL=300 to change the cadence
+```
+
+It only ever fast-forwards to your own `origin/main`, and nothing listens for inbound connections —
+GitHub never reaches into your machine. Re-run the installer to pick up changes to the scripts
+themselves; the running updater is a copy taken outside the clone it resets.
 
 **Windows** — two options:
 
