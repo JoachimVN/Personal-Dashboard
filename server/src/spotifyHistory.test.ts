@@ -94,6 +94,22 @@ describe('SpotifyHistoryStore', () => {
     expect(store.getAllTime().albums).toEqual([]);
   });
 
+  it('keeps Trilogy even though Spotify tags it album_type=compilation', () => {
+    const { store } = createStore();
+    store.recordPlays([
+      {
+        playedAt: '2026-01-01T00:00:00Z',
+        track: track({ id: 't1', album: { id: '5EbpxRwbbpCJUepbqVTZ1U', name: 'Trilogy', albumType: 'compilation' } }),
+      },
+      {
+        playedAt: '2026-01-02T00:00:00Z',
+        track: track({ id: 't2', name: 'Track Two', album: { id: '5EbpxRwbbpCJUepbqVTZ1U', name: 'Trilogy', albumType: 'compilation' } }),
+      },
+    ]);
+
+    expect(store.getAllTime().albums).toEqual([expect.objectContaining({ id: '5EbpxRwbbpCJUepbqVTZ1U' })]);
+  });
+
   it('backfills missing artist image/url/genres via mergeArtistMetadata without overwriting existing values', () => {
     const { store } = createStore();
     store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]);

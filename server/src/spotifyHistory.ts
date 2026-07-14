@@ -13,6 +13,15 @@ const TOP_LIMIT = 100;
  */
 const MIN_TRACKED_TRACKS_PER_ALBUM = 2;
 
+/**
+ * Album ids that Spotify tags album_type=compilation but that are really a real release someone
+ * listens to as an album, not a scattered hits collection — excluded from the compilation filter.
+ * Spotify id, not name, since names collide across artists/reissues.
+ */
+const COMPILATION_TYPE_OVERRIDES = new Set([
+  '5EbpxRwbbpCJUepbqVTZ1U', // Trilogy (The Weeknd) — bundles three early mixtapes into one official release
+]);
+
 const trackRecordSchema = z.object({
   id: z.string(),
   track: z.string(),
@@ -399,7 +408,7 @@ export class SpotifyHistoryStore {
         .slice(0, limit),
       tracks: allTracks.sort(byPlayCountDesc).slice(0, limit),
       albums: Object.values(this.albums)
-        .filter((album) => album.albumType !== 'compilation')
+        .filter((album) => album.albumType !== 'compilation' || COMPILATION_TYPE_OVERRIDES.has(album.id))
         .filter((album) => (trackedTrackCountByAlbum.get(album.id) ?? 0) >= minTrackedTracksPerAlbum)
         .map((album) => ({ ...album, playCount: albumPlayCounts.get(album.id) ?? 0 }))
         .sort(byPlayCountDesc)
