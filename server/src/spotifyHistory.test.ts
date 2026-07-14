@@ -75,16 +75,23 @@ describe('SpotifyHistoryStore', () => {
     expect(allTime.albums.map((a) => a.id)).toEqual(['al2', 'al1']);
   });
 
-  it('excludes albums until at least 3 distinct tracks from them have been tracked', () => {
+  it('excludes albums until at least 2 distinct tracks from them have been tracked', () => {
     const { store } = createStore();
-    store.recordPlays([
-      { playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1' }) },
-      { playedAt: '2026-01-02T00:00:00Z', track: track({ id: 't2', name: 'Track Two' }) },
-    ]);
+    store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1' }) }]);
     expect(store.getAllTime().albums).toEqual([]);
 
-    store.recordPlays([{ playedAt: '2026-01-03T00:00:00Z', track: track({ id: 't3', name: 'Track Three' }) }]);
+    store.recordPlays([{ playedAt: '2026-01-02T00:00:00Z', track: track({ id: 't2', name: 'Track Two' }) }]);
     expect(store.getAllTime().albums).toEqual([expect.objectContaining({ id: 'al1' })]);
+  });
+
+  it('excludes compilations from top albums, e.g. a greatest-hits collection', () => {
+    const { store } = createStore();
+    store.recordPlays([
+      { playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1', album: { id: 'al1', name: 'The Highlights', albumType: 'compilation' } }) },
+      { playedAt: '2026-01-02T00:00:00Z', track: track({ id: 't2', name: 'Track Two', album: { id: 'al1', name: 'The Highlights', albumType: 'compilation' } }) },
+    ]);
+
+    expect(store.getAllTime().albums).toEqual([]);
   });
 
   it('backfills missing artist image/url/genres via mergeArtistMetadata without overwriting existing values', () => {
@@ -148,7 +155,7 @@ describe('SpotifyHistoryStore', () => {
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual(['al1']);
 
     store.enrichAlbumDetails([
-      { id: 'al1', totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day', trackIds: ['t1'] },
+      { id: 'al1', totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day', tracks: [{ id: 't1', artistIds: ['a1'] }] },
     ]);
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual([]);
     const [album] = store.getAllTime(100, 0).albums;
@@ -159,7 +166,7 @@ describe('SpotifyHistoryStore', () => {
     const { store } = createStore();
     store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]);
     // Duration-only enrichment (as if from an older code path) leaves totalTracks unset.
-    store.enrichAlbumDetails([{ id: 'al1', totalDurationMs: 2_400_000, trackIds: [] }]);
+    store.enrichAlbumDetails([{ id: 'al1', totalDurationMs: 2_400_000, tracks: [] }]);
 
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual(['al1']);
   });
@@ -191,13 +198,40 @@ describe('SpotifyHistoryStore', () => {
     expect(trackRecord).toMatchObject({ playCount: 302, verified: true });
   });
 
+  it('derives artist/album totals as the exact sum of their tracks\' playCounts, immune to drift across mixed write paths, crediting only the primary artist', () => {
+    const { store } = createStore();
+    // a1 is primary on both tracks, touched via three different write paths (seed, organic play,
+    // real-count import) — the old incrementally-bookkept approach could drift between the
+    // track-level and artist-level numbers across these; deriving can't. a2 only ever appears as
+    // a secondary/feature credit and should get zero credit toward "top artists".
+    store.seedIfNeeded({
+      artists: [{ id: 'a1', name: 'Artist One', genres: [] }],
+      tracks: [track({ id: 't1', artists: [{ id: 'a1', name: 'Artist One' }, { id: 'a2', name: 'Feature' }] })],
+    });
+    store.recordPlays([
+      { playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1', artists: [{ id: 'a1', name: 'Artist One' }, { id: 'a2', name: 'Feature' }] }) },
+      { playedAt: '2026-01-02T00:00:00Z', track: track({ id: 't2', name: 'Track Two', artists: [{ id: 'a1', name: 'Artist One' }] }) },
+    ]);
+    store.applyRealStreamCounts([{ track: track({ id: 't2', name: 'Track Two', artists: [{ id: 'a1', name: 'Artist One' }] }), streams: 50 }]);
+
+    const allTime = store.getAllTime();
+    const t1 = allTime.tracks.find((t) => t.id === 't1')!;
+    const t2 = allTime.tracks.find((t) => t.id === 't2')!;
+    const primary = allTime.artists.find((a) => a.id === 'a1')!;
+    expect(primary.playCount).toBe(t1.playCount + t2.playCount);
+    expect(allTime.artists.find((a) => a.id === 'a2')).toBeUndefined();
+
+    const album = allTime.albums.find((a) => a.id === 'al1')!;
+    expect(album.playCount).toBe(t1.playCount + t2.playCount);
+  });
+
   it('self-heals albumId on stale track records via enrichAlbumDetails\' tracklist', () => {
     const { store } = createStore();
     // Simulate a pre-existing track record written before albumId existed.
     store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1' }) }]);
 
     store.enrichAlbumDetails([
-      { id: 'al1', totalDurationMs: 1_000_000, trackIds: ['t1'] },
+      { id: 'al1', totalDurationMs: 1_000_000, tracks: [{ id: 't1', artistIds: ['a1'] }] },
     ]);
 
     const [album] = store.getAllTime(100, 0).albums;

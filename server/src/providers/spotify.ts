@@ -28,6 +28,7 @@ export interface RawTrack {
   album?: {
     id: string;
     name?: string;
+    album_type?: string;
     images?: RawImage[];
     release_date?: string;
     release_date_precision?: string;
@@ -40,7 +41,7 @@ interface RawAlbumDetail {
   id: string;
   total_tracks?: number;
   release_date_precision?: string;
-  tracks?: { items?: { id?: string; duration_ms?: number }[] };
+  tracks?: { items?: { id?: string; duration_ms?: number; artists?: { id: string }[] }[] };
 }
 interface CurrentlyPlaying {
   is_playing: boolean;
@@ -65,6 +66,10 @@ const firstImage = (images?: RawImage[]) => images?.[0]?.url;
 
 function toReleaseDatePrecision(precision?: string): 'year' | 'month' | 'day' | undefined {
   return precision === 'year' || precision === 'month' || precision === 'day' ? precision : undefined;
+}
+
+function toAlbumType(type?: string): 'album' | 'single' | 'compilation' | undefined {
+  return type === 'album' || type === 'single' || type === 'compilation' ? type : undefined;
 }
 
 function mapTrack(track: RawTrack) {
@@ -107,6 +112,7 @@ export function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefine
       releaseDate: track.album.release_date,
       releaseDatePrecision: toReleaseDatePrecision(track.album.release_date_precision),
       totalTracks: track.album.total_tracks,
+      albumType: toAlbumType(track.album.album_type),
     },
   };
 }
@@ -285,9 +291,9 @@ export function createSpotifyProvider(
               ),
               totalTracks: album.total_tracks,
               releaseDatePrecision: toReleaseDatePrecision(album.release_date_precision),
-              trackIds: (album.tracks?.items ?? [])
-                .map((t) => t.id)
-                .filter((id): id is string => id !== undefined),
+              tracks: (album.tracks?.items ?? [])
+                .filter((t): t is { id: string; duration_ms?: number; artists?: { id: string }[] } => t.id !== undefined)
+                .map((t) => ({ id: t.id, artistIds: (t.artists ?? []).map((a) => a.id) })),
             }));
           historyStore.enrichAlbumDetails(enrichments);
         }
