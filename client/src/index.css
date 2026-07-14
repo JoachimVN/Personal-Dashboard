@@ -125,24 +125,6 @@ a {
   padding: 0.25rem 0.25rem 1.75rem;
 }
 
-.live-indicator {
-  display: grid;
-  width: 1rem;
-  height: 1rem;
-  place-items: center;
-  border-radius: 999px;
-  background: color-mix(in oklab, #10b981 13%, transparent);
-}
-
-.live-indicator span {
-  width: 0.32rem;
-  height: 0.32rem;
-  border-radius: inherit;
-  background: #10b981;
-  box-shadow: 0 0 9px rgb(16 185 129 / 0.7);
-  animation: status-pulse 2.6s ease-in-out infinite;
-}
-
 .hero-title {
   max-width: 760px;
   font-size: clamp(2.5rem, 5.6vw, 4.8rem);
@@ -238,22 +220,6 @@ a {
   min-width: 0;
   border-radius: 1.4rem;
   padding: 1.25rem;
-}
-
-.command-status {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.625rem;
-  color: var(--color-ink-faint);
-}
-
-.command-status span {
-  width: 0.35rem;
-  height: 0.35rem;
-  border-radius: 999px;
-  background: #10b981;
-  box-shadow: 0 0 8px rgb(16 185 129 / 0.6);
 }
 
 .command-event-time {
@@ -700,10 +666,6 @@ a {
   to { transform: translate3d(-7vw, 5rem, 0) scale(0.94); }
 }
 
-@keyframes status-pulse {
-  50% { opacity: 0.55; transform: scale(0.78); }
-}
-
 @media (min-width: 1024px) {
   .command-layout {
     grid-template-columns: minmax(0, 1.75fr) minmax(18rem, 0.8fr);
@@ -784,7 +746,6 @@ a {
 
 @media (prefers-reduced-motion: reduce) {
   .ambient-orb,
-  .live-indicator span,
   .detail-intro-orb {
     animation: none;
   }

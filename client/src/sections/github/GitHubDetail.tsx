@@ -40,9 +40,9 @@ export function GitHubDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Build workspace"
-        title={<>Turn momentum<br /><span className="text-ink-faint">into shipped work.</span></>}
-        description="Capture the next move, launch a focused session, and keep a clean pulse on the work already in motion."
+        eyebrow="Build"
+        title={<>Issues, PRs<br /><span className="text-ink-faint">and quick actions.</span></>}
+        description="Capture an issue, launch a coding session, or check what's moving across your repos."
         accent="var(--color-accent-github)"
       >
         <GitHubSignals />

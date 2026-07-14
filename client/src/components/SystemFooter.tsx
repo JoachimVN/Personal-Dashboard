@@ -15,8 +15,7 @@ export function SystemFooter() {
   if (!data) return null;
 
   return (
-    <footer className="mt-7 flex flex-col items-center justify-between gap-2 border-t border-card-border px-1 pt-5 text-[11px] text-ink-faint sm:flex-row">
-      <span className="flex items-center gap-2"><i aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgb(16_185_129_/_0.7)]" />All systems operational</span>
+    <footer className="mt-7 flex items-center justify-center border-t border-card-border px-1 pt-5 text-[11px] text-ink-faint">
       <span>{data.hostname} · up {formatUptime(data.uptimeSeconds)} · {data.serverTime} {data.timezone}</span>
     </footer>
   );

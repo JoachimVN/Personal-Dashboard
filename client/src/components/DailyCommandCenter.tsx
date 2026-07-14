@@ -163,8 +163,8 @@ export function DailyCommandCenter() {
     <section className="command-center glass" aria-labelledby="command-center-title">
       <div className="command-center-head">
         <div>
-          <p className="command-eyebrow">Daily command center</p>
-          <h2 id="command-center-title" className="command-title">What deserves your attention</h2>
+          <p className="command-eyebrow">Overview</p>
+          <h2 id="command-center-title" className="command-title">What's next</h2>
         </div>
         <nav className="command-nav" aria-label="Dashboard sections">
           <a href="#/personal">Day</a>
@@ -176,10 +176,7 @@ export function DailyCommandCenter() {
 
       <div className="command-layout">
         <div className="command-primary">
-          <div className="flex items-center justify-between gap-4">
-            <p className="command-label">Next on deck</p>
-            <span className="command-status"><span aria-hidden /> Live overview</span>
-          </div>
+          <p className="command-label">Next on deck</p>
           {next ? (
             <div className="mt-5">
               <p className="command-event-time">{eventTiming(next, now)}</p>
