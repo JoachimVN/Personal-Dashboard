@@ -267,7 +267,11 @@ async function loadSpotify(): Promise<{ overview: SpotifyData; detail: SpotifyDa
 
 function healthDayFor(daysAgo: number, rng: () => number) {
   const date = new Date(Date.now() - daysAgo * 86_400_000);
-  const weekend = date.getDay() === 0 || date.getDay() === 6;
+  // A stable cyclical pattern, not date.getDay() — real weekday drifts by one position every time
+  // this script runs on a different calendar day, which reshuffled the *entire* RNG sequence
+  // below (weekend vs. weekday takes a different branch) and made the chart change on every run
+  // regardless of whether anything actually changed.
+  const weekend = daysAgo % 7 === 0 || daysAgo % 7 === 1;
   const roll = rng();
   // A real month has rest days, ordinary days, and the occasional big-activity day — not a
   // smooth wave. Weekends skew a bit lower on average but aren't uniformly quiet.
@@ -391,7 +395,9 @@ function contributionDays(rng: () => number) {
   const days: { date: string; count: number }[] = [];
   for (let i = 364; i >= 0; i--) {
     const date = new Date(Date.now() - i * 86_400_000);
-    const weekend = date.getDay() === 0 || date.getDay() === 6;
+    // A stable cyclical pattern, not date.getDay() — see healthDayFor's comment on why coupling
+    // this to the real weekday reshuffles the whole grid every time "today" rolls to a new day.
+    const weekend = i % 7 === 0 || i % 7 === 1;
     const roll = rng();
     let count: number;
     if (weekend) {

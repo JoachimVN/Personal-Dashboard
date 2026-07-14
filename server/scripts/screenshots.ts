@@ -2,17 +2,20 @@
 // overview (hero + command center) plus the Spotify, Health, AI usage, and GitHub detail pages.
 // The overview's command-center ranking runs through the *real* scoring code (importance/
 // sources.ts + rank.ts), so that page's output always matches actual behavior. Boots a throwaway
-// mock API on :4822, points a scratch Vite client dev server at it, and drives headless Chrome
-// over the DevTools protocol to capture each page.
+// mock API on :4822, points a scratch Vite client dev server at it, and drives headless Chromium
+// via Playwright to capture each page. Runs both locally (npm run screenshots -w server) and in
+// CI (.github/workflows/screenshots.yml) — Playwright handles browser provisioning on both.
 //
 // Usage: npm run screenshots -w server
 import 'dotenv/config';
 import { createServer, type Server } from 'node:http';
 import { spawn, execSync, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readdirSync, unlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chromium, type Page as PlaywrightPage } from 'playwright';
+import { PNG } from 'pngjs';
+import pixelmatch from 'pixelmatch';
 import type { WidgetEnvelope } from '@personal-dashboard/shared';
 import { rankCandidates } from '../src/importance/rank.js';
 import {
@@ -40,8 +43,14 @@ import {
 
 const MOCK_PORT = 4822;
 const CLIENT_PORT = 5199;
-const CDP_PORT = 9333;
 const GMAIL_STALE_MS = 24 * 60 * 60_000;
+const VIEWPORT = { width: 1600, height: 900 };
+
+// A capture only overwrites the committed PNG once more than this many pixels differ beyond the
+// per-pixel color threshold — trivial font-rendering/anti-aliasing jitter between runs shouldn't
+// produce a commit. Mirrors the Versed screenshot workflow this one is modeled on.
+const DIFF_PIXEL_THRESHOLD = 50;
+const COLOR_THRESHOLD = 0.1;
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(dirname, '../..');
@@ -62,10 +71,10 @@ const DAYPART_HOUR: Record<Daypart, [number, number]> = {
   night: [2, 0], morning: [8, 30], day: [14, 0], evening: [19, 30],
 };
 
-/** Mirrors the in-browser FakeDate script's target time — used so a widget envelope's fetchedAt
- * matches what the page's faked clock will think "now" is. Without this, anything computing
- * elapsed-since-fetch (the Now Playing progress bar, "Synced Xh ago" captions) measures against
- * the real generation time instead and renders nonsense once the browser clock is faked. */
+/** Mirrors the in-browser FakeDate init script's target time — used so a widget envelope's
+ * fetchedAt matches what the page's faked clock will think "now" is. Without this, anything
+ * computing elapsed-since-fetch (the Now Playing progress bar, "Synced Xh ago" captions) measures
+ * against the real generation time instead and renders nonsense once the browser clock is faked. */
 function referenceNow(daypart: Daypart): Date {
   const [hour, minute] = DAYPART_HOUR[daypart];
   const d = new Date();
@@ -211,53 +220,120 @@ function waitForHttp(url: string, timeoutMs: number): Promise<void> {
   });
 }
 
-interface CdpConnection {
-  send(method: string, params?: object): Promise<any>;
-  close(): void;
-}
-
-async function connectCdp(): Promise<CdpConnection> {
-  const targets = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, { method: 'PUT' })).json();
-  const ws = new WebSocket(targets.webSocketDebuggerUrl);
-  await new Promise<void>((resolve, reject) => {
-    ws.addEventListener('open', () => resolve(), { once: true });
-    ws.addEventListener('error', (event) => reject(event), { once: true });
-  });
-  let nextId = 1;
-  const pending = new Map<number, { resolve: (value: any) => void; reject: (err: any) => void }>();
-  ws.addEventListener('message', (event) => {
-    const message = JSON.parse(String(event.data));
-    if (message.id && pending.has(message.id)) {
-      const { resolve, reject } = pending.get(message.id)!;
-      pending.delete(message.id);
-      if (message.error) reject(new Error(message.error.message));
-      else resolve(message.result);
-    }
-  });
-  return {
-    send(method, params = {}) {
-      const id = nextId++;
-      return new Promise((resolve, reject) => {
-        pending.set(id, { resolve, reject });
-        ws.send(JSON.stringify({ id, method, params }));
-      });
-    },
-    close() {
-      ws.close();
-    },
-  };
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Runs before any of the page's own scripts, on every navigation in this browser context. Fakes
+ * Date so the ambient sky-wash daypart *and* the overview's "Good evening"/"Good morning" greeting
+ * (a separate client-side computation off the same clock) agree, regardless of what time this
+ * script actually runs at. Only the hour/minute move; the calendar date stays real, so the
+ * fixture's "tomorrow"/"Friday" event timing is unaffected.
+ *
+ * Deliberately does *not* also inject a blanket `animation-duration:0s!important` freeze: a
+ * 0-duration `infinite` CSS animation's "current frame" is implementation-defined, which made the
+ * Now Playing equalizer bars render at a different (wrong) height on every run. The context's own
+ * `reducedMotion: 'reduce'` option already covers this correctly — the app's CSS has a real
+ * `@media (prefers-reduced-motion: reduce)` rule for the equalizer, and Framer Motion's
+ * `MotionConfig reducedMotion="user"` (App.tsx) does the same for every motion.* animation. */
+function installPageOverrides({ hour, minute }: { hour: number; minute: number }): void {
+  const target = new Date();
+  target.setHours(hour, minute, 0, 0);
+  const offset = target.getTime() - Date.now();
+  const RealDate = Date;
+  // A Proxy, not a `class ... extends Date`, deliberately — Playwright's addInitScript extracts
+  // this function's source via toString() and runs it standalone in the browser, so it can't rely
+  // on esbuild's class-transform helpers (e.g. __name) that only exist in this file's own module
+  // scope; a class declaration here throws "__name is not defined" the moment it's evaluated.
+  const FakeDate = new Proxy(RealDate, {
+    construct(ctor, args) {
+      return args.length === 0 ? new ctor(RealDate.now() + offset) : new ctor(...(args as []));
+    },
+    apply() {
+      return new RealDate(RealDate.now() + offset).toString();
+    },
+    get(ctor, prop) {
+      if (prop === 'now') return () => RealDate.now() + offset;
+      return Reflect.get(ctor, prop);
+    },
+  });
+  window.Date = FakeDate;
+}
+
+function scrollToTarget({ text, align, extraScroll }: { text: string; align: 'top' | 'bottom'; extraScroll: number }): boolean {
+  const target = [...document.querySelectorAll('h1,h2,h3,p,span')]
+    .find((el): el is HTMLElement => el.children.length === 0 && el.textContent?.trim() === text) as HTMLElement | undefined;
+  if (!target) return false;
+  if (align === 'bottom') {
+    // Align the containing card's *bottom* edge to the viewport bottom, so the full card is
+    // guaranteed visible regardless of its height — robust to content changes, unlike a
+    // hand-tuned pixel offset.
+    (target.closest('section') ?? target).scrollIntoView(false);
+    window.scrollBy(0, -16 + extraScroll);
+  } else {
+    // .detail-header is sticky (top: 1rem) — scrolling the target flush to y=0 tucks it right
+    // behind the floating header, so back off by the header's height plus its sticky offset to
+    // land just below it instead.
+    target.scrollIntoView(true);
+    const header = document.querySelector('.detail-header');
+    const clearance = (header?.getBoundingClientRect().height ?? 0) + 32;
+    window.scrollBy(0, -clearance + extraScroll);
+  }
+  return true;
+}
+
+/** Only overwrites the committed PNG when the new capture differs meaningfully from it — keeps
+ * PRs quiet (and avoids a churny commit-then-push loop in CI) when the pixels are effectively
+ * unchanged. */
+function saveIfChanged(buf: Buffer, outFile: string): boolean {
+  const next = PNG.sync.read(buf);
+  if (existsSync(outFile)) {
+    let prev: PNG | null = null;
+    try {
+      prev = PNG.sync.read(readFileSync(outFile));
+    } catch {
+      prev = null;
+    }
+    if (prev && prev.width === next.width && prev.height === next.height) {
+      const changed = pixelmatch(prev.data, next.data, undefined, next.width, next.height, {
+        threshold: COLOR_THRESHOLD, includeAA: false,
+      });
+      if (changed <= DIFF_PIXEL_THRESHOLD) {
+        console.log(`  ${changed} px changed (<= ${DIFF_PIXEL_THRESHOLD}), keeping the committed image`);
+        return false;
+      }
+      console.log(`  ${changed} px changed, updating`);
+    }
+  }
+  writeFileSync(outFile, buf);
+  return true;
+}
+
+async function capturePage(pw: PlaywrightPage, page: Page): Promise<void> {
+  await pw.goto(`http://localhost:${CLIENT_PORT}/${page.hash}`);
+  await sleep(2_500);
+  // A fixed sleep isn't enough on its own — pages with multiple independent widgets (e.g. two
+  // ai-tool-panel cards each with their own useWidget poll) can still have one card mid-fetch at
+  // that point even though the mock server already answered, since each widget's own React state
+  // update lands on its own tick. Wait for every WidgetBody loading skeleton to actually clear.
+  await pw.waitForFunction(() => !document.querySelector('.animate-pulse'), null, { timeout: 5_000 }).catch(() => {});
+
+  if (page.scrollToText) {
+    const found = await pw.evaluate(scrollToTarget, { text: page.scrollToText, align: page.scrollAlign ?? 'top', extraScroll: page.extraScroll ?? 0 });
+    if (!found) {
+      console.error(`  scroll target "${page.scrollToText}" not found for ${page.slug} — capturing from the top`);
+    }
+    await sleep(400);
+  }
+
+  const buf = await pw.screenshot({ type: 'png' });
+  const outFile = path.join(outDir, page.file);
+  const changed = saveIfChanged(buf, outFile);
+  console.log(`  -> ${path.relative(repoRoot, outFile)}${changed ? '' : ' (unchanged)'}`);
+}
+
 async function main() {
   mkdirSync(outDir, { recursive: true });
-  // Clear out any screenshots from a previous run/naming scheme so stale files don't linger.
-  for (const file of readdirSync(outDir)) {
-    if (file.endsWith('.png')) unlinkSync(path.join(outDir, file));
-  }
 
   console.log('Loading fixtures (fetching real cover art / artist photos)...');
   const pages = await buildPages();
@@ -273,134 +349,33 @@ async function main() {
   });
   await waitForHttp(`http://localhost:${CLIENT_PORT}`, 20_000);
 
-  const profileDir = mkdtempSync(path.join(tmpdir(), 'dashboard-screenshot-'));
-  console.log('Launching headless Chrome...');
-  freePort(CDP_PORT);
-  const chrome: ChildProcess = spawn(
-    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-    [
-      '--headless=new',
-      `--remote-debugging-port=${CDP_PORT}`,
-      `--user-data-dir=${profileDir}`,
-      '--hide-scrollbars',
-      '--disable-gpu',
-      '--window-size=1600,900',
-    ],
-    { stdio: 'ignore' },
-  );
-  await waitForHttp(`http://127.0.0.1:${CDP_PORT}/json/version`, 15_000);
-  await sleep(500);
+  console.log('Launching headless Chromium...');
+  const browser = await chromium.launch();
 
   try {
-    const cdp = await connectCdp();
-    await cdp.send('Page.enable');
-    // Fixed 16:9 viewport — README-friendly aspect ratio matching the rest of the user's repos.
-    // No element clipping: each page just scrolls its most interesting section to the top of
-    // this frame (see scrollToText below) and we capture exactly what's visible, like a real
-    // "above the fold" screenshot rather than the full scrollable page.
-    await cdp.send('Emulation.setDeviceMetricsOverride', {
-      width: 1600, height: 900, deviceScaleFactor: 2, mobile: false,
-    });
-
     for (const [index, page] of pages.entries()) {
       currentPage = page;
       console.log(`[${index + 1}/${pages.length}] ${page.slug}`);
 
-      // prefers-color-scheme is what light-dark() actually resolves against — the app's own
-      // toggle just sets the `color-scheme` CSS *property*, which controls light-dark() only
-      // when color-scheme includes both keywords; forcing the media feature directly is the
-      // robust way to control this regardless of the app's own toggle implementation.
-      await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: page.theme }] });
-
-      // Fakes the page's Date so the ambient sky-wash daypart *and* the overview's "Good
-      // evening"/"Good morning" greeting (a separate client-side computation off the same clock)
-      // agree, regardless of what time this script actually runs at. Only the hour/minute move;
-      // the calendar date stays real, so the fixture's "tomorrow" event timing is unaffected.
-      const [hour, minute] = DAYPART_HOUR[page.daypart];
-      const dateScript = await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
-        source: `(() => {
-          const target = new Date();
-          target.setHours(${hour}, ${minute}, 0, 0);
-          const offset = target.getTime() - Date.now();
-          const RealDate = Date;
-          class FakeDate extends RealDate {
-            constructor(...args) {
-              if (args.length === 0) super(RealDate.now() + offset);
-              else super(...args);
-            }
-            static now() { return RealDate.now() + offset; }
-          }
-          window.Date = FakeDate;
-        })();`,
+      // A fresh context per page — cleaner isolation than one shared page, and guarantees the
+      // init script below actually reruns (a plain page.goto to a URL differing only by #hash is
+      // a same-document navigation in some engines and won't always rerun page scripts).
+      const context = await browser.newContext({
+        viewport: VIEWPORT,
+        deviceScaleFactor: 2,
+        colorScheme: page.theme,
+        reducedMotion: 'reduce',
       });
-      // A fresh navigation (not a reload) so the hash router reads the target route at mount.
-      // The `?shot=N` query param is load-bearing, not decorative: two URLs differing only in
-      // their #hash are the same document as far as Chrome's navigation stack is concerned, so
-      // addScriptToEvaluateOnNewDocument above never re-fires past the first page — every later
-      // page silently kept running page 1's injected Date/theme override. Varying the actual path
-      // forces a real navigation each time.
-      await cdp.send('Page.navigate', { url: `http://localhost:${CLIENT_PORT}/?shot=${index}${page.hash}` });
-      await sleep(2_500);
-      await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: dateScript.identifier });
-
-      if (page.scrollToText) {
-        const align = page.scrollAlign ?? 'top';
-        const found = await cdp.send('Runtime.evaluate', {
-          expression: `(() => {
-            const target = [...document.querySelectorAll('h1,h2,h3,p,span')]
-              .find((el) => el.children.length === 0 && el.textContent.trim() === ${JSON.stringify(page.scrollToText)});
-            if (!target) return false;
-            if (${JSON.stringify(align)} === 'bottom') {
-              // Align the containing card's *bottom* edge to the viewport bottom, so the full
-              // card is guaranteed visible regardless of its height — robust to content changes,
-              // unlike a hand-tuned pixel offset.
-              (target.closest('section') ?? target).scrollIntoView(false);
-              window.scrollBy(0, -16 + ${page.extraScroll ?? 0});
-            } else {
-              // .detail-header is sticky (top: 1rem) — scrolling the target flush to y=0 tucks
-              // it right behind the floating header, so back off by the header's height plus
-              // its sticky offset to land just below it instead.
-              target.scrollIntoView(true);
-              const header = document.querySelector('.detail-header');
-              const clearance = (header?.getBoundingClientRect().height ?? 0) + 32;
-              window.scrollBy(0, -clearance + ${page.extraScroll ?? 0});
-            }
-            return true;
-          })()`,
-          returnByValue: true,
-        });
-        if (!found.result.value) {
-          console.error(`  scroll target "${page.scrollToText}" not found for ${page.slug} — capturing from the top`);
-        }
-        await sleep(400);
-      }
-
-      const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
-      const outFile = path.join(outDir, page.file);
-      writeFileSync(outFile, Buffer.from(shot.data, 'base64'));
-      console.log(`  -> ${path.relative(repoRoot, outFile)}`);
+      const [hour, minute] = DAYPART_HOUR[page.daypart];
+      await context.addInitScript(installPageOverrides, { hour, minute });
+      const pw = await context.newPage();
+      await capturePage(pw, page);
+      await context.close();
     }
-
-    cdp.close();
   } finally {
-    // Chrome writes lock/cache files as it shuts down in response to the signal below, so
-    // deleting the profile dir immediately after kill() races that and can throw ENOTEMPTY.
-    await new Promise<void>((resolve) => {
-      chrome.once('exit', () => resolve());
-      chrome.kill();
-      setTimeout(resolve, 3_000);
-    });
+    await browser.close();
     vite.kill();
     mockServer.close();
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        rmSync(profileDir, { recursive: true, force: true });
-        break;
-      } catch (err) {
-        if (attempt === 2) console.error(`Could not clean up ${profileDir}:`, err);
-        await sleep(500);
-      }
-    }
   }
 
   console.log('Done.');
