@@ -10,12 +10,7 @@ import './spotify.css';
 
 export function SpotifyDetail() {
   return (
-    <div className="relative">
-      <div aria-hidden className="spotify-detail-bg">
-        <div className="spotify-detail-bg-orb spotify-detail-bg-orb--one" />
-        <div className="spotify-detail-bg-orb spotify-detail-bg-orb--two" />
-        <div className="spotify-detail-bg-orb spotify-detail-bg-orb--three" />
-      </div>
+    <div>
       <DetailSectionHeading label="On now" title="What's playing" />
       <NowPlayingWidget />
       <DetailSectionHeading

@@ -11,66 +11,68 @@
   }
 }
 
-/* Green gradient wash + drifting blurred spotlights behind the Spotify detail page. */
-.spotify-detail-bg {
+/* Green gradient wash + blurred spotlights behind the whole Spotify page —
+   fixed to the viewport (not the content column) and rendered by App.tsx
+   as a sibling of <main>, so it sits behind the header bar too, edge to edge. */
+.spotify-page-glow {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -5;
   overflow: hidden;
   pointer-events: none;
   background: linear-gradient(
-    160deg,
-    color-mix(in oklab, var(--color-accent-spotify) 10%, transparent),
-    transparent 55%
+    165deg,
+    color-mix(in oklab, var(--color-accent-spotify) 16%, transparent),
+    transparent 60%
   );
 }
 
-.spotify-detail-bg-orb {
+.spotify-page-orb {
   position: absolute;
   border-radius: 999px;
-  filter: blur(2px);
+  filter: blur(60px);
   will-change: transform;
 }
 
-.spotify-detail-bg-orb--one {
-  width: min(58rem, 85vw);
-  height: min(58rem, 85vw);
-  top: -30rem;
-  left: -18rem;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 26%, transparent), transparent 68%);
-  animation: spotify-bg-drift-one 24s ease-in-out infinite alternate;
+.spotify-page-orb--one {
+  width: 46rem;
+  height: 46rem;
+  top: -16rem;
+  left: -14rem;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 42%, transparent), transparent 70%);
+  animation: spotify-orb-drift-one 22s ease-in-out infinite alternate;
 }
 
-.spotify-detail-bg-orb--two {
+.spotify-page-orb--two {
   width: 40rem;
   height: 40rem;
-  top: 10%;
-  right: -20rem;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 20%, transparent), transparent 70%);
-  animation: spotify-bg-drift-two 20s ease-in-out infinite alternate;
+  top: 12%;
+  right: -16rem;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 34%, transparent), transparent 70%);
+  animation: spotify-orb-drift-two 26s ease-in-out infinite alternate;
 }
 
-.spotify-detail-bg-orb--three {
-  width: 36rem;
-  height: 36rem;
-  bottom: -20rem;
-  left: 35%;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 16%, transparent), transparent 70%);
-  animation: spotify-bg-drift-one 30s ease-in-out infinite alternate-reverse;
+.spotify-page-orb--three {
+  width: 42rem;
+  height: 42rem;
+  bottom: -18rem;
+  left: 20%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 28%, transparent), transparent 70%);
+  animation: spotify-orb-drift-one 30s ease-in-out infinite alternate-reverse;
 }
 
-@keyframes spotify-bg-drift-one {
+@keyframes spotify-orb-drift-one {
   from { transform: translate(0, 0); }
-  to { transform: translate(3rem, 4rem); }
+  to { transform: translate(2.5rem, 3rem); }
 }
 
-@keyframes spotify-bg-drift-two {
+@keyframes spotify-orb-drift-two {
   from { transform: translate(0, 0); }
-  to { transform: translate(-2.5rem, 3rem); }
+  to { transform: translate(-2rem, 2.5rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spotify-detail-bg-orb {
+  .spotify-page-orb {
     animation: none;
   }
 }
