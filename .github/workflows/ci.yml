@@ -19,7 +19,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # server/package.json requires >=22.5: the iMessage provider imports node:sqlite,
+          # which doesn't exist before then.
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
