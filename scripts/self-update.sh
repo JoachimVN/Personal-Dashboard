@@ -37,3 +37,14 @@ npm run build
 
 launchctl kickstart -k "gui/$(id -u)/$LABEL"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] dashboard restarted on ${remote_sha:0:7}"
+
+# Refresh the copy launchd runs, so a commit that changes this script reaches the next
+# run instead of needing install-launchd.sh by hand. `mv` is an atomic rename: it swaps
+# the directory entry while this shell keeps reading the old inode it already opened, so
+# replacing the script mid-run is safe in a way that overwriting it in place is not.
+if ! cmp -s "$DEPLOY_DIR/scripts/self-update.sh" "$ROOT/self-update.sh"; then
+  cp "$DEPLOY_DIR/scripts/self-update.sh" "$ROOT/self-update.sh.new"
+  chmod +x "$ROOT/self-update.sh.new"
+  mv -f "$ROOT/self-update.sh.new" "$ROOT/self-update.sh"
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] updater refreshed itself"
+fi

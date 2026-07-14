@@ -61,9 +61,11 @@ deploy clone and restarts — so merging to `main` updates the dashboard on your
 PD_AUTO_UPDATE=1 ./scripts/install-launchd.sh     # PD_UPDATE_INTERVAL=300 to change the cadence
 ```
 
-It only ever fast-forwards to your own `origin/main`, and nothing listens for inbound connections —
-GitHub never reaches into your machine. Re-run the installer to pick up changes to the scripts
-themselves; the running updater is a copy taken outside the clone it resets.
+Installing it is the one manual step, and it has to be: nothing here listens for inbound connections,
+so GitHub can't reach into your machine to start anything — something has to run locally once. After
+that it's hands-off. The updater refreshes its own copy too, so a commit that changes the update
+script still lands by itself; only a change to the launchd agents themselves (the poll interval, say)
+needs the installer re-run.
 
 **Windows** — two options:
 
