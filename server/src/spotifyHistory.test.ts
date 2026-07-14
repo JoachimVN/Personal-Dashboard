@@ -253,4 +253,62 @@ describe('SpotifyHistoryStore', () => {
     const [album] = store.getAllTime(100, 0).albums;
     expect(album.topTracks).toEqual([expect.objectContaining({ id: 't1' })]);
   });
+
+  it('healTrackMetadata backfills missing artistIds/albumType on an existing track without touching playCount', () => {
+    const { store } = createStore();
+    // Simulate a legacy track record written before artistIds/albumType existed.
+    store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1', artists: [], album: { id: 'al1', name: 'Album One' } }) }]);
+    expect(store.getAllTime(100, 0).tracks[0]).toMatchObject({ artistIds: [], playCount: 1 });
+    expect(store.getAllTime(100, 0).albums[0]).toMatchObject({ albumType: undefined });
+
+    store.healTrackMetadata([
+      track({ id: 't1', artists: [{ id: 'a1', name: 'Artist One' }], album: { id: 'al1', name: 'Album One', albumType: 'album' } }),
+    ]);
+
+    const allTime = store.getAllTime(100, 0);
+    expect(allTime.tracks[0]).toMatchObject({ id: 't1', artistIds: ['a1'], playCount: 1 });
+    expect(allTime.artists[0]).toMatchObject({ id: 'a1', playCount: 1 });
+    expect(allTime.albums[0]).toMatchObject({ albumType: 'album' });
+  });
+
+  it('healTrackMetadata never creates new track records, only heals ones already tracked', () => {
+    const { store } = createStore();
+    store.healTrackMetadata([track({ id: 'unseen' })]);
+    expect(store.getAllTime(100, 0).tracks).toEqual([]);
+  });
+
+  it('merges deluxe/reissue editions of the same album into one entry when ranking all-time albums', () => {
+    const { store } = createStore();
+    store.recordPlays([
+      { playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1', name: 'Track One', album: { id: 'al1', name: 'Kiss Land' } }) },
+      { playedAt: '2026-01-02T00:00:00Z', track: track({ id: 't2', name: 'Track Two', album: { id: 'al1', name: 'Kiss Land' } }) },
+      { playedAt: '2026-01-03T00:00:00Z', track: track({ id: 't3', name: 'Track Three', album: { id: 'al2', name: 'Kiss Land (Deluxe)' } }) },
+      // t3 played twice so the deluxe edition alone outweighs the base edition's own tracks —
+      // the base edition (no suffix) should still be chosen as the canonical display record.
+      { playedAt: '2026-01-04T00:00:00Z', track: track({ id: 't3', name: 'Track Three', album: { id: 'al2', name: 'Kiss Land (Deluxe)' } }) },
+    ]);
+
+    const [album] = store.getAllTime().albums;
+    expect(album).toMatchObject({ id: 'al1', name: 'Kiss Land', playCount: 4 });
+  });
+
+  it('groups edition variants by primary artist, ignoring a bonus-track feature credit added on the reissue', () => {
+    const { store } = createStore();
+    store.recordPlays([
+      { playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1', name: 'Track One', artists: [{ id: 'a1', name: 'The Weeknd' }], album: { id: 'al1', name: 'After Hours' } }) },
+      { playedAt: '2026-01-02T00:00:00Z', track: track({ id: 't2', name: 'Track Two', artists: [{ id: 'a1', name: 'The Weeknd' }], album: { id: 'al1', name: 'After Hours' } }) },
+      {
+        playedAt: '2026-01-03T00:00:00Z',
+        track: track({
+          id: 't3',
+          name: 'Track Three',
+          artists: [{ id: 'a1', name: 'The Weeknd' }, { id: 'a2', name: 'Ariana Grande' }],
+          album: { id: 'al2', name: 'After Hours (Deluxe)' },
+        }),
+      },
+    ]);
+
+    const [album] = store.getAllTime().albums;
+    expect(album).toMatchObject({ id: 'al1', name: 'After Hours', playCount: 3 });
+  });
 });

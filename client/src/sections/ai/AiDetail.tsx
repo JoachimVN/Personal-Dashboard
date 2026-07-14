@@ -148,33 +148,12 @@ export function AiDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Live intelligence"
-        title={<>Know your pace.<br /><span className="text-ink-faint">Keep your flow.</span></>}
-        description="A calm, honest view of your active context and account allowances—so the tools stay useful without becoming a distraction."
+        eyebrow="Usage"
+        title={<>Context and<br /><span className="text-ink-faint">usage limits.</span></>}
+        description="How much of your AI usage allowance is left, and how fast you're using it."
         accent="var(--color-accent-ai)"
-      >
-        <div className="detail-signal-panel">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-ink-muted">Telemetry</span>
-            <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-ink-faint">
-              <i aria-hidden className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" /> Live
-            </span>
-          </div>
-          <div className="mt-6 flex items-end gap-1.5" aria-hidden>
-            {[32, 54, 40, 72, 58, 88, 64, 78, 46, 68, 52, 82].map((height, index) => (
-              <motion.span
-                key={index}
-                className="flex-1 rounded-full bg-(--color-accent-ai)"
-                initial={{ height: 4 }}
-                animate={{ height }}
-                transition={{ delay: 0.18 + index * 0.025, type: 'spring', stiffness: 180, damping: 20 }}
-                style={{ opacity: 0.22 + index * 0.035 }}
-              />
-            ))}
-          </div>
-        </div>
-      </DetailIntro>
-      <DetailSectionHeading label="Allowance" title="Your working headroom" detail="Live context is local. Account quota updates on a conservative cadence." />
+      />
+      <DetailSectionHeading label="Allowance" title="Usage by tool" detail="Context usage is read locally. Account quota updates on a slower cadence." />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {AI_TOOLS.map((tool) => <ToolCard key={tool.id} {...tool} />)}
       </div>

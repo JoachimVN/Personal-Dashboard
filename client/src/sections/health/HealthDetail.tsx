@@ -77,9 +77,9 @@ export function HealthDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Health dashboard"
-        title={<>Move with intent.<br /><span className="text-ink-faint">Recover with context.</span></>}
-        description="Your daily activity, heart rate and recovery signals in one place—plus the complete history your phone has synced."
+        eyebrow="Health"
+        title={<>Activity and<br /><span className="text-ink-faint">recovery.</span></>}
+        description="Today's activity, heart rate, and recovery — plus the full history synced from your phone."
         accent="var(--color-accent-health)"
       >
         <WidgetBody envelope={envelope} offline={offline}>
@@ -87,7 +87,7 @@ export function HealthDetail() {
         </WidgetBody>
       </DetailIntro>
 
-      <DetailSectionHeading label="Today" title="Your current signals" detail="Live values from your Apple Health Shortcut." />
+      <DetailSectionHeading label="Today" title="Today's numbers" detail="Live values from your Apple Health Shortcut." />
       <HealthWidget />
 
       <div className="mt-6">

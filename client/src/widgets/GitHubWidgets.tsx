@@ -191,7 +191,7 @@ export function ContributionsWidget() {
   );
 }
 
-function ContributionGrid({
+export function ContributionGrid({
   data,
   hovered,
   onHover,

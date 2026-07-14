@@ -1,7 +1,7 @@
 import { motion } from 'motion/react';
 import type { SectionDef } from './registry';
 import { OVERVIEW_HREF } from '../router';
-import { AccentDot, accentStyle } from './SectionCard';
+import { accentStyle } from './SectionCard';
 import { ThemeToggle } from '../components/ThemeToggle';
 
 /**
@@ -11,8 +11,11 @@ import { ThemeToggle } from '../components/ThemeToggle';
 export function SectionView({ section }: Readonly<{ section: SectionDef }>) {
   return (
     <motion.div
-      className="col-start-1 row-start-1"
+      className="col-start-1 row-start-1 min-w-0"
       style={accentStyle(section)}
+      initial={false}
+      animate={{ opacity: 1, filter: 'blur(0px)' }}
+      exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeOut' } }}
     >
       <motion.header
         layoutId={`section-${section.id}`}
@@ -33,10 +36,6 @@ export function SectionView({ section }: Readonly<{ section: SectionDef }>) {
           </motion.p>
         </div>
         <div className="ml-auto flex items-center gap-3 text-[11px] text-ink-faint">
-          <span className="flex items-center gap-2">
-            <AccentDot />
-            <span>Live</span>
-          </span>
           <ThemeToggle />
         </div>
       </motion.header>

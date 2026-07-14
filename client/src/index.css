@@ -14,7 +14,7 @@
   /* Text hierarchy */
   --color-ink: light-dark(#111827, #f1f3f7);
   --color-ink-muted: light-dark(#667085, #9ba3b4);
-  --color-ink-faint: light-dark(#94a3b8, #64748b);
+  --color-ink-faint: light-dark(#718096, #64748b);
 
   /* Section accents */
   --color-accent-ai: light-dark(#7456e8, #a995ff);
@@ -70,85 +70,107 @@ a {
   isolation: isolate;
 }
 
-.ambient-orb {
+/* Sky wash, not a drifting blob farm. Color is driven by --sky-a/--sky-b, which
+   App.tsx sets via [data-daypart] on .app-shell (the app root, so other cards —
+   like .command-center below — can read the same variables) from the real
+   clock. The color has a reason to be there (it's what time it is) instead of
+   decoration for its own sake. Static shape, one soft vertical fade, no grid/noise. */
+.ambient-aurora {
   position: absolute;
-  border-radius: 999px;
-  filter: blur(2px);
-  will-change: transform;
+  top: -3rem;
+  left: 50%;
+  width: min(90rem, 170vw);
+  height: 26rem;
+  translate: -50% 0;
+  background: linear-gradient(180deg, var(--sky-a), var(--sky-b) 45%, transparent 82%);
+  filter: blur(70px);
+  opacity: 0.55;
+  transition: background 1.2s ease;
 }
 
-.ambient-orb--one {
-  width: min(62rem, 90vw);
-  height: min(62rem, 90vw);
-  top: -34rem;
-  left: -22rem;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-ai) 17%, transparent), transparent 68%);
-  animation: ambient-drift-one 22s ease-in-out infinite alternate;
+.app-shell[data-daypart='night'] {
+  --sky-a: light-dark(#c7d2fe, #4c3a8a);
+  --sky-b: light-dark(#a5b4fc, #1e1b4b);
 }
 
-.ambient-orb--two {
-  width: 48rem;
-  height: 48rem;
-  top: 15%;
-  right: -30rem;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-github) 14%, transparent), transparent 70%);
-  animation: ambient-drift-two 27s ease-in-out infinite alternate;
+.app-shell[data-daypart='morning'] {
+  --sky-a: light-dark(#fdba74, #8a5a2e);
+  --sky-b: light-dark(#93c5fd, #2c4a72);
 }
 
-.ambient-orb--three {
-  width: 44rem;
-  height: 44rem;
-  bottom: -28rem;
-  left: 30%;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-personal) 13%, transparent), transparent 70%);
+.app-shell[data-daypart='day'] {
+  --sky-a: light-dark(#bfdbfe, #2c4a72);
+  --sky-b: light-dark(#e0f2fe, #1c2f4a);
 }
 
-.ambient-grid {
-  position: absolute;
+.app-shell[data-daypart='evening'] {
+  --sky-a: light-dark(#fb923c, #7c2d3f);
+  --sky-b: light-dark(#e879a8, #2e1a4a);
+}
+
+/* Section-accent wash layered on top of the sky wash while a section page is
+   open (App.tsx SectionGlow) — --section-accent is set inline per section from
+   its registry.tsx accentVar, so this one rule covers every section. */
+.section-page-glow {
+  position: fixed;
   inset: 0;
-  opacity: 0.24;
-  background-image:
-    linear-gradient(to right, color-mix(in oklab, var(--color-ink) 5%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in oklab, var(--color-ink) 5%, transparent) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: linear-gradient(to bottom, black, transparent 75%);
+  z-index: -5;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-.ambient-noise {
+.section-page-aurora {
   position: absolute;
-  inset: 0;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E");
+  top: -14rem;
+  left: 50%;
+  width: min(64rem, 150vw);
+  height: 30rem;
+  translate: -50% 0;
+  background: radial-gradient(ellipse at 50% 30%, color-mix(in oklab, var(--section-accent) 30%, transparent), transparent 72%);
+  filter: blur(70px);
+  opacity: 0.6;
 }
 
+/* The hero text sits directly on the sky wash with no card behind it — unlike everywhere
+   else, so contrast against it varies with the time-of-day color; the faint gray date/
+   eyebrow text is the most exposed since it isn't light or dark enough to always win
+   against a mid-toned wash in either mode. A soft halo (canvas-colored per mode) keeps
+   it legible without touching the wash colors themselves. */
 .dashboard-hero {
   padding: 0.25rem 0.25rem 1.75rem;
+  text-shadow:
+    0 1px 3px light-dark(rgb(255 255 255 / 0.85), rgb(0 0 0 / 0.55)),
+    0 0 22px light-dark(rgb(255 255 255 / 0.65), rgb(0 0 0 / 0.45));
 }
 
-.live-indicator {
-  display: grid;
-  width: 1rem;
-  height: 1rem;
-  place-items: center;
-  border-radius: 999px;
-  background: color-mix(in oklab, #10b981 13%, transparent);
-}
-
-.live-indicator span {
-  width: 0.32rem;
-  height: 0.32rem;
-  border-radius: inherit;
-  background: #10b981;
-  box-shadow: 0 0 9px rgb(16 185 129 / 0.7);
-  animation: status-pulse 2.6s ease-in-out infinite;
-}
-
+/* A very faint time-of-day tint on top of the normal white/dark text — almost all ink,
+   just a whisper of warmth/coolness matching the sky, not a "gradient text" effect.
+   -webkit-text-fill-color (not just color) is required for background-clip:text to
+   actually paint the gradient instead of leaving the glyphs transparent. No text-shadow
+   here — the fill is still ~90% ink so it doesn't need the contrast halo the sibling
+   eyebrow text does. */
 .hero-title {
   max-width: 760px;
   font-size: clamp(2.5rem, 5.6vw, 4.8rem);
   font-weight: 620;
   line-height: 0.91;
   letter-spacing: -0.07em;
+  /* line-height is tighter than the font's natural descender depth, and background-clip:text
+     (unlike a plain color fill) clips strictly to the line box — pad it out a touch so
+     descenders like the "g" in "evening" don't get cut off, offset by an equal negative
+     margin so the extra room doesn't shift surrounding layout. */
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+  background: linear-gradient(
+    115deg,
+    color-mix(in oklab, var(--sky-a) 24%, light-dark(#000, var(--color-ink))),
+    color-mix(in oklab, var(--sky-b) 24%, light-dark(#000, var(--color-ink)))
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
 }
 
 .command-center {
@@ -166,8 +188,9 @@ a {
   width: 34rem;
   height: 34rem;
   border-radius: 999px;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-personal) 15%, transparent), transparent 68%);
+  background: radial-gradient(circle, color-mix(in oklab, var(--sky-a) 22%, transparent), transparent 68%);
   pointer-events: none;
+  transition: background 1.2s ease;
 }
 
 .command-center-head,
@@ -228,32 +251,30 @@ a {
 }
 
 .command-primary,
-.command-signals,
-.command-agenda {
+.command-signals {
   border: 1px solid var(--color-card-border);
   background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
+}
+
+.command-agenda {
+  position: relative;
+  margin-top: 1rem;
+  border: 1px solid var(--color-card-border);
+  border-radius: 1.4rem;
+  padding: 1rem 1.25rem;
+  background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.command-agenda:hover {
+  background: light-dark(rgb(255 255 255 / 0.52), rgb(2 5 10 / 0.34));
+  border-color: color-mix(in oklab, var(--color-ink) 12%, var(--color-card-border));
 }
 
 .command-primary {
   min-width: 0;
   border-radius: 1.4rem;
   padding: 1.25rem;
-}
-
-.command-status {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.625rem;
-  color: var(--color-ink-faint);
-}
-
-.command-status span {
-  width: 0.35rem;
-  height: 0.35rem;
-  border-radius: 999px;
-  background: #10b981;
-  box-shadow: 0 0 8px rgb(16 185 129 / 0.6);
 }
 
 .command-event-time {
@@ -365,17 +386,15 @@ a {
   background: var(--color-accent-health);
 }
 
-.command-agenda {
-  position: relative;
-  margin-top: 1rem;
-  border-radius: 1.4rem;
-  padding: 1rem 1.25rem;
-}
-
 .command-agenda-heading a {
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-ink-muted);
+  transition: color 160ms ease;
+}
+
+.command-agenda-heading a:hover {
+  color: var(--color-ink);
 }
 
 .command-agenda-list {
@@ -456,15 +475,15 @@ a {
   top: -13rem;
   right: -9rem;
   border-radius: 999px;
-  background: var(--accent);
-  opacity: 0.08;
-  filter: blur(18px);
+  background: radial-gradient(circle, var(--accent), transparent 72%);
+  opacity: 0.1;
+  filter: blur(24px);
   transition: opacity 400ms ease, transform 600ms cubic-bezier(.2,.8,.2,1);
 }
 
 .dashboard-section-card:hover .section-card-aura {
-  opacity: 0.15;
-  transform: scale(1.12) translate(-1rem, 1rem);
+  opacity: 0.18;
+  transform: scale(1.5) translate(-1rem, 1rem);
 }
 
 .section-icon,
@@ -692,18 +711,6 @@ a {
   to { transform: translate3d(-2rem, 2rem, 0) scale(1.08); opacity: 0.78; }
 }
 
-@keyframes ambient-drift-one {
-  to { transform: translate3d(8vw, 4rem, 0) scale(1.08); }
-}
-
-@keyframes ambient-drift-two {
-  to { transform: translate3d(-7vw, 5rem, 0) scale(0.94); }
-}
-
-@keyframes status-pulse {
-  50% { opacity: 0.55; transform: scale(0.78); }
-}
-
 @media (min-width: 1024px) {
   .command-layout {
     grid-template-columns: minmax(0, 1.75fr) minmax(18rem, 0.8fr);
@@ -783,8 +790,6 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ambient-orb,
-  .live-indicator span,
   .detail-intro-orb {
     animation: none;
   }

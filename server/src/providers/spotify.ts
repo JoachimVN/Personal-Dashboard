@@ -304,6 +304,11 @@ export function createSpotifyProvider(
           historyStore.mergeArtistMetadata(
             [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
           );
+          historyStore.healTrackMetadata(
+            [...topData.tracksShort, ...topData.tracksMedium]
+              .map(toPlayedTrackInput)
+              .filter((t): t is PlayedTrackInput => t !== undefined),
+          );
         }
 
         const nowPlaying =
