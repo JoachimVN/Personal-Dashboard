@@ -381,7 +381,7 @@ function AlbumRow({ album, rank }: Readonly<{ album: Album; rank: number }>) {
         {meta && <p className="mt-0.5 truncate text-[11px] text-ink-faint">{meta}</p>}
       </div>
       {album.topTracks.length > 0 && (
-        <div className="w-48 shrink-0 border-l border-card-border/60 py-2.5 pl-3 pr-3 sm:w-64">
+        <div className="hidden w-48 shrink-0 border-l border-card-border/60 py-2.5 pl-3 pr-3 sm:block sm:w-64">
           <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Top tracks</p>
           <ol className="mt-1 space-y-0.5 text-xs text-ink-muted">
             {album.topTracks.map((track, i) => (
