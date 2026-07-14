@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const trackSchema = z.object({
+  id: z.string().optional(),
   track: z.string(),
   artist: z.string(),
   album: z.string().optional(),
@@ -11,10 +12,34 @@ const trackSchema = z.object({
 });
 
 const artistSchema = z.object({
+  id: z.string().optional(),
   name: z.string(),
   imageUrl: z.string().optional(),
   url: z.string().optional(),
   genres: z.array(z.string()).default([]),
+});
+
+const albumSchema = z.object({
+  id: z.string().optional(),
+  name: z.string(),
+  artist: z.string(),
+  imageUrl: z.string().optional(),
+  url: z.string().optional(),
+  releaseDate: z.string().optional(),
+});
+
+/**
+ * Play-count leaderboards accumulated locally over time — Spotify's API has no all-time or
+ * top-albums endpoint, so these are built up on the server from observed plays (see
+ * server/src/spotifyHistory.ts). Seeded once from Spotify's long_term top lists (weighted by
+ * rank), then real observed plays accrue on top and eventually dominate the seed weight.
+ */
+const allTimeSchema = z.object({
+  /** When tracking started (first long_term seed) — undefined until the first successful fetch. */
+  trackedSince: z.string().optional(),
+  artists: z.array(artistSchema.extend({ playCount: z.number() })),
+  tracks: z.array(trackSchema.extend({ playCount: z.number() })),
+  albums: z.array(albumSchema.extend({ playCount: z.number() })),
 });
 
 export const spotifySchema = z.object({
@@ -42,6 +67,7 @@ export const spotifySchema = z.object({
     shortTerm: z.array(trackSchema),
     mediumTerm: z.array(trackSchema),
   }),
+  allTime: allTimeSchema.default({ artists: [], tracks: [], albums: [] }),
 });
 
 export type SpotifyData = z.infer<typeof spotifySchema>;

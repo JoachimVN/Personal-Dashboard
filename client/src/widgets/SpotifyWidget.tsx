@@ -4,11 +4,20 @@ import { useWidget } from '../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
 
-type Range = 'shortTerm' | 'mediumTerm';
-const RANGE_LABEL: Record<Range, string> = { shortTerm: '4 weeks', mediumTerm: '6 months' };
+type Range = 'shortTerm' | 'mediumTerm' | 'allTime';
+const RANGE_LABEL: Record<Range, string> = { shortTerm: '4 weeks', mediumTerm: '6 months', allTime: 'All time' };
 
-type Track = SpotifyData['topTracks']['shortTerm'][number];
-type Artist = SpotifyData['topArtists']['shortTerm'][number];
+type Track = SpotifyData['topTracks']['shortTerm'][number] & { playCount?: number };
+type Artist = SpotifyData['topArtists']['shortTerm'][number] & { playCount?: number };
+type Album = SpotifyData['allTime']['albums'][number];
+
+function tracksForRange(data: SpotifyData, range: Range): Track[] {
+  return range === 'allTime' ? data.allTime.tracks : data.topTracks[range];
+}
+
+function artistsForRange(data: SpotifyData, range: Range): Artist[] {
+  return range === 'allTime' ? data.allTime.artists : data.topArtists[range];
+}
 
 const linkClass = 'truncate font-medium text-ink hover:underline';
 const accent = 'var(--color-accent-spotify)';
@@ -40,6 +49,9 @@ function TrackRow({ track, rank }: Readonly<{ track: Track; rank: number }>) {
         )}
         <p className="truncate text-xs text-ink-faint">{track.artist}</p>
       </div>
+      {track.playCount !== undefined && (
+        <span className="shrink-0 text-xs tabular-nums text-ink-faint">{track.playCount}×</span>
+      )}
     </li>
   );
 }
@@ -112,7 +124,7 @@ export function NowPlayingWidget() {
 function RangeToggle({ range, onChange }: Readonly<{ range: Range; onChange: (r: Range) => void }>) {
   return (
     <fieldset className="spotify-range-toggle" aria-label="Time range">
-      {(['shortTerm', 'mediumTerm'] as Range[]).map((r) => (
+      {(['shortTerm', 'mediumTerm', 'allTime'] as Range[]).map((r) => (
         <button key={r} type="button" data-active={r === range} onClick={() => onChange(r)}>
           {RANGE_LABEL[r]}
         </button>
@@ -166,7 +178,11 @@ function ArtistCell({ artist, rank }: { artist: Artist; rank: number }) {
         </span>
       </div>
       <p className="mt-1.5 truncate text-sm font-medium text-ink">{artist.name}</p>
-      {artist.genres[0] && <p className="truncate text-xs text-ink-faint">{artist.genres[0]}</p>}
+      {artist.playCount !== undefined ? (
+        <p className="truncate text-xs text-ink-faint">{artist.playCount} plays</p>
+      ) : (
+        artist.genres[0] && <p className="truncate text-xs text-ink-faint">{artist.genres[0]}</p>
+      )}
     </>
   );
   return artist.url ? (
@@ -185,8 +201,8 @@ export function TopArtistsWidget() {
     <WidgetShell title="Top artists" badge={<RangeToggle range={range} onChange={setRange} />}>
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) => {
-          const artists = data.topArtists[range].slice(0, 8);
-          const topTrack = data.topTracks[range][0];
+          const artists = artistsForRange(data, range).slice(0, 8);
+          const topTrack = tracksForRange(data, range)[0];
           if (artists.length === 0 && !topTrack) {
             return <p className="text-sm text-ink-faint">No data yet.</p>;
           }
@@ -213,7 +229,7 @@ export function TopTracksWidget() {
     <WidgetShell title="Top tracks" badge={<RangeToggle range={range} onChange={setRange} />}>
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) => {
-          const tracks = data.topTracks[range];
+          const tracks = tracksForRange(data, range);
           if (tracks.length === 0) return <p className="text-sm text-ink-faint">No data yet.</p>;
           return (
             <ol className="max-h-[34rem] space-y-2 overflow-y-auto pr-1 text-sm">
@@ -259,6 +275,61 @@ export function RecentlyPlayedWidget() {
             </ul>
           )
         }
+      </WidgetBody>
+    </WidgetShell>
+  );
+}
+
+// ── Top albums (all-time only — Spotify has no top-albums endpoint) ────────
+
+function AlbumCell({ album, rank }: Readonly<{ album: Album; rank: number }>) {
+  const inner = (
+    <>
+      <div className="relative aspect-square overflow-hidden rounded-xl bg-track">
+        {album.imageUrl && (
+          <img
+            src={album.imageUrl}
+            alt=""
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          />
+        )}
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-xs font-medium tabular-nums text-white">
+          {rank}
+        </span>
+      </div>
+      <p className="mt-1.5 truncate text-sm font-medium text-ink">{album.name}</p>
+      <p className="truncate text-xs text-ink-faint">
+        {album.artist} · {album.playCount} plays
+      </p>
+    </>
+  );
+  return album.url ? (
+    <a href={album.url} target="_blank" rel="noreferrer" className="group block">
+      {inner}
+    </a>
+  ) : (
+    <div className="group block">{inner}</div>
+  );
+}
+
+export function TopAlbumsWidget() {
+  const { envelope, offline } = useWidget<SpotifyData>('spotify');
+  return (
+    <WidgetShell title="Top albums" badge={<StaleBadge envelope={envelope} />}>
+      <WidgetBody envelope={envelope} offline={offline}>
+        {(data) => {
+          const albums = data.allTime.albums.slice(0, 12);
+          if (albums.length === 0) {
+            return <p className="text-sm text-ink-faint">No album data yet — builds up as you listen.</p>;
+          }
+          return (
+            <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4">
+              {albums.map((album, i) => (
+                <AlbumCell key={album.id ?? `${album.name}-${i}`} album={album} rank={i + 1} />
+              ))}
+            </div>
+          );
+        }}
       </WidgetBody>
     </WidgetShell>
   );

@@ -1,6 +1,7 @@
 import { spotifySchema, type SpotifyData } from '@personal-dashboard/shared';
 import { readSpotifyToken, writeSpotifyToken } from '../spotifyToken.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
+import { SpotifyHistoryStore, type PlayedTrackInput } from '../spotifyHistory.js';
 import type { Provider } from '../scheduler.js';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -13,16 +14,18 @@ interface RawImage {
   url: string;
 }
 interface RawArtist {
+  id: string;
   name: string;
   images?: RawImage[];
   genres?: string[];
   external_urls?: { spotify?: string };
 }
 interface RawTrack {
+  id: string;
   name: string;
   duration_ms?: number;
-  artists: { name: string }[];
-  album?: { name?: string; images?: RawImage[]; release_date?: string };
+  artists: { id: string; name: string }[];
+  album?: { id: string; name?: string; images?: RawImage[]; release_date?: string; external_urls?: { spotify?: string } };
   external_urls?: { spotify?: string };
 }
 interface CurrentlyPlaying {
@@ -48,6 +51,7 @@ const firstImage = (images?: RawImage[]) => images?.[0]?.url;
 
 function mapTrack(track: RawTrack) {
   return {
+    id: track.id,
     track: track.name,
     artist: track.artists.map((a) => a.name).join(', '),
     album: track.album?.name,
@@ -59,10 +63,29 @@ function mapTrack(track: RawTrack) {
 
 function mapArtist(artist: RawArtist) {
   return {
+    id: artist.id,
     name: artist.name,
     imageUrl: firstImage(artist.images),
     url: artist.external_urls?.spotify,
     genres: artist.genres ?? [],
+  };
+}
+
+/** Shapes a raw track for history recording/seeding — undefined for tracks missing the ids we need to dedupe on (e.g. local files). */
+function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefined {
+  if (!track.id || !track.album?.id) return undefined;
+  return {
+    id: track.id,
+    name: track.name,
+    url: track.external_urls?.spotify,
+    artists: track.artists.map((a) => ({ id: a.id, name: a.name })),
+    album: {
+      id: track.album.id,
+      name: track.album.name ?? 'Unknown album',
+      imageUrl: firstImage(track.album.images),
+      url: track.album.external_urls?.spotify,
+      releaseDate: track.album.release_date,
+    },
   };
 }
 
@@ -115,6 +138,7 @@ async function accessToken(
 export function createSpotifyProvider(
   oauth: { clientId: string; clientSecret: string } | undefined,
   snapshotStore: SpotifySnapshotStore,
+  historyStore: SpotifyHistoryStore,
 ): Provider<SpotifyData> {
   let topData: TopData | undefined;
   let topDataFetchedAt = 0;
@@ -158,6 +182,7 @@ export function createSpotifyProvider(
           get<RecentlyPlayed>('/me/player/recently-played?limit=50'),
         ]);
 
+        let topDataRefreshed = false;
         if (!topData || Date.now() - topDataFetchedAt >= TOP_DATA_REFRESH_MS) {
           const [artistsShort, artistsMedium, tracksShort, tracksMedium] = await Promise.all([
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8'),
@@ -172,6 +197,36 @@ export function createSpotifyProvider(
             tracksMedium: tracksMedium?.items ?? [],
           };
           topDataFetchedAt = Date.now();
+          topDataRefreshed = true;
+        }
+
+        // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
+        // aren't empty on day one — real observed plays accrue on top from here.
+        if (!historyStore.isSeeded()) {
+          const [artistsLong, tracksLong] = await Promise.all([
+            get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50'),
+            get<TopResponse<RawTrack>>('/me/top/tracks?time_range=long_term&limit=50'),
+          ]);
+          historyStore.seedIfNeeded({
+            artists: (artistsLong?.items ?? []).map(mapArtist),
+            tracks: (tracksLong?.items ?? [])
+              .map(toPlayedTrackInput)
+              .filter((t): t is PlayedTrackInput => t !== undefined),
+          });
+        }
+
+        const recentPlays = (recent?.items ?? [])
+          .map((entry) => {
+            const track = toPlayedTrackInput(entry.track);
+            return track ? { playedAt: entry.played_at, track } : undefined;
+          })
+          .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
+        historyStore.recordPlays(recentPlays);
+
+        if (topDataRefreshed) {
+          historyStore.mergeArtistMetadata(
+            [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
+          );
         }
 
         const nowPlaying =
@@ -198,6 +253,7 @@ export function createSpotifyProvider(
             shortTerm: topData.tracksShort.map(mapTrack),
             mediumTerm: topData.tracksMedium.map(mapTrack),
           },
+          allTime: historyStore.getAllTime(),
         };
         snapshotStore.setSnapshot(snapshot);
         return snapshot;

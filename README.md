@@ -119,7 +119,7 @@ One-time setup:
 2. Run `npm run setup:spotify -w server`. It prints an exact redirect URI (`http://127.0.0.1:8888/callback`) — add that under the app's **Settings → Redirect URIs** and save.
 3. Open the printed authorize URL, approve. The refresh token is saved to `server/.tokens/spotify.json` (owner-only permissions); restart the server.
 
-Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months.
+Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months / all time. Spotify's API has no all-time or top-albums endpoint, so those are built up locally: seeded once from Spotify's long_term (multi-year) top lists, then grown from every observed play in `server/.data/spotify-history.json` (gitignored, per-machine — not synced if you run the server from more than one device).
 
 ### Philips Hue
 

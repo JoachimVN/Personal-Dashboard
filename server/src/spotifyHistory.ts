@@ -1,0 +1,249 @@
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { z } from 'zod';
+
+const TOP_LIMIT = 50;
+
+const trackRecordSchema = z.object({
+  id: z.string(),
+  track: z.string(),
+  artist: z.string(),
+  album: z.string().optional(),
+  releaseDate: z.string().optional(),
+  imageUrl: z.string().optional(),
+  url: z.string().optional(),
+  playCount: z.number(),
+});
+
+const artistRecordSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  imageUrl: z.string().optional(),
+  url: z.string().optional(),
+  genres: z.array(z.string()).default([]),
+  playCount: z.number(),
+});
+
+const albumRecordSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  artist: z.string(),
+  imageUrl: z.string().optional(),
+  url: z.string().optional(),
+  releaseDate: z.string().optional(),
+  playCount: z.number(),
+});
+
+const fileSchema = z.object({
+  version: z.literal(1),
+  seededAt: z.string().optional(),
+  lastPlayedAt: z.string().optional(),
+  tracks: z.record(z.string(), trackRecordSchema).default({}),
+  artists: z.record(z.string(), artistRecordSchema).default({}),
+  albums: z.record(z.string(), albumRecordSchema).default({}),
+});
+
+export interface PlayedTrackInput {
+  id: string;
+  name: string;
+  url?: string;
+  artists: { id: string; name: string }[];
+  album: { id: string; name: string; imageUrl?: string; url?: string; releaseDate?: string };
+}
+
+export interface SeedArtistInput {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  url?: string;
+  genres: string[];
+}
+
+export interface ArtistMetadataInput {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  url?: string;
+  genres: string[];
+}
+
+type TrackRecord = z.infer<typeof trackRecordSchema>;
+type ArtistRecord = z.infer<typeof artistRecordSchema>;
+type AlbumRecord = z.infer<typeof albumRecordSchema>;
+
+const byPlayCountDesc = (a: { playCount: number }, b: { playCount: number }) => b.playCount - a.playCount;
+
+/**
+ * Accumulates real Spotify play counts (from recentlyPlayed, deduped by played_at) into an
+ * "all-time" leaderboard the API itself never exposes — Spotify has no top-albums endpoint and no
+ * permanent history, only rolling short/medium/long_term windows. Seeded once from the long_term
+ * top lists (weighted by rank) so the view isn't empty on day one; real observed plays then accrue
+ * on top and eventually overtake the seed weight. Persisted to disk (same pattern as
+ * spotifyCache.ts) so history survives server restarts.
+ */
+export class SpotifyHistoryStore {
+  private seededAt: string | undefined;
+  private lastPlayedAt: string | undefined;
+  private tracks: Record<string, TrackRecord>;
+  private artists: Record<string, ArtistRecord>;
+  private albums: Record<string, AlbumRecord>;
+
+  constructor(private readonly filePath: string) {
+    const loaded = this.load();
+    this.seededAt = loaded.seededAt;
+    this.lastPlayedAt = loaded.lastPlayedAt;
+    this.tracks = loaded.tracks;
+    this.artists = loaded.artists;
+    this.albums = loaded.albums;
+  }
+
+  isSeeded(): boolean {
+    return this.seededAt !== undefined;
+  }
+
+  /** One-time backfill from Spotify's long_term top lists. No-ops if already seeded. */
+  seedIfNeeded(input: { artists: SeedArtistInput[]; tracks: PlayedTrackInput[] }): void {
+    if (this.isSeeded()) return;
+
+    input.artists.forEach((artist, i) => {
+      this.artists[artist.id] = { ...artist, playCount: input.artists.length - i };
+    });
+
+    input.tracks.forEach((track, i) => {
+      const weight = input.tracks.length - i;
+      this.tracks[track.id] = {
+        id: track.id,
+        track: track.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        album: track.album.name,
+        releaseDate: track.album.releaseDate,
+        imageUrl: track.album.imageUrl,
+        url: track.url,
+        playCount: weight,
+      };
+      const existingAlbum = this.albums[track.album.id];
+      this.albums[track.album.id] = {
+        id: track.album.id,
+        name: track.album.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        imageUrl: track.album.imageUrl,
+        url: track.album.url,
+        releaseDate: track.album.releaseDate,
+        playCount: (existingAlbum?.playCount ?? 0) + weight,
+      };
+    });
+
+    this.seededAt = new Date().toISOString();
+    this.save();
+  }
+
+  /** Records newly-observed plays (played_at newer than the last one processed) from a recentlyPlayed page. */
+  recordPlays(entries: { playedAt: string; track: PlayedTrackInput }[]): void {
+    const cutoff = this.lastPlayedAt ? Date.parse(this.lastPlayedAt) : -Infinity;
+    const fresh = entries
+      .filter((e) => Date.parse(e.playedAt) > cutoff)
+      .sort((a, b) => Date.parse(a.playedAt) - Date.parse(b.playedAt));
+    if (fresh.length === 0) return;
+
+    for (const { playedAt, track } of fresh) {
+      const existingTrack = this.tracks[track.id];
+      this.tracks[track.id] = {
+        id: track.id,
+        track: track.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        album: track.album.name,
+        releaseDate: track.album.releaseDate,
+        imageUrl: track.album.imageUrl,
+        url: track.url,
+        playCount: (existingTrack?.playCount ?? 0) + 1,
+      };
+
+      for (const artist of track.artists) {
+        const existingArtist = this.artists[artist.id];
+        this.artists[artist.id] = {
+          id: artist.id,
+          name: artist.name,
+          imageUrl: existingArtist?.imageUrl,
+          url: existingArtist?.url,
+          genres: existingArtist?.genres ?? [],
+          playCount: (existingArtist?.playCount ?? 0) + 1,
+        };
+      }
+
+      const existingAlbum = this.albums[track.album.id];
+      this.albums[track.album.id] = {
+        id: track.album.id,
+        name: track.album.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        imageUrl: track.album.imageUrl,
+        url: track.album.url,
+        releaseDate: track.album.releaseDate,
+        playCount: (existingAlbum?.playCount ?? 0) + 1,
+      };
+
+      this.lastPlayedAt = playedAt;
+    }
+    this.save();
+  }
+
+  /** Backfills image/url/genres for accumulated artists once they show up in a top-artists fetch — recentlyPlayed alone never carries artist images. */
+  mergeArtistMetadata(metadata: ArtistMetadataInput[]): void {
+    let changed = false;
+    for (const meta of metadata) {
+      const existing = this.artists[meta.id];
+      if (!existing) continue;
+      const imageUrl = existing.imageUrl ?? meta.imageUrl;
+      const url = existing.url ?? meta.url;
+      const genres = existing.genres.length > 0 ? existing.genres : meta.genres;
+      if (imageUrl !== existing.imageUrl || url !== existing.url || genres !== existing.genres) {
+        this.artists[meta.id] = { ...existing, imageUrl, url, genres };
+        changed = true;
+      }
+    }
+    if (changed) this.save();
+  }
+
+  getAllTime(limit = TOP_LIMIT): {
+    trackedSince: string | undefined;
+    artists: ArtistRecord[];
+    tracks: TrackRecord[];
+    albums: AlbumRecord[];
+  } {
+    return {
+      trackedSince: this.seededAt,
+      artists: Object.values(this.artists).sort(byPlayCountDesc).slice(0, limit),
+      tracks: Object.values(this.tracks).sort(byPlayCountDesc).slice(0, limit),
+      albums: Object.values(this.albums).sort(byPlayCountDesc).slice(0, limit),
+    };
+  }
+
+  private load(): z.infer<typeof fileSchema> {
+    try {
+      return fileSchema.parse(JSON.parse(readFileSync(this.filePath, 'utf8')));
+    } catch {
+      return { version: 1, tracks: {}, artists: {}, albums: {} };
+    }
+  }
+
+  private save(): void {
+    try {
+      mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
+      const tmpPath = `${this.filePath}.tmp`;
+      writeFileSync(
+        tmpPath,
+        JSON.stringify({
+          version: 1,
+          seededAt: this.seededAt,
+          lastPlayedAt: this.lastPlayedAt,
+          tracks: this.tracks,
+          artists: this.artists,
+          albums: this.albums,
+        }),
+        { mode: 0o600 },
+      );
+      renameSync(tmpPath, this.filePath);
+    } catch (error) {
+      console.warn('[spotify] Could not persist play-count history:', (error as Error).message);
+    }
+  }
+}
