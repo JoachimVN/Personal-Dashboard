@@ -92,6 +92,7 @@ export interface AlbumDetailInput {
   totalDurationMs: number;
   totalTracks?: number;
   releaseDatePrecision?: 'year' | 'month' | 'day';
+  albumType?: 'album' | 'single' | 'compilation';
   /** Every track on the album, per Spotify — used to backfill albumId/artistIds on our own track records. */
   tracks: { id: string; artistIds: string[] }[];
 }
@@ -303,7 +304,7 @@ export class SpotifyHistoryStore {
     if (changed) this.save();
   }
 
-  /** Album ids missing duration/track-count, or that still have a tracked track missing artistIds — one fetch per id (see providers/spotify.ts). Re-checked on every call so an album already enriched before a field existed still gets revisited once that field needs backfilling. */
+  /** Album ids missing duration/track-count/albumType, or that still have a tracked track missing artistIds — one fetch per id (see providers/spotify.ts). Re-checked on every call so an album already enriched before a field existed still gets revisited once that field needs backfilling. */
   getAlbumIdsNeedingDurations(limit: number): string[] {
     const tracksByAlbum = new Map<string, TrackRecord[]>();
     for (const track of Object.values(this.tracks)) {
@@ -315,6 +316,7 @@ export class SpotifyHistoryStore {
     return Object.values(this.albums)
       .filter((album) => {
         if (album.totalDurationMs === undefined || album.totalTracks === undefined) return true;
+        if (album.albumType === undefined) return true;
         return (tracksByAlbum.get(album.id) ?? []).some((track) => track.artistIds.length === 0);
       })
       .slice(0, limit)
@@ -337,6 +339,7 @@ export class SpotifyHistoryStore {
           totalDurationMs: detail.totalDurationMs,
           totalTracks: detail.totalTracks ?? existing.totalTracks,
           releaseDatePrecision: detail.releaseDatePrecision ?? existing.releaseDatePrecision,
+          albumType: detail.albumType ?? existing.albumType,
         };
         changed = true;
       }

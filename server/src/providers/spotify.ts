@@ -41,6 +41,7 @@ interface RawAlbumDetail {
   id: string;
   total_tracks?: number;
   release_date_precision?: string;
+  album_type?: string;
   tracks?: { items?: { id?: string; duration_ms?: number; artists?: { id: string }[] }[] };
 }
 interface CurrentlyPlaying {
@@ -291,6 +292,7 @@ export function createSpotifyProvider(
               ),
               totalTracks: album.total_tracks,
               releaseDatePrecision: toReleaseDatePrecision(album.release_date_precision),
+              albumType: toAlbumType(album.album_type),
               tracks: (album.tracks?.items ?? [])
                 .filter((t): t is { id: string; duration_ms?: number; artists?: { id: string }[] } => t.id !== undefined)
                 .map((t) => ({ id: t.id, artistIds: (t.artists ?? []).map((a) => a.id) })),

@@ -155,11 +155,11 @@ describe('SpotifyHistoryStore', () => {
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual(['al1']);
 
     store.enrichAlbumDetails([
-      { id: 'al1', totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day', tracks: [{ id: 't1', artistIds: ['a1'] }] },
+      { id: 'al1', totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day', albumType: 'album', tracks: [{ id: 't1', artistIds: ['a1'] }] },
     ]);
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual([]);
     const [album] = store.getAllTime(100, 0).albums;
-    expect(album).toMatchObject({ totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day' });
+    expect(album).toMatchObject({ totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day', albumType: 'album' });
   });
 
   it('keeps an album pending if it has a duration but is still missing totalTracks', () => {
