@@ -10,14 +10,17 @@ npm-workspaces monorepo:
 - **`server/`** — Express on `127.0.0.1:4821`. Each data source is a *provider* polled on its own interval; results are schema-validated (zod) and cached in memory. Widgets read the cache via `/api/widgets/:id`.
 - **`shared/`** — zod schemas + types shared by both.
 
-No database. Secrets live in gitignored `server/.env` / `server/.tokens/`.
+No database. Nothing personal is in this repo: credentials live in gitignored `server/.env` /
+`server/.tokens/`, your settings in gitignored `server/config.json`, and fetched data (health,
+listening history, message previews) never leaves gitignored `server/.data/` on your own machine.
 
 ## Getting started
 
 ```bash
 npm install
-cp server/.env.example server/.env   # fill in what you want enabled
-npm run dev                          # server :4822 + client :5173
+cp server/.env.example server/.env              # fill in what you want enabled
+cp server/config.example.json server/config.json  # optional — defaults are fine
+npm run dev                                     # server :4822 + client :5173
 ```
 
 Widgets without credentials show as "not configured" instead of breaking — enable them one at a time.
