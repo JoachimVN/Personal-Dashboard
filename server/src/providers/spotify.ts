@@ -157,6 +157,26 @@ async function accessToken(
   return next.access_token;
 }
 
+/** Spotify caps `limit` at 50/call for top-items endpoints, so paginate with `offset` to get more. */
+async function getTopTracks(
+  get: <T>(path: string) => Promise<T | null>,
+  timeRange: 'short_term' | 'medium_term' | 'long_term',
+  total: number,
+): Promise<RawTrack[]> {
+  const pageSize = 50;
+  const results: RawTrack[] = [];
+  for (let offset = 0; offset < total; offset += pageSize) {
+    const limit = Math.min(pageSize, total - offset);
+    const page = await get<TopResponse<RawTrack>>(
+      `/me/top/tracks?time_range=${timeRange}&limit=${limit}&offset=${offset}`,
+    );
+    const items = page?.items ?? [];
+    results.push(...items);
+    if (items.length < limit) break; // fewer than requested means there's nothing more to page through
+  }
+  return results;
+}
+
 export function createSpotifyProvider(
   oauth: { clientId: string; clientSecret: string } | undefined,
   snapshotStore: SpotifySnapshotStore,
@@ -209,14 +229,14 @@ export function createSpotifyProvider(
           const [artistsShort, artistsMedium, tracksShort, tracksMedium] = await Promise.all([
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8'),
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8'),
-            get<TopResponse<RawTrack>>('/me/top/tracks?time_range=short_term&limit=50'),
-            get<TopResponse<RawTrack>>('/me/top/tracks?time_range=medium_term&limit=50'),
+            getTopTracks(get, 'short_term', 100),
+            getTopTracks(get, 'medium_term', 100),
           ]);
           topData = {
             artistsShort: artistsShort?.items ?? [],
             artistsMedium: artistsMedium?.items ?? [],
-            tracksShort: tracksShort?.items ?? [],
-            tracksMedium: tracksMedium?.items ?? [],
+            tracksShort,
+            tracksMedium,
           };
           topDataFetchedAt = Date.now();
           topDataRefreshed = true;
@@ -227,13 +247,11 @@ export function createSpotifyProvider(
         if (!historyStore.isSeeded()) {
           const [artistsLong, tracksLong] = await Promise.all([
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50'),
-            get<TopResponse<RawTrack>>('/me/top/tracks?time_range=long_term&limit=50'),
+            getTopTracks(get, 'long_term', 100),
           ]);
           historyStore.seedIfNeeded({
             artists: (artistsLong?.items ?? []).map(mapArtist),
-            tracks: (tracksLong?.items ?? [])
-              .map(toPlayedTrackInput)
-              .filter((t): t is PlayedTrackInput => t !== undefined),
+            tracks: tracksLong.map(toPlayedTrackInput).filter((t): t is PlayedTrackInput => t !== undefined),
           });
         }
 

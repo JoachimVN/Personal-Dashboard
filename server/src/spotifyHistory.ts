@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 
-const TOP_LIMIT = 50;
+const TOP_LIMIT = 100;
 
 const trackRecordSchema = z.object({
   id: z.string(),
