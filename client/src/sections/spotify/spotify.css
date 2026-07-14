@@ -3,6 +3,8 @@
    accentStyle()/section-card-aura machinery like every other section accent. */
 :root {
   --color-accent-spotify: light-dark(#16a34a, #1ed760);
+  /* Brighter in light mode, deeper (not neon) in dark mode — used only by the page glow below. */
+  --color-spotify-glow: light-dark(#22c55e, #0e6b35);
 }
 
 @media (min-width: 1024px) {
@@ -22,7 +24,7 @@
   pointer-events: none;
   background: linear-gradient(
     165deg,
-    color-mix(in oklab, var(--color-accent-spotify) 16%, transparent),
+    color-mix(in oklab, var(--color-spotify-glow) 26%, transparent),
     transparent 60%
   );
 }
@@ -39,7 +41,7 @@
   height: 46rem;
   top: -16rem;
   left: -14rem;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 42%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-spotify-glow) 62%, transparent), transparent 70%);
   animation: spotify-orb-drift-one 22s ease-in-out infinite alternate;
 }
 
@@ -48,7 +50,7 @@
   height: 40rem;
   top: 12%;
   right: -16rem;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 34%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-spotify-glow) 52%, transparent), transparent 70%);
   animation: spotify-orb-drift-two 26s ease-in-out infinite alternate;
 }
 
@@ -57,7 +59,7 @@
   height: 42rem;
   bottom: -18rem;
   left: 20%;
-  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 28%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-spotify-glow) 44%, transparent), transparent 70%);
   animation: spotify-orb-drift-one 30s ease-in-out infinite alternate-reverse;
 }
 
