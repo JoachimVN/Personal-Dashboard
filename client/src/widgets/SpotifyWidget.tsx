@@ -49,9 +49,6 @@ function TrackRow({ track, rank }: Readonly<{ track: Track; rank: number }>) {
         )}
         <p className="truncate text-xs text-ink-faint">{track.artist}</p>
       </div>
-      {track.playCount !== undefined && (
-        <span className="shrink-0 text-xs tabular-nums text-ink-faint">{track.playCount}×</span>
-      )}
     </li>
   );
 }
@@ -178,11 +175,7 @@ function ArtistCell({ artist, rank }: { artist: Artist; rank: number }) {
         </span>
       </div>
       <p className="mt-1.5 truncate text-sm font-medium text-ink">{artist.name}</p>
-      {artist.playCount !== undefined ? (
-        <p className="truncate text-xs text-ink-faint">{artist.playCount} plays</p>
-      ) : (
-        artist.genres[0] && <p className="truncate text-xs text-ink-faint">{artist.genres[0]}</p>
-      )}
+      {artist.genres[0] && <p className="truncate text-xs text-ink-faint">{artist.genres[0]}</p>}
     </>
   );
   return artist.url ? (
@@ -316,34 +309,39 @@ function AlbumRow({ album, rank }: Readonly<{ album: Album; rank: number }>) {
     .join(' · ');
 
   return (
-    <li className="rounded-2xl border border-card-border bg-track/25 p-3 transition hover:bg-track/45">
-      <div className="flex items-center gap-3">
-        <Rank n={rank} />
-        <Thumb url={album.imageUrl} size="h-16 w-16" />
-        <div className="min-w-0 flex-1">
-          {album.url ? (
-            <a href={album.url} target="_blank" rel="noreferrer" className={linkClass}>
-              {album.name}
-            </a>
-          ) : (
-            <span className="block truncate font-medium">{album.name}</span>
-          )}
-          <p className="truncate text-xs text-ink-faint">{album.artist}</p>
-          {meta && <p className="mt-0.5 truncate text-[11px] text-ink-faint">{meta}</p>}
-        </div>
-        <span className="shrink-0 text-xs tabular-nums text-ink-faint">{album.playCount}×</span>
+    <li className="flex items-stretch gap-3 overflow-hidden rounded-2xl border border-card-border bg-track/25 transition hover:bg-track/45">
+      <div className="relative w-20 shrink-0 sm:w-24">
+        {album.imageUrl ? (
+          <img src={album.imageUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="h-full w-full bg-track" />
+        )}
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-xs font-medium tabular-nums text-white">
+          {rank}
+        </span>
+      </div>
+      <div className="min-w-0 flex-1 py-2.5 pr-1">
+        {album.url ? (
+          <a href={album.url} target="_blank" rel="noreferrer" className={linkClass}>
+            {album.name}
+          </a>
+        ) : (
+          <span className="block truncate font-medium">{album.name}</span>
+        )}
+        <p className="truncate text-xs text-ink-faint">{album.artist}</p>
+        {meta && <p className="mt-0.5 truncate text-[11px] text-ink-faint">{meta}</p>}
       </div>
       {album.topTracks.length > 0 && (
-        <ol className="mt-2 space-y-1 border-t border-card-border/60 pl-9 pt-2 text-xs text-ink-muted">
-          {album.topTracks.map((track, i) => (
-            <li key={track.id ?? `${track.track}-${i}`} className="flex items-center gap-2">
-              <span className="min-w-0 flex-1 truncate">
+        <div className="w-36 shrink-0 border-l border-card-border/60 py-2.5 pl-3 pr-3 sm:w-44">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Top tracks</p>
+          <ol className="mt-1 space-y-0.5 text-xs text-ink-muted">
+            {album.topTracks.map((track, i) => (
+              <li key={track.id ?? `${track.track}-${i}`} className="truncate">
                 {i + 1}. {track.track}
-              </span>
-              <span className="shrink-0 tabular-nums text-ink-faint">{track.playCount}×</span>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
     </li>
   );
