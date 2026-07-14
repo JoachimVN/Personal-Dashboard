@@ -29,16 +29,22 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-function iso(hoursFromNow: number): string {
-  return new Date(Date.now() + hoursFromNow * 3_600_000).toISOString();
+// Every one of these takes an explicit `now` rather than reading Date.now()/`new Date()` — the
+// script can run at any real wall-clock moment, but the client renders relative-time text
+// ("2 h ago", contribution grid dates) against a *frozen* fake clock (see referenceNow in
+// screenshots.ts). Computing fixture timestamps off the real clock instead of that same frozen
+// reference meant every CI run — even with zero source changes — nudged "11 h ago" to "10 h ago"
+// and produced a spurious screenshot commit purely from wall-clock drift.
+function iso(now: Date, hoursFromNow: number): string {
+  return new Date(now.getTime() + hoursFromNow * 3_600_000).toISOString();
 }
 
-function isoDaysAgo(days: number, hoursFromNow = 0): string {
-  return new Date(Date.now() - days * 86_400_000 + hoursFromNow * 3_600_000).toISOString();
+function isoDaysAgo(now: Date, days: number, hoursFromNow = 0): string {
+  return new Date(now.getTime() - days * 86_400_000 + hoursFromNow * 3_600_000).toISOString();
 }
 
-function dateDaysAgo(days: number): string {
-  return isoDaysAgo(days).slice(0, 10);
+function dateDaysAgo(now: Date, days: number): string {
+  return isoDaysAgo(now, days).slice(0, 10);
 }
 
 function hhmm(date: Date): string {
@@ -48,8 +54,8 @@ function hhmm(date: Date): string {
 /** A day N days out at a fixed local time — independent of what time the screenshot script
  * happens to run, unlike a relative `iso(hoursFromNow)` offset, which drifted into an "in 4h"
  * label that no longer matched a hardcoded "19:15" string once enough real time had passed. */
-function daysFromNowAt(days: number, hour: number, minute: number): Date {
-  const d = new Date();
+function daysFromNowAt(now: Date, days: number, hour: number, minute: number): Date {
+  const d = new Date(now);
   d.setDate(d.getDate() + days);
   d.setHours(hour, minute, 0, 0);
   return d;
@@ -100,73 +106,87 @@ async function resolvedArtistPhoto(name: string, fallbackSeed: string): Promise<
 
 // ── Overview page (calendar + weather + a quiet day of tiles) ──────────────────────────────────
 
-export const weather: WeatherData = {
-  location: { lat: 40.71, lon: -74.01, name: 'New York' },
-  current: { temperature: 18, windSpeed: 2.6, symbol: 'partlycloudy_day' },
-  hours: [
-    { time: iso(1), hourLabel: '14', temperature: 18, precipitationMm: 0, symbol: 'partlycloudy_day' },
-    { time: iso(2), hourLabel: '15', temperature: 19, precipitationMm: 0, symbol: 'clearsky_day' },
-    { time: iso(3), hourLabel: '16', temperature: 17, precipitationMm: 0, symbol: 'fair_day' },
-    { time: iso(4), hourLabel: '17', temperature: 16, precipitationMm: 0.1, symbol: 'lightrain' },
-  ],
-  days: [
-    { date: dateDaysAgo(0), dayLabel: 'Wed', minTemperature: 14, maxTemperature: 20, precipitationMm: 0.4, symbol: 'partlycloudy_day' },
-  ],
-};
+export function weather(now: Date): WeatherData {
+  return {
+    location: { lat: 40.71, lon: -74.01, name: 'New York' },
+    current: { temperature: 18, windSpeed: 2.6, symbol: 'partlycloudy_day' },
+    hours: [
+      { time: iso(now, 1), hourLabel: '14', temperature: 18, precipitationMm: 0, symbol: 'partlycloudy_day' },
+      { time: iso(now, 2), hourLabel: '15', temperature: 19, precipitationMm: 0, symbol: 'clearsky_day' },
+      { time: iso(now, 3), hourLabel: '16', temperature: 17, precipitationMm: 0, symbol: 'fair_day' },
+      { time: iso(now, 4), hourLabel: '17', temperature: 16, precipitationMm: 0.1, symbol: 'lightrain' },
+    ],
+    days: [
+      { date: dateDaysAgo(now, 0), dayLabel: 'Wed', minTemperature: 14, maxTemperature: 20, precipitationMm: 0.4, symbol: 'partlycloudy_day' },
+    ],
+  };
+}
 
-const odysseyStart = daysFromNowAt(2, 19, 15); // Friday
-const ODYSSEY_DURATION_MIN = 2 * 60 + 53;
-const odysseyEnd = new Date(odysseyStart.getTime() + ODYSSEY_DURATION_MIN * 60_000);
-const odysseyDurationLabel = `${Math.floor(ODYSSEY_DURATION_MIN / 60)}h ${ODYSSEY_DURATION_MIN % 60}m`;
-const standupStart = daysFromNowAt(1, 9, 30);
-const standupEnd = new Date(standupStart.getTime() + 30 * 60_000);
+export function overviewCalendar(now: Date): CalendarData {
+  const odysseyStart = daysFromNowAt(now, 2, 19, 15); // Friday
+  const ODYSSEY_DURATION_MIN = 2 * 60 + 53;
+  const odysseyEnd = new Date(odysseyStart.getTime() + ODYSSEY_DURATION_MIN * 60_000);
+  const odysseyDurationLabel = `${Math.floor(ODYSSEY_DURATION_MIN / 60)}h ${ODYSSEY_DURATION_MIN % 60}m`;
+  const standupStart = daysFromNowAt(now, 1, 9, 30);
+  const standupEnd = new Date(standupStart.getTime() + 30 * 60_000);
 
-export const overviewCalendar: CalendarData = {
-  events: [
-    {
-      id: 'ev1', title: 'Cinema — The Odyssey', calendar: 'Personal', allDay: false,
-      location: `${odysseyDurationLabel} · with Sam`, start: odysseyStart.toISOString(), end: odysseyEnd.toISOString(),
-      date: odysseyStart.toISOString().slice(0, 10), startLabel: hhmm(odysseyStart), endLabel: hhmm(odysseyEnd),
+  return {
+    events: [
+      {
+        id: 'ev1', title: 'Cinema — The Odyssey', calendar: 'Personal', allDay: false,
+        location: `${odysseyDurationLabel} · with Sam`, start: odysseyStart.toISOString(), end: odysseyEnd.toISOString(),
+        date: odysseyStart.toISOString().slice(0, 10), startLabel: hhmm(odysseyStart), endLabel: hhmm(odysseyEnd),
+      },
+      {
+        id: 'ev2', title: 'Team standup', calendar: 'Work', allDay: false, location: 'Video call',
+        start: standupStart.toISOString(), end: standupEnd.toISOString(),
+        date: standupStart.toISOString().slice(0, 10), startLabel: hhmm(standupStart), endLabel: hhmm(standupEnd),
+      },
+    ],
+  };
+}
+
+export function overviewGithub(now: Date): GitHubData {
+  return {
+    activity: [], issues: [],
+    pullRequests: [
+      { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(now, -2) },
+    ],
+    contributions: { total: 512, days: [{ date: dateDaysAgo(now, 0), count: 2 }] },
+    repoHealth: [],
+  };
+}
+
+export function overviewGmail(now: Date): GmailData {
+  return {
+    unreadThreads: 5,
+    threads: [{ id: 't1', from: 'Newsletter', subject: 'This week in open source', date: iso(now, -3), unread: true, url: '#' }],
+  };
+}
+
+export function overviewHealth(now: Date): HealthData {
+  return {
+    today: {
+      date: dateDaysAgo(now, 0), steps: 3247, watchSteps: 3247, activeEnergyKcal: 214, exerciseMinutes: 14,
+      standHours: 7, heartRate: 71, restingHeartRate: 59, walkingHeartRate: 89, bloodOxygenPercent: 98,
     },
-    {
-      id: 'ev2', title: 'Team standup', calendar: 'Work', allDay: false, location: 'Video call',
-      start: standupStart.toISOString(), end: standupEnd.toISOString(),
-      date: standupStart.toISOString().slice(0, 10), startLabel: hhmm(standupStart), endLabel: hhmm(standupEnd),
-    },
-  ],
-};
+    history: [], updatedAt: iso(now, 0),
+    goals: { steps: 9000, activeEnergyKcal: 500, exerciseMinutes: 30, standHours: 12 },
+  };
+}
 
-export const overviewGithub: GitHubData = {
-  activity: [], issues: [],
-  pullRequests: [
-    { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(-2) },
-  ],
-  contributions: { total: 512, days: [{ date: dateDaysAgo(0), count: 2 }] },
-  repoHealth: [],
-};
-
-export const overviewGmail: GmailData = {
-  unreadThreads: 5,
-  threads: [{ id: 't1', from: 'Newsletter', subject: 'This week in open source', date: iso(-3), unread: true, url: '#' }],
-};
-
-export const overviewHealth: HealthData = {
-  today: {
-    date: dateDaysAgo(0), steps: 3247, watchSteps: 3247, activeEnergyKcal: 214, exerciseMinutes: 14,
-    standHours: 7, heartRate: 71, restingHeartRate: 59, walkingHeartRate: 89, bloodOxygenPercent: 98,
-  },
-  history: [], updatedAt: iso(0),
-  goals: { steps: 9000, activeEnergyKcal: 500, exerciseMinutes: 30, standHours: 12 },
-};
-
-export const overviewAiClaude: AiUsageToolData = {
-  available: true, fiveHour: { usedPercent: 28, resetsAt: iso(3) }, weekly: { usedPercent: 37, resetsAt: iso(96) },
-  fiveHourStatus: 'limited', weeklyStatus: 'limited', history: [],
-};
-export const overviewAiCodex: AiUsageToolData = {
-  available: true, fiveHour: { usedPercent: 15, resetsAt: iso(3) }, weekly: { usedPercent: 22, resetsAt: iso(96) },
-  fiveHourStatus: 'limited', weeklyStatus: 'limited', history: [],
-};
+export function overviewAiClaude(now: Date): AiUsageToolData {
+  return {
+    available: true, fiveHour: { usedPercent: 28, resetsAt: iso(now, 3) }, weekly: { usedPercent: 37, resetsAt: iso(now, 96) },
+    fiveHourStatus: 'limited', weeklyStatus: 'limited', history: [],
+  };
+}
+export function overviewAiCodex(now: Date): AiUsageToolData {
+  return {
+    available: true, fiveHour: { usedPercent: 15, resetsAt: iso(now, 3) }, weekly: { usedPercent: 22, resetsAt: iso(now, 96) },
+    fiveHourStatus: 'limited', weeklyStatus: 'limited', history: [],
+  };
+}
 
 // ── Spotify page — real, broadly-recognizable artists/tracks, not an obscure curated list ──────
 
@@ -212,7 +232,7 @@ const ALBUMS = [
   { id: 'al3', name: 'SOUR', artist: 'Olivia Rodrigo', releaseDate: '2021-05-21', totalTracks: 11, totalDurationMs: 2_050_000, playCount: 176, topTrack: TRACKS[4] },
 ];
 
-async function loadSpotify(): Promise<{ overview: SpotifyData; detail: SpotifyData }> {
+async function loadSpotify(now: Date): Promise<{ overview: SpotifyData; detail: SpotifyData }> {
   const artistImages = Object.fromEntries(await Promise.all(
     ARTIST_NAMES.map(async (name) => [name, MANUAL_ARTIST_IMAGES[name] ?? await resolvedArtistPhoto(name, `artist-${name}`)] as const),
   ));
@@ -239,17 +259,17 @@ async function loadSpotify(): Promise<{ overview: SpotifyData; detail: SpotifyDa
   const detail: SpotifyData = {
     nowPlaying: { track: 'Levitating', artist: 'Dua Lipa', album: 'Future Nostalgia', imageUrl: tracks[1].imageUrl, isPlaying: true, progressMs: 112_000, durationMs: 203_000 },
     recentlyPlayed: [
-      { ...tracks[2], playedAt: isoDaysAgo(0, -0.1) },
-      { ...oneOffs[0], playedAt: isoDaysAgo(0, -0.6) },
-      { ...tracks[6], playedAt: isoDaysAgo(0, -1.4) },
-      { ...oneOffs[1], playedAt: isoDaysAgo(0, -2.9) },
-      { ...tracks[0], playedAt: isoDaysAgo(0, -4.1) },
-      { ...oneOffs[2], playedAt: isoDaysAgo(0, -6.3) },
+      { ...tracks[2], playedAt: isoDaysAgo(now, 0, -0.1) },
+      { ...oneOffs[0], playedAt: isoDaysAgo(now, 0, -0.6) },
+      { ...tracks[6], playedAt: isoDaysAgo(now, 0, -1.4) },
+      { ...oneOffs[1], playedAt: isoDaysAgo(now, 0, -2.9) },
+      { ...tracks[0], playedAt: isoDaysAgo(now, 0, -4.1) },
+      { ...oneOffs[2], playedAt: isoDaysAgo(now, 0, -6.3) },
     ],
     topArtists: { shortTerm: artists, mediumTerm: artists.slice().reverse() },
     topTracks: { shortTerm: tracks, mediumTerm: tracks.slice().reverse() },
     allTime: {
-      trackedSince: dateDaysAgo(280),
+      trackedSince: dateDaysAgo(now, 280),
       artists: artists.map((artist, i) => ({ ...artist, playCount: 410 - i * 38 })),
       tracks: tracks.map((track, i) => ({ ...track, playCount: 128 - i * 11, verified: i < 2 })),
       albums: ALBUMS.map((album) => ({
@@ -266,8 +286,8 @@ async function loadSpotify(): Promise<{ overview: SpotifyData; detail: SpotifyDa
 
 // ── Health page ──────────────────────────────────────────────────────────────────────────────
 
-function healthDayFor(daysAgo: number, rng: () => number) {
-  const date = new Date(Date.now() - daysAgo * 86_400_000);
+function healthDayFor(now: Date, daysAgo: number, rng: () => number) {
+  const date = new Date(now.getTime() - daysAgo * 86_400_000);
   // A stable cyclical pattern, not date.getDay() — real weekday drifts by one position every time
   // this script runs on a different calendar day, which reshuffled the *entire* RNG sequence
   // below (weekend vs. weekday takes a different branch) and made the chart change on every run
@@ -300,14 +320,15 @@ function healthDayFor(daysAgo: number, rng: () => number) {
   };
 }
 
-const healthRng = mulberry32(20260714);
-
-export const healthFixture: HealthData = {
-  today: { ...healthDayFor(0, healthRng), date: dateDaysAgo(0), exerciseMinutes: 23 },
-  history: Array.from({ length: 30 }, (_, i) => healthDayFor(29 - i, healthRng)),
-  updatedAt: iso(0),
-  goals: { steps: 9000, activeEnergyKcal: 500, exerciseMinutes: 30, standHours: 12 },
-};
+export function healthFixture(now: Date): HealthData {
+  const healthRng = mulberry32(20260714);
+  return {
+    today: { ...healthDayFor(now, 0, healthRng), date: dateDaysAgo(now, 0), exerciseMinutes: 23 },
+    history: Array.from({ length: 30 }, (_, i) => healthDayFor(now, 29 - i, healthRng)),
+    updatedAt: iso(now, 0),
+    goals: { steps: 9000, activeEnergyKcal: 500, exerciseMinutes: 30, standHours: 12 },
+  };
+}
 
 // ── AI usage page (Claude + Codex, no model-specific window) ───────────────────────────────────
 
@@ -412,10 +433,10 @@ export function buildAiFixtures(now: Date): { claude: AiUsageToolData; codex: Ai
 
 // ── GitHub page ──────────────────────────────────────────────────────────────────────────────
 
-function contributionDays(rng: () => number) {
+function contributionDays(now: Date, rng: () => number) {
   const days: { date: string; count: number }[] = [];
   for (let i = 364; i >= 0; i--) {
-    const date = new Date(Date.now() - i * 86_400_000);
+    const date = new Date(now.getTime() - i * 86_400_000);
     // A stable cyclical pattern, not date.getDay() — see healthDayFor's comment on why coupling
     // this to the real weekday reshuffles the whole grid every time "today" rolls to a new day.
     const weekend = i % 7 === 0 || i % 7 === 1;
@@ -434,42 +455,44 @@ function contributionDays(rng: () => number) {
   return days;
 }
 
-const githubRng = mulberry32(42);
-const githubDays = contributionDays(githubRng);
+export function githubFixture(now: Date): GitHubData {
+  const githubRng = mulberry32(42);
+  const githubDays = contributionDays(now, githubRng);
 
-export const githubFixture: GitHubData = {
-  activity: [
-    {
-      id: 'ev1', summary: '3 commits', repo: 'yourname/personal-dashboard', timestamp: iso(-2), branch: 'dev',
-      commits: [
-        { sha: 'a1b2c3d', title: 'Add importance scoring to the command center' },
-        { sha: 'b2c3d4e', title: 'Wire health baseline into the scoring engine' },
-        { sha: 'c3d4e5f', title: 'Fix null coalescing on Postgres-backed health store' },
-      ],
-    },
-    { id: 'ev2', summary: '1 commit', repo: 'yourname/weekend-project', timestamp: iso(-26), branch: 'main', commits: [{ sha: 'd4e5f6a', title: 'Prototype the offline sync queue' }] },
-  ],
-  pullRequests: [
-    { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(-2) },
-    { title: 'Bump Vite to 7.x', repo: 'yourname/personal-dashboard', number: 40, url: '#', role: 'review-requested', draft: false, updatedAt: iso(-20) },
-  ],
-  issues: [
-    { title: 'Contribution grid should scroll on narrow viewports', repo: 'yourname/personal-dashboard', number: 38, url: '#', updatedAt: iso(-40) },
-  ],
-  contributions: { total: githubDays.reduce((sum, day) => sum + day.count, 0), days: githubDays },
-  repoHealth: [
-    { fullName: 'yourname/personal-dashboard', stars: 12, ciStatus: 'success', ciUrl: '#', latestRelease: 'v1.4.0', url: '#' },
-    { fullName: 'yourname/weekend-project', stars: 3, ciStatus: 'running', ciUrl: '#', url: '#' },
-    { fullName: 'yourname/dotfiles', stars: 41, ciStatus: 'none', url: '#' },
-  ],
-};
+  return {
+    activity: [
+      {
+        id: 'ev1', summary: '3 commits', repo: 'yourname/personal-dashboard', timestamp: iso(now, -2), branch: 'dev',
+        commits: [
+          { sha: 'a1b2c3d', title: 'Add importance scoring to the command center' },
+          { sha: 'b2c3d4e', title: 'Wire health baseline into the scoring engine' },
+          { sha: 'c3d4e5f', title: 'Fix null coalescing on Postgres-backed health store' },
+        ],
+      },
+      { id: 'ev2', summary: '1 commit', repo: 'yourname/weekend-project', timestamp: iso(now, -26), branch: 'main', commits: [{ sha: 'd4e5f6a', title: 'Prototype the offline sync queue' }] },
+    ],
+    pullRequests: [
+      { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(now, -2) },
+      { title: 'Bump Vite to 7.x', repo: 'yourname/personal-dashboard', number: 40, url: '#', role: 'review-requested', draft: false, updatedAt: iso(now, -20) },
+    ],
+    issues: [
+      { title: 'Contribution grid should scroll on narrow viewports', repo: 'yourname/personal-dashboard', number: 38, url: '#', updatedAt: iso(now, -40) },
+    ],
+    contributions: { total: githubDays.reduce((sum, day) => sum + day.count, 0), days: githubDays },
+    repoHealth: [
+      { fullName: 'yourname/personal-dashboard', stars: 12, ciStatus: 'success', ciUrl: '#', latestRelease: 'v1.4.0', url: '#' },
+      { fullName: 'yourname/weekend-project', stars: 3, ciStatus: 'running', ciUrl: '#', url: '#' },
+      { fullName: 'yourname/dotfiles', stars: 41, ciStatus: 'none', url: '#' },
+    ],
+  };
+}
 
 export interface Fixtures {
   spotifyOverview: SpotifyData;
   spotifyDetail: SpotifyData;
 }
 
-export async function loadFixtures(): Promise<Fixtures> {
-  const { overview, detail } = await loadSpotify();
+export async function loadFixtures(now: Date): Promise<Fixtures> {
+  const { overview, detail } = await loadSpotify(now);
   return { spotifyOverview: overview, spotifyDetail: detail };
 }

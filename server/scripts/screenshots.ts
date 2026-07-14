@@ -105,34 +105,46 @@ interface Page {
 }
 
 async function buildPages(): Promise<Page[]> {
-  const fixtures = await loadFixtures();
-
-  const overviewCommandCenter = rankCandidates([
-    ...calendarCandidates(overviewCalendar, Date.now()),
-    ...gmailCandidates(overviewGmail, undefined, GMAIL_STALE_MS),
-    ...githubCandidates(overviewGithub),
-    ...healthCandidates(overviewHealth),
-    ...spotifyCandidates(fixtures.spotifyOverview, overviewGithub),
-    ...aiCandidates([overviewAiClaude, overviewAiCodex]),
-    ...fallbackCandidates(),
-  ]);
-
+  // Computed up front, then threaded into every fixture builder below instead of letting them
+  // read the real Date.now() — keeps each page's data timestamps pinned to the exact same frozen
+  // clock the client fakes for that page, so two runs on different days/hours produce byte-
+  // identical screenshots (given the fixtures' seeded RNGs) instead of spuriously-drifted ones.
   const overviewNow = referenceNow('evening');
   const spotifyNow = referenceNow('morning');
   const healthNow = referenceNow('day');
   const aiNow = referenceNow('night');
   const githubNow = referenceNow('morning');
+
+  const fixtures = await loadFixtures(spotifyNow);
   const aiFixtures = buildAiFixtures(aiNow);
+  const overviewCalendarFixture = overviewCalendar(overviewNow);
+  const overviewGithubFixture = overviewGithub(overviewNow);
+  const overviewGmailFixture = overviewGmail(overviewNow);
+  const overviewHealthFixture = overviewHealth(overviewNow);
+  const overviewAiClaudeFixture = overviewAiClaude(overviewNow);
+  const overviewAiCodexFixture = overviewAiCodex(overviewNow);
+  const healthPageFixture = healthFixture(healthNow);
+  const githubPageFixture = githubFixture(githubNow);
+
+  const overviewCommandCenter = rankCandidates([
+    ...calendarCandidates(overviewCalendarFixture, overviewNow.getTime()),
+    ...gmailCandidates(overviewGmailFixture, undefined, GMAIL_STALE_MS),
+    ...githubCandidates(overviewGithubFixture),
+    ...healthCandidates(overviewHealthFixture),
+    ...spotifyCandidates(fixtures.spotifyOverview, overviewGithubFixture),
+    ...aiCandidates([overviewAiClaudeFixture, overviewAiCodexFixture]),
+    ...fallbackCandidates(),
+  ]);
 
   return [
     {
       slug: 'overview', file: '01-overview.png', hash: '', daypart: 'evening', theme: 'dark',
       widgets: {
         'command-center': envelope(overviewCommandCenter, overviewNow),
-        calendar: envelope(overviewCalendar, overviewNow),
-        weather: envelope(weather, overviewNow),
-        github: envelope(overviewGithub, overviewNow),
-        health: envelope(overviewHealth, overviewNow),
+        calendar: envelope(overviewCalendarFixture, overviewNow),
+        weather: envelope(weather(overviewNow), overviewNow),
+        github: envelope(overviewGithubFixture, overviewNow),
+        health: envelope(overviewHealthFixture, overviewNow),
         spotify: envelope(fixtures.spotifyOverview, overviewNow),
       },
     },
@@ -144,7 +156,7 @@ async function buildPages(): Promise<Page[]> {
     {
       slug: 'health', file: '03-health.png', hash: '#/health', scrollToText: 'Your last 30 days, charted',
       daypart: 'day', theme: 'light',
-      widgets: { health: envelope(healthFixture, healthNow) },
+      widgets: { health: envelope(healthPageFixture, healthNow) },
     },
     {
       // Bottom-aligning the ai-tool-panel card guarantees both the Claude and Codex cards show
@@ -161,7 +173,7 @@ async function buildPages(): Promise<Page[]> {
       // contributions in the last year") so the crop ends on the grid itself.
       slug: 'github', file: '05-github.png', hash: '#/github', scrollToText: 'Contributions', scrollAlign: 'bottom', extraScroll: -50,
       daypart: 'morning', theme: 'dark',
-      widgets: { github: envelope(githubFixture, githubNow) },
+      widgets: { github: envelope(githubPageFixture, githubNow) },
     },
   ];
 }
