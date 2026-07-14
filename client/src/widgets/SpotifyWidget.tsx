@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SpotifyData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../components/WidgetCard';
@@ -21,6 +21,18 @@ function artistsForRange(data: SpotifyData, range: Range): Artist[] {
 
 const linkClass = 'block truncate font-medium text-ink hover:underline';
 const accent = 'var(--color-accent-spotify)';
+
+function releaseYear(releaseDate?: string): string | undefined {
+  return releaseDate?.slice(0, 4);
+}
+
+function formatClock(ms?: number | null): string | undefined {
+  if (ms == null || !Number.isFinite(ms)) return undefined;
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
 
 function Thumb({ url, size = 'h-10 w-10' }: { url?: string; size?: string }) {
   return url ? (
@@ -55,14 +67,35 @@ function TrackRow({ track, rank }: Readonly<{ track: Track; rank: number }>) {
 
 // ── Now playing ────────────────────────────────────────────────────────────
 
-export function NowPlaying({ nowPlaying }: Readonly<{ nowPlaying: SpotifyData['nowPlaying'] }>) {
+export function NowPlaying({
+  nowPlaying,
+  fetchedAt,
+}: Readonly<{ nowPlaying: SpotifyData['nowPlaying']; fetchedAt?: string }>) {
+  const isPlaying = nowPlaying?.isPlaying ?? false;
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [isPlaying]);
+
   if (!nowPlaying) {
     return <p className="text-sm text-ink-muted">Nothing playing right now.</p>;
   }
-  const pct =
-    nowPlaying.durationMs && nowPlaying.progressMs != null
-      ? Math.min(100, (nowPlaying.progressMs / nowPlaying.durationMs) * 100)
+
+  // Estimate progress between polls by advancing from the server's last sampled position —
+  // otherwise the bar only jumps once per poll instead of moving continuously.
+  const elapsedSinceFetch = isPlaying && fetchedAt ? Math.max(0, now - Date.parse(fetchedAt)) : 0;
+  const estimatedProgressMs =
+    nowPlaying.progressMs != null
+      ? Math.min(nowPlaying.progressMs + elapsedSinceFetch, nowPlaying.durationMs ?? Infinity)
       : null;
+  const pct =
+    nowPlaying.durationMs && estimatedProgressMs != null
+      ? Math.min(100, (estimatedProgressMs / nowPlaying.durationMs) * 100)
+      : null;
+  const year = releaseYear(nowPlaying.releaseDate);
 
   return (
     <div className="flex gap-4">
@@ -94,11 +127,18 @@ export function NowPlaying({ nowPlaying }: Readonly<{ nowPlaying: SpotifyData['n
         <p className="truncate text-sm text-ink-muted">
           {nowPlaying.artist}
           {nowPlaying.album ? ` · ${nowPlaying.album}` : ''}
+          {year ? ` · ${year}` : ''}
         </p>
         {pct !== null && (
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-track">
-            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
-          </div>
+          <>
+            <div className="mt-2 h-1 overflow-hidden rounded-full bg-track">
+              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] tabular-nums text-ink-faint">
+              <span>{formatClock(estimatedProgressMs)}</span>
+              <span>{formatClock(nowPlaying.durationMs)}</span>
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -110,7 +150,7 @@ export function NowPlayingWidget() {
   return (
     <WidgetShell title="Now playing" badge={<StaleBadge envelope={envelope} />}>
       <WidgetBody envelope={envelope} offline={offline}>
-        {(data) => <NowPlaying nowPlaying={data.nowPlaying} />}
+        {(data) => <NowPlaying nowPlaying={data.nowPlaying} fetchedAt={envelope?.fetchedAt} />}
       </WidgetBody>
     </WidgetShell>
   );
@@ -133,6 +173,9 @@ function RangeToggle({ range, onChange }: Readonly<{ range: Range; onChange: (r:
 // ── Top artists (grid) + featured #1 track ─────────────────────────────────
 
 function FeaturedTrack({ track, label }: { track: Track; label: string }) {
+  const year = releaseYear(track.releaseDate);
+  const duration = formatClock(track.durationMs);
+  const meta = [track.artist, year, duration].filter(Boolean).join(' · ');
   const content = (
     <>
       <Thumb url={track.imageUrl} size="h-16 w-16 sm:h-20 sm:w-20" />
@@ -141,7 +184,7 @@ function FeaturedTrack({ track, label }: { track: Track; label: string }) {
           Your #1 track · {label}
         </p>
         <p className="mt-0.5 truncate text-base font-semibold text-ink">{track.track}</p>
-        <p className="truncate text-sm text-ink-muted">{track.artist}</p>
+        <p className="truncate text-sm text-ink-muted">{meta}</p>
       </div>
     </>
   );

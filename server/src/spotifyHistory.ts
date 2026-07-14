@@ -11,6 +11,7 @@ const trackRecordSchema = z.object({
   album: z.string().optional(),
   albumId: z.string().optional(),
   releaseDate: z.string().optional(),
+  durationMs: z.number().optional(),
   imageUrl: z.string().optional(),
   url: z.string().optional(),
   playCount: z.number(),
@@ -52,6 +53,7 @@ export interface PlayedTrackInput {
   id: string;
   name: string;
   url?: string;
+  durationMs?: number;
   artists: { id: string; name: string }[];
   album: {
     id: string;
@@ -140,6 +142,7 @@ export class SpotifyHistoryStore {
         album: track.album.name,
         albumId: track.album.id,
         releaseDate: track.album.releaseDate,
+        durationMs: track.durationMs,
         imageUrl: track.album.imageUrl,
         url: track.url,
         playCount: weight,
@@ -180,6 +183,7 @@ export class SpotifyHistoryStore {
         album: track.album.name,
         albumId: track.album.id,
         releaseDate: track.album.releaseDate,
+        durationMs: track.durationMs,
         imageUrl: track.album.imageUrl,
         url: track.url,
         playCount: (existingTrack?.playCount ?? 0) + 1,

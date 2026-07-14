@@ -74,6 +74,7 @@ function mapTrack(track: RawTrack) {
     artist: track.artists.map((a) => a.name).join(', '),
     album: track.album?.name,
     releaseDate: track.album?.release_date,
+    durationMs: track.duration_ms,
     imageUrl: firstImage(track.album?.images),
     url: track.external_urls?.spotify,
   };
@@ -96,6 +97,7 @@ function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefined {
     id: track.id,
     name: track.name,
     url: track.external_urls?.spotify,
+    durationMs: track.duration_ms,
     artists: track.artists.map((a) => ({ id: a.id, name: a.name })),
     album: {
       id: track.album.id,
