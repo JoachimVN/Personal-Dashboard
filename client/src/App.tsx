@@ -85,17 +85,14 @@ function Overview() {
         initial={runEntrance ? { opacity: 0, y: 10 } : false}
         animate={{ opacity: 1, y: 0 }}
       >
-        <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
-          <span>Oslo</span>
-          <span className="ml-auto"><ThemeToggle /></span>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-ink-faint">
+            {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </p>
+          <ThemeToggle />
         </div>
-        <div className="mt-6 grid items-end gap-5 sm:mt-8 sm:grid-cols-[1fr_auto]">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-faint">
-              {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-            </p>
-            <h1 className="hero-title">{greeting}</h1>
-          </div>
+        <div className="grid items-end gap-5 sm:grid-cols-[1fr_auto]">
+          <h1 className="hero-title">{greeting}</h1>
           <div className="hidden text-right sm:block">
             <p className="hero-time tabular-nums">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
