@@ -251,13 +251,18 @@ a {
 }
 
 .command-primary,
-.command-signals,
-.command-agenda {
+.command-signals {
   border: 1px solid var(--color-card-border);
   background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
 }
 
 .command-agenda {
+  position: relative;
+  margin-top: 1rem;
+  border: 1px solid var(--color-card-border);
+  border-radius: 1.4rem;
+  padding: 1rem 1.25rem;
+  background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
   transition: background 200ms ease, border-color 200ms ease;
 }
 
@@ -379,13 +384,6 @@ a {
 
 .command-meter--low span {
   background: var(--color-accent-health);
-}
-
-.command-agenda {
-  position: relative;
-  margin-top: 1rem;
-  border-radius: 1.4rem;
-  padding: 1rem 1.25rem;
 }
 
 .command-agenda-heading a {

@@ -153,7 +153,7 @@ function secondaryContentFor(
   if (agenda.length) return { kind: 'agenda' };
   if (spotify?.nowPlaying?.isPlaying) return { kind: 'spotify', data: spotify };
   if (health?.today) return { kind: 'health', data: health };
-  if (github && github.contributions.days.length) return { kind: 'github', data: github };
+  if (github?.contributions.days.length) return { kind: 'github', data: github };
   return { kind: 'empty' };
 }
 

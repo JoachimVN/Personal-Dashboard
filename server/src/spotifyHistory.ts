@@ -156,13 +156,46 @@ const byPlayCountDesc = (a: { playCount: number }, b: { playCount: number }) => 
  * trailing edition marker gives editions of the same album a shared grouping key so they can be
  * merged before ranking.
  */
-const EDITION_SUFFIX_RE =
-  /\s*[[(]\s*(deluxe|extended|expanded|anniversary|remaster(?:ed)?|special|super deluxe|bonus(?: track)?(?: version)?|explicit|clean|international|complete|revisited|reissue)[^)\]]*[)\]]\s*$/i;
+const EDITION_PREFIXES = [
+  'deluxe',
+  'extended',
+  'expanded',
+  'anniversary',
+  'remaster',
+  'remastered',
+  'special',
+  'super deluxe',
+  'bonus',
+  'bonus track',
+  'bonus track version',
+  'explicit',
+  'clean',
+  'international',
+  'complete',
+  'revisited',
+  'reissue',
+];
+
+function isEditionLabel(label: string): boolean {
+  const normalized = label.trim().toLowerCase();
+  return EDITION_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix} `));
+}
+
+function editionSuffixStart(name: string): number | undefined {
+  const trimmed = name.trim();
+  const close = trimmed.at(-1);
+  if (close !== ')' && close !== ']') return undefined;
+
+  const open = close === ')' ? '(' : '[';
+  const start = trimmed.lastIndexOf(open);
+  if (start < 0 || !isEditionLabel(trimmed.slice(start + 1, -1))) return undefined;
+  return start;
+}
 
 function canonicalAlbumName(name: string): string {
   let result = name;
-  for (let stripped = result.replace(EDITION_SUFFIX_RE, '').trim(); stripped !== result; stripped = result.replace(EDITION_SUFFIX_RE, '').trim()) {
-    result = stripped;
+  for (let suffixStart = editionSuffixStart(result); suffixStart !== undefined; suffixStart = editionSuffixStart(result)) {
+    result = result.slice(0, suffixStart).trim();
   }
   return result;
 }
@@ -494,6 +527,7 @@ export class SpotifyHistoryStore {
         ...canonical,
         playCount,
         topTracks: groupTracks
+          .slice()
           .sort(byPlayCountDesc)
           .slice(0, 3)
           .map(({ id, track, playCount: trackPlayCount, url }) => ({ id, track, playCount: trackPlayCount, url })),
