@@ -65,17 +65,19 @@ function Overview() {
   }, []);
 
   return (
-    <motion.div className="col-start-1 row-start-1">
+    <motion.div
+      className="col-start-1 row-start-1 min-w-0"
+      initial={false}
+      animate={{ opacity: 1, filter: 'blur(0px)' }}
+      exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeOut' } }}
+    >
       <motion.header
         className="dashboard-hero"
         initial={runEntrance ? { opacity: 0, y: 10 } : false}
         animate={{ opacity: 1, y: 0 }}
       >
         <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
-          <span className="live-indicator"><span /></span>
-          <span>Personal system</span>
-          <span className="text-ink-faint">/</span>
-          <span className="text-ink-faint">Oslo</span>
+          <span>Oslo</span>
           <span className="ml-auto"><ThemeToggle /></span>
         </div>
         <div className="mt-6 grid items-end gap-5 sm:mt-8 sm:grid-cols-[1fr_auto]">
@@ -83,11 +85,10 @@ function Overview() {
             <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-ink-faint">
               {now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
-            <h1 className="hero-title">{greeting}<br /><span>Here is the signal.</span></h1>
+            <h1 className="hero-title">{greeting}</h1>
           </div>
           <div className="hidden text-right sm:block">
             <p className="hero-time tabular-nums">{now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</p>
-            <p className="mt-1 text-xs text-ink-faint">Your day at a glance</p>
           </div>
         </div>
       </motion.header>
@@ -100,10 +101,10 @@ function Overview() {
       </motion.div>
       <div className="dashboard-section-heading">
         <div>
-          <p className="command-eyebrow">Your system</p>
-          <h2>Go deeper</h2>
+          <p className="command-eyebrow">Sections</p>
+          <h2>More detail</h2>
         </div>
-        <p>Open a section for the complete picture and quick actions.</p>
+        <p>Open a section for the full view.</p>
       </div>
       <motion.div
         className="dashboard-grid grid grid-cols-1 gap-4 lg:grid-cols-12"
@@ -134,7 +135,7 @@ export default function App() {
           transition={{ type: 'spring', stiffness: 260, damping: 30 }}
         >
           <LayoutGroup>
-            <div className="grid">
+            <div className="relative grid grid-cols-[minmax(0,1fr)]">
               <AnimatePresence mode="popLayout" initial={false}>
                 {route.view === 'overview' ? (
                   <Overview key="overview" />

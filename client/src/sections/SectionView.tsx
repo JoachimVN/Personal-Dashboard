@@ -11,8 +11,11 @@ import { ThemeToggle } from '../components/ThemeToggle';
 export function SectionView({ section }: Readonly<{ section: SectionDef }>) {
   return (
     <motion.div
-      className="col-start-1 row-start-1"
+      className="col-start-1 row-start-1 min-w-0"
       style={accentStyle(section)}
+      initial={false}
+      animate={{ opacity: 1, filter: 'blur(0px)' }}
+      exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeOut' } }}
     >
       <motion.header
         layoutId={`section-${section.id}`}
