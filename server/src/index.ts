@@ -1,4 +1,3 @@
-import { appendFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -111,11 +110,6 @@ app.post('/api/hue/scenes/:id', async (req, res) => {
 // Same trust model as the rest of the dashboard: loopback + `tailscale serve`, no separate auth.
 // Accepts either a single day sample or `{ days: [...] }` covering a multi-day window.
 app.post('/api/health/ingest', async (req, res) => {
-  // TEMP: debugging Shortcut payloads — remove once the Shortcut is stable.
-  appendFileSync(
-    path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.data/ingest-debug.log'),
-    `${JSON.stringify({ at: new Date().toISOString(), body: req.body })}\n`,
-  );
   const isBatch = typeof req.body === 'object' && req.body !== null && 'days' in req.body;
   const parsed = isBatch
     ? healthIngestBatchSchema.safeParse(req.body)
