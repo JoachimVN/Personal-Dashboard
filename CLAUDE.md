@@ -46,6 +46,8 @@ add a widget component under `client/src/widgets/` that calls `useWidget<XData>(
 - `server/.env` (gitignored): secrets and per-machine credentials — API tokens, OAuth tokens,
   coordinates. Read via `server/src/env.ts` (`ServerEnv`). Each machine's dashboard only shows what
   that machine has credentials for.
-- `server/config.json` (tracked, not secret): user preferences that aren't credentials — pinned
-  repos, calendar allowlist, news feeds, refresh intervals. Read via `server/src/config.ts`
-  (`AppConfig`), zod-validated with defaults so a missing file is fine.
+- `server/config.json` (gitignored, not secret): user preferences that aren't credentials —
+  calendar allowlist, news feeds, refresh intervals, local repos root. Read via
+  `server/src/config.ts` (`AppConfig`), zod-validated with defaults so a missing file is fine.
+  It isn't secret, but it is personal — calendar names, a home directory path — so it's ignored
+  like `.env` and `server/config.example.json` is tracked in its place.
