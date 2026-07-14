@@ -1,40 +1,15 @@
 /* Spotify section design tokens + flourishes, kept out of index.css so the
    section is self-contained. --color-accent-spotify feeds the shared
-   accentStyle()/section-card-aura machinery like every other section accent. */
+   accentStyle()/section-card-aura machinery like every other section accent,
+   and (via registry.tsx's accentVar) App.tsx's generic SectionGlow page wash. */
 :root {
   --color-accent-spotify: light-dark(#16a34a, #1ed760);
-  /* Brighter in light mode, deeper (not neon) in dark mode — used only by the page glow below. */
-  --color-spotify-glow: light-dark(#22c55e, #0e6b35);
 }
 
 @media (min-width: 1024px) {
   .dashboard-section-card--spotify {
     grid-column: span 12;
   }
-}
-
-/* Green color wash behind the whole Spotify page — fixed to the viewport
-   (not the content column) and rendered by App.tsx as a sibling of <main>,
-   so it sits behind the header bar too, edge to edge. Static, single shape —
-   no drifting orb farm. */
-.spotify-page-glow {
-  position: fixed;
-  inset: 0;
-  z-index: -5;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.spotify-page-aurora {
-  position: absolute;
-  top: -14rem;
-  left: 50%;
-  width: min(64rem, 150vw);
-  height: 30rem;
-  translate: -50% 0;
-  background: radial-gradient(ellipse at 50% 30%, color-mix(in oklab, var(--color-spotify-glow) 42%, transparent), transparent 72%);
-  filter: blur(70px);
-  opacity: 0.6;
 }
 
 /* Small range toggle in the top-artists/tracks card headers. */

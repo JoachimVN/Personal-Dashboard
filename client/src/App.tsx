@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { useHashRoute } from './router';
 import { useDeviceLocation } from './useDeviceLocation';
@@ -20,25 +20,24 @@ function dayPartFor(hour: number): DayPart {
 }
 
 /** Fixed decorative layer the glass cards blur against — a sky wash that shifts with the actual
-    time of day, so the color has a reason to be there instead of just sitting for decoration. */
+    time of day, so the color has a reason to be there instead of just sitting for decoration.
+    --sky-a/--sky-b are set on the app root (by daypart) so other cards, like the command center,
+    can pick up the same time-of-day color instead of only this background layer seeing it. */
 function BackgroundGlow() {
-  const now = useCurrentTime();
   return (
-    <div
-      aria-hidden
-      data-daypart={dayPartFor(now.getHours())}
-      className="ambient-canvas pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas"
-    >
+    <div aria-hidden className="ambient-canvas pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas">
       <div className="ambient-aurora" />
     </div>
   );
 }
 
-/** Green color wash behind the whole page, only while the Spotify section is open. */
-function SpotifyGlow() {
+/** Section-accent color wash layered on top of the sky wash while a section page is open —
+    each section's own accent (AI purple, GitHub blue, Spotify green, ...) on top of whatever
+    time of day it is, the same way the Spotify page's green wash worked before this generalized. */
+function SectionGlow({ accentVar }: Readonly<{ accentVar: string }>) {
   return (
-    <div aria-hidden className="spotify-page-glow">
-      <div className="spotify-page-aurora" />
+    <div aria-hidden className="section-page-glow" style={{ '--section-accent': `var(${accentVar})` } as CSSProperties}>
+      <div className="section-page-aurora" />
     </div>
   );
 }
@@ -133,12 +132,16 @@ function Overview() {
 
 export default function App() {
   const route = useHashRoute();
+  const now = useCurrentTime();
   useDeviceLocation();
 
   return (
-    <div className="min-h-screen text-ink selection:bg-(--color-accent-ai)/25">
+    <div
+      className="app-shell min-h-screen text-ink selection:bg-(--color-accent-ai)/25"
+      data-daypart={dayPartFor(now.getHours())}
+    >
       <BackgroundGlow />
-      {route.view === 'section' && route.sectionId === 'spotify' && <SpotifyGlow />}
+      {route.view === 'section' && <SectionGlow accentVar={sectionById(route.sectionId).accentVar} />}
       <main className="mx-auto max-w-[78rem] px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 sm:px-8 sm:pt-10 lg:px-10">
         <MotionConfig
           reducedMotion="user"
