@@ -12,7 +12,7 @@ import { useWidget } from '../useWidget';
 import { deg, glyph, weatherLocation } from '../lib/weather';
 import { ActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
-import { NowPlaying } from '../widgets/SpotifyWidget';
+import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
 import '../sections/spotify/spotify.css';
 
 function formatEventDay(event: CalendarData['events'][number]): string {
@@ -124,6 +124,7 @@ export function DailyCommandCenter() {
   const github = useWidget<GitHubData>('github').envelope?.data;
   const health = useWidget<HealthData>('health').envelope?.data;
   const spotifyEnvelope = useWidget<SpotifyData>('spotify').envelope;
+  const spotify = spotifyEnvelope?.data;
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
 
   const fallback: CommandCenterData = {
@@ -140,6 +141,9 @@ export function DailyCommandCenter() {
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
     : undefined;
+  const heroTrack = heroRender.type === 'spotify-track'
+    ? spotify?.topTracks.shortTerm.find((track) => (track.id ?? track.track) === heroRender.trackId)
+    : undefined;
   const heroKicker = heroEvent ? eventTiming(heroEvent, Date.now()) : ranked.hero.kicker;
   const todayWeather = weather?.days[0];
 
@@ -151,7 +155,14 @@ export function DailyCommandCenter() {
     <div className="command-layout">
       <div className="command-primary">
         <p className="command-label">{ranked.hero.kicker}</p>
-        <div className="mt-5"><p className="command-event-time">{heroKicker}</p><p className="command-event-title">{heroEvent?.title ?? ranked.hero.title}</p><p className="mt-2 text-sm text-ink-muted">{heroEvent?.location || ranked.hero.detail}</p></div>
+        <div className="mt-5 flex items-start gap-4">
+          {heroTrack && <Thumb url={heroTrack.imageUrl} size="h-16 w-16" />}
+          <div className="min-w-0">
+            <p className="command-event-time">{heroKicker}</p>
+            <p className="command-event-title">{heroEvent?.title ?? heroTrack?.track ?? ranked.hero.title}</p>
+            <p className="mt-2 text-sm text-ink-muted">{heroEvent?.location || (heroTrack ? heroTrack.artist : ranked.hero.detail)}</p>
+          </div>
+        </div>
         <div className="command-weather-row">
           <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
           <div><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p>{weather && <p className="text-[11px] text-ink-faint">📍 {weatherLocation(weather.location)}</p>}</div>
@@ -162,7 +173,7 @@ export function DailyCommandCenter() {
     </div>
     <div className="command-agenda">
       <div className="command-agenda-heading"><p className="command-label">{ranked.secondary.kicker}</p><a href={ranked.secondary.href}>Open section <span aria-hidden>↗</span></a></div>
-      <SecondaryContent slot={ranked.secondary} calendar={calendar} spotify={spotifyEnvelope?.data} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
+      <SecondaryContent slot={ranked.secondary} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
     </div>
   </section>;
 }

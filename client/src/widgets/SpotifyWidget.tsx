@@ -34,7 +34,7 @@ function formatClock(ms?: number | null): string | undefined {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
-function Thumb({ url, size = 'h-10 w-10' }: { url?: string; size?: string }) {
+export function Thumb({ url, size = 'h-10 w-10' }: { url?: string; size?: string }) {
   return url ? (
     <img src={url} alt="" className={`${size} shrink-0 rounded-md object-cover`} />
   ) : (
