@@ -9,6 +9,7 @@ const trackRecordSchema = z.object({
   track: z.string(),
   artist: z.string(),
   album: z.string().optional(),
+  albumId: z.string().optional(),
   releaseDate: z.string().optional(),
   imageUrl: z.string().optional(),
   url: z.string().optional(),
@@ -31,6 +32,10 @@ const albumRecordSchema = z.object({
   imageUrl: z.string().optional(),
   url: z.string().optional(),
   releaseDate: z.string().optional(),
+  releaseDatePrecision: z.enum(['year', 'month', 'day']).optional(),
+  totalTracks: z.number().optional(),
+  /** Sum of every track's duration_ms from the full Spotify album — backfilled once via enrichAlbumDurations, since recentlyPlayed/top lists don't carry it. */
+  totalDurationMs: z.number().optional(),
   playCount: z.number(),
 });
 
@@ -48,7 +53,20 @@ export interface PlayedTrackInput {
   name: string;
   url?: string;
   artists: { id: string; name: string }[];
-  album: { id: string; name: string; imageUrl?: string; url?: string; releaseDate?: string };
+  album: {
+    id: string;
+    name: string;
+    imageUrl?: string;
+    url?: string;
+    releaseDate?: string;
+    releaseDatePrecision?: 'year' | 'month' | 'day';
+    totalTracks?: number;
+  };
+}
+
+export interface AlbumDurationInput {
+  id: string;
+  totalDurationMs: number;
 }
 
 export interface SeedArtistInput {
@@ -116,6 +134,7 @@ export class SpotifyHistoryStore {
         track: track.name,
         artist: track.artists.map((a) => a.name).join(', '),
         album: track.album.name,
+        albumId: track.album.id,
         releaseDate: track.album.releaseDate,
         imageUrl: track.album.imageUrl,
         url: track.url,
@@ -129,6 +148,9 @@ export class SpotifyHistoryStore {
         imageUrl: track.album.imageUrl,
         url: track.album.url,
         releaseDate: track.album.releaseDate,
+        releaseDatePrecision: track.album.releaseDatePrecision,
+        totalTracks: track.album.totalTracks,
+        totalDurationMs: existingAlbum?.totalDurationMs,
         playCount: (existingAlbum?.playCount ?? 0) + weight,
       };
     });
@@ -152,6 +174,7 @@ export class SpotifyHistoryStore {
         track: track.name,
         artist: track.artists.map((a) => a.name).join(', '),
         album: track.album.name,
+        albumId: track.album.id,
         releaseDate: track.album.releaseDate,
         imageUrl: track.album.imageUrl,
         url: track.url,
@@ -178,6 +201,9 @@ export class SpotifyHistoryStore {
         imageUrl: track.album.imageUrl,
         url: track.album.url,
         releaseDate: track.album.releaseDate,
+        releaseDatePrecision: track.album.releaseDatePrecision ?? existingAlbum?.releaseDatePrecision,
+        totalTracks: track.album.totalTracks ?? existingAlbum?.totalTracks,
+        totalDurationMs: existingAlbum?.totalDurationMs,
         playCount: (existingAlbum?.playCount ?? 0) + 1,
       };
 
@@ -203,17 +229,47 @@ export class SpotifyHistoryStore {
     if (changed) this.save();
   }
 
+  /** Album ids missing a full duration — batchable into Spotify's "Get Several Albums" (max 20 ids/call). One-time per album; static metadata never needs refetching. */
+  getAlbumIdsNeedingDurations(limit: number): string[] {
+    return Object.values(this.albums)
+      .filter((album) => album.totalDurationMs === undefined)
+      .slice(0, limit)
+      .map((album) => album.id);
+  }
+
+  enrichAlbumDurations(details: AlbumDurationInput[]): void {
+    let changed = false;
+    for (const detail of details) {
+      const existing = this.albums[detail.id];
+      if (!existing || existing.totalDurationMs === detail.totalDurationMs) continue;
+      this.albums[detail.id] = { ...existing, totalDurationMs: detail.totalDurationMs };
+      changed = true;
+    }
+    if (changed) this.save();
+  }
+
   getAllTime(limit = TOP_LIMIT): {
     trackedSince: string | undefined;
     artists: ArtistRecord[];
     tracks: TrackRecord[];
-    albums: AlbumRecord[];
+    albums: (AlbumRecord & { topTracks: { id: string; track: string; playCount: number; url?: string }[] })[];
   } {
+    const allTracks = Object.values(this.tracks);
     return {
       trackedSince: this.seededAt,
       artists: Object.values(this.artists).sort(byPlayCountDesc).slice(0, limit),
-      tracks: Object.values(this.tracks).sort(byPlayCountDesc).slice(0, limit),
-      albums: Object.values(this.albums).sort(byPlayCountDesc).slice(0, limit),
+      tracks: allTracks.sort(byPlayCountDesc).slice(0, limit),
+      albums: Object.values(this.albums)
+        .sort(byPlayCountDesc)
+        .slice(0, limit)
+        .map((album) => ({
+          ...album,
+          topTracks: allTracks
+            .filter((track) => track.albumId === album.id)
+            .sort(byPlayCountDesc)
+            .slice(0, 3)
+            .map(({ id, track, playCount, url }) => ({ id, track, playCount, url })),
+        })),
     };
   }
 

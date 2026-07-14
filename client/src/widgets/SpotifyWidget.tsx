@@ -282,33 +282,70 @@ export function RecentlyPlayedWidget() {
 
 // ── Top albums (all-time only — Spotify has no top-albums endpoint) ────────
 
-function AlbumCell({ album, rank }: Readonly<{ album: Album; rank: number }>) {
-  const inner = (
-    <>
-      <div className="relative aspect-square overflow-hidden rounded-xl bg-track">
-        {album.imageUrl && (
-          <img
-            src={album.imageUrl}
-            alt=""
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          />
-        )}
-        <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-xs font-medium tabular-nums text-white">
-          {rank}
-        </span>
+function formatReleaseDate(album: Album): string | undefined {
+  if (!album.releaseDate) return undefined;
+  if (album.releaseDatePrecision === 'day') {
+    return new Date(album.releaseDate).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+  if (album.releaseDatePrecision === 'month') {
+    const [year, month] = album.releaseDate.split('-').map(Number);
+    return new Date(year, month - 1).toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+  }
+  return album.releaseDate.slice(0, 4);
+}
+
+function formatDuration(ms?: number): string | undefined {
+  if (!ms) return undefined;
+  const totalMinutes = Math.round(ms / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
+}
+
+function AlbumRow({ album, rank }: Readonly<{ album: Album; rank: number }>) {
+  const meta = [
+    formatReleaseDate(album),
+    album.totalTracks ? `${album.totalTracks} tracks` : undefined,
+    formatDuration(album.totalDurationMs),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <li className="rounded-2xl border border-card-border bg-track/25 p-3 transition hover:bg-track/45">
+      <div className="flex items-center gap-3">
+        <Rank n={rank} />
+        <Thumb url={album.imageUrl} size="h-16 w-16" />
+        <div className="min-w-0 flex-1">
+          {album.url ? (
+            <a href={album.url} target="_blank" rel="noreferrer" className={linkClass}>
+              {album.name}
+            </a>
+          ) : (
+            <span className="block truncate font-medium">{album.name}</span>
+          )}
+          <p className="truncate text-xs text-ink-faint">{album.artist}</p>
+          {meta && <p className="mt-0.5 truncate text-[11px] text-ink-faint">{meta}</p>}
+        </div>
+        <span className="shrink-0 text-xs tabular-nums text-ink-faint">{album.playCount}×</span>
       </div>
-      <p className="mt-1.5 truncate text-sm font-medium text-ink">{album.name}</p>
-      <p className="truncate text-xs text-ink-faint">
-        {album.artist} · {album.playCount} plays
-      </p>
-    </>
-  );
-  return album.url ? (
-    <a href={album.url} target="_blank" rel="noreferrer" className="group block">
-      {inner}
-    </a>
-  ) : (
-    <div className="group block">{inner}</div>
+      {album.topTracks.length > 0 && (
+        <ol className="mt-2 space-y-1 border-t border-card-border/60 pl-9 pt-2 text-xs text-ink-muted">
+          {album.topTracks.map((track, i) => (
+            <li key={track.id ?? `${track.track}-${i}`} className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate">
+                {i + 1}. {track.track}
+              </span>
+              <span className="shrink-0 tabular-nums text-ink-faint">{track.playCount}×</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </li>
   );
 }
 
@@ -318,16 +355,16 @@ export function TopAlbumsWidget() {
     <WidgetShell title="Top albums" badge={<StaleBadge envelope={envelope} />}>
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) => {
-          const albums = data.allTime.albums.slice(0, 12);
+          const albums = data.allTime.albums.slice(0, 10);
           if (albums.length === 0) {
             return <p className="text-sm text-ink-faint">No album data yet — builds up as you listen.</p>;
           }
           return (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-4">
+            <ol className="max-h-[34rem] space-y-2 overflow-y-auto pr-1">
               {albums.map((album, i) => (
-                <AlbumCell key={album.id ?? `${album.name}-${i}`} album={album} rank={i + 1} />
+                <AlbumRow key={album.id ?? `${album.name}-${i}`} album={album} rank={i + 1} />
               ))}
-            </div>
+            </ol>
           );
         }}
       </WidgetBody>

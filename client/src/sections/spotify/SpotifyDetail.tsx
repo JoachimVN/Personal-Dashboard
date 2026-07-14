@@ -78,9 +78,9 @@ export function SpotifyDetail() {
       />
       <div className="space-y-4">
         <TopArtistsWidget />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <TopAlbumsWidget />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <TopTracksWidget />
-          <TopAlbumsWidget />
           <RecentlyPlayedWidget />
         </div>
       </div>

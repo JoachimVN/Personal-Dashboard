@@ -26,6 +26,18 @@ const albumSchema = z.object({
   imageUrl: z.string().optional(),
   url: z.string().optional(),
   releaseDate: z.string().optional(),
+  /** Whether releaseDate is a full day, a month, or only a year — Spotify reports this per-album. */
+  releaseDatePrecision: z.enum(['year', 'month', 'day']).optional(),
+  totalTracks: z.number().optional(),
+  /** Sum of every track's duration on the album, from Spotify's full album object — undefined until backfilled. */
+  totalDurationMs: z.number().optional(),
+});
+
+const albumTopTrackSchema = z.object({
+  id: z.string().optional(),
+  track: z.string(),
+  playCount: z.number(),
+  url: z.string().optional(),
 });
 
 /**
@@ -39,7 +51,13 @@ const allTimeSchema = z.object({
   trackedSince: z.string().optional(),
   artists: z.array(artistSchema.extend({ playCount: z.number() })),
   tracks: z.array(trackSchema.extend({ playCount: z.number() })),
-  albums: z.array(albumSchema.extend({ playCount: z.number() })),
+  albums: z.array(
+    albumSchema.extend({
+      playCount: z.number(),
+      /** Your most-played tracks from this album, up to 3. */
+      topTracks: z.array(albumTopTrackSchema),
+    }),
+  ),
 });
 
 export const spotifySchema = z.object({

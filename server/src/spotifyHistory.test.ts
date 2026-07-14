@@ -104,4 +104,38 @@ describe('SpotifyHistoryStore', () => {
     reloaded.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]);
     expect(reloaded.getAllTime().tracks[0].playCount).toBe(1);
   });
+
+  it('computes each album\'s top 3 tracks by play count, scoped to that album', () => {
+    const { store } = createStore();
+    store.recordPlays([
+      { playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1', name: 'Track One' }) },
+      { playedAt: '2026-01-02T00:00:00Z', track: track({ id: 't2', name: 'Track Two' }) },
+      { playedAt: '2026-01-03T00:00:00Z', track: track({ id: 't2', name: 'Track Two' }) },
+      { playedAt: '2026-01-04T00:00:00Z', track: track({ id: 't3', name: 'Track Three' }) },
+      { playedAt: '2026-01-05T00:00:00Z', track: track({ id: 't4', name: 'Track Four' }) },
+      // A track from a different album must not show up in album al1's top tracks.
+      {
+        playedAt: '2026-01-06T00:00:00Z',
+        track: track({ id: 't5', name: 'Other Album Track', album: { id: 'al2', name: 'Album Two' } }),
+      },
+    ]);
+
+    const [album] = store.getAllTime().albums.filter((a) => a.id === 'al1');
+    expect(album.topTracks).toEqual([
+      expect.objectContaining({ id: 't2', playCount: 2 }),
+      expect.objectContaining({ id: 't1', playCount: 1 }),
+      expect.objectContaining({ id: 't3', playCount: 1 }),
+    ]);
+  });
+
+  it('backfills album duration via enrichAlbumDurations, once per album', () => {
+    const { store } = createStore();
+    store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]);
+    expect(store.getAlbumIdsNeedingDurations(20)).toEqual(['al1']);
+
+    store.enrichAlbumDurations([{ id: 'al1', totalDurationMs: 2_400_000 }]);
+    expect(store.getAlbumIdsNeedingDurations(20)).toEqual([]);
+    const [album] = store.getAllTime().albums;
+    expect(album.totalDurationMs).toBe(2_400_000);
+  });
 });

@@ -1,7 +1,7 @@
 import { spotifySchema, type SpotifyData } from '@personal-dashboard/shared';
 import { readSpotifyToken, writeSpotifyToken } from '../spotifyToken.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
-import { SpotifyHistoryStore, type PlayedTrackInput } from '../spotifyHistory.js';
+import { SpotifyHistoryStore, type AlbumDurationInput, type PlayedTrackInput } from '../spotifyHistory.js';
 import type { Provider } from '../scheduler.js';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -25,8 +25,20 @@ interface RawTrack {
   name: string;
   duration_ms?: number;
   artists: { id: string; name: string }[];
-  album?: { id: string; name?: string; images?: RawImage[]; release_date?: string; external_urls?: { spotify?: string } };
+  album?: {
+    id: string;
+    name?: string;
+    images?: RawImage[];
+    release_date?: string;
+    release_date_precision?: string;
+    total_tracks?: number;
+    external_urls?: { spotify?: string };
+  };
   external_urls?: { spotify?: string };
+}
+interface RawAlbumDetail {
+  id: string;
+  tracks?: { items?: { duration_ms?: number }[] };
 }
 interface CurrentlyPlaying {
   is_playing: boolean;
@@ -48,6 +60,10 @@ interface TopData {
 }
 
 const firstImage = (images?: RawImage[]) => images?.[0]?.url;
+
+function toReleaseDatePrecision(precision?: string): 'year' | 'month' | 'day' | undefined {
+  return precision === 'year' || precision === 'month' || precision === 'day' ? precision : undefined;
+}
 
 function mapTrack(track: RawTrack) {
   return {
@@ -85,6 +101,8 @@ function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefined {
       imageUrl: firstImage(track.album.images),
       url: track.album.external_urls?.spotify,
       releaseDate: track.album.release_date,
+      releaseDatePrecision: toReleaseDatePrecision(track.album.release_date_precision),
+      totalTracks: track.album.total_tracks,
     },
   };
 }
@@ -222,6 +240,26 @@ export function createSpotifyProvider(
           })
           .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
         historyStore.recordPlays(recentPlays);
+
+        // Backfill full album duration once per album (max 20/cycle) — the only album field
+        // that needs Spotify's dedicated Albums endpoint rather than coming along for free on
+        // track/top-list responses.
+        const pendingAlbumIds = historyStore.getAlbumIdsNeedingDurations(20);
+        if (pendingAlbumIds.length > 0) {
+          const details = await get<{ albums: (RawAlbumDetail | null)[] }>(
+            `/albums?ids=${pendingAlbumIds.join(',')}`,
+          );
+          const durations: AlbumDurationInput[] = (details?.albums ?? [])
+            .filter((album): album is RawAlbumDetail => album !== null)
+            .map((album) => ({
+              id: album.id,
+              totalDurationMs: (album.tracks?.items ?? []).reduce(
+                (sum, t) => sum + (t.duration_ms ?? 0),
+                0,
+              ),
+            }));
+          historyStore.enrichAlbumDurations(durations);
+        }
 
         if (topDataRefreshed) {
           historyStore.mergeArtistMetadata(
