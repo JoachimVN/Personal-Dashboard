@@ -132,22 +132,45 @@ a {
 }
 
 /* The hero text sits directly on the sky wash with no card behind it — unlike everywhere
-   else, so contrast against it varies with the time-of-day color. A soft halo (no-op in
-   dark mode, where light text on the wash already contrasts fine regardless of hue) keeps
+   else, so contrast against it varies with the time-of-day color; the faint gray date/
+   eyebrow text is the most exposed since it isn't light or dark enough to always win
+   against a mid-toned wash in either mode. A soft halo (canvas-colored per mode) keeps
    it legible without touching the wash colors themselves. */
 .dashboard-hero {
   padding: 0.25rem 0.25rem 1.75rem;
   text-shadow:
-    0 1px 3px light-dark(rgb(255 255 255 / 0.85), transparent),
-    0 0 22px light-dark(rgb(255 255 255 / 0.65), transparent);
+    0 1px 3px light-dark(rgb(255 255 255 / 0.85), rgb(0 0 0 / 0.55)),
+    0 0 22px light-dark(rgb(255 255 255 / 0.65), rgb(0 0 0 / 0.45));
 }
 
+/* A very faint time-of-day tint on top of the normal white/dark text — almost all ink,
+   just a whisper of warmth/coolness matching the sky, not a "gradient text" effect.
+   -webkit-text-fill-color (not just color) is required for background-clip:text to
+   actually paint the gradient instead of leaving the glyphs transparent. No text-shadow
+   here — the fill is still ~90% ink so it doesn't need the contrast halo the sibling
+   eyebrow text does. */
 .hero-title {
   max-width: 760px;
   font-size: clamp(2.5rem, 5.6vw, 4.8rem);
   font-weight: 620;
   line-height: 0.91;
   letter-spacing: -0.07em;
+  /* line-height is tighter than the font's natural descender depth, and background-clip:text
+     (unlike a plain color fill) clips strictly to the line box — pad it out a touch so
+     descenders like the "g" in "evening" don't get cut off, offset by an equal negative
+     margin so the extra room doesn't shift surrounding layout. */
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+  background: linear-gradient(
+    115deg,
+    color-mix(in oklab, var(--sky-a) 24%, var(--color-ink)),
+    color-mix(in oklab, var(--sky-b) 24%, var(--color-ink))
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
 }
 
 .command-center {

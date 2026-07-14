@@ -16,9 +16,9 @@ export function ActivityRings({
 }: Readonly<ActivityRingsProps>) {
   const gradientPrefix = useId().replaceAll(':', '');
   const rings = [
-    { id: 'move', label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', start: '#d91f3b', end: '#ff5a8b', legend: 'light-dark(#db2777, #ff5a8b)', track: 'light-dark(#f6c7d2, #4c0717)', radius: 48 },
-    { id: 'exercise', label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', start: '#70cc00', end: '#d4ff00', legend: 'light-dark(#65a30d, #d4ff00)', track: 'light-dark(#d8efc4, #173c0a)', radius: 33 },
-    { id: 'stand', label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', start: '#00b7cb', end: '#48def4', legend: 'light-dark(#0891b2, #48def4)', track: 'light-dark(#c3e9ee, #063940)', radius: 18 },
+    { id: 'move', label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', start: '#d91f3b', end: '#ff5a8b', legend: 'light-dark(#ec4899, #ff5a8b)', track: 'light-dark(#f6c7d2, #4c0717)', radius: 48 },
+    { id: 'exercise', label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', start: '#70cc00', end: '#d4ff00', legend: 'light-dark(#84cc16, #d4ff00)', track: 'light-dark(#d8efc4, #173c0a)', radius: 33 },
+    { id: 'stand', label: 'Stand', value: standHours, goal: goals.standHours, unit: 'hrs', start: '#00b7cb', end: '#48def4', legend: 'light-dark(#06b6d4, #48def4)', track: 'light-dark(#c3e9ee, #063940)', radius: 18 },
   ];
 
   return (
