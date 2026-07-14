@@ -132,7 +132,10 @@ export function NowPlaying({
         {pct !== null && (
           <>
             <div className="mt-2 h-1 overflow-hidden rounded-full bg-track">
-              <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${pct}%`, background: accent, transition: 'width 500ms linear' }}
+              />
             </div>
             <div className="mt-1 flex justify-between text-[10px] tabular-nums text-ink-faint">
               <span>{formatClock(estimatedProgressMs)}</span>
