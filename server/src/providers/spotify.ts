@@ -241,15 +241,18 @@ export function createSpotifyProvider(
           .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
         historyStore.recordPlays(recentPlays);
 
-        // Backfill full album duration once per album (max 20/cycle) — the only album field
-        // that needs Spotify's dedicated Albums endpoint rather than coming along for free on
-        // track/top-list responses.
-        const pendingAlbumIds = historyStore.getAlbumIdsNeedingDurations(20);
+        // Backfill full album duration once per album (max 5/cycle) — the only album field that
+        // needs a dedicated fetch rather than coming along for free on track/top-list responses.
+        // Spotify's Nov 2024 API policy locked the batched "Get Several Albums" endpoint behind
+        // Extended Quota Mode approval (403 for dev-mode apps like this one), but the singular
+        // per-album endpoint is still open, so fetch one at a time. Failures (e.g. a removed
+        // album) are swallowed per-item and simply retried next cycle.
+        const pendingAlbumIds = historyStore.getAlbumIdsNeedingDurations(5);
         if (pendingAlbumIds.length > 0) {
-          const details = await get<{ albums: (RawAlbumDetail | null)[] }>(
-            `/albums?ids=${pendingAlbumIds.join(',')}`,
+          const details = await Promise.all(
+            pendingAlbumIds.map((id) => get<RawAlbumDetail>(`/albums/${id}`).catch(() => null)),
           );
-          const durations: AlbumDurationInput[] = (details?.albums ?? [])
+          const durations: AlbumDurationInput[] = details
             .filter((album): album is RawAlbumDetail => album !== null)
             .map((album) => ({
               id: album.id,
