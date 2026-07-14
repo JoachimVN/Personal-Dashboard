@@ -11,6 +11,10 @@ server/dist/
 !.env.example
 server/.tokens/
 
+# Personal settings (calendar names, feeds, local repo paths).
+# Start from server/config.example.json — a missing config.json just uses defaults.
+server/config.json
+
 # Local data (AI usage history, …)
 server/.data/
 
@@ -18,3 +22,4 @@ server/.data/
 *.log
 .DS_Store
 /.vscode
+/.claude

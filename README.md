@@ -1,6 +1,13 @@
 # Personal Dashboard
 
-One glanceable page for life + dev: weather, calendar, email, GitHub, and AI usage. Runs locally on your own machine (Mac or Windows); your phone reaches it privately over [Tailscale](https://tailscale.com).
+One glanceable page for life + dev: weather, calendar, email, GitHub, and AI usage. Runs locally on
+your own machine (macOS or Windows) and is just a web app at `localhost:4821` — open it in a browser
+and you're done.
+
+Everything beyond that is optional. [Tailscale](https://tailscale.com) is only needed to reach it
+*from your phone*; without it the dashboard works fine on the machine it runs on. Individual widgets
+have their own requirements — iMessage is macOS-only, Health needs an iPhone Shortcut — and any
+widget you don't configure simply shows as "not configured" rather than breaking the page.
 
 ## Stack
 
@@ -10,14 +17,17 @@ npm-workspaces monorepo:
 - **`server/`** — Express on `127.0.0.1:4821`. Each data source is a *provider* polled on its own interval; results are schema-validated (zod) and cached in memory. Widgets read the cache via `/api/widgets/:id`.
 - **`shared/`** — zod schemas + types shared by both.
 
-No database. Secrets live in gitignored `server/.env` / `server/.tokens/`.
+No database. Nothing personal is in this repo: credentials live in gitignored `server/.env` /
+`server/.tokens/`, your settings in gitignored `server/config.json`, and fetched data (health,
+listening history, message previews) never leaves gitignored `server/.data/` on your own machine.
 
 ## Getting started
 
 ```bash
 npm install
-cp server/.env.example server/.env   # fill in what you want enabled
-npm run dev                          # server :4821 + client :5173
+cp server/.env.example server/.env              # fill in what you want enabled
+cp server/config.example.json server/config.json  # optional — defaults are fine
+npm run dev                                     # server :4822 + client :5173
 ```
 
 Widgets without credentials show as "not configured" instead of breaking — enable them one at a time.
@@ -31,11 +41,31 @@ npm start
 
 ## Run at login
 
-**macOS** — installs (or refreshes) a launchd agent that builds the client and keeps `npm start` running:
+**macOS** — installs a launchd agent that keeps `npm start` running and restarts it at login:
 
 ```bash
 ./scripts/install-launchd.sh
 ```
+
+Production runs from its own **deploy clone** (`~/.local/share/personal-dashboard/repo`), not from
+your working copy, so a dirty tree or a WIP branch can't take down the dashboard your phone is
+looking at. Credentials and fetched data (`.env`, `config.json`, `.tokens/`, `.data/`) are moved once
+into `~/.local/share/personal-dashboard/state` and symlinked into both checkouts, so the two share a
+single set of OAuth tokens — keeping two copies would mean two clients refreshing the same grant, and
+Spotify and Hue rotate refresh tokens on use, so one copy would eventually be left with a dead token.
+
+Opt in to auto-update and a second agent polls your `origin/main` every 5 minutes, fast-forwards the
+deploy clone and restarts — so merging to `main` updates the dashboard on your phone by itself:
+
+```bash
+PD_AUTO_UPDATE=1 ./scripts/install-launchd.sh     # PD_UPDATE_INTERVAL=300 to change the cadence
+```
+
+Installing it is the one manual step, and it has to be: nothing here listens for inbound connections,
+so GitHub can't reach into your machine to start anything — something has to run locally once. After
+that it's hands-off. The updater refreshes its own copy too, so a commit that changes the update
+script still lands by itself; only a change to the launchd agents themselves (the poll interval, say)
+needs the installer re-run.
 
 **Windows** — two options:
 
@@ -119,7 +149,7 @@ One-time setup:
 2. Run `npm run setup:spotify -w server`. It prints an exact redirect URI (`http://127.0.0.1:8888/callback`) — add that under the app's **Settings → Redirect URIs** and save.
 3. Open the printed authorize URL, approve. The refresh token is saved to `server/.tokens/spotify.json` (owner-only permissions); restart the server.
 
-Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months.
+Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months / all time. Spotify's API has no all-time or top-albums endpoint, so those are built up locally: seeded once from Spotify's long_term (multi-year) top lists, then grown from every observed play in `server/.data/spotify-history.json` (gitignored, per-machine — not synced if you run the server from more than one device).
 
 ### Philips Hue
 

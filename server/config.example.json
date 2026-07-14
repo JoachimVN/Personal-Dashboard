@@ -1,0 +1,16 @@
+{
+  "calendar": {
+    "allowlist": []
+  },
+  "news": {
+    "feeds": [
+      { "name": "Hacker News", "url": "https://news.ycombinator.com/rss" }
+    ]
+  },
+  "code": {
+    "reposRoot": {
+      "darwin": "/Users/you/GitHub",
+      "win32": "C:\\Users\\you\\GitHub"
+    }
+  }
+}

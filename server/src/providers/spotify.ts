@@ -1,6 +1,7 @@
 import { spotifySchema, type SpotifyData } from '@personal-dashboard/shared';
 import { readSpotifyToken, writeSpotifyToken } from '../spotifyToken.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
+import { SpotifyHistoryStore, type AlbumDetailInput, type PlayedTrackInput } from '../spotifyHistory.js';
 import type { Provider } from '../scheduler.js';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -13,17 +14,35 @@ interface RawImage {
   url: string;
 }
 interface RawArtist {
+  id: string;
   name: string;
   images?: RawImage[];
   genres?: string[];
   external_urls?: { spotify?: string };
 }
-interface RawTrack {
+export interface RawTrack {
+  id: string;
   name: string;
   duration_ms?: number;
-  artists: { name: string }[];
-  album?: { name?: string; images?: RawImage[]; release_date?: string };
+  artists: { id: string; name: string }[];
+  album?: {
+    id: string;
+    name?: string;
+    album_type?: string;
+    images?: RawImage[];
+    release_date?: string;
+    release_date_precision?: string;
+    total_tracks?: number;
+    external_urls?: { spotify?: string };
+  };
   external_urls?: { spotify?: string };
+}
+interface RawAlbumDetail {
+  id: string;
+  total_tracks?: number;
+  release_date_precision?: string;
+  album_type?: string;
+  tracks?: { items?: { id?: string; duration_ms?: number; artists?: { id: string }[] }[] };
 }
 interface CurrentlyPlaying {
   is_playing: boolean;
@@ -46,12 +65,22 @@ interface TopData {
 
 const firstImage = (images?: RawImage[]) => images?.[0]?.url;
 
+function toReleaseDatePrecision(precision?: string): 'year' | 'month' | 'day' | undefined {
+  return precision === 'year' || precision === 'month' || precision === 'day' ? precision : undefined;
+}
+
+function toAlbumType(type?: string): 'album' | 'single' | 'compilation' | undefined {
+  return type === 'album' || type === 'single' || type === 'compilation' ? type : undefined;
+}
+
 function mapTrack(track: RawTrack) {
   return {
+    id: track.id,
     track: track.name,
     artist: track.artists.map((a) => a.name).join(', '),
     album: track.album?.name,
     releaseDate: track.album?.release_date,
+    durationMs: track.duration_ms,
     imageUrl: firstImage(track.album?.images),
     url: track.external_urls?.spotify,
   };
@@ -59,10 +88,33 @@ function mapTrack(track: RawTrack) {
 
 function mapArtist(artist: RawArtist) {
   return {
+    id: artist.id,
     name: artist.name,
     imageUrl: firstImage(artist.images),
     url: artist.external_urls?.spotify,
     genres: artist.genres ?? [],
+  };
+}
+
+/** Shapes a raw track for history recording/seeding — undefined for tracks missing the ids we need to dedupe on (e.g. local files). */
+export function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefined {
+  if (!track.id || !track.album?.id) return undefined;
+  return {
+    id: track.id,
+    name: track.name,
+    url: track.external_urls?.spotify,
+    durationMs: track.duration_ms,
+    artists: track.artists.map((a) => ({ id: a.id, name: a.name })),
+    album: {
+      id: track.album.id,
+      name: track.album.name ?? 'Unknown album',
+      imageUrl: firstImage(track.album.images),
+      url: track.album.external_urls?.spotify,
+      releaseDate: track.album.release_date,
+      releaseDatePrecision: toReleaseDatePrecision(track.album.release_date_precision),
+      totalTracks: track.album.total_tracks,
+      albumType: toAlbumType(track.album.album_type),
+    },
   };
 }
 
@@ -75,7 +127,7 @@ function isRateLimitError(error: unknown): boolean {
  * refresh_token when the current one is within a minute of expiry. Never logs
  * response bodies — Spotify's token responses carry the tokens themselves.
  */
-async function accessToken(
+export async function accessToken(
   oauth: { clientId: string; clientSecret: string },
   signal: AbortSignal,
 ): Promise<string> {
@@ -112,9 +164,30 @@ async function accessToken(
   return next.access_token;
 }
 
+/** Spotify caps `limit` at 50/call for top-items endpoints, so paginate with `offset` to get more. */
+async function getTopTracks(
+  get: <T>(path: string) => Promise<T | null>,
+  timeRange: 'short_term' | 'medium_term' | 'long_term',
+  total: number,
+): Promise<RawTrack[]> {
+  const pageSize = 50;
+  const results: RawTrack[] = [];
+  for (let offset = 0; offset < total; offset += pageSize) {
+    const limit = Math.min(pageSize, total - offset);
+    const page = await get<TopResponse<RawTrack>>(
+      `/me/top/tracks?time_range=${timeRange}&limit=${limit}&offset=${offset}`,
+    );
+    const items = page?.items ?? [];
+    results.push(...items);
+    if (items.length < limit) break; // fewer than requested means there's nothing more to page through
+  }
+  return results;
+}
+
 export function createSpotifyProvider(
   oauth: { clientId: string; clientSecret: string } | undefined,
   snapshotStore: SpotifySnapshotStore,
+  historyStore: SpotifyHistoryStore,
 ): Provider<SpotifyData> {
   let topData: TopData | undefined;
   let topDataFetchedAt = 0;
@@ -158,20 +231,79 @@ export function createSpotifyProvider(
           get<RecentlyPlayed>('/me/player/recently-played?limit=50'),
         ]);
 
+        let topDataRefreshed = false;
         if (!topData || Date.now() - topDataFetchedAt >= TOP_DATA_REFRESH_MS) {
           const [artistsShort, artistsMedium, tracksShort, tracksMedium] = await Promise.all([
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8'),
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8'),
-            get<TopResponse<RawTrack>>('/me/top/tracks?time_range=short_term&limit=50'),
-            get<TopResponse<RawTrack>>('/me/top/tracks?time_range=medium_term&limit=50'),
+            getTopTracks(get, 'short_term', 100),
+            getTopTracks(get, 'medium_term', 100),
           ]);
           topData = {
             artistsShort: artistsShort?.items ?? [],
             artistsMedium: artistsMedium?.items ?? [],
-            tracksShort: tracksShort?.items ?? [],
-            tracksMedium: tracksMedium?.items ?? [],
+            tracksShort,
+            tracksMedium,
           };
           topDataFetchedAt = Date.now();
+          topDataRefreshed = true;
+        }
+
+        // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
+        // aren't empty on day one — real observed plays accrue on top from here.
+        if (!historyStore.isSeeded()) {
+          const [artistsLong, tracksLong] = await Promise.all([
+            get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50'),
+            getTopTracks(get, 'long_term', 100),
+          ]);
+          historyStore.seedIfNeeded({
+            artists: (artistsLong?.items ?? []).map(mapArtist),
+            tracks: tracksLong.map(toPlayedTrackInput).filter((t): t is PlayedTrackInput => t !== undefined),
+          });
+        }
+
+        const recentPlays = (recent?.items ?? [])
+          .map((entry) => {
+            const track = toPlayedTrackInput(entry.track);
+            return track ? { playedAt: entry.played_at, track } : undefined;
+          })
+          .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
+        historyStore.recordPlays(recentPlays);
+
+        // Backfill full album duration/metadata once per album (max 5/cycle) — duration needs a
+        // dedicated fetch (doesn't come along for free on track/top-list responses), and the same
+        // response's tracklist also self-heals albumId on any track records that predate that
+        // field. Spotify's Nov 2024 API policy locked the batched "Get Several Albums" endpoint
+        // behind Extended Quota Mode approval (403 for dev-mode apps like this one), but the
+        // singular per-album endpoint is still open, so fetch one at a time. Failures (e.g. a
+        // removed album) are swallowed per-item and simply retried next cycle.
+        const pendingAlbumIds = historyStore.getAlbumIdsNeedingDurations(5);
+        if (pendingAlbumIds.length > 0) {
+          const details = await Promise.all(
+            pendingAlbumIds.map((id) => get<RawAlbumDetail>(`/albums/${id}`).catch(() => null)),
+          );
+          const enrichments: AlbumDetailInput[] = details
+            .filter((album): album is RawAlbumDetail => album !== null)
+            .map((album) => ({
+              id: album.id,
+              totalDurationMs: (album.tracks?.items ?? []).reduce(
+                (sum, t) => sum + (t.duration_ms ?? 0),
+                0,
+              ),
+              totalTracks: album.total_tracks,
+              releaseDatePrecision: toReleaseDatePrecision(album.release_date_precision),
+              albumType: toAlbumType(album.album_type),
+              tracks: (album.tracks?.items ?? [])
+                .filter((t): t is { id: string; duration_ms?: number; artists?: { id: string }[] } => t.id !== undefined)
+                .map((t) => ({ id: t.id, artistIds: (t.artists ?? []).map((a) => a.id) })),
+            }));
+          historyStore.enrichAlbumDetails(enrichments);
+        }
+
+        if (topDataRefreshed) {
+          historyStore.mergeArtistMetadata(
+            [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
+          );
         }
 
         const nowPlaying =
@@ -198,6 +330,7 @@ export function createSpotifyProvider(
             shortTerm: topData.tracksShort.map(mapTrack),
             mediumTerm: topData.tracksMedium.map(mapTrack),
           },
+          allTime: historyStore.getAllTime(),
         };
         snapshotStore.setSnapshot(snapshot);
         return snapshot;

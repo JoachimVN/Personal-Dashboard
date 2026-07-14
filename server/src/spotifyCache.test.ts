@@ -12,6 +12,7 @@ function snapshot() {
     recentlyPlayed: [],
     topArtists: { shortTerm: [], mediumTerm: [] },
     topTracks: { shortTerm: [], mediumTerm: [] },
+    allTime: { artists: [], tracks: [], albums: [] },
   };
 }
 

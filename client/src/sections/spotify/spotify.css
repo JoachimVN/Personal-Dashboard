@@ -3,11 +3,79 @@
    accentStyle()/section-card-aura machinery like every other section accent. */
 :root {
   --color-accent-spotify: light-dark(#16a34a, #1ed760);
+  /* Brighter in light mode, deeper (not neon) in dark mode — used only by the page glow below. */
+  --color-spotify-glow: light-dark(#22c55e, #0e6b35);
 }
 
 @media (min-width: 1024px) {
   .dashboard-section-card--spotify {
     grid-column: span 12;
+  }
+}
+
+/* Green gradient wash + blurred spotlights behind the whole Spotify page —
+   fixed to the viewport (not the content column) and rendered by App.tsx
+   as a sibling of <main>, so it sits behind the header bar too, edge to edge. */
+.spotify-page-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -5;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(
+    165deg,
+    color-mix(in oklab, var(--color-spotify-glow) 26%, transparent),
+    transparent 60%
+  );
+}
+
+.spotify-page-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(60px);
+  will-change: transform;
+}
+
+.spotify-page-orb--one {
+  width: 46rem;
+  height: 46rem;
+  top: -16rem;
+  left: -14rem;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-spotify-glow) 62%, transparent), transparent 70%);
+  animation: spotify-orb-drift-one 22s ease-in-out infinite alternate;
+}
+
+.spotify-page-orb--two {
+  width: 40rem;
+  height: 40rem;
+  top: 12%;
+  right: -16rem;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-spotify-glow) 52%, transparent), transparent 70%);
+  animation: spotify-orb-drift-two 26s ease-in-out infinite alternate;
+}
+
+.spotify-page-orb--three {
+  width: 42rem;
+  height: 42rem;
+  bottom: -18rem;
+  left: 20%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-spotify-glow) 44%, transparent), transparent 70%);
+  animation: spotify-orb-drift-one 30s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes spotify-orb-drift-one {
+  from { transform: translate(0, 0); }
+  to { transform: translate(2.5rem, 3rem); }
+}
+
+@keyframes spotify-orb-drift-two {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-2rem, 2.5rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotify-page-orb {
+    animation: none;
   }
 }
 

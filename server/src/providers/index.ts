@@ -6,6 +6,7 @@ import type { Provider } from '../scheduler.js';
 import { HealthStore } from '../healthStore.js';
 import { UsageHistoryStore } from '../usageHistory.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
+import { SpotifyHistoryStore } from '../spotifyHistory.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
@@ -39,6 +40,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
     config.aiUsage.historyRetentionDays * 24 * 60 * 60_000,
   );
   const spotifySnapshot = new SpotifySnapshotStore(path.join(dataDir, 'spotify-cache.json'));
+  const spotifyHistory = new SpotifyHistoryStore(path.join(dataDir, 'spotify-history.json'));
   return {
     weather,
     hue,
@@ -51,7 +53,7 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
       createClaudeUsageProvider(config.aiUsage.claudeRefreshMs, usageHistory),
       createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
       createNewsProvider(config.news.feeds),
-      createSpotifyProvider(env.spotify, spotifySnapshot),
+      createSpotifyProvider(env.spotify, spotifySnapshot, spotifyHistory),
       createHealthProvider(health, env.timezone, {
         steps: config.health.stepGoal,
         activeEnergyKcal: config.health.moveGoalKcal,

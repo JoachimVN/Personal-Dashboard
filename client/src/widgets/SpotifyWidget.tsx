@@ -1,17 +1,38 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SpotifyData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
 
-type Range = 'shortTerm' | 'mediumTerm';
-const RANGE_LABEL: Record<Range, string> = { shortTerm: '4 weeks', mediumTerm: '6 months' };
+type Range = 'shortTerm' | 'mediumTerm' | 'allTime';
+const RANGE_LABEL: Record<Range, string> = { shortTerm: '4 weeks', mediumTerm: '6 months', allTime: 'All time' };
 
-type Track = SpotifyData['topTracks']['shortTerm'][number];
-type Artist = SpotifyData['topArtists']['shortTerm'][number];
+type Track = SpotifyData['topTracks']['shortTerm'][number] & { playCount?: number };
+type Artist = SpotifyData['topArtists']['shortTerm'][number] & { playCount?: number };
+type Album = SpotifyData['allTime']['albums'][number];
 
-const linkClass = 'truncate font-medium text-ink hover:underline';
+function tracksForRange(data: SpotifyData, range: Range): Track[] {
+  return range === 'allTime' ? data.allTime.tracks : data.topTracks[range];
+}
+
+function artistsForRange(data: SpotifyData, range: Range): Artist[] {
+  return range === 'allTime' ? data.allTime.artists : data.topArtists[range];
+}
+
+const linkClass = 'block truncate font-medium text-ink hover:underline';
 const accent = 'var(--color-accent-spotify)';
+
+function releaseYear(releaseDate?: string): string | undefined {
+  return releaseDate?.slice(0, 4);
+}
+
+function formatClock(ms?: number | null): string | undefined {
+  if (ms == null || !Number.isFinite(ms)) return undefined;
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
 
 function Thumb({ url, size = 'h-10 w-10' }: { url?: string; size?: string }) {
   return url ? (
@@ -40,20 +61,44 @@ function TrackRow({ track, rank }: Readonly<{ track: Track; rank: number }>) {
         )}
         <p className="truncate text-xs text-ink-faint">{track.artist}</p>
       </div>
+      {track.verified && track.playCount !== undefined && (
+        <span className="shrink-0 text-xs tabular-nums text-ink-faint">{track.playCount}×</span>
+      )}
     </li>
   );
 }
 
 // ── Now playing ────────────────────────────────────────────────────────────
 
-export function NowPlaying({ nowPlaying }: Readonly<{ nowPlaying: SpotifyData['nowPlaying'] }>) {
+export function NowPlaying({
+  nowPlaying,
+  fetchedAt,
+}: Readonly<{ nowPlaying: SpotifyData['nowPlaying']; fetchedAt?: string }>) {
+  const isPlaying = nowPlaying?.isPlaying ?? false;
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const id = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [isPlaying]);
+
   if (!nowPlaying) {
     return <p className="text-sm text-ink-muted">Nothing playing right now.</p>;
   }
-  const pct =
-    nowPlaying.durationMs && nowPlaying.progressMs != null
-      ? Math.min(100, (nowPlaying.progressMs / nowPlaying.durationMs) * 100)
+
+  // Estimate progress between polls by advancing from the server's last sampled position —
+  // otherwise the bar only jumps once per poll instead of moving continuously.
+  const elapsedSinceFetch = isPlaying && fetchedAt ? Math.max(0, now - Date.parse(fetchedAt)) : 0;
+  const estimatedProgressMs =
+    nowPlaying.progressMs != null
+      ? Math.min(nowPlaying.progressMs + elapsedSinceFetch, nowPlaying.durationMs ?? Infinity)
       : null;
+  const pct =
+    nowPlaying.durationMs && estimatedProgressMs != null
+      ? Math.min(100, (estimatedProgressMs / nowPlaying.durationMs) * 100)
+      : null;
+  const year = releaseYear(nowPlaying.releaseDate);
 
   return (
     <div className="flex gap-4">
@@ -85,11 +130,21 @@ export function NowPlaying({ nowPlaying }: Readonly<{ nowPlaying: SpotifyData['n
         <p className="truncate text-sm text-ink-muted">
           {nowPlaying.artist}
           {nowPlaying.album ? ` · ${nowPlaying.album}` : ''}
+          {year ? ` · ${year}` : ''}
         </p>
         {pct !== null && (
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-track">
-            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: accent }} />
-          </div>
+          <>
+            <div className="mt-2 h-1 overflow-hidden rounded-full bg-track">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${pct}%`, background: accent, transition: 'width 500ms linear' }}
+              />
+            </div>
+            <div className="mt-1 flex justify-between text-[10px] tabular-nums text-ink-faint">
+              <span>{formatClock(estimatedProgressMs)}</span>
+              <span>{formatClock(nowPlaying.durationMs)}</span>
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -101,7 +156,7 @@ export function NowPlayingWidget() {
   return (
     <WidgetShell title="Now playing" badge={<StaleBadge envelope={envelope} />}>
       <WidgetBody envelope={envelope} offline={offline}>
-        {(data) => <NowPlaying nowPlaying={data.nowPlaying} />}
+        {(data) => <NowPlaying nowPlaying={data.nowPlaying} fetchedAt={envelope?.fetchedAt} />}
       </WidgetBody>
     </WidgetShell>
   );
@@ -112,7 +167,7 @@ export function NowPlayingWidget() {
 function RangeToggle({ range, onChange }: Readonly<{ range: Range; onChange: (r: Range) => void }>) {
   return (
     <fieldset className="spotify-range-toggle" aria-label="Time range">
-      {(['shortTerm', 'mediumTerm'] as Range[]).map((r) => (
+      {(['shortTerm', 'mediumTerm', 'allTime'] as Range[]).map((r) => (
         <button key={r} type="button" data-active={r === range} onClick={() => onChange(r)}>
           {RANGE_LABEL[r]}
         </button>
@@ -124,6 +179,9 @@ function RangeToggle({ range, onChange }: Readonly<{ range: Range; onChange: (r:
 // ── Top artists (grid) + featured #1 track ─────────────────────────────────
 
 function FeaturedTrack({ track, label }: { track: Track; label: string }) {
+  const year = releaseYear(track.releaseDate);
+  const duration = formatClock(track.durationMs);
+  const meta = [track.artist, year, duration].filter(Boolean).join(' · ');
   const content = (
     <>
       <Thumb url={track.imageUrl} size="h-16 w-16 sm:h-20 sm:w-20" />
@@ -132,7 +190,7 @@ function FeaturedTrack({ track, label }: { track: Track; label: string }) {
           Your #1 track · {label}
         </p>
         <p className="mt-0.5 truncate text-base font-semibold text-ink">{track.track}</p>
-        <p className="truncate text-sm text-ink-muted">{track.artist}</p>
+        <p className="truncate text-sm text-ink-muted">{meta}</p>
       </div>
     </>
   );
@@ -185,8 +243,8 @@ export function TopArtistsWidget() {
     <WidgetShell title="Top artists" badge={<RangeToggle range={range} onChange={setRange} />}>
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) => {
-          const artists = data.topArtists[range].slice(0, 8);
-          const topTrack = data.topTracks[range][0];
+          const artists = artistsForRange(data, range).slice(0, 8);
+          const topTrack = tracksForRange(data, range)[0];
           if (artists.length === 0 && !topTrack) {
             return <p className="text-sm text-ink-faint">No data yet.</p>;
           }
@@ -213,7 +271,7 @@ export function TopTracksWidget() {
     <WidgetShell title="Top tracks" badge={<RangeToggle range={range} onChange={setRange} />}>
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) => {
-          const tracks = data.topTracks[range];
+          const tracks = tracksForRange(data, range);
           if (tracks.length === 0) return <p className="text-sm text-ink-faint">No data yet.</p>;
           return (
             <ol className="max-h-[34rem] space-y-2 overflow-y-auto pr-1 text-sm">
@@ -259,6 +317,103 @@ export function RecentlyPlayedWidget() {
             </ul>
           )
         }
+      </WidgetBody>
+    </WidgetShell>
+  );
+}
+
+// ── Top albums (all-time only — Spotify has no top-albums endpoint) ────────
+
+function formatReleaseDate(album: Album): string | undefined {
+  if (!album.releaseDate) return undefined;
+  if (album.releaseDatePrecision === 'day') {
+    return new Date(album.releaseDate).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  }
+  if (album.releaseDatePrecision === 'month') {
+    const [year, month] = album.releaseDate.split('-').map(Number);
+    return new Date(year, month - 1).toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+  }
+  return album.releaseDate.slice(0, 4);
+}
+
+function formatDuration(ms?: number): string | undefined {
+  if (!ms) return undefined;
+  const totalMinutes = Math.round(ms / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
+}
+
+function AlbumRow({ album, rank }: Readonly<{ album: Album; rank: number }>) {
+  const meta = [
+    formatReleaseDate(album),
+    album.totalTracks ? `${album.totalTracks} tracks` : undefined,
+    formatDuration(album.totalDurationMs),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <li className="flex items-stretch gap-3 overflow-hidden rounded-r-2xl border border-card-border bg-track/25 transition hover:bg-track/45">
+      <div className="relative w-20 shrink-0 sm:w-24">
+        {album.imageUrl ? (
+          <img src={album.imageUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="h-full w-full bg-track" />
+        )}
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-1.5 text-xs font-medium tabular-nums text-white">
+          {rank}
+        </span>
+      </div>
+      <div className="min-w-0 flex-1 py-2.5 pr-1">
+        {album.url ? (
+          <a href={album.url} target="_blank" rel="noreferrer" className={linkClass}>
+            {album.name}
+          </a>
+        ) : (
+          <span className="block truncate font-medium">{album.name}</span>
+        )}
+        <p className="truncate text-xs text-ink-faint">{album.artist}</p>
+        {meta && <p className="mt-0.5 truncate text-[11px] text-ink-faint">{meta}</p>}
+      </div>
+      {album.topTracks.length > 0 && (
+        <div className="w-48 shrink-0 border-l border-card-border/60 py-2.5 pl-3 pr-3 sm:w-64">
+          <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Top tracks</p>
+          <ol className="mt-1 space-y-0.5 text-xs text-ink-muted">
+            {album.topTracks.map((track, i) => (
+              <li key={track.id ?? `${track.track}-${i}`} className="truncate">
+                {i + 1}. {track.track}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </li>
+  );
+}
+
+export function TopAlbumsWidget() {
+  const { envelope, offline } = useWidget<SpotifyData>('spotify');
+  return (
+    <WidgetShell title="Top albums" badge={<StaleBadge envelope={envelope} />}>
+      <WidgetBody envelope={envelope} offline={offline}>
+        {(data) => {
+          const albums = data.allTime.albums.slice(0, 10);
+          if (albums.length === 0) {
+            return <p className="text-sm text-ink-faint">No album data yet — builds up as you listen.</p>;
+          }
+          return (
+            <ol className="max-h-[34rem] space-y-2 overflow-y-auto pr-1">
+              {albums.map((album, i) => (
+                <AlbumRow key={album.id ?? `${album.name}-${i}`} album={album} rank={i + 1} />
+              ))}
+            </ol>
+          );
+        }}
       </WidgetBody>
     </WidgetShell>
   );

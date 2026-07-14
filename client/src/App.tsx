@@ -22,6 +22,17 @@ function BackgroundGlow() {
   );
 }
 
+/** Green gradient wash + spotlights behind the whole page, only while the Spotify section is open. */
+function SpotifyGlow() {
+  return (
+    <div aria-hidden className="spotify-page-glow">
+      <div className="spotify-page-orb spotify-page-orb--one" />
+      <div className="spotify-page-orb spotify-page-orb--two" />
+      <div className="spotify-page-orb spotify-page-orb--three" />
+    </div>
+  );
+}
+
 const overviewGridVariants = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.06 } },
@@ -114,8 +125,9 @@ export default function App() {
   useDeviceLocation();
 
   return (
-    <div className="min-h-screen bg-canvas text-ink selection:bg-(--color-accent-ai)/25">
+    <div className="min-h-screen text-ink selection:bg-(--color-accent-ai)/25">
       <BackgroundGlow />
+      {route.view === 'section' && route.sectionId === 'spotify' && <SpotifyGlow />}
       <main className="mx-auto max-w-[78rem] px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 sm:px-8 sm:pt-10 lg:px-10">
         <MotionConfig
           reducedMotion="user"

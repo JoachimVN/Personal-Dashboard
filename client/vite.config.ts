@@ -30,7 +30,9 @@ export default defineConfig({
   server: {
     host: true,
     proxy: {
-      '/api': 'http://localhost:4821',
+      // Dev server only — kept on a different port than the launchd-managed production
+      // `npm start` instance (4821) so a dev session never fights it for the port.
+      '/api': 'http://localhost:4822',
     },
   },
 });
