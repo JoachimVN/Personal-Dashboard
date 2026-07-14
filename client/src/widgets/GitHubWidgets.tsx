@@ -217,6 +217,10 @@ export function ContributionGrid({
     if (el) el.scrollLeft = el.scrollWidth;
   }, [weeks.length]);
 
+  const contributionSummary = hovered
+    ? `${hovered.date} · ${hovered.count} contribution${hovered.count === 1 ? '' : 's'}`
+    : `${data.contributions.total} contributions in the last year`;
+
   return (
     <div>
       <div
@@ -239,9 +243,7 @@ export function ContributionGrid({
         ))}
       </div>
       <p className="mt-2 text-xs text-ink-muted">
-        {hovered
-          ? `${hovered.date} · ${hovered.count} contribution${hovered.count === 1 ? '' : 's'}`
-          : `${data.contributions.total} contributions in the last year`}
+        {contributionSummary}
       </p>
     </div>
   );
