@@ -1,0 +1,57 @@
+name: Privacy guard
+
+# This repo is public but its whole job is handling private data, so the failure mode
+# that matters is personal data reaching a commit. This is the tripwire for that:
+# it fails the build if a gitignored personal file becomes tracked, or if a real
+# credential / phone number / home path shows up in source.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Personal files must never be tracked
+        run: |
+          fail=0
+          for p in server/.env server/.tokens server/.data server/config.json; do
+            if [ -n "$(git ls-files -- "$p")" ]; then
+              echo "::error::'$p' is tracked. It holds personal data and must stay gitignored."
+              fail=1
+            fi
+          done
+          exit $fail
+
+      - name: No credentials in source
+        run: |
+          if git grep -nIE '(ghp_|gho_|github_pat_|sk-ant-|xox[baprs]-|-----BEGIN [A-Z ]*PRIVATE KEY)' \
+               -- . ':!.github/workflows/privacy-guard.yml'; then
+            echo "::error::A credential-shaped string is committed. Rotate it, then remove it."
+            exit 1
+          fi
+
+      - name: No real phone numbers in source
+        # 555-… and 99887766 are the documented fakes used by the iMessage fixtures.
+        run: |
+          if git grep -nIE '\+[0-9]{1,3}[ -]?[0-9][0-9 -]{6,}' \
+               -- '*.ts' '*.tsx' '*.json' '*.md' ':!package-lock.json' \
+             | grep -vE '555|99887766|998 87 766|99 88 77 66'; then
+            echo "::error::A real-looking phone number is committed. Use a fake fixture instead."
+            exit 1
+          fi
+
+      - name: No personal home paths in source
+        run: |
+          if git grep -nIE '(/Users/|/home/|C:\\\\Users\\\\)' \
+               -- '*.ts' '*.tsx' '*.json' '*.md' ':!package-lock.json' ':!.github/**' \
+             | grep -vE '/Users/you|/Users/test|C:\\\\Users\\\\you'; then
+            echo "::error::A personal home path is committed. Use a placeholder like /Users/you."
+            exit 1
+          fi
