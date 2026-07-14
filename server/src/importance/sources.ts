@@ -75,7 +75,7 @@ export function healthCandidates(data: HealthData | undefined): Candidate[] {
     const [metric, value] = anomaly;
     candidates.push({
       id: `health:baseline:${metric}`, source: 'health', kind: 'health', score: 82, shapes: [...allShapes],
-      kicker: 'Personal baseline', title: `${metric.replace(/([A-Z])/g, ' $1').trim()} ${value.deviationPercent.toFixed(0)}% ${value.direction}`,
+      kicker: 'Personal baseline', title: `${metric.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim()} ${value.deviationPercent.toFixed(0)}% ${value.direction}`,
       detail: `${value.current.toFixed(0)} today · usual ${value.average.toFixed(0)} across ${value.samples} days`,
       href: '#/health', render: { type: 'health-rings' },
     });

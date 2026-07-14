@@ -32,6 +32,11 @@ for (const provider of providers.all) {
 }
 const signalHistory = new SignalHistoryStore(database);
 scheduler.register(createCommandCenterProvider(scheduler, signalHistory, config));
+// Recompute the ranking as soon as any source settles, not just on command-center's own timer —
+// otherwise a cold start can snapshot an all-fallback ranking and sit on it for a full cycle.
+scheduler.onSettled((id) => {
+  if (id !== 'command-center') void scheduler.refresh('command-center');
+});
 scheduler.start();
 
 const layoutStore = new LayoutStore(
