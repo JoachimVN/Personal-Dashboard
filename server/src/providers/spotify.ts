@@ -1,7 +1,7 @@
 import { spotifySchema, type SpotifyData } from '@personal-dashboard/shared';
 import { readSpotifyToken, writeSpotifyToken } from '../spotifyToken.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
-import { SpotifyHistoryStore, type AlbumDurationInput, type PlayedTrackInput } from '../spotifyHistory.js';
+import { SpotifyHistoryStore, type AlbumDetailInput, type PlayedTrackInput } from '../spotifyHistory.js';
 import type { Provider } from '../scheduler.js';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
@@ -38,7 +38,9 @@ interface RawTrack {
 }
 interface RawAlbumDetail {
   id: string;
-  tracks?: { items?: { duration_ms?: number }[] };
+  total_tracks?: number;
+  release_date_precision?: string;
+  tracks?: { items?: { id?: string; duration_ms?: number }[] };
 }
 interface CurrentlyPlaying {
   is_playing: boolean;
@@ -241,18 +243,19 @@ export function createSpotifyProvider(
           .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
         historyStore.recordPlays(recentPlays);
 
-        // Backfill full album duration once per album (max 5/cycle) — the only album field that
-        // needs a dedicated fetch rather than coming along for free on track/top-list responses.
-        // Spotify's Nov 2024 API policy locked the batched "Get Several Albums" endpoint behind
-        // Extended Quota Mode approval (403 for dev-mode apps like this one), but the singular
-        // per-album endpoint is still open, so fetch one at a time. Failures (e.g. a removed
-        // album) are swallowed per-item and simply retried next cycle.
+        // Backfill full album duration/metadata once per album (max 5/cycle) — duration needs a
+        // dedicated fetch (doesn't come along for free on track/top-list responses), and the same
+        // response's tracklist also self-heals albumId on any track records that predate that
+        // field. Spotify's Nov 2024 API policy locked the batched "Get Several Albums" endpoint
+        // behind Extended Quota Mode approval (403 for dev-mode apps like this one), but the
+        // singular per-album endpoint is still open, so fetch one at a time. Failures (e.g. a
+        // removed album) are swallowed per-item and simply retried next cycle.
         const pendingAlbumIds = historyStore.getAlbumIdsNeedingDurations(5);
         if (pendingAlbumIds.length > 0) {
           const details = await Promise.all(
             pendingAlbumIds.map((id) => get<RawAlbumDetail>(`/albums/${id}`).catch(() => null)),
           );
-          const durations: AlbumDurationInput[] = details
+          const enrichments: AlbumDetailInput[] = details
             .filter((album): album is RawAlbumDetail => album !== null)
             .map((album) => ({
               id: album.id,
@@ -260,8 +263,13 @@ export function createSpotifyProvider(
                 (sum, t) => sum + (t.duration_ms ?? 0),
                 0,
               ),
+              totalTracks: album.total_tracks,
+              releaseDatePrecision: toReleaseDatePrecision(album.release_date_precision),
+              trackIds: (album.tracks?.items ?? [])
+                .map((t) => t.id)
+                .filter((id): id is string => id !== undefined),
             }));
-          historyStore.enrichAlbumDurations(durations);
+          historyStore.enrichAlbumDetails(enrichments);
         }
 
         if (topDataRefreshed) {

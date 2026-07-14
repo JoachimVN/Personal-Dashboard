@@ -128,14 +128,29 @@ describe('SpotifyHistoryStore', () => {
     ]);
   });
 
-  it('backfills album duration via enrichAlbumDurations, once per album', () => {
+  it('backfills album duration/metadata via enrichAlbumDetails, once per album', () => {
     const { store } = createStore();
     store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]);
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual(['al1']);
 
-    store.enrichAlbumDurations([{ id: 'al1', totalDurationMs: 2_400_000 }]);
+    store.enrichAlbumDetails([
+      { id: 'al1', totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day', trackIds: ['t1'] },
+    ]);
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual([]);
     const [album] = store.getAllTime().albums;
-    expect(album.totalDurationMs).toBe(2_400_000);
+    expect(album).toMatchObject({ totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day' });
+  });
+
+  it('self-heals albumId on stale track records via enrichAlbumDetails\' tracklist', () => {
+    const { store } = createStore();
+    // Simulate a pre-existing track record written before albumId existed.
+    store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1' }) }]);
+
+    store.enrichAlbumDetails([
+      { id: 'al1', totalDurationMs: 1_000_000, trackIds: ['t1'] },
+    ]);
+
+    const [album] = store.getAllTime().albums;
+    expect(album.topTracks).toEqual([expect.objectContaining({ id: 't1' })]);
   });
 });

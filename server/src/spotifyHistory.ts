@@ -64,9 +64,13 @@ export interface PlayedTrackInput {
   };
 }
 
-export interface AlbumDurationInput {
+export interface AlbumDetailInput {
   id: string;
   totalDurationMs: number;
+  totalTracks?: number;
+  releaseDatePrecision?: 'year' | 'month' | 'day';
+  /** Ids of every track on the album, per Spotify — used to backfill albumId on our own track records. */
+  trackIds: string[];
 }
 
 export interface SeedArtistInput {
@@ -229,7 +233,7 @@ export class SpotifyHistoryStore {
     if (changed) this.save();
   }
 
-  /** Album ids missing a full duration — batchable into Spotify's "Get Several Albums" (max 20 ids/call). One-time per album; static metadata never needs refetching. */
+  /** Album ids missing a full duration — one fetch per id (see providers/spotify.ts). One-time per album; static metadata never needs refetching. */
   getAlbumIdsNeedingDurations(limit: number): string[] {
     return Object.values(this.albums)
       .filter((album) => album.totalDurationMs === undefined)
@@ -237,13 +241,32 @@ export class SpotifyHistoryStore {
       .map((album) => album.id);
   }
 
-  enrichAlbumDurations(details: AlbumDurationInput[]): void {
+  /**
+   * Applies a fetched album's authoritative metadata, and — since the same response carries the
+   * album's full tracklist — self-heals `albumId` on any of our own track records that predate
+   * that field (or otherwise drifted), so per-album top tracks stay correct without waiting for
+   * those tracks to be replayed.
+   */
+  enrichAlbumDetails(details: AlbumDetailInput[]): void {
     let changed = false;
     for (const detail of details) {
       const existing = this.albums[detail.id];
-      if (!existing || existing.totalDurationMs === detail.totalDurationMs) continue;
-      this.albums[detail.id] = { ...existing, totalDurationMs: detail.totalDurationMs };
-      changed = true;
+      if (existing) {
+        this.albums[detail.id] = {
+          ...existing,
+          totalDurationMs: detail.totalDurationMs,
+          totalTracks: detail.totalTracks ?? existing.totalTracks,
+          releaseDatePrecision: detail.releaseDatePrecision ?? existing.releaseDatePrecision,
+        };
+        changed = true;
+      }
+      for (const trackId of detail.trackIds) {
+        const track = this.tracks[trackId];
+        if (track && track.albumId !== detail.id) {
+          this.tracks[trackId] = { ...track, albumId: detail.id };
+          changed = true;
+        }
+      }
     }
     if (changed) this.save();
   }
