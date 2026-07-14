@@ -3,6 +3,8 @@ import path from 'node:path';
 import { z } from 'zod';
 
 const TOP_LIMIT = 100;
+/** An album only counts as "listened to" once we've tracked at least this many distinct songs from it — otherwise a single popular track from a 20-track album would rank alongside albums played all the way through. */
+const MIN_TRACKED_TRACKS_PER_ALBUM = 3;
 
 const trackRecordSchema = z.object({
   id: z.string(),
@@ -15,6 +17,8 @@ const trackRecordSchema = z.object({
   imageUrl: z.string().optional(),
   url: z.string().optional(),
   playCount: z.number(),
+  /** True only for tracks set via applyRealStreamCounts — everything else is a long_term-rank guess or a partial organic count, not a trustworthy absolute number. */
+  verified: z.boolean().optional(),
 });
 
 const artistRecordSchema = z.object({
@@ -187,6 +191,7 @@ export class SpotifyHistoryStore {
         imageUrl: track.album.imageUrl,
         url: track.url,
         playCount: (existingTrack?.playCount ?? 0) + 1,
+        verified: existingTrack?.verified,
       };
 
       for (const artist of track.artists) {
@@ -216,6 +221,61 @@ export class SpotifyHistoryStore {
       };
 
       this.lastPlayedAt = playedAt;
+    }
+    this.save();
+  }
+
+  /**
+   * Overwrites specific tracks' playCount with real, externally-known stream counts (e.g. from a
+   * personally-tracked playlist), rather than the +1-per-observed-play accumulation the rest of
+   * this store does. Artist/album totals are adjusted by the delta versus the previous count
+   * rather than re-summed outright, so other tracks contributing to the same artist/album aren't
+   * touched. Safe to re-run with updated numbers — it's a set, not an increment.
+   */
+  applyRealStreamCounts(entries: { track: PlayedTrackInput; streams: number }[]): void {
+    for (const { track, streams } of entries) {
+      const existingTrack = this.tracks[track.id];
+      const delta = streams - (existingTrack?.playCount ?? 0);
+
+      this.tracks[track.id] = {
+        id: track.id,
+        track: track.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        album: track.album.name,
+        albumId: track.album.id,
+        releaseDate: track.album.releaseDate,
+        durationMs: track.durationMs,
+        imageUrl: track.album.imageUrl,
+        url: track.url,
+        playCount: streams,
+        verified: true,
+      };
+
+      for (const artist of track.artists) {
+        const existingArtist = this.artists[artist.id];
+        this.artists[artist.id] = {
+          id: artist.id,
+          name: artist.name,
+          imageUrl: existingArtist?.imageUrl,
+          url: existingArtist?.url,
+          genres: existingArtist?.genres ?? [],
+          playCount: (existingArtist?.playCount ?? 0) + delta,
+        };
+      }
+
+      const existingAlbum = this.albums[track.album.id];
+      this.albums[track.album.id] = {
+        id: track.album.id,
+        name: track.album.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        imageUrl: track.album.imageUrl,
+        url: track.album.url,
+        releaseDate: track.album.releaseDate,
+        releaseDatePrecision: track.album.releaseDatePrecision ?? existingAlbum?.releaseDatePrecision,
+        totalTracks: track.album.totalTracks ?? existingAlbum?.totalTracks,
+        totalDurationMs: existingAlbum?.totalDurationMs,
+        playCount: (existingAlbum?.playCount ?? 0) + delta,
+      };
     }
     this.save();
   }
@@ -275,18 +335,28 @@ export class SpotifyHistoryStore {
     if (changed) this.save();
   }
 
-  getAllTime(limit = TOP_LIMIT): {
+  getAllTime(
+    limit = TOP_LIMIT,
+    minTrackedTracksPerAlbum = MIN_TRACKED_TRACKS_PER_ALBUM,
+  ): {
     trackedSince: string | undefined;
     artists: ArtistRecord[];
     tracks: TrackRecord[];
     albums: (AlbumRecord & { topTracks: { id: string; track: string; playCount: number; url?: string }[] })[];
   } {
     const allTracks = Object.values(this.tracks);
+    const trackedTrackCountByAlbum = new Map<string, number>();
+    for (const track of allTracks) {
+      if (!track.albumId) continue;
+      trackedTrackCountByAlbum.set(track.albumId, (trackedTrackCountByAlbum.get(track.albumId) ?? 0) + 1);
+    }
+
     return {
       trackedSince: this.seededAt,
       artists: Object.values(this.artists).sort(byPlayCountDesc).slice(0, limit),
       tracks: allTracks.sort(byPlayCountDesc).slice(0, limit),
       albums: Object.values(this.albums)
+        .filter((album) => (trackedTrackCountByAlbum.get(album.id) ?? 0) >= minTrackedTracksPerAlbum)
         .sort(byPlayCountDesc)
         .slice(0, limit)
         .map((album) => ({

@@ -10,6 +10,8 @@ const trackSchema = z.object({
   durationMs: z.number().optional(),
   imageUrl: z.string().optional(),
   url: z.string().optional(),
+  /** True only when playCount is a real, externally-verified stream count (see spotifyHistory.ts) — otherwise it may be a long_term-rank guess. */
+  verified: z.boolean().optional(),
 });
 
 const artistSchema = z.object({

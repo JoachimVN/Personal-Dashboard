@@ -61,6 +61,9 @@ function TrackRow({ track, rank }: Readonly<{ track: Track; rank: number }>) {
         )}
         <p className="truncate text-xs text-ink-faint">{track.artist}</p>
       </div>
+      {track.verified && track.playCount !== undefined && (
+        <span className="shrink-0 text-xs tabular-nums text-ink-faint">{track.playCount}×</span>
+      )}
     </li>
   );
 }

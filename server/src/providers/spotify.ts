@@ -20,7 +20,7 @@ interface RawArtist {
   genres?: string[];
   external_urls?: { spotify?: string };
 }
-interface RawTrack {
+export interface RawTrack {
   id: string;
   name: string;
   duration_ms?: number;
@@ -91,7 +91,7 @@ function mapArtist(artist: RawArtist) {
 }
 
 /** Shapes a raw track for history recording/seeding — undefined for tracks missing the ids we need to dedupe on (e.g. local files). */
-function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefined {
+export function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefined {
   if (!track.id || !track.album?.id) return undefined;
   return {
     id: track.id,
@@ -120,7 +120,7 @@ function isRateLimitError(error: unknown): boolean {
  * refresh_token when the current one is within a minute of expiry. Never logs
  * response bodies — Spotify's token responses carry the tokens themselves.
  */
-async function accessToken(
+export async function accessToken(
   oauth: { clientId: string; clientSecret: string },
   signal: AbortSignal,
 ): Promise<string> {

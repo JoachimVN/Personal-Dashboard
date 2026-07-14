@@ -53,7 +53,9 @@ describe('SpotifyHistoryStore', () => {
     store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]); // duplicate, older/equal cutoff
     store.recordPlays([{ playedAt: '2026-01-02T00:00:00Z', track: track() }]);
 
-    const allTime = store.getAllTime();
+    // getAllTime(limit, 0) disables the min-tracked-tracks-per-album filter — this test is about
+    // play-count accumulation/dedup, not the album threshold (covered separately below).
+    const allTime = store.getAllTime(100, 0);
     expect(allTime.tracks).toEqual([expect.objectContaining({ id: 't1', playCount: 2 })]);
     expect(allTime.artists).toEqual([expect.objectContaining({ id: 'a1', playCount: 2 })]);
     expect(allTime.albums).toEqual([expect.objectContaining({ id: 'al1', playCount: 2 })]);
@@ -67,10 +69,22 @@ describe('SpotifyHistoryStore', () => {
       { playedAt: '2026-01-03T00:00:00Z', track: track({ id: 't2', name: 'Track Two', artists: [{ id: 'a2', name: 'Artist Two' }], album: { id: 'al2', name: 'Album Two' } }) },
     ]);
 
-    const allTime = store.getAllTime();
+    const allTime = store.getAllTime(100, 0);
     expect(allTime.tracks.map((t) => t.id)).toEqual(['t2', 't1']);
     expect(allTime.artists.map((a) => a.id)).toEqual(['a2', 'a1']);
     expect(allTime.albums.map((a) => a.id)).toEqual(['al2', 'al1']);
+  });
+
+  it('excludes albums until at least 3 distinct tracks from them have been tracked', () => {
+    const { store } = createStore();
+    store.recordPlays([
+      { playedAt: '2026-01-01T00:00:00Z', track: track({ id: 't1' }) },
+      { playedAt: '2026-01-02T00:00:00Z', track: track({ id: 't2', name: 'Track Two' }) },
+    ]);
+    expect(store.getAllTime().albums).toEqual([]);
+
+    store.recordPlays([{ playedAt: '2026-01-03T00:00:00Z', track: track({ id: 't3', name: 'Track Three' }) }]);
+    expect(store.getAllTime().albums).toEqual([expect.objectContaining({ id: 'al1' })]);
   });
 
   it('backfills missing artist image/url/genres via mergeArtistMetadata without overwriting existing values', () => {
@@ -137,7 +151,7 @@ describe('SpotifyHistoryStore', () => {
       { id: 'al1', totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day', trackIds: ['t1'] },
     ]);
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual([]);
-    const [album] = store.getAllTime().albums;
+    const [album] = store.getAllTime(100, 0).albums;
     expect(album).toMatchObject({ totalDurationMs: 2_400_000, totalTracks: 12, releaseDatePrecision: 'day' });
   });
 
@@ -150,6 +164,33 @@ describe('SpotifyHistoryStore', () => {
     expect(store.getAlbumIdsNeedingDurations(20)).toEqual(['al1']);
   });
 
+  it('applyRealStreamCounts sets an authoritative playCount, marks it verified, and adjusts artist/album totals by the delta', () => {
+    const { store } = createStore();
+    // Seed weight of 1 (single-item seed list), then one organic play on top — playCount is 2 before the real import.
+    store.seedIfNeeded({ artists: [{ id: 'a1', name: 'Artist One', genres: [] }], tracks: [track()] });
+    store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]);
+    expect(store.getAllTime().tracks[0].playCount).toBe(2);
+
+    store.applyRealStreamCounts([{ track: track(), streams: 301 }]);
+
+    const [trackRecord] = store.getAllTime().tracks;
+    expect(trackRecord).toMatchObject({ playCount: 301, verified: true });
+    // delta was 301 - 2 = 299, applied on top of the artist/album's existing 2.
+    expect(store.getAllTime().artists[0]).toMatchObject({ playCount: 301 });
+    expect(store.getAllTime(100, 0).albums[0]).toMatchObject({ playCount: 301 });
+  });
+
+  it('preserves the verified flag when a verified track is played again', () => {
+    const { store } = createStore();
+    store.recordPlays([{ playedAt: '2026-01-01T00:00:00Z', track: track() }]);
+    store.applyRealStreamCounts([{ track: track(), streams: 301 }]);
+
+    store.recordPlays([{ playedAt: '2026-01-02T00:00:00Z', track: track() }]);
+
+    const [trackRecord] = store.getAllTime().tracks;
+    expect(trackRecord).toMatchObject({ playCount: 302, verified: true });
+  });
+
   it('self-heals albumId on stale track records via enrichAlbumDetails\' tracklist', () => {
     const { store } = createStore();
     // Simulate a pre-existing track record written before albumId existed.
@@ -159,7 +200,7 @@ describe('SpotifyHistoryStore', () => {
       { id: 'al1', totalDurationMs: 1_000_000, trackIds: ['t1'] },
     ]);
 
-    const [album] = store.getAllTime().albums;
+    const [album] = store.getAllTime(100, 0).albums;
     expect(album.topTracks).toEqual([expect.objectContaining({ id: 't1' })]);
   });
 });

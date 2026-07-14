@@ -14,6 +14,7 @@
     "setup:gmail": "tsx scripts/setupGmail.ts",
     "setup:spotify": "tsx scripts/setupSpotify.ts",
     "setup:hue": "tsx scripts/setupHue.ts",
+    "seed:spotify-streams": "tsx scripts/seedSpotifyStreams.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
