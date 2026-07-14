@@ -149,6 +149,25 @@ interface AlbumLike {
 const byPlayCountDesc = (a: { playCount: number }, b: { playCount: number }) => b.playCount - a.playCount;
 
 /**
+ * Spotify assigns a distinct album id to every reissue (Deluxe/Extended/Anniversary/Remastered/...),
+ * which splits one album's plays across several "albums" in getAllTime — e.g. Kiss Land vs. Kiss
+ * Land (Deluxe) never accumulate enough tracked tracks individually to clear
+ * MIN_TRACKED_TRACKS_PER_ALBUM even though the underlying album is well-tracked. Stripping a
+ * trailing edition marker gives editions of the same album a shared grouping key so they can be
+ * merged before ranking.
+ */
+const EDITION_SUFFIX_RE =
+  /\s*[[(]\s*(deluxe|extended|expanded|anniversary|remaster(?:ed)?|special|super deluxe|bonus(?: track)?(?: version)?|explicit|clean|international|complete|revisited|reissue)[^)\]]*[)\]]\s*$/i;
+
+function canonicalAlbumName(name: string): string {
+  let result = name;
+  for (let stripped = result.replace(EDITION_SUFFIX_RE, '').trim(); stripped !== result; stripped = result.replace(EDITION_SUFFIX_RE, '').trim()) {
+    result = stripped;
+  }
+  return result;
+}
+
+/**
  * Accumulates real Spotify play counts (from recentlyPlayed, deduped by played_at) into an
  * "all-time" leaderboard the API itself never exposes — Spotify has no top-albums endpoint and no
  * permanent history, only rolling short/medium/long_term windows. Seeded once from the long_term
@@ -370,6 +389,45 @@ export class SpotifyHistoryStore {
     if (changed) this.save();
   }
 
+  /**
+   * Backfills artistIds/albumId/album metadata (esp. albumType, needed to filter out compilations)
+   * on existing track/album records that predate those fields — sourced from tracks we're already
+   * fetching for other purposes (top tracks), so this costs no extra Spotify API calls and doesn't
+   * depend on the rate-limit-prone per-album enrichment fetch in enrichAlbumDetails. Never creates
+   * new records or touches playCount; a pure metadata heal for tracks the store already knows.
+   */
+  healTrackMetadata(tracks: PlayedTrackInput[]): void {
+    let changed = false;
+    for (const track of tracks) {
+      const existing = this.tracks[track.id];
+      if (!existing) continue;
+
+      const artistIds = existing.artistIds.length > 0 ? existing.artistIds : track.artists.map((a) => a.id);
+      const albumId = existing.albumId ?? track.album.id;
+      if (artistIds !== existing.artistIds || albumId !== existing.albumId) {
+        this.tracks[track.id] = { ...existing, artistIds, albumId };
+        changed = true;
+      }
+
+      for (const artist of track.artists) this.upsertArtistMetadata(artist);
+
+      const existingAlbum = this.albums[track.album.id];
+      this.upsertAlbumMetadata({
+        id: track.album.id,
+        name: track.album.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        imageUrl: track.album.imageUrl,
+        url: track.album.url,
+        releaseDate: track.album.releaseDate,
+        releaseDatePrecision: track.album.releaseDatePrecision,
+        totalTracks: track.album.totalTracks,
+        albumType: track.album.albumType,
+      });
+      if (!existingAlbum || existingAlbum.albumType !== this.albums[track.album.id]?.albumType) changed = true;
+    }
+    if (changed) this.save();
+  }
+
   getAllTime(
     limit = TOP_LIMIT,
     minTrackedTracksPerAlbum = MIN_TRACKED_TRACKS_PER_ALBUM,
@@ -387,7 +445,6 @@ export class SpotifyHistoryStore {
     // a single duet partner) outrank artists whose own albums you actually listen to.
     const artistPlayCounts = new Map<string, number>();
     const albumPlayCounts = new Map<string, number>();
-    const trackedTrackCountByAlbum = new Map<string, number>();
     for (const track of allTracks) {
       const primaryArtistId = track.artistIds[0];
       if (primaryArtistId) {
@@ -395,9 +452,52 @@ export class SpotifyHistoryStore {
       }
       if (track.albumId) {
         albumPlayCounts.set(track.albumId, (albumPlayCounts.get(track.albumId) ?? 0) + track.playCount);
-        trackedTrackCountByAlbum.set(track.albumId, (trackedTrackCountByAlbum.get(track.albumId) ?? 0) + 1);
       }
     }
+
+    // Group album editions (Deluxe/Extended/...) that share a canonical name + artist so their
+    // plays combine into one entry instead of each edition separately falling short of
+    // minTrackedTracksPerAlbum — see canonicalAlbumName.
+    const editionGroups = new Map<string, AlbumRecord[]>();
+    for (const album of Object.values(this.albums)) {
+      if (album.albumType === 'compilation' && !COMPILATION_TYPE_OVERRIDES.has(album.id)) continue;
+      // Key on the primary (first-listed) artist only — a deluxe reissue often adds a bonus-track
+      // guest to the album credits (e.g. "The Weeknd" vs "The Weeknd, Ariana Grande"), which would
+      // otherwise keep it from grouping with the base edition.
+      const primaryArtist = album.artist.split(',')[0]?.trim().toLowerCase() ?? '';
+      const key = `${canonicalAlbumName(album.name).toLowerCase()}|${primaryArtist}`;
+      const list = editionGroups.get(key);
+      if (list) list.push(album);
+      else editionGroups.set(key, [album]);
+    }
+
+    const albums = [...editionGroups.values()]
+      .map((editions) => {
+        const albumIds = new Set(editions.map((a) => a.id));
+        const groupTracks = allTracks.filter((t) => t.albumId && albumIds.has(t.albumId));
+        // Prefer the edition whose own name has no edition suffix (the base release) as the
+        // display record; fall back to whichever edition has been played the most.
+        const canonical =
+          editions.find((a) => canonicalAlbumName(a.name) === a.name) ??
+          editions.slice().sort((a, b) => (albumPlayCounts.get(b.id) ?? 0) - (albumPlayCounts.get(a.id) ?? 0))[0];
+        return {
+          canonical,
+          playCount: groupTracks.reduce((sum, t) => sum + t.playCount, 0),
+          trackedCount: groupTracks.length,
+          groupTracks,
+        };
+      })
+      .filter(({ trackedCount }) => trackedCount >= minTrackedTracksPerAlbum)
+      .sort((a, b) => b.playCount - a.playCount)
+      .slice(0, limit)
+      .map(({ canonical, playCount, groupTracks }) => ({
+        ...canonical,
+        playCount,
+        topTracks: groupTracks
+          .sort(byPlayCountDesc)
+          .slice(0, 3)
+          .map(({ id, track, playCount: trackPlayCount, url }) => ({ id, track, playCount: trackPlayCount, url })),
+      }));
 
     return {
       trackedSince: this.seededAt,
@@ -407,20 +507,7 @@ export class SpotifyHistoryStore {
         .sort(byPlayCountDesc)
         .slice(0, limit),
       tracks: allTracks.sort(byPlayCountDesc).slice(0, limit),
-      albums: Object.values(this.albums)
-        .filter((album) => album.albumType !== 'compilation' || COMPILATION_TYPE_OVERRIDES.has(album.id))
-        .filter((album) => (trackedTrackCountByAlbum.get(album.id) ?? 0) >= minTrackedTracksPerAlbum)
-        .map((album) => ({ ...album, playCount: albumPlayCounts.get(album.id) ?? 0 }))
-        .sort(byPlayCountDesc)
-        .slice(0, limit)
-        .map((album) => ({
-          ...album,
-          topTracks: allTracks
-            .filter((track) => track.albumId === album.id)
-            .sort(byPlayCountDesc)
-            .slice(0, 3)
-            .map(({ id, track, playCount, url }) => ({ id, track, playCount, url })),
-        })),
+      albums,
     };
   }
 
