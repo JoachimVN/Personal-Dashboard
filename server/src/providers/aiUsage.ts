@@ -351,7 +351,7 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
         tokens: tokenTotals,
         asOf: quota.asOf ?? new Date().toISOString(),
       };
-      return { ...snapshot, history: history.record('ai-usage-claude', snapshot) };
+      return { ...snapshot, history: await history.record('ai-usage-claude', snapshot) };
     },
   };
 }
@@ -369,7 +369,7 @@ export function createCodexUsageProvider(
     isConfigured: () => true,
     fetch: async () => {
       const snapshot = await codexSnapshot();
-      return { ...snapshot, history: history.record('ai-usage-codex', snapshot) };
+      return { ...snapshot, history: await history.record('ai-usage-codex', snapshot) };
     },
   };
 }

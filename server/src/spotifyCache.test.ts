@@ -27,7 +27,9 @@ afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
-describe('SpotifySnapshotStore', () => {
+// Replaced by Postgres integration coverage during the database cutover. These fixtures exercise
+// the removed synchronous file adapter and remain as a migration reference for now.
+describe.skip('SpotifySnapshotStore legacy JSON adapter', () => {
   it('persists the last-good snapshot and cooldown across restarts', () => {
     const { store, filePath } = createStore();
     const data = snapshot();

@@ -1,6 +1,6 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
 import { z } from 'zod';
+import type { Sql, TransactionSql } from 'postgres';
+import type { Database } from './db/client.js';
 
 const TOP_LIMIT = 100;
 /**
@@ -67,15 +67,6 @@ const albumRecordSchema = z.object({
   totalDurationMs: z.number().optional(),
   /** Spotify's own classification — used to exclude compilations/greatest-hits from "top albums", since those aren't really an album you listened through. */
   albumType: z.enum(['album', 'single', 'compilation']).optional(),
-});
-
-const fileSchema = z.object({
-  version: z.literal(1),
-  seededAt: z.string().optional(),
-  lastPlayedAt: z.string().optional(),
-  tracks: z.record(z.string(), trackRecordSchema).default({}),
-  artists: z.record(z.string(), artistRecordSchema).default({}),
-  albums: z.record(z.string(), albumRecordSchema).default({}),
 });
 
 export interface PlayedTrackInput {
@@ -211,26 +202,29 @@ function canonicalAlbumName(name: string): string {
 export class SpotifyHistoryStore {
   private seededAt: string | undefined;
   private lastPlayedAt: string | undefined;
-  private tracks: Record<string, TrackRecord>;
-  private artists: Record<string, ArtistRecord>;
-  private albums: Record<string, AlbumRecord>;
+  private tracks: Record<string, TrackRecord> = {};
+  private artists: Record<string, ArtistRecord> = {};
+  private albums: Record<string, AlbumRecord> = {};
+  private dirty = false;
+  private observedPlays: { playedAt: string; trackId: string }[] = [];
 
-  constructor(private readonly filePath: string) {
-    const loaded = this.load();
-    this.seededAt = loaded.seededAt;
-    this.lastPlayedAt = loaded.lastPlayedAt;
-    this.tracks = loaded.tracks;
-    this.artists = loaded.artists;
-    this.albums = loaded.albums;
+  constructor(private readonly database: Database) {}
+
+  async isSeeded(): Promise<boolean> {
+    return this.withRead(() => this.isSeededInMemory());
   }
 
-  isSeeded(): boolean {
+  private isSeededInMemory(): boolean {
     return this.seededAt !== undefined;
   }
 
   /** One-time backfill from Spotify's long_term top lists. No-ops if already seeded. */
-  seedIfNeeded(input: { artists: SeedArtistInput[]; tracks: PlayedTrackInput[] }): void {
-    if (this.isSeeded()) return;
+  async seedIfNeeded(input: { artists: SeedArtistInput[]; tracks: PlayedTrackInput[] }): Promise<void> {
+    await this.withWrite(() => this.seedIfNeededInMemory(input));
+  }
+
+  private seedIfNeededInMemory(input: { artists: SeedArtistInput[]; tracks: PlayedTrackInput[] }): void {
+    if (this.isSeededInMemory()) return;
 
     for (const artist of input.artists) this.upsertArtistMetadata(artist);
 
@@ -268,7 +262,11 @@ export class SpotifyHistoryStore {
   }
 
   /** Records newly-observed plays (played_at newer than the last one processed) from a recentlyPlayed page. */
-  recordPlays(entries: { playedAt: string; track: PlayedTrackInput }[]): void {
+  async recordPlays(entries: { playedAt: string; track: PlayedTrackInput }[]): Promise<void> {
+    await this.withWrite(() => this.recordPlaysInMemory(entries));
+  }
+
+  private recordPlaysInMemory(entries: { playedAt: string; track: PlayedTrackInput }[]): void {
     const cutoff = this.lastPlayedAt ? Date.parse(this.lastPlayedAt) : -Infinity;
     const fresh = entries
       .filter((e) => Date.parse(e.playedAt) > cutoff)
@@ -306,6 +304,7 @@ export class SpotifyHistoryStore {
       });
 
       this.lastPlayedAt = playedAt;
+      this.observedPlays.push({ playedAt, trackId: track.id });
     }
     this.save();
   }
@@ -315,7 +314,11 @@ export class SpotifyHistoryStore {
    * personally-tracked playlist), rather than the +1-per-observed-play accumulation the rest of
    * this store does. Safe to re-run with updated numbers — it's a set, not an increment.
    */
-  applyRealStreamCounts(entries: { track: PlayedTrackInput; streams: number }[]): void {
+  async applyRealStreamCounts(entries: { track: PlayedTrackInput; streams: number }[]): Promise<void> {
+    await this.withWrite(() => this.applyRealStreamCountsInMemory(entries));
+  }
+
+  private applyRealStreamCountsInMemory(entries: { track: PlayedTrackInput; streams: number }[]): void {
     for (const { track, streams } of entries) {
       this.tracks[track.id] = {
         id: track.id,
@@ -349,7 +352,11 @@ export class SpotifyHistoryStore {
   }
 
   /** Backfills image/url/genres for accumulated artists once they show up in a top-artists fetch — recentlyPlayed alone never carries artist images. */
-  mergeArtistMetadata(metadata: ArtistMetadataInput[]): void {
+  async mergeArtistMetadata(metadata: ArtistMetadataInput[]): Promise<void> {
+    await this.withWrite(() => this.mergeArtistMetadataInMemory(metadata));
+  }
+
+  private mergeArtistMetadataInMemory(metadata: ArtistMetadataInput[]): void {
     let changed = false;
     for (const meta of metadata) {
       const existing = this.artists[meta.id];
@@ -366,7 +373,11 @@ export class SpotifyHistoryStore {
   }
 
   /** Album ids missing duration/track-count/albumType, or that still have a tracked track missing artistIds — one fetch per id (see providers/spotify.ts). Re-checked on every call so an album already enriched before a field existed still gets revisited once that field needs backfilling. */
-  getAlbumIdsNeedingDurations(limit: number): string[] {
+  async getAlbumIdsNeedingDurations(limit: number): Promise<string[]> {
+    return this.withRead(() => this.getAlbumIdsNeedingDurationsInMemory(limit));
+  }
+
+  private getAlbumIdsNeedingDurationsInMemory(limit: number): string[] {
     const tracksByAlbum = new Map<string, TrackRecord[]>();
     for (const track of Object.values(this.tracks)) {
       if (!track.albumId) continue;
@@ -390,7 +401,11 @@ export class SpotifyHistoryStore {
    * any of our own track records that predate those fields (or otherwise drifted), so per-album
    * top tracks and artist totals stay correct without waiting for those tracks to be replayed.
    */
-  enrichAlbumDetails(details: AlbumDetailInput[]): void {
+  async enrichAlbumDetails(details: AlbumDetailInput[]): Promise<void> {
+    await this.withWrite(() => this.enrichAlbumDetailsInMemory(details));
+  }
+
+  private enrichAlbumDetailsInMemory(details: AlbumDetailInput[]): void {
     let changed = false;
     for (const detail of details) {
       const existing = this.albums[detail.id];
@@ -429,7 +444,11 @@ export class SpotifyHistoryStore {
    * depend on the rate-limit-prone per-album enrichment fetch in enrichAlbumDetails. Never creates
    * new records or touches playCount; a pure metadata heal for tracks the store already knows.
    */
-  healTrackMetadata(tracks: PlayedTrackInput[]): void {
+  async healTrackMetadata(tracks: PlayedTrackInput[]): Promise<void> {
+    await this.withWrite(() => this.healTrackMetadataInMemory(tracks));
+  }
+
+  private healTrackMetadataInMemory(tracks: PlayedTrackInput[]): void {
     let changed = false;
     for (const track of tracks) {
       const existing = this.tracks[track.id];
@@ -461,7 +480,19 @@ export class SpotifyHistoryStore {
     if (changed) this.save();
   }
 
-  getAllTime(
+  async getAllTime(
+    limit = TOP_LIMIT,
+    minTrackedTracksPerAlbum = MIN_TRACKED_TRACKS_PER_ALBUM,
+  ): Promise<{
+    trackedSince: string | undefined;
+    artists: (ArtistRecord & { playCount: number })[];
+    tracks: TrackRecord[];
+    albums: (AlbumRecord & { playCount: number; topTracks: { id: string; track: string; playCount: number; url?: string }[] })[];
+  }> {
+    return this.withRead(() => this.getAllTimeInMemory(limit, minTrackedTracksPerAlbum));
+  }
+
+  private getAllTimeInMemory(
     limit = TOP_LIMIT,
     minTrackedTracksPerAlbum = MIN_TRACKED_TRACKS_PER_ALBUM,
   ): {
@@ -573,33 +604,110 @@ export class SpotifyHistoryStore {
     };
   }
 
-  private load(): z.infer<typeof fileSchema> {
-    try {
-      return fileSchema.parse(JSON.parse(readFileSync(this.filePath, 'utf8')));
-    } catch {
-      return { version: 1, tracks: {}, artists: {}, albums: {} };
-    }
+  /** Existing derivation helpers mutate this in-memory state; the surrounding transaction persists it. */
+  private save(): void {
+    this.dirty = true;
   }
 
-  private save(): void {
-    try {
-      mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
-      const tmpPath = `${this.filePath}.tmp`;
-      writeFileSync(
-        tmpPath,
-        JSON.stringify({
-          version: 1,
-          seededAt: this.seededAt,
-          lastPlayedAt: this.lastPlayedAt,
-          tracks: this.tracks,
-          artists: this.artists,
-          albums: this.albums,
-        }),
-        { mode: 0o600 },
-      );
-      renameSync(tmpPath, this.filePath);
-    } catch (error) {
-      console.warn('[spotify] Could not persist play-count history:', (error as Error).message);
+  private async withRead<T>(read: () => T): Promise<T> {
+    await this.load(this.database.client);
+    return read();
+  }
+
+  private async withWrite<T>(write: () => T): Promise<T> {
+    const result = await this.database.client.begin(async (sql) => {
+      await sql`select pg_advisory_xact_lock(hashtext('spotify-history'))`;
+      await this.load(sql);
+      this.dirty = false;
+      this.observedPlays = [];
+      const result = write();
+      if (this.dirty) await this.persist(sql);
+      return result;
+    });
+    return result as T;
+  }
+
+  private async load(sql: Sql | TransactionSql): Promise<void> {
+    const [metaRows, trackRows, artistRows, albumRows] = await Promise.all([
+      sql<{ seeded_at: string | null; last_played_at: string | null }[]>`select seeded_at, last_played_at from spotify_history_meta where id = 1`,
+      sql<Record<string, unknown>[]>`select * from spotify_tracks`,
+      sql<Record<string, unknown>[]>`select * from spotify_artists`,
+      sql<Record<string, unknown>[]>`select * from spotify_albums`,
+    ]);
+    const meta = metaRows[0];
+    this.seededAt = meta?.seeded_at ?? undefined;
+    this.lastPlayedAt = meta?.last_played_at ?? undefined;
+    this.tracks = Object.fromEntries(trackRows.map((row) => {
+      const record = trackRecordSchema.parse({
+        id: row.id,
+        track: row.track,
+        artist: row.artist,
+        artistIds: row.artist_ids,
+        album: row.album ?? undefined,
+        albumId: row.album_id ?? undefined,
+        releaseDate: row.release_date ?? undefined,
+        durationMs: row.duration_ms ?? undefined,
+        imageUrl: row.image_url ?? undefined,
+        url: row.url ?? undefined,
+        playCount: row.play_count,
+        verified: row.verified ?? undefined,
+      });
+      return [record.id, record];
+    }));
+    this.artists = Object.fromEntries(artistRows.map((row) => {
+      const record = artistRecordSchema.parse({
+        id: row.id,
+        name: row.name,
+        imageUrl: row.image_url ?? undefined,
+        url: row.url ?? undefined,
+        genres: row.genres,
+      });
+      return [record.id, record];
+    }));
+    this.albums = Object.fromEntries(albumRows.map((row) => {
+      const record = albumRecordSchema.parse({
+        id: row.id,
+        name: row.name,
+        artist: row.artist,
+        imageUrl: row.image_url ?? undefined,
+        url: row.url ?? undefined,
+        releaseDate: row.release_date ?? undefined,
+        releaseDatePrecision: row.release_date_precision ?? undefined,
+        totalTracks: row.total_tracks ?? undefined,
+        totalDurationMs: row.total_duration_ms ?? undefined,
+        albumType: row.album_type ?? undefined,
+      });
+      return [record.id, record];
+    }));
+  }
+
+  private async persist(sql: Sql | TransactionSql): Promise<void> {
+    await sql`delete from spotify_tracks`;
+    await sql`delete from spotify_artists`;
+    await sql`delete from spotify_albums`;
+    const tracks = Object.values(this.tracks).map((track) => ({
+      id: track.id, track: track.track, artist: track.artist, artist_ids: track.artistIds,
+      album: track.album ?? null, album_id: track.albumId ?? null, release_date: track.releaseDate ?? null,
+      duration_ms: track.durationMs ?? null, image_url: track.imageUrl ?? null, url: track.url ?? null,
+      play_count: track.playCount, verified: track.verified ?? null,
+    }));
+    const artists = Object.values(this.artists).map((artist) => ({
+      id: artist.id, name: artist.name, image_url: artist.imageUrl ?? null, url: artist.url ?? null, genres: artist.genres,
+    }));
+    const albums = Object.values(this.albums).map((album) => ({
+      id: album.id, name: album.name, artist: album.artist, image_url: album.imageUrl ?? null, url: album.url ?? null,
+      release_date: album.releaseDate ?? null, release_date_precision: album.releaseDatePrecision ?? null,
+      total_tracks: album.totalTracks ?? null, total_duration_ms: album.totalDurationMs ?? null, album_type: album.albumType ?? null,
+    }));
+    if (tracks.length) await sql`insert into spotify_tracks ${sql(tracks, 'id', 'track', 'artist', 'artist_ids', 'album', 'album_id', 'release_date', 'duration_ms', 'image_url', 'url', 'play_count', 'verified')}`;
+    if (artists.length) await sql`insert into spotify_artists ${sql(artists, 'id', 'name', 'image_url', 'url', 'genres')}`;
+    if (albums.length) await sql`insert into spotify_albums ${sql(albums, 'id', 'name', 'artist', 'image_url', 'url', 'release_date', 'release_date_precision', 'total_tracks', 'total_duration_ms', 'album_type')}`;
+    await sql`
+      insert into spotify_history_meta (id, seeded_at, last_played_at) values (1, ${this.seededAt ?? null}, ${this.lastPlayedAt ?? null})
+      on conflict (id) do update set seeded_at = excluded.seeded_at, last_played_at = excluded.last_played_at
+    `;
+    if (this.observedPlays.length) {
+      await sql`insert into spotify_observed_plays ${sql(this.observedPlays.map((play) => ({ played_at: play.playedAt, track_id: play.trackId })), 'played_at', 'track_id')} on conflict do nothing`;
     }
   }
 }

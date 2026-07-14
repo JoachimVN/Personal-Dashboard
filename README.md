@@ -17,9 +17,29 @@ npm-workspaces monorepo:
 - **`server/`** — Express on `127.0.0.1:4821`. Each data source is a *provider* polled on its own interval; results are schema-validated (zod) and cached in memory. Widgets read the cache via `/api/widgets/:id`.
 - **`shared/`** — zod schemas + types shared by both.
 
-No database. Nothing personal is in this repo: credentials live in gitignored `server/.env` /
-`server/.tokens/`, your settings in gitignored `server/config.json`, and fetched data (health,
-listening history, message previews) never leaves gitignored `server/.data/` on your own machine.
+Persistent health, AI-usage, and Spotify history live in Railway Postgres so dashboard installs on
+different machines see the same history. The connection string remains in ignored `server/.env`;
+credentials and OAuth tokens stay in ignored `server/.tokens/`, while local-only layout state remains
+in `server/.data/`.
+
+## Shared Postgres setup
+
+`DATABASE_URL` is required. Set it to Railway's **public** Postgres URL (not the internal
+`postgres.railway.internal` URL, which only works from Railway services), then migrate:
+
+```bash
+npm run db:migrate -w server
+```
+
+For an existing installation, stop every dashboard server first, back up each machine's
+`server/.data/`, choose the authoritative history source, and import it explicitly:
+
+```bash
+npm run db:import-json -w server -- /path/to/server/.data
+```
+
+The importer is idempotent for the same export. Keep the JSON backups as rollback material; do not
+run two old JSON-backed dashboard versions while performing the cutover.
 
 ## Getting started
 
@@ -149,7 +169,7 @@ One-time setup:
 2. Run `npm run setup:spotify -w server`. It prints an exact redirect URI (`http://127.0.0.1:8888/callback`) — add that under the app's **Settings → Redirect URIs** and save.
 3. Open the printed authorize URL, approve. The refresh token is saved to `server/.tokens/spotify.json` (owner-only permissions); restart the server.
 
-Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months / all time. Spotify's API has no all-time or top-albums endpoint, so those are built up locally: seeded once from Spotify's long_term (multi-year) top lists, then grown from every observed play in `server/.data/spotify-history.json` (gitignored, per-machine — not synced if you run the server from more than one device).
+Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months / all time. Spotify's API has no all-time or top-albums endpoint, so those are seeded once from Spotify's long_term (multi-year) top lists and then grown from observed plays in the shared Postgres history.
 
 ### Philips Hue
 

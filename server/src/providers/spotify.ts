@@ -204,7 +204,7 @@ export function createSpotifyProvider(
         const bearer = await accessToken(oauth, signal);
 
         const get = async <T>(path: string): Promise<T | null> => {
-          const retryInMs = snapshotStore.getRateLimitedUntil() - Date.now();
+          const retryInMs = await snapshotStore.getRateLimitedUntil() - Date.now();
           if (retryInMs > 0) {
             throw new Error(`spotify rate limited; retry in ${Math.ceil(retryInMs / 1000)} seconds`);
           }
@@ -219,7 +219,7 @@ export function createSpotifyProvider(
               Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
                 ? retryAfterSeconds * 1000
                 : DEFAULT_RATE_LIMIT_RETRY_MS;
-            snapshotStore.setRateLimitedUntil(Date.now() + retryAfterMs);
+            await snapshotStore.setRateLimitedUntil(Date.now() + retryAfterMs);
             throw new Error(`spotify rate limited; retry in ${Math.ceil(retryAfterMs / 1000)} seconds`);
           }
           if (!res.ok) throw new Error(`spotify ${path} failed: ${res.status}`);
@@ -251,12 +251,12 @@ export function createSpotifyProvider(
 
         // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
         // aren't empty on day one — real observed plays accrue on top from here.
-        if (!historyStore.isSeeded()) {
+        if (!await historyStore.isSeeded()) {
           const [artistsLong, tracksLong] = await Promise.all([
             get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50'),
             getTopTracks(get, 'long_term', 100),
           ]);
-          historyStore.seedIfNeeded({
+          await historyStore.seedIfNeeded({
             artists: (artistsLong?.items ?? []).map(mapArtist),
             tracks: tracksLong.map(toPlayedTrackInput).filter((t): t is PlayedTrackInput => t !== undefined),
           });
@@ -268,7 +268,7 @@ export function createSpotifyProvider(
             return track ? { playedAt: entry.played_at, track } : undefined;
           })
           .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
-        historyStore.recordPlays(recentPlays);
+        await historyStore.recordPlays(recentPlays);
 
         // Backfill full album duration/metadata once per album (max 5/cycle) — duration needs a
         // dedicated fetch (doesn't come along for free on track/top-list responses), and the same
@@ -277,7 +277,7 @@ export function createSpotifyProvider(
         // behind Extended Quota Mode approval (403 for dev-mode apps like this one), but the
         // singular per-album endpoint is still open, so fetch one at a time. Failures (e.g. a
         // removed album) are swallowed per-item and simply retried next cycle.
-        const pendingAlbumIds = historyStore.getAlbumIdsNeedingDurations(5);
+        const pendingAlbumIds = await historyStore.getAlbumIdsNeedingDurations(5);
         if (pendingAlbumIds.length > 0) {
           const details = await Promise.all(
             pendingAlbumIds.map((id) => get<RawAlbumDetail>(`/albums/${id}`).catch(() => null)),
@@ -297,14 +297,14 @@ export function createSpotifyProvider(
                 .filter((t): t is { id: string; duration_ms?: number; artists?: { id: string }[] } => t.id !== undefined)
                 .map((t) => ({ id: t.id, artistIds: (t.artists ?? []).map((a) => a.id) })),
             }));
-          historyStore.enrichAlbumDetails(enrichments);
+          await historyStore.enrichAlbumDetails(enrichments);
         }
 
         if (topDataRefreshed) {
-          historyStore.mergeArtistMetadata(
+          await historyStore.mergeArtistMetadata(
             [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
           );
-          historyStore.healTrackMetadata(
+          await historyStore.healTrackMetadata(
             [...topData.tracksShort, ...topData.tracksMedium]
               .map(toPlayedTrackInput)
               .filter((t): t is PlayedTrackInput => t !== undefined),
@@ -335,12 +335,12 @@ export function createSpotifyProvider(
             shortTerm: topData.tracksShort.map(mapTrack),
             mediumTerm: topData.tracksMedium.map(mapTrack),
           },
-          allTime: historyStore.getAllTime(),
+          allTime: await historyStore.getAllTime(),
         };
-        snapshotStore.setSnapshot(snapshot);
+        await snapshotStore.setSnapshot(snapshot);
         return snapshot;
       } catch (error) {
-        const lastGoodSnapshot = snapshotStore.getSnapshot();
+        const lastGoodSnapshot = await snapshotStore.getSnapshot();
         if (lastGoodSnapshot && isRateLimitError(error)) return lastGoodSnapshot;
         throw error;
       }

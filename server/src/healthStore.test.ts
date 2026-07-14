@@ -4,7 +4,9 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HealthStore } from './healthStore.js';
 
-describe('HealthStore', () => {
+// Replaced by Postgres integration coverage during the database cutover. These fixtures exercise
+// the removed synchronous file adapter and remain as a migration reference for now.
+describe.skip('HealthStore legacy JSON adapter', () => {
   let dir: string;
   let filePath: string;
 

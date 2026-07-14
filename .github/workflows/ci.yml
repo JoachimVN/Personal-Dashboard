@@ -13,6 +13,19 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: personal_dashboard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d personal_dashboard_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +45,8 @@ jobs:
 
       - name: Test
         run: npm test
+        env:
+          DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/personal_dashboard_test
 
       - name: Build client
         run: npm run build

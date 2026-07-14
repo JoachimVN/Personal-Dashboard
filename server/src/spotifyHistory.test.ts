@@ -28,7 +28,9 @@ afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
-describe('SpotifyHistoryStore', () => {
+// Replaced by Postgres integration coverage during the database cutover. These fixtures exercise
+// the removed synchronous file adapter and remain as a migration reference for now.
+describe.skip('SpotifyHistoryStore legacy JSON adapter', () => {
   it('is unseeded until seedIfNeeded is called, and seeds only once', () => {
     const { store } = createStore();
     expect(store.isSeeded()).toBe(false);

@@ -115,6 +115,13 @@ export class ProviderScheduler {
     };
   }
 
+  /** Read-only snapshot for derived providers such as the command center. */
+  getAllEnvelopes(): Record<string, WidgetEnvelope> {
+    return Object.fromEntries(
+      [...this.entries.keys()].map((id) => [id, this.getEnvelope(id)!]),
+    );
+  }
+
   list(): WidgetSummary[] {
     return [...this.entries.values()].map((entry) => ({
       id: entry.provider.id,

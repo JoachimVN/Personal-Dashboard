@@ -1,6 +1,5 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { AppConfig } from '../config.js';
+import type { Database } from '../db/client.js';
 import type { ServerEnv } from '../env.js';
 import type { Provider } from '../scheduler.js';
 import { HealthStore } from '../healthStore.js';
@@ -26,21 +25,20 @@ export interface Providers {
   health: HealthStore;
 }
 
-export function createProviders(env: ServerEnv, config: AppConfig): Providers {
-  const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.data');
+export function createProviders(env: ServerEnv, config: AppConfig, database: Database): Providers {
   const weather = createWeatherProvider(env.weather, env.timezone);
   const hue = createHueProvider(env.hue);
   const health = new HealthStore(
-    path.join(dataDir, 'health.json'),
+    database,
     config.health.historyRetentionDays,
   );
   const usageHistory = new UsageHistoryStore(
-    path.join(dataDir, 'ai-usage-history.json'),
+    database,
     config.aiUsage.historySampleMs,
     config.aiUsage.historyRetentionDays * 24 * 60 * 60_000,
   );
-  const spotifySnapshot = new SpotifySnapshotStore(path.join(dataDir, 'spotify-cache.json'));
-  const spotifyHistory = new SpotifyHistoryStore(path.join(dataDir, 'spotify-history.json'));
+  const spotifySnapshot = new SpotifySnapshotStore(database);
+  const spotifyHistory = new SpotifyHistoryStore(database);
   return {
     weather,
     hue,
@@ -59,6 +57,9 @@ export function createProviders(env: ServerEnv, config: AppConfig): Providers {
         activeEnergyKcal: config.health.moveGoalKcal,
         exerciseMinutes: config.health.exerciseGoalMinutes,
         standHours: config.health.standGoalHours,
+      }, {
+        windowDays: config.health.baselineWindowDays,
+        deviationPercent: config.health.baselineDeviationPercent,
       }),
       createSystemProvider(env.timezone),
       hue,
