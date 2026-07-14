@@ -433,15 +433,15 @@ a {
   top: -13rem;
   right: -9rem;
   border-radius: 999px;
-  background: var(--accent);
-  opacity: 0.08;
-  filter: blur(18px);
+  background: radial-gradient(circle, var(--accent), transparent 72%);
+  opacity: 0.1;
+  filter: blur(24px);
   transition: opacity 400ms ease, transform 600ms cubic-bezier(.2,.8,.2,1);
 }
 
 .dashboard-section-card:hover .section-card-aura {
-  opacity: 0.15;
-  transform: scale(1.12) translate(-1rem, 1rem);
+  opacity: 0.18;
+  transform: scale(1.5) translate(-1rem, 1rem);
 }
 
 .section-icon,
