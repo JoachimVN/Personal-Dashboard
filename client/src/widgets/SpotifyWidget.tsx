@@ -19,7 +19,7 @@ function artistsForRange(data: SpotifyData, range: Range): Artist[] {
   return range === 'allTime' ? data.allTime.artists : data.topArtists[range];
 }
 
-const linkClass = 'truncate font-medium text-ink hover:underline';
+const linkClass = 'block truncate font-medium text-ink hover:underline';
 const accent = 'var(--color-accent-spotify)';
 
 function Thumb({ url, size = 'h-10 w-10' }: { url?: string; size?: string }) {
