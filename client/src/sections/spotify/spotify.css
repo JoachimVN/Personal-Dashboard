@@ -11,6 +11,70 @@
   }
 }
 
+/* Green gradient wash + drifting blurred spotlights behind the Spotify detail page. */
+.spotify-detail-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(
+    160deg,
+    color-mix(in oklab, var(--color-accent-spotify) 10%, transparent),
+    transparent 55%
+  );
+}
+
+.spotify-detail-bg-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(2px);
+  will-change: transform;
+}
+
+.spotify-detail-bg-orb--one {
+  width: min(58rem, 85vw);
+  height: min(58rem, 85vw);
+  top: -30rem;
+  left: -18rem;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 26%, transparent), transparent 68%);
+  animation: spotify-bg-drift-one 24s ease-in-out infinite alternate;
+}
+
+.spotify-detail-bg-orb--two {
+  width: 40rem;
+  height: 40rem;
+  top: 10%;
+  right: -20rem;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 20%, transparent), transparent 70%);
+  animation: spotify-bg-drift-two 20s ease-in-out infinite alternate;
+}
+
+.spotify-detail-bg-orb--three {
+  width: 36rem;
+  height: 36rem;
+  bottom: -20rem;
+  left: 35%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--color-accent-spotify) 16%, transparent), transparent 70%);
+  animation: spotify-bg-drift-one 30s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes spotify-bg-drift-one {
+  from { transform: translate(0, 0); }
+  to { transform: translate(3rem, 4rem); }
+}
+
+@keyframes spotify-bg-drift-two {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-2.5rem, 3rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spotify-detail-bg-orb {
+    animation: none;
+  }
+}
+
 /* Small range toggle in the top-artists/tracks card headers. */
 .spotify-range-toggle {
   display: inline-flex;
