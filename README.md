@@ -17,7 +17,7 @@ No database. Secrets live in gitignored `server/.env` / `server/.tokens/`.
 ```bash
 npm install
 cp server/.env.example server/.env   # fill in what you want enabled
-npm run dev                          # server :4821 + client :5173
+npm run dev                          # server :4822 + client :5173
 ```
 
 Widgets without credentials show as "not configured" instead of breaking — enable them one at a time.

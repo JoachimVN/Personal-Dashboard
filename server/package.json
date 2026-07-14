@@ -7,8 +7,8 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "predev": "tsx scripts/freePort.ts",
-    "dev": "tsx watch src/index.ts",
+    "predev": "cross-env PORT=4822 tsx scripts/freePort.ts",
+    "dev": "cross-env PORT=4822 tsx watch src/index.ts",
     "start": "cross-env NODE_ENV=production tsx src/index.ts",
     "test": "vitest run",
     "setup:gmail": "tsx scripts/setupGmail.ts",
