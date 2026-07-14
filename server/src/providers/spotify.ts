@@ -38,12 +38,17 @@ export interface RawTrack {
   };
   external_urls?: { spotify?: string };
 }
+interface RawAlbumTrack {
+  id?: string;
+  duration_ms?: number;
+  artists?: { id: string }[];
+}
 interface RawAlbumDetail {
   id: string;
   total_tracks?: number;
   release_date_precision?: string;
   album_type?: string;
-  tracks?: { items?: { id?: string; duration_ms?: number; artists?: { id: string }[] }[] };
+  tracks?: { items?: RawAlbumTrack[] };
 }
 interface CurrentlyPlaying {
   is_playing: boolean;
@@ -73,6 +78,25 @@ function toReleaseDatePrecision(precision?: string): 'year' | 'month' | 'day' | 
 
 function toAlbumType(type?: string): 'album' | 'single' | 'compilation' | undefined {
   return type === 'album' || type === 'single' || type === 'compilation' ? type : undefined;
+}
+
+function toAlbumTrackInput(track: RawAlbumTrack): { id: string; artistIds: string[] } | undefined {
+  if (!track.id) return undefined;
+  return { id: track.id, artistIds: (track.artists ?? []).map((artist) => artist.id) };
+}
+
+function toAlbumDetailInput(album: RawAlbumDetail): AlbumDetailInput {
+  const tracks = album.tracks?.items ?? [];
+  return {
+    id: album.id,
+    totalDurationMs: tracks.reduce((sum, track) => sum + (track.duration_ms ?? 0), 0),
+    totalTracks: album.total_tracks,
+    releaseDatePrecision: toReleaseDatePrecision(album.release_date_precision),
+    albumType: toAlbumType(album.album_type),
+    tracks: tracks
+      .map(toAlbumTrackInput)
+      .filter((track): track is { id: string; artistIds: string[] } => track !== undefined),
+  };
 }
 
 function mapTrack(track: RawTrack) {
@@ -256,9 +280,7 @@ export function createSpotifyProvider(
         // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
         // aren't empty on day one — real observed plays accrue on top from here.
         if (!await historyStore.isSeeded()) {
-          const [artistsLong] = await Promise.all([
-            get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50'),
-          ]);
+          const artistsLong = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');
           await historyStore.seedIfNeeded({
             artists: (artistsLong?.items ?? []).map(mapArtist),
             // The existing all-time view intentionally starts with a bounded rank-weighted seed.
@@ -290,21 +312,9 @@ export function createSpotifyProvider(
           const details = await Promise.all(
             pendingAlbumIds.map((id) => get<RawAlbumDetail>(`/albums/${id}`).catch(() => null)),
           );
-          const enrichments: AlbumDetailInput[] = details
+          const enrichments = details
             .filter((album): album is RawAlbumDetail => album !== null)
-            .map((album) => ({
-              id: album.id,
-              totalDurationMs: (album.tracks?.items ?? []).reduce(
-                (sum, t) => sum + (t.duration_ms ?? 0),
-                0,
-              ),
-              totalTracks: album.total_tracks,
-              releaseDatePrecision: toReleaseDatePrecision(album.release_date_precision),
-              albumType: toAlbumType(album.album_type),
-              tracks: (album.tracks?.items ?? [])
-                .filter((t): t is { id: string; duration_ms?: number; artists?: { id: string }[] } => t.id !== undefined)
-                .map((t) => ({ id: t.id, artistIds: (t.artists ?? []).map((a) => a.id) })),
-            }));
+            .map(toAlbumDetailInput);
           await historyStore.enrichAlbumDetails(enrichments);
         }
 

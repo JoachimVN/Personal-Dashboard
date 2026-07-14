@@ -2,6 +2,9 @@ import { z } from 'zod';
 import type { Sql, TransactionSql } from 'postgres';
 import type { Database } from './db/client.js';
 
+type ReleaseDatePrecision = 'year' | 'month' | 'day';
+type AlbumType = 'album' | 'single' | 'compilation';
+
 const TOP_LIMIT = 100;
 /**
  * An album only counts as "listened to" once we've tracked at least this many distinct songs from
@@ -81,9 +84,9 @@ export interface PlayedTrackInput {
     imageUrl?: string;
     url?: string;
     releaseDate?: string;
-    releaseDatePrecision?: 'year' | 'month' | 'day';
+    releaseDatePrecision?: ReleaseDatePrecision;
     totalTracks?: number;
-    albumType?: 'album' | 'single' | 'compilation';
+    albumType?: AlbumType;
   };
 }
 
@@ -91,8 +94,8 @@ export interface AlbumDetailInput {
   id: string;
   totalDurationMs: number;
   totalTracks?: number;
-  releaseDatePrecision?: 'year' | 'month' | 'day';
-  albumType?: 'album' | 'single' | 'compilation';
+  releaseDatePrecision?: ReleaseDatePrecision;
+  albumType?: AlbumType;
   /** Every track on the album, per Spotify — used to backfill albumId/artistIds on our own track records. */
   tracks: { id: string; artistIds: string[] }[];
 }
@@ -132,9 +135,9 @@ interface AlbumLike {
   imageUrl?: string;
   url?: string;
   releaseDate?: string;
-  releaseDatePrecision?: 'year' | 'month' | 'day';
+  releaseDatePrecision?: ReleaseDatePrecision;
   totalTracks?: number;
-  albumType?: 'album' | 'single' | 'compilation';
+  albumType?: AlbumType;
 }
 
 const byPlayCountDesc = (a: { playCount: number }, b: { playCount: number }) => b.playCount - a.playCount;
@@ -452,33 +455,42 @@ export class SpotifyHistoryStore {
   private enrichAlbumDetailsInMemory(details: AlbumDetailInput[]): void {
     let changed = false;
     for (const detail of details) {
-      const existing = this.albums[detail.id];
-      if (existing) {
-        this.albums[detail.id] = {
-          ...existing,
-          totalDurationMs: detail.totalDurationMs,
-          totalTracks: detail.totalTracks ?? existing.totalTracks,
-          releaseDatePrecision: detail.releaseDatePrecision ?? existing.releaseDatePrecision,
-          albumType: detail.albumType ?? existing.albumType,
-        };
-        changed = true;
-      }
-      for (const trackInfo of detail.tracks) {
-        const track = this.tracks[trackInfo.id];
-        if (!track) continue;
-        const needsAlbumId = track.albumId !== detail.id;
-        const needsArtistIds = track.artistIds.length === 0 && trackInfo.artistIds.length > 0;
-        if (needsAlbumId || needsArtistIds) {
-          this.tracks[trackInfo.id] = {
-            ...track,
-            albumId: detail.id,
-            artistIds: needsArtistIds ? trackInfo.artistIds : track.artistIds,
-          };
-          changed = true;
-        }
-      }
+      const albumChanged = this.updateAlbumDetails(detail);
+      const tracksChanged = this.updateTracksFromAlbum(detail);
+      changed = changed || albumChanged || tracksChanged;
     }
     if (changed) this.save();
+  }
+
+  private updateAlbumDetails(detail: AlbumDetailInput): boolean {
+    const existing = this.albums[detail.id];
+    if (!existing) return false;
+    this.albums[detail.id] = {
+      ...existing,
+      totalDurationMs: detail.totalDurationMs,
+      totalTracks: detail.totalTracks ?? existing.totalTracks,
+      releaseDatePrecision: detail.releaseDatePrecision ?? existing.releaseDatePrecision,
+      albumType: detail.albumType ?? existing.albumType,
+    };
+    return true;
+  }
+
+  private updateTracksFromAlbum(detail: AlbumDetailInput): boolean {
+    let changed = false;
+    for (const trackInfo of detail.tracks) {
+      const track = this.tracks[trackInfo.id];
+      if (!track) continue;
+      const needsAlbumId = track.albumId !== detail.id;
+      const needsArtistIds = track.artistIds.length === 0 && trackInfo.artistIds.length > 0;
+      if (!needsAlbumId && !needsArtistIds) continue;
+      this.tracks[trackInfo.id] = {
+        ...track,
+        albumId: detail.id,
+        artistIds: needsArtistIds ? trackInfo.artistIds : track.artistIds,
+      };
+      changed = true;
+    }
+    return changed;
   }
 
   /**

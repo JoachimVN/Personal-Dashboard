@@ -45,10 +45,13 @@ export function githubCandidates(data: GitHubData | undefined): Candidate[] {
       title: reviews[0].title, detail: reviews[0].repo, href: '#/github', render: { type: 'text' },
     });
   }
+  let contributionTitle = 'No contributions yet today';
+  if (today) contributionTitle = `${today} contributions today`;
+  if (reviews.length) contributionTitle = `${reviews.length} reviews waiting`;
   candidates.push({
     id: 'github:contributions', source: 'github', kind: 'github', score: reviews.length ? 47 : 36,
     shapes: ['secondary', 'tile'], kicker: 'This week on GitHub',
-    title: reviews.length ? `${reviews.length} reviews waiting` : today ? `${today} contributions today` : 'No contributions yet today',
+    title: contributionTitle,
     detail: `${data.pullRequests.length} open pull requests`, href: '#/github', render: { type: 'github-contributions' },
   });
   return candidates;
@@ -58,11 +61,16 @@ export function gmailCandidates(data: GmailData | undefined, staleForMs: number 
   if (!data) return [];
   const oldestUnread = data.threads.find((thread) => thread.unread);
   const stale = staleForMs !== undefined && staleForMs >= staleThresholdMs;
+  const unreadDetail = oldestUnread?.subject ?? 'No unread thread needs attention';
+  const staleDetail = `No count change for ${Math.floor((staleForMs ?? 0) / 3_600_000)}h`;
+  let inboxScore = 20;
+  if (data.unreadThreads) inboxScore = 53;
+  if (stale) inboxScore = 74;
   return [{
-    id: 'gmail:inbox', source: 'gmail', kind: 'gmail', score: stale ? 74 : data.unreadThreads ? 53 : 20,
+    id: 'gmail:inbox', source: 'gmail', kind: 'gmail', score: inboxScore,
     shapes: stale ? [...allShapes] : ['tile'], kicker: stale ? 'Inbox unchanged' : 'Inbox',
     title: `${data.unreadThreads} unread`,
-    detail: stale ? `No count change for ${Math.floor(staleForMs / 3_600_000)}h` : (oldestUnread?.subject ?? 'No unread thread needs attention'),
+    detail: stale ? staleDetail : unreadDetail,
     href: '#/personal', render: { type: 'text' },
   }];
 }
@@ -126,7 +134,10 @@ export function aiCandidates(tools: (AiUsageToolData | undefined)[]): Candidate[
     return [tool.fiveHour, tool.weekly].filter((window): window is NonNullable<typeof window> => Boolean(window));
   });
   if (!limits.length) return [];
-  const tightest = limits.reduce((lowest, window) => window.usedPercent > lowest.usedPercent ? window : lowest);
+  const tightest = limits.reduce(
+    (lowest, window) => window.usedPercent > lowest.usedPercent ? window : lowest,
+    limits[0]!,
+  );
   const remaining = Math.max(0, Math.round(100 - tightest.usedPercent));
   return [{
     id: 'ai-usage:runway', source: 'ai-usage', kind: 'ai-usage', score: remaining <= 15 ? 86 : 30,

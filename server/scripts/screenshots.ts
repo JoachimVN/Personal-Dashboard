@@ -166,12 +166,12 @@ async function buildPages(): Promise<Page[]> {
   ];
 }
 
-function freePort(port: number): void {
+async function freePort(port: number): Promise<void> {
   try {
     const pids = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, { encoding: 'utf8' })
       .split('\n').map((line) => line.trim()).filter(Boolean);
     for (const pid of pids) process.kill(Number(pid), 'SIGTERM');
-    if (pids.length) execSync('sleep 0.5');
+    if (pids.length) await sleep(500);
   } catch {
     // Nothing listening — fine.
   }
@@ -338,12 +338,13 @@ async function main() {
   console.log('Loading fixtures (fetching real cover art / artist photos)...');
   const pages = await buildPages();
   let currentPage = pages[0];
-  freePort(MOCK_PORT);
+  await freePort(MOCK_PORT);
   const mockServer = startMockServer(() => currentPage);
 
   console.log(`Starting scratch Vite client on :${CLIENT_PORT}...`);
-  freePort(CLIENT_PORT);
-  const vite: ChildProcess = spawn('npx', ['vite', '--port', String(CLIENT_PORT), '--strictPort'], {
+  await freePort(CLIENT_PORT);
+  const viteCli = path.resolve(repoRoot, 'node_modules/vite/bin/vite.js');
+  const vite: ChildProcess = spawn(process.execPath, [viteCli, '--port', String(CLIENT_PORT), '--strictPort'], {
     cwd: path.resolve(repoRoot, 'client'),
     stdio: 'ignore',
   });
@@ -381,7 +382,9 @@ async function main() {
   console.log('Done.');
 }
 
-main().catch((err) => {
+try {
+  await main();
+} catch (err) {
   console.error(err);
   process.exit(1);
-});
+}

@@ -21,8 +21,8 @@ import type {
 function mulberry32(seed: number): () => number {
   let state = seed;
   return () => {
-    state |= 0;
-    state = (state + 0x6d2b79f5) | 0;
+    state = Math.trunc(state);
+    state = Math.trunc(state + 0x6d2b79f5);
     let t = Math.imul(state ^ (state >>> 15), 1 | state);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -71,9 +71,10 @@ async function fetchJson(url: string): Promise<any> {
  * artwork instead of the album cover a real music app would actually show for that track. */
 function albumArt(album: string, artist: string): Promise<string | undefined> {
   const key = `album:${album}|${artist}`;
+  const searchTerm = encodeURIComponent([album, artist].join(' '));
   if (!artCache.has(key)) {
     artCache.set(key, fetchJson(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(`${album} ${artist}`)}&media=music&entity=album&limit=1`,
+      `https://itunes.apple.com/search?term=${searchTerm}&media=music&entity=album&limit=1`,
     ).then((data) => data.results?.[0]?.artworkUrl100?.replace('100x100', '600x600')).catch(() => undefined));
   }
   return artCache.get(key)!;
@@ -315,17 +316,29 @@ export const healthFixture: HealthData = {
  * chart already renders a spacing gap (>3x the median step) as a dashed line instead of a solid
  * one, exactly the "this just reset" signal a real dashboard shows during a sampling gap, and
  * cleaner than an artificial vertical line ever looks. */
-function sawtoothHistory(
-  resetsAtIso: string,
-  periodMs: number,
-  spanMs: number,
-  stepMs: number,
-  peakRange: [number, number],
-  rng: () => number,
-  field: 'fiveHourUsedPercent' | 'weeklyUsedPercent',
-  gapSteps: number,
-  now: number,
-): AiUsageToolData['history'] {
+interface SawtoothHistoryOptions {
+  resetsAtIso: string;
+  periodMs: number;
+  spanMs: number;
+  stepMs: number;
+  peakRange: [number, number];
+  rng: () => number;
+  field: 'fiveHourUsedPercent' | 'weeklyUsedPercent';
+  gapSteps: number;
+  now: number;
+}
+
+function sawtoothHistory({
+  resetsAtIso,
+  periodMs,
+  spanMs,
+  stepMs,
+  peakRange,
+  rng,
+  field,
+  gapSteps,
+  now,
+}: SawtoothHistoryOptions): AiUsageToolData['history'] {
   const resetsAt = Date.parse(resetsAtIso);
   const peaks = new Map<number, number>();
   const peakFor = (cycle: number) => {
@@ -347,8 +360,16 @@ function sawtoothHistory(
 
 function usageHistoryFor(fiveHour: { usedPercent: number; resetsAt: string }, weekly: { usedPercent: number; resetsAt: string }, seed: number, now: number): AiUsageToolData['history'] {
   const rng = mulberry32(seed);
-  const fiveHourPoints = sawtoothHistory(fiveHour.resetsAt, 5 * 3_600_000, 24 * 3_600_000, 15 * 60_000, [fiveHour.usedPercent * 0.6, Math.min(100, fiveHour.usedPercent * 1.15)], rng, 'fiveHourUsedPercent', 4, now);
-  const weeklyPoints = sawtoothHistory(weekly.resetsAt, 7 * 86_400_000, 7 * 86_400_000, 3 * 3_600_000, [weekly.usedPercent * 0.5, Math.min(100, weekly.usedPercent * 1.1)], rng, 'weeklyUsedPercent', 4, now);
+  const fiveHourPoints = sawtoothHistory({
+    resetsAtIso: fiveHour.resetsAt, periodMs: 5 * 3_600_000, spanMs: 24 * 3_600_000,
+    stepMs: 15 * 60_000, peakRange: [fiveHour.usedPercent * 0.6, Math.min(100, fiveHour.usedPercent * 1.15)],
+    rng, field: 'fiveHourUsedPercent', gapSteps: 4, now,
+  });
+  const weeklyPoints = sawtoothHistory({
+    resetsAtIso: weekly.resetsAt, periodMs: 7 * 86_400_000, spanMs: 7 * 86_400_000,
+    stepMs: 3 * 3_600_000, peakRange: [weekly.usedPercent * 0.5, Math.min(100, weekly.usedPercent * 1.1)],
+    rng, field: 'weeklyUsedPercent', gapSteps: 4, now,
+  });
   return [...fiveHourPoints, ...weeklyPoints].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
 

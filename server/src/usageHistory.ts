@@ -46,7 +46,8 @@ export class UsageHistoryStore {
     if (Number.isNaN(at.getTime())) return this.get(toolId);
 
     return sql.begin(async (transaction) => {
-      await transaction`select pg_advisory_xact_lock(hashtext(${`ai-usage:${toolId}`}))`;
+      const lockKey = ['ai-usage', toolId].join(':');
+      await transaction`select pg_advisory_xact_lock(hashtext(${lockKey}))`;
       const [last] = await transaction<UsagePointRow[]>`
         select at, five_hour_used_percent, weekly_used_percent, model_weekly_used_percent
         from ai_usage_history_points where tool_id = ${toolId} order by at desc limit 1

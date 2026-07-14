@@ -8,7 +8,8 @@ export class SignalHistoryStore {
   async record(source: string, metric: string, value: JSONValue): Promise<void> {
     const sql = this.database.client;
     await sql.begin(async (transaction) => {
-      await transaction`select pg_advisory_xact_lock(hashtext(${`signal:${source}:${metric}`}))`;
+      const lockKey = ['signal', source, metric].join(':');
+      await transaction`select pg_advisory_xact_lock(hashtext(${lockKey}))`;
       const [current] = await transaction<{ value: unknown }[]>`
         select value from signal_current where source = ${source} and metric = ${metric} for update
       `;
