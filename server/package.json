@@ -14,7 +14,10 @@
     "setup:gmail": "tsx scripts/setupGmail.ts",
     "setup:spotify": "tsx scripts/setupSpotify.ts",
     "setup:hue": "tsx scripts/setupHue.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:import-json": "tsx scripts/importJsonToPostgres.ts",
     "seed:spotify-streams": "tsx scripts/seedSpotifyStreams.ts",
+    "screenshots": "tsx scripts/screenshots.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -22,10 +25,12 @@
     "ccusage": "20.0.17",
     "cross-env": "^10.0.0",
     "dotenv": "^17.2.0",
+    "drizzle-orm": "^0.44.4",
     "express": "^5.1.0",
     "googleapis": "^173.0.0",
     "node-ical": "^0.26.1",
     "octokit": "^5.0.5",
+    "postgres": "^3.4.7",
     "rss-parser": "^3.13.0",
     "tsdav": "^2.3.1",
     "tsx": "^4.20.0",
@@ -34,6 +39,11 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^24.0.0",
+    "@types/pngjs": "^6.0.5",
+    "drizzle-kit": "^0.31.4",
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.61.1",
+    "pngjs": "^7.0.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0"
   }

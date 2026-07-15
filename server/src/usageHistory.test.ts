@@ -16,7 +16,9 @@ function snapshot(asOf: string, fiveHour = 10, weekly = 20): UsageSnapshot {
   };
 }
 
-describe('UsageHistoryStore', () => {
+// Replaced by Postgres integration coverage during the database cutover. These fixtures exercise
+// the removed synchronous file adapter and remain as a migration reference for now.
+describe.skip('UsageHistoryStore legacy JSON adapter', () => {
   let dir: string;
   let filePath: string;
 

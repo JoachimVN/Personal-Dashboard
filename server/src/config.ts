@@ -39,8 +39,16 @@ const configSchema = z.object({
       standGoalHours: z.number().int().positive().default(12),
       /** How many recent days of samples to retain for the trend chart. */
       historyRetentionDays: z.number().int().min(1).default(30),
+      /** Trailing completed days used for personal physiological baselines. */
+      baselineWindowDays: z.number().int().min(3).default(7),
+      /** Minimum percentage away from the personal baseline before it becomes a signal. */
+      baselineDeviationPercent: z.number().positive().default(15),
     })
-    .default({ stepGoal: 10_000, moveGoalKcal: 290, exerciseGoalMinutes: 30, standGoalHours: 12, historyRetentionDays: 30 }),
+    .default({ stepGoal: 10_000, moveGoalKcal: 290, exerciseGoalMinutes: 30, standGoalHours: 12, historyRetentionDays: 30, baselineWindowDays: 7, baselineDeviationPercent: 15 }),
+  commandCenter: z.object({
+    /** How long an unchanged inbox count must persist before it becomes a command-center signal. */
+    gmailStaleMs: z.number().int().min(60_000).default(24 * 60 * 60_000),
+  }).default({ gmailStaleMs: 24 * 60 * 60_000 }),
   code: z
     .object({
       /** Local parent directory to scan for git repos, per OS. Each immediate subdirectory with a .git and a GitHub-remote origin becomes a launchable project. */

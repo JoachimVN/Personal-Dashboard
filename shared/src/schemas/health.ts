@@ -70,6 +70,19 @@ export const healthSchema = z.object({
     exerciseMinutes: z.number(),
     standHours: z.number(),
   }),
+  /** Personal trailing-average comparisons for physiological readings, never medical thresholds. */
+  baseline: z.object({
+    windowDays: z.number().int(),
+    minimumSamples: z.number().int(),
+    metrics: z.record(z.string(), z.object({
+      average: z.number(),
+      current: z.number(),
+      deviationPercent: z.number(),
+      samples: z.number().int(),
+      direction: z.enum(['above', 'below']),
+      anomalous: z.boolean(),
+    })),
+  }).optional(),
 });
 
 export type HealthDay = z.infer<typeof healthDaySchema>;

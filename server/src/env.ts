@@ -5,6 +5,8 @@ export interface ServerEnv {
   host: string;
   timezone: string;
   isProduction: boolean;
+  /** Required: all persistent dashboard state is shared through Railway Postgres. */
+  databaseUrl: string;
   weather?: { lat: number; lon: number };
   github?: { token: string; username: string };
   githubIssuesToken?: string;
@@ -26,6 +28,12 @@ function parseWeather(): ServerEnv['weather'] {
 }
 
 export function loadEnv(): ServerEnv {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error(
+      'DATABASE_URL is required. Add the Railway Postgres connection URL to server/.env before starting the dashboard.',
+    );
+  }
   const host = process.env.HOST ?? '127.0.0.1';
   if (host !== '127.0.0.1' && host !== 'localhost') {
     console.warn(
@@ -38,6 +46,7 @@ export function loadEnv(): ServerEnv {
     host,
     timezone: process.env.DASHBOARD_TIMEZONE ?? 'Europe/Oslo',
     isProduction: process.env.NODE_ENV === 'production',
+    databaseUrl,
     weather: parseWeather(),
     github:
       process.env.GITHUB_TOKEN && process.env.GITHUB_USERNAME

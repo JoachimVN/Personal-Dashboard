@@ -5,9 +5,13 @@ import { z } from 'zod';
 import { healthIngestBatchSchema, healthIngestSchema } from '@personal-dashboard/shared';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
+import { createDatabase } from './db/client.js';
+import { migrateDatabase } from './db/migrate.js';
 import { LayoutStore } from './layoutStore.js';
 import { ProviderScheduler } from './scheduler.js';
 import { createProviders } from './providers/index.js';
+import { createCommandCenterProvider } from './providers/commandCenter.js';
+import { SignalHistoryStore } from './signalHistory.js';
 import { createIssue, issueErrorCode, parseIssueInput } from './issues.js';
 import { availableProjects, codeActionError, launchCodeAction } from './codeSession.js';
 import { listOwnedRepos } from './providers/github.js';
@@ -15,15 +19,24 @@ import { todayInZone } from './providers/health.js';
 
 const env = loadEnv();
 const config = loadConfig();
+const database = createDatabase(env.databaseUrl);
+await migrateDatabase(database);
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json());
 
 const scheduler = new ProviderScheduler();
-const providers = createProviders(env, config);
+const providers = createProviders(env, config, database);
 for (const provider of providers.all) {
   scheduler.register(provider);
 }
+const signalHistory = new SignalHistoryStore(database);
+scheduler.register(createCommandCenterProvider(scheduler, signalHistory, config));
+// Recompute the ranking as soon as any source settles, not just on command-center's own timer —
+// otherwise a cold start can snapshot an all-fallback ranking and sit on it for a full cycle.
+scheduler.onSettled((id) => {
+  if (id !== 'command-center') void scheduler.refresh('command-center');
+});
 scheduler.start();
 
 const layoutStore = new LayoutStore(
@@ -121,9 +134,10 @@ app.post('/api/health/ingest', async (req, res) => {
   const today = todayInZone(env.timezone);
   const samples = 'days' in parsed.data ? parsed.data.days : [parsed.data];
   for (const sample of samples) {
-    providers.health.ingest(sample, today);
+    await providers.health.ingest(sample, today);
   }
   await scheduler.refresh('health'); // reflect the new samples immediately, not on the next 5-min poll
+  await scheduler.refresh('command-center');
   res.json({ ok: true });
 });
 
@@ -238,3 +252,11 @@ server.on('error', (err: NodeJS.ErrnoException) => {
   }
   process.exit(1);
 });
+
+async function closeDatabase(): Promise<void> {
+  scheduler.stop();
+  await database.client.end({ timeout: 5 });
+}
+
+process.once('SIGINT', () => void closeDatabase().finally(() => process.exit(0)));
+process.once('SIGTERM', () => void closeDatabase().finally(() => process.exit(0)));

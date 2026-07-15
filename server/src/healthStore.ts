@@ -1,95 +1,106 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
-import { z } from 'zod';
-import { healthDaySchema, type HealthDay, type HealthIngest } from '@personal-dashboard/shared';
+import type { HealthDay, HealthIngest } from '@personal-dashboard/shared';
+import type { Database } from './db/client.js';
 
-const fileSchema = z.object({
-  version: z.literal(1),
-  updatedAt: z.string().nullable().default(null),
-  days: z.array(healthDaySchema).default([]),
-});
+interface HealthDayRow {
+  date: string;
+  steps?: number;
+  watch_steps?: number;
+  phone_steps?: number;
+  active_energy_kcal?: number;
+  exercise_minutes?: number;
+  stand_hours?: number;
+  heart_rate?: number;
+  resting_heart_rate?: number;
+  walking_heart_rate?: number;
+  blood_oxygen_percent?: number;
+  updated_at: string;
+}
 
-/**
- * Persists Apple Health day rollups POSTed by a phone Shortcut to a gitignored JSON file
- * (server/.data/health.json) — same load/save-with-tmp-rename shape as usageHistory.ts. There
- * is no external API to poll; the store is the source of truth and the provider just reads it.
- */
+// postgres.js returns SQL NULL as `null`, but the wire schema's metrics are optional
+// (undefined-only), not nullable — coalesce so an unset metric round-trips as absent.
+function toHealthDay(row: HealthDayRow): HealthDay {
+  return {
+    date: row.date,
+    steps: row.steps ?? undefined,
+    watchSteps: row.watch_steps ?? undefined,
+    phoneSteps: row.phone_steps ?? undefined,
+    activeEnergyKcal: row.active_energy_kcal ?? undefined,
+    exerciseMinutes: row.exercise_minutes ?? undefined,
+    standHours: row.stand_hours ?? undefined,
+    heartRate: row.heart_rate ?? undefined,
+    restingHeartRate: row.resting_heart_rate ?? undefined,
+    walkingHeartRate: row.walking_heart_rate ?? undefined,
+    bloodOxygenPercent: row.blood_oxygen_percent ?? undefined,
+  };
+}
+
+/** PostgreSQL-backed source of truth for Apple Health day rollups. */
 export class HealthStore {
-  private days: HealthDay[];
-  private updatedAt: string | null;
-
   constructor(
-    private readonly filePath: string,
+    private readonly database: Database,
     private readonly retentionDays: number,
-  ) {
-    const loaded = this.load();
-    this.days = loaded.days;
-    this.updatedAt = loaded.updatedAt;
-  }
+  ) {}
 
-  /** Upsert a sample into its day (merging metrics so partial posts accumulate), prune, persist. */
-  ingest(sample: HealthIngest, today: string): HealthDay {
+  /** Upsert an additive sample while preserving independently reported device totals. */
+  async ingest(sample: HealthIngest, today: string): Promise<HealthDay> {
     const date = sample.date ?? today;
-    const existing = this.days.find((day) => day.date === date);
-    // The ingest schema turns zero readings into explicit `undefined`s; spreading those
-    // as-is would clobber an earlier real reading for the same day.
     const defined = Object.fromEntries(
       Object.entries(sample).filter(([, value]) => value !== undefined),
     ) as HealthIngest;
-    const merged: HealthDay = {
-      ...(existing ?? { date }),
-      ...defined,
-      date,
-    };
-    // Watch and iPhone report independent cumulative day totals. Their time ranges can
-    // overlap, so summing would double-count. Keep both sources and use the higher total
-    // as the conservative dashboard value; legacy `steps` remains untouched when neither
-    // source has been supplied.
-    const sourceSteps = [merged.watchSteps, merged.phoneSteps].filter(
-      (value): value is number => value != null,
+    const sql = this.database.client;
+    const [row] = await sql<HealthDayRow[]>`
+      insert into health_days (
+        date, steps, watch_steps, phone_steps, active_energy_kcal, exercise_minutes,
+        stand_hours, heart_rate, resting_heart_rate, walking_heart_rate, blood_oxygen_percent
+      ) values (
+        ${date}, ${defined.steps ?? null}, ${defined.watchSteps ?? null}, ${defined.phoneSteps ?? null},
+        ${defined.activeEnergyKcal ?? null}, ${defined.exerciseMinutes ?? null}, ${defined.standHours ?? null},
+        ${defined.heartRate ?? null}, ${defined.restingHeartRate ?? null}, ${defined.walkingHeartRate ?? null},
+        ${defined.bloodOxygenPercent ?? null}
+      )
+      on conflict (date) do update set
+        watch_steps = coalesce(excluded.watch_steps, health_days.watch_steps),
+        phone_steps = coalesce(excluded.phone_steps, health_days.phone_steps),
+        active_energy_kcal = coalesce(excluded.active_energy_kcal, health_days.active_energy_kcal),
+        exercise_minutes = coalesce(excluded.exercise_minutes, health_days.exercise_minutes),
+        stand_hours = coalesce(excluded.stand_hours, health_days.stand_hours),
+        heart_rate = coalesce(excluded.heart_rate, health_days.heart_rate),
+        resting_heart_rate = coalesce(excluded.resting_heart_rate, health_days.resting_heart_rate),
+        walking_heart_rate = coalesce(excluded.walking_heart_rate, health_days.walking_heart_rate),
+        blood_oxygen_percent = coalesce(excluded.blood_oxygen_percent, health_days.blood_oxygen_percent),
+        steps = case
+          when coalesce(excluded.watch_steps, health_days.watch_steps, excluded.phone_steps, health_days.phone_steps) is not null
+          then greatest(
+            coalesce(excluded.watch_steps, health_days.watch_steps, 0),
+            coalesce(excluded.phone_steps, health_days.phone_steps, 0)
+          )
+          else coalesce(excluded.steps, health_days.steps)
+        end,
+        updated_at = now()
+      returning *
+    `;
+    await sql`
+      delete from health_days
+      where date < (
+        select date from health_days order by date desc offset ${this.retentionDays - 1} limit 1
+      )
+    `;
+    return toHealthDay(row);
+  }
+
+  async snapshot(today: string): Promise<{ today: HealthDay | null; history: HealthDay[]; updatedAt: string | null }> {
+    const rows = await this.database.client<HealthDayRow[]>`
+      select * from health_days order by date asc
+    `;
+    const history = rows.map(toHealthDay);
+    const updatedAt = rows.reduce<string | undefined>(
+      (latest, row) => (!latest || Date.parse(row.updated_at) > Date.parse(latest) ? row.updated_at : latest),
+      undefined,
     );
-    if (sourceSteps.length > 0) merged.steps = Math.max(...sourceSteps);
-    this.days = this.days.filter((day) => day.date !== date);
-    this.days.push(merged);
-    this.days.sort((a, b) => a.date.localeCompare(b.date));
-    if (this.days.length > this.retentionDays) {
-      this.days = this.days.slice(-this.retentionDays);
-    }
-    this.updatedAt = new Date().toISOString();
-    this.save();
-    return merged;
-  }
-
-  snapshot(today: string): { today: HealthDay | null; history: HealthDay[]; updatedAt: string | null } {
     return {
-      today: this.days.find((day) => day.date === today) ?? null,
-      history: this.days,
-      updatedAt: this.updatedAt,
+      today: history.find((day) => day.date === today) ?? null,
+      history,
+      updatedAt: updatedAt ?? null,
     };
-  }
-
-  private load(): { days: HealthDay[]; updatedAt: string | null } {
-    try {
-      const parsed = fileSchema.parse(JSON.parse(readFileSync(this.filePath, 'utf8')));
-      return { days: parsed.days, updatedAt: parsed.updatedAt };
-    } catch {
-      // Missing or corrupt file — start empty rather than failing provider registration.
-      return { days: [], updatedAt: null };
-    }
-  }
-
-  private save(): void {
-    try {
-      mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
-      const tmpPath = `${this.filePath}.tmp`;
-      writeFileSync(
-        tmpPath,
-        JSON.stringify({ version: 1, updatedAt: this.updatedAt, days: this.days }),
-        { mode: 0o600 },
-      );
-      renameSync(tmpPath, this.filePath);
-    } catch (err) {
-      console.warn('[health] Could not persist health samples:', (err as Error).message);
-    }
   }
 }

@@ -1,68 +1,39 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
-import { z } from 'zod';
 import { spotifySchema, type SpotifyData } from '@personal-dashboard/shared';
+import type { Database } from './db/client.js';
 
-const cacheFileSchema = z.object({
-  version: z.literal(1),
-  snapshot: spotifySchema.optional(),
-  rateLimitedUntil: z.number().nonnegative().default(0),
-});
-
-/**
- * Owner-only last-good Spotify data and rate-limit deadline. Keeping both on disk means a server
- * restart during a Spotify cooldown can still render the previous dashboard state without making
- * another request that extends the limit.
- */
+/** Owner-only last-good Spotify data and rate-limit deadline, shared safely by all installations. */
 export class SpotifySnapshotStore {
-  private snapshot: SpotifyData | undefined;
-  private rateLimitedUntil: number;
+  constructor(private readonly database: Database) {}
 
-  constructor(private readonly filePath: string) {
-    const loaded = this.load();
-    this.snapshot = loaded.snapshot;
-    this.rateLimitedUntil = loaded.rateLimitedUntil;
+  async getSnapshot(): Promise<SpotifyData | undefined> {
+    const [row] = await this.database.client<{ snapshot: unknown }[]>`
+      select snapshot from spotify_snapshot where id = 1
+    `;
+    return row?.snapshot ? spotifySchema.parse(row.snapshot) : undefined;
   }
 
-  getSnapshot(): SpotifyData | undefined {
-    return this.snapshot;
+  async getRateLimitedUntil(): Promise<number> {
+    const [row] = await this.database.client<{ rate_limited_until: number }[]>`
+      select rate_limited_until from spotify_snapshot where id = 1
+    `;
+    return Number(row?.rate_limited_until ?? 0);
   }
 
-  getRateLimitedUntil(): number {
-    return this.rateLimitedUntil;
+  async setRateLimitedUntil(until: number): Promise<void> {
+    const sql = this.database.client;
+    await sql`
+      insert into spotify_snapshot (id, rate_limited_until) values (1, ${until})
+      on conflict (id) do update set
+        rate_limited_until = greatest(spotify_snapshot.rate_limited_until, excluded.rate_limited_until),
+        updated_at = now()
+    `;
   }
 
-  setRateLimitedUntil(until: number): void {
-    this.rateLimitedUntil = Math.max(this.rateLimitedUntil, until);
-    this.save();
-  }
-
-  setSnapshot(snapshot: SpotifyData): void {
-    this.snapshot = snapshot;
-    this.rateLimitedUntil = 0;
-    this.save();
-  }
-
-  private load(): z.infer<typeof cacheFileSchema> {
-    try {
-      return cacheFileSchema.parse(JSON.parse(readFileSync(this.filePath, 'utf8')));
-    } catch {
-      return { version: 1, rateLimitedUntil: 0 };
-    }
-  }
-
-  private save(): void {
-    try {
-      mkdirSync(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
-      const temporaryPath = `${this.filePath}.tmp`;
-      writeFileSync(
-        temporaryPath,
-        JSON.stringify({ version: 1, snapshot: this.snapshot, rateLimitedUntil: this.rateLimitedUntil }),
-        { mode: 0o600 },
-      );
-      renameSync(temporaryPath, this.filePath);
-    } catch (error) {
-      console.warn('[spotify] Could not persist cached data:', (error as Error).message);
-    }
+  async setSnapshot(snapshot: SpotifyData): Promise<void> {
+    const sql = this.database.client;
+    await sql`
+      insert into spotify_snapshot (id, snapshot, rate_limited_until) values (1, ${JSON.stringify(snapshot)}::jsonb, 0)
+      on conflict (id) do update set snapshot = excluded.snapshot, rate_limited_until = 0, updated_at = now()
+    `;
   }
 }

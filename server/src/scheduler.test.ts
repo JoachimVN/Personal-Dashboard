@@ -174,4 +174,31 @@ describe('ProviderScheduler', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  it('notifies onSettled listeners after every refresh, success or failure', async () => {
+    scheduler.register(fakeProvider({ id: 'a' }));
+    scheduler.register(fakeProvider({ id: 'b', fetch: async () => { throw new Error('boom'); } }));
+    const settled: string[] = [];
+    scheduler.onSettled((id) => settled.push(id));
+
+    await scheduler.refresh('a');
+    await scheduler.refresh('b');
+
+    expect(settled).toEqual(['a', 'b']);
+  });
+
+  it('lets a listener trigger another provider refresh without deadlocking', async () => {
+    scheduler.register(fakeProvider({ id: 'source' }));
+    const derivedFetch = vi.fn(async () => ({ value: 1 }));
+    scheduler.register(fakeProvider({ id: 'derived', fetch: derivedFetch }));
+    let triggered: Promise<void> | undefined;
+    scheduler.onSettled((id) => {
+      if (id !== 'derived') triggered = scheduler.refresh('derived');
+    });
+
+    await scheduler.refresh('source');
+    await triggered;
+
+    expect(derivedFetch).toHaveBeenCalledTimes(1);
+  });
 });

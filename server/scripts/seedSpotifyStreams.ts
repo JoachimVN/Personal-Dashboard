@@ -7,20 +7,27 @@
 // an increment.
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { accessToken, toPlayedTrackInput, type RawTrack } from '../src/providers/spotify.js';
 import { SpotifyHistoryStore, type PlayedTrackInput } from '../src/spotifyHistory.js';
+import { createDatabase } from '../src/db/client.js';
 
 const clientId = process.env.SPOTIFY_CLIENT_ID;
 const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+const databaseUrl = process.env.DATABASE_URL;
 if (!clientId || !clientSecret) {
   console.error('Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in server/.env first.');
   process.exit(1);
 }
+if (!databaseUrl) {
+  console.error('Set DATABASE_URL in server/.env first.');
+  process.exit(1);
+}
 
-const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.data');
-const csvPath = process.argv[2] ?? path.join(dataDir, 'spotify-top-120.csv');
+const csvPath = process.argv[2];
+if (!csvPath) {
+  console.error('Pass the path to the tab-separated Spotify export as the first argument.');
+  process.exit(1);
+}
 
 interface CsvRow {
   trackId: string;
@@ -59,7 +66,8 @@ async function main() {
   const rows = parseCsv(csvPath);
   console.log(`Parsed ${rows.length} rows from ${csvPath}\n`);
 
-  const historyStore = new SpotifyHistoryStore(path.join(dataDir, 'spotify-history.json'));
+  const database = createDatabase(databaseUrl!);
+  const historyStore = new SpotifyHistoryStore(database);
   const bearer = await accessToken({ clientId: clientId!, clientSecret: clientSecret! }, new AbortController().signal);
 
   const entries: { track: PlayedTrackInput; streams: number }[] = [];
@@ -78,7 +86,8 @@ async function main() {
     console.log(`  ✓ ${track.name} — ${row.streams} streams`);
   }
 
-  historyStore.applyRealStreamCounts(entries);
+  await historyStore.applyRealStreamCounts(entries);
+  await database.client.end({ timeout: 5 });
   console.log(`\nApplied real stream counts for ${entries.length}/${rows.length} tracks.`);
   console.log('If the dashboard server is currently running, restart it to pick up the change.');
 }

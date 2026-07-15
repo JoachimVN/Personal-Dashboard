@@ -34,6 +34,7 @@ function sanitizeError(err: unknown): string {
 
 export class ProviderScheduler {
   private readonly entries = new Map<string, Entry>();
+  private readonly settledListeners = new Set<(id: string) => void>();
 
   register(provider: Provider): void {
     if (this.entries.has(provider.id)) {
@@ -95,10 +96,19 @@ export class ProviderScheduler {
         entry.lastAttemptAt = new Date();
         entry.inFlight = false;
         entry.refreshPromise = undefined;
+        for (const listener of this.settledListeners) listener(id);
       }
     })();
 
     return entry.refreshPromise;
+  }
+
+  /** Notified after every refresh attempt (success or failure) for any provider. Used to let a
+   * derived provider (the command center) recompute right away instead of waiting out its own
+   * timer — otherwise it can snapshot an all-fallback ranking before slower siblings' first fetch
+   * lands, and sit on that for a full refresh cycle. */
+  onSettled(listener: (id: string) => void): void {
+    this.settledListeners.add(listener);
   }
 
   getEnvelope(id: string): WidgetEnvelope | undefined {
@@ -113,6 +123,13 @@ export class ProviderScheduler {
       error: entry.error,
       refreshMs: entry.provider.refreshMs,
     };
+  }
+
+  /** Read-only snapshot for derived providers such as the command center. */
+  getAllEnvelopes(): Record<string, WidgetEnvelope> {
+    return Object.fromEntries(
+      [...this.entries.keys()].map((id) => [id, this.getEnvelope(id)!]),
+    );
   }
 
   list(): WidgetSummary[] {
