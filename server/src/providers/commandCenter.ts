@@ -55,7 +55,13 @@ export function createCommandCenterProvider(
           widgetData<AiUsageToolData>(envelopes, 'ai-usage-claude'),
           widgetData<AiUsageToolData>(envelopes, 'ai-usage-codex'),
         ]),
-        ...fallbackCandidates(),
+        ...fallbackCandidates({
+          calendar: envelopes.calendar?.status ?? 'loading',
+          gmail: envelopes.gmail?.status ?? 'loading',
+          github: envelopes.github?.status ?? 'loading',
+          aiClaude: envelopes['ai-usage-claude']?.status ?? 'loading',
+          aiCodex: envelopes['ai-usage-codex']?.status ?? 'loading',
+        }),
       ]);
     },
   };

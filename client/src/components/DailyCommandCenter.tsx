@@ -117,6 +117,34 @@ function SecondaryContent({
   return <div className="mt-4"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-1 text-sm text-ink-muted">{slot.detail}</p></div>;
 }
 
+function CommandCenterSkeleton() {
+  return (
+    <section className="command-center glass" aria-labelledby="command-center-title">
+      <div className="command-center-head">
+        <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
+        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
+      </div>
+      <div className="command-layout animate-pulse">
+        <div className="command-primary space-y-3">
+          <div className="h-3 w-24 rounded bg-track" />
+          <div className="h-6 w-2/3 rounded bg-track" />
+          <div className="h-4 w-1/3 rounded bg-track" />
+          <div className="mt-4 h-10 w-full rounded bg-track" />
+        </div>
+        <div className="command-signals space-y-3">
+          <div className="h-16 rounded bg-track" />
+          <div className="h-16 rounded bg-track" />
+          <div className="h-16 rounded bg-track" />
+        </div>
+      </div>
+      <div className="command-agenda animate-pulse space-y-2">
+        <div className="h-3 w-20 rounded bg-track" />
+        <div className="h-4 w-1/2 rounded bg-track" />
+      </div>
+    </section>
+  );
+}
+
 export function DailyCommandCenter() {
   const commandCenter = useWidget<CommandCenterData>('command-center').envelope?.data;
   const calendar = useWidget<CalendarData>('calendar').envelope?.data;
@@ -127,16 +155,9 @@ export function DailyCommandCenter() {
   const spotify = spotifyEnvelope?.data;
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
 
-  const fallback: CommandCenterData = {
-    hero: { id: 'client:loading-hero', source: 'fallback', kind: 'fallback', score: 0, kicker: 'Overview', title: 'Building your command center', detail: 'Waiting for the first ranked snapshot.', href: '#/personal', render: { type: 'text' } },
-    secondary: { id: 'client:loading-secondary', source: 'fallback', kind: 'fallback', score: 0, kicker: 'Coming up', title: 'Syncing your day', detail: 'Calendar and activity signals are loading.', href: '#/personal', render: { type: 'text' } },
-    tiles: [
-      { id: 'client:loading-inbox', source: 'fallback', kind: 'fallback', score: 0, kicker: 'Inbox', title: 'Syncing mail', detail: 'Waiting for the first snapshot.', href: '#/personal', render: { type: 'text' } },
-      { id: 'client:loading-code', source: 'fallback', kind: 'fallback', score: 0, kicker: 'Code queue', title: 'Syncing GitHub', detail: 'Waiting for the first snapshot.', href: '#/github', render: { type: 'text' } },
-      { id: 'client:loading-ai', source: 'fallback', kind: 'fallback', score: 0, kicker: 'AI runway', title: 'Awaiting snapshot', detail: 'Waiting for allowance data.', href: '#/ai', render: { type: 'text' } },
-    ],
-  };
-  const ranked = commandCenter ?? fallback;
+  if (!commandCenter) return <CommandCenterSkeleton />;
+
+  const ranked = commandCenter;
   const heroRender = ranked.hero.render;
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)

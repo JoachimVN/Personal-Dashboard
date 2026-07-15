@@ -5,6 +5,7 @@ import type {
   GmailData,
   HealthData,
   SpotifyData,
+  WidgetStatus,
 } from '@personal-dashboard/shared';
 import type { Candidate } from './types.js';
 
@@ -147,12 +148,68 @@ export function aiCandidates(tools: (AiUsageToolData | undefined)[]): Candidate[
   }];
 }
 
-export function fallbackCandidates(): Candidate[] {
+interface FallbackCopy {
+  title: string;
+  detail: string;
+}
+
+/**
+ * Fallback candidates only fill a shape when the real source produced nothing — which can mean
+ * "hasn't loaded yet" but can also mean "not configured" or "last fetch failed". Picking copy off
+ * the source's own envelope status keeps a permanently-disabled widget from claiming forever that
+ * a snapshot is still on its way.
+ */
+function fallbackCopy(status: WidgetStatus, loading: FallbackCopy, emptyWhenReady: FallbackCopy): FallbackCopy {
+  if (status === 'disabled') return { title: 'Not configured', detail: 'See the README to set this widget up.' };
+  if (status === 'error') return { title: "Couldn't load", detail: 'The last fetch failed — check the server logs.' };
+  if (status === 'loading') return loading;
+  return emptyWhenReady;
+}
+
+function combineAiStatus(claude: WidgetStatus, codex: WidgetStatus): WidgetStatus {
+  if (claude === 'disabled' && codex === 'disabled') return 'disabled';
+  if (claude === 'loading' || codex === 'loading') return 'loading';
+  if (claude === 'error' && codex === 'error') return 'error';
+  return 'ready';
+}
+
+export function fallbackCandidates(status: {
+  calendar: WidgetStatus;
+  gmail: WidgetStatus;
+  github: WidgetStatus;
+  aiClaude: WidgetStatus;
+  aiCodex: WidgetStatus;
+}): Candidate[] {
+  const horizon = fallbackCopy(
+    status.calendar,
+    { title: 'Building your command center', detail: 'Waiting for the first ranked snapshot.' },
+    { title: 'Nothing urgent right now', detail: 'Your command center will adapt as new signals arrive.' },
+  );
+  const agenda = fallbackCopy(
+    status.calendar,
+    { title: 'Syncing your day', detail: 'Calendar and activity signals are loading.' },
+    { title: 'Your day is clear', detail: 'No upcoming calendar items.' },
+  );
+  const inbox = fallbackCopy(
+    status.gmail,
+    { title: 'Syncing mail', detail: 'Waiting for the first snapshot.' },
+    { title: 'Inbox quiet', detail: 'Nothing new to flag.' },
+  );
+  const code = fallbackCopy(
+    status.github,
+    { title: 'Syncing GitHub', detail: 'Waiting for the first snapshot.' },
+    { title: 'Code queue quiet', detail: 'Nothing new to flag.' },
+  );
+  const ai = fallbackCopy(
+    combineAiStatus(status.aiClaude, status.aiCodex),
+    { title: 'Awaiting snapshot', detail: 'Waiting for allowance data.' },
+    { title: 'No allowance data', detail: 'Neither tool reported a quota just now.' },
+  );
   return [
-    { id: 'fallback:horizon', source: 'fallback-horizon', kind: 'fallback', score: 1, shapes: ['hero'], kicker: 'Open horizon', title: 'Nothing urgent right now', detail: 'Your command center will adapt as new signals arrive.', href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:agenda', source: 'fallback-agenda', kind: 'fallback', score: 1, shapes: ['secondary'], kicker: 'Coming up', title: 'Your day is clear', detail: 'No upcoming calendar items.', href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:inbox', source: 'fallback-inbox', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'Inbox', title: 'Syncing mail', detail: 'Waiting for the first snapshot.', href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:code', source: 'fallback-code', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'Code queue', title: 'Syncing GitHub', detail: 'Waiting for the first snapshot.', href: '#/github', render: { type: 'text' } },
-    { id: 'fallback:ai', source: 'fallback-ai', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'AI runway', title: 'Awaiting snapshot', detail: 'Waiting for allowance data.', href: '#/ai', render: { type: 'text' } },
+    { id: 'fallback:horizon', source: 'fallback-horizon', kind: 'fallback', score: 1, shapes: ['hero'], kicker: 'Open horizon', title: horizon.title, detail: horizon.detail, href: '#/personal', render: { type: 'text' } },
+    { id: 'fallback:agenda', source: 'fallback-agenda', kind: 'fallback', score: 1, shapes: ['secondary'], kicker: 'Coming up', title: agenda.title, detail: agenda.detail, href: '#/personal', render: { type: 'text' } },
+    { id: 'fallback:inbox', source: 'fallback-inbox', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'Inbox', title: inbox.title, detail: inbox.detail, href: '#/personal', render: { type: 'text' } },
+    { id: 'fallback:code', source: 'fallback-code', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'Code queue', title: code.title, detail: code.detail, href: '#/github', render: { type: 'text' } },
+    { id: 'fallback:ai', source: 'fallback-ai', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'AI runway', title: ai.title, detail: ai.detail, href: '#/ai', render: { type: 'text' } },
   ];
 }
