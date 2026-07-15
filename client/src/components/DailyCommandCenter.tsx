@@ -29,6 +29,14 @@ function formatEventDay(event: CalendarData['events'][number]): string {
   });
 }
 
+function formatAlbumDuration(durationMs?: number): string | undefined {
+  if (!durationMs) return undefined;
+  const totalMinutes = Math.round(durationMs / 60_000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
+}
+
 const SOON_MS = 6 * 60 * 60_000;
 
 function startsIn(ms: number): string {
@@ -177,9 +185,9 @@ function SecondaryCarousel({
             <motion.div
               key={items[visibleIndex]!.id}
               className="command-secondary-carousel-slide"
-              initial={{ opacity: 0, x: 28, y: 8, scale: 0.985, filter: 'blur(7px)' }}
-              animate={{ opacity: 1, x: 0, y: 0, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: -20, y: -5, scale: 0.99, filter: 'blur(5px)' }}
+              initial={{ opacity: 0, x: 28, y: 8, filter: 'blur(7px)' }}
+              animate={{ opacity: 1, x: 0, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, x: -20, y: -5, filter: 'blur(5px)' }}
               transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
             >
               {renderItem(items[visibleIndex]!)}
@@ -235,14 +243,14 @@ function SecondaryContent({
     }
   }
   if (slot.render.type === 'spotify-now-playing' && spotify?.nowPlaying) {
-    return <div className="mt-4"><NowPlaying nowPlaying={spotify.nowPlaying} fetchedAt={spotifyFetchedAt} /></div>;
+    return <div className="mt-4"><NowPlaying nowPlaying={spotify.nowPlaying} fetchedAt={spotifyFetchedAt} className="command-secondary-spotify" artworkClassName="command-secondary-spotify-artwork" /></div>;
   }
   if (slot.render.type === 'spotify-track') {
     const trackId = slot.render.trackId;
     const track = [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? []]
       .find((item) => (item.id ?? item.track) === trackId);
-    return <div className="mt-4 flex items-center gap-3">
-      <Thumb url={track?.imageUrl} size="h-12 w-12" />
+    return <div className="command-secondary-spotify mt-4">
+      <Thumb url={track?.imageUrl} size="command-secondary-spotify-artwork" />
       <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
     </div>;
   }
@@ -250,17 +258,28 @@ function SecondaryContent({
     const artistId = slot.render.artistId;
     const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? []]
       .find((a) => (a.id ?? a.name) === artistId);
-    return <div className="mt-4 flex items-center gap-3">
-      {artist && <Thumb url={artist.imageUrl} size="h-12 w-12" />}
+    return <div className="command-secondary-spotify mt-4">
+      {artist && <Thumb url={artist.imageUrl} size="command-secondary-spotify-artwork" />}
       <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
     </div>;
   }
   if (slot.render.type === 'spotify-album') {
     const albumId = slot.render.albumId;
     const album = spotify?.allTime.albums.find((a) => (a.id ?? a.name) === albumId);
-    return <div className="mt-4 flex items-center gap-3">
-      {album && <Thumb url={album.imageUrl} size="h-12 w-12" />}
-      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    const albumMeta = [
+      { label: 'Released', value: album?.releaseDate?.slice(0, 4) },
+      { label: 'Length', value: formatAlbumDuration(album?.totalDurationMs) },
+    ].filter((item): item is { label: string; value: string } => Boolean(item.value));
+    return <div className="command-secondary-spotify mt-4">
+      {album && <Thumb url={album.imageUrl} size="command-secondary-spotify-artwork" />}
+      <div className="command-secondary-album-details">
+        <p className="line-clamp-2 text-base font-semibold leading-tight text-ink">{slot.title}</p>
+        <p className="mt-1 truncate text-sm text-ink-muted">{album?.artist.split(',')[0]?.trim() ?? slot.detail}</p>
+        {albumMeta.length > 0 && <dl className="command-secondary-album-meta">
+          {albumMeta.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}
+        </dl>}
+        {album?.totalTracks && <p className="mt-2 text-xs text-ink-faint">{album.totalTracks} tracks</p>}
+      </div>
     </div>;
   }
   if (slot.render.type === 'health-rings' && health?.today) {

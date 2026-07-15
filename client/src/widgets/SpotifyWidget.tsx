@@ -73,7 +73,14 @@ function TrackRow({ track, rank }: Readonly<{ track: Track; rank: number }>) {
 export function NowPlaying({
   nowPlaying,
   fetchedAt,
-}: Readonly<{ nowPlaying: SpotifyData['nowPlaying']; fetchedAt?: string }>) {
+  className,
+  artworkClassName,
+}: Readonly<{
+  nowPlaying: SpotifyData['nowPlaying'];
+  fetchedAt?: string;
+  className?: string;
+  artworkClassName?: string;
+}>) {
   const isPlaying = nowPlaying?.isPlaying ?? false;
   const [now, setNow] = useState(() => Date.now());
 
@@ -107,12 +114,12 @@ export function NowPlaying({
   }
 
   return (
-    <div className="flex gap-4">
+    <div className={`flex gap-4 ${className ?? ''}`}>
       {nowPlaying.imageUrl && (
         <img
           src={nowPlaying.imageUrl}
           alt=""
-          className="h-20 w-20 shrink-0 rounded-xl object-cover shadow-lg"
+          className={`h-20 w-20 shrink-0 rounded-xl object-cover shadow-lg ${artworkClassName ?? ''}`}
         />
       )}
       <div className="flex min-w-0 flex-1 flex-col justify-center">
