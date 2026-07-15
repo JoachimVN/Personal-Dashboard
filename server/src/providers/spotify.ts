@@ -249,6 +249,64 @@ async function getTopTracks(
   return results;
 }
 
+/**
+ * Runs the bounded top-list work serially. A fresh process used to fan out dozens of
+ * paginated requests at once, which is precisely what triggers long Spotify cooldowns.
+ */
+async function refreshTopData(get: SpotifyGet, historyStore: SpotifyHistoryStore): Promise<TopData> {
+  const artistsShort = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8');
+  const artistsMedium = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8');
+  const artistsLong = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=8');
+  const tracksShort = await getTopTracks(get, 'short_term', TOP_TRACK_HISTORY_LIMIT);
+  const tracksMedium = await getTopTracks(get, 'medium_term', TOP_TRACK_HISTORY_LIMIT);
+  const tracksLong = await getTopTracks(get, 'long_term', TOP_TRACK_HISTORY_LIMIT);
+  const topData: TopData = {
+    artistsShort: artistsShort?.items ?? [],
+    artistsMedium: artistsMedium?.items ?? [],
+    artistsLong: artistsLong?.items ?? [],
+    tracksShort,
+    tracksMedium,
+    tracksLong,
+  };
+
+  // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
+  // aren't empty on day one — real observed plays accrue on top from here.
+  if (!(await historyStore.isSeeded())) {
+    const artistsLongSeed = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');
+    await historyStore.seedIfNeeded({
+      artists: (artistsLongSeed?.items ?? []).map(mapArtist),
+      tracks: topData.tracksLong
+        .map(toPlayedTrackInput)
+        .filter((t): t is PlayedTrackInput => t !== undefined),
+    });
+  }
+
+  // Album enrichment is useful metadata, but never worth spending live-playback quota on.
+  const pendingAlbumIds = await historyStore.getAlbumIdsNeedingDurations(5);
+  const enrichments: AlbumDetailInput[] = [];
+  for (const id of pendingAlbumIds) {
+    const album = await get<RawAlbumDetail>(`/albums/${id}`).catch(() => null);
+    if (album) enrichments.push(toAlbumDetailInput(album));
+  }
+  await historyStore.enrichAlbumDetails(enrichments);
+
+  await historyStore.mergeArtistMetadata(
+    [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
+  );
+  await historyStore.healTrackMetadata(
+    [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
+      .map(toPlayedTrackInput)
+      .filter((t): t is PlayedTrackInput => t !== undefined),
+  );
+  await historyStore.discoverTracks(
+    [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
+      .map(toPlayedTrackInput)
+      .filter((t): t is PlayedTrackInput => t !== undefined),
+  );
+
+  return topData;
+}
+
 export function createSpotifyProvider(
   oauth: { clientId: string; clientSecret: string } | undefined,
   snapshotStore: SpotifySnapshotStore,
@@ -305,56 +363,7 @@ export function createSpotifyProvider(
         let topDataRefreshed = false;
         if (topDataFetchedAt === 0) topDataFetchedAt = await snapshotStore.getTopDataFetchedAt();
         if (topDataFetchedAt === 0 || Date.now() - topDataFetchedAt >= TOP_DATA_REFRESH_MS) {
-          // Run the bounded top-list work serially. A fresh process used to fan out dozens of
-          // paginated requests at once, which is precisely what triggers long Spotify cooldowns.
-          const artistsShort = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8');
-          const artistsMedium = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8');
-          const artistsLong = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=8');
-          const tracksShort = await getTopTracks(get, 'short_term', TOP_TRACK_HISTORY_LIMIT);
-          const tracksMedium = await getTopTracks(get, 'medium_term', TOP_TRACK_HISTORY_LIMIT);
-          const tracksLong = await getTopTracks(get, 'long_term', TOP_TRACK_HISTORY_LIMIT);
-          topData = {
-            artistsShort: artistsShort?.items ?? [],
-            artistsMedium: artistsMedium?.items ?? [],
-            artistsLong: artistsLong?.items ?? [],
-            tracksShort,
-            tracksMedium,
-            tracksLong,
-          };
-          // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
-          // aren't empty on day one — real observed plays accrue on top from here.
-          if (!await historyStore.isSeeded()) {
-            const artistsLongSeed = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');
-            await historyStore.seedIfNeeded({
-              artists: (artistsLongSeed?.items ?? []).map(mapArtist),
-              tracks: topData.tracksLong
-                .map(toPlayedTrackInput)
-                .filter((t): t is PlayedTrackInput => t !== undefined),
-            });
-          }
-
-          // Album enrichment is useful metadata, but never worth spending live-playback quota on.
-          const pendingAlbumIds = await historyStore.getAlbumIdsNeedingDurations(5);
-          const enrichments: AlbumDetailInput[] = [];
-          for (const id of pendingAlbumIds) {
-            const album = await get<RawAlbumDetail>(`/albums/${id}`).catch(() => null);
-            if (album) enrichments.push(toAlbumDetailInput(album));
-          }
-          await historyStore.enrichAlbumDetails(enrichments);
-
-          await historyStore.mergeArtistMetadata(
-            [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
-          );
-          await historyStore.healTrackMetadata(
-            [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
-              .map(toPlayedTrackInput)
-              .filter((t): t is PlayedTrackInput => t !== undefined),
-          );
-          await historyStore.discoverTracks(
-            [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
-              .map(toPlayedTrackInput)
-              .filter((t): t is PlayedTrackInput => t !== undefined),
-          );
+          topData = await refreshTopData(get, historyStore);
           topDataFetchedAt = Date.now();
           topDataRefreshed = true;
         }
