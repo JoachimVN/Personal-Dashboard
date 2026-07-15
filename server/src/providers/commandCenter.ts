@@ -7,6 +7,7 @@ import {
   type HealthData,
   type HueData,
   type IMessageData,
+  type NewsData,
   type SpotifyData,
   type WeatherData,
   type WidgetEnvelope,
@@ -22,6 +23,7 @@ import {
   healthCandidates,
   hueCandidates,
   imessageCandidates,
+  newsCandidates,
   spotifyCandidates,
   weatherCandidates,
   type SpotifyFreshness,
@@ -100,6 +102,7 @@ export function createCommandCenterProvider(
         ...githubCandidates(github, config.commandCenter.baselineWindowDays, config.commandCenter.baselineDeviationPercent),
         ...healthCandidates(widgetData<HealthData>(envelopes, 'health')),
         ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),
+        ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
         ...spotifyCandidates(spotify, spotifyFresh),
         ...weatherCandidates(widgetData<WeatherData>(envelopes, 'weather'), config.commandCenter.weatherHotC, config.commandCenter.weatherColdC),
         ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
@@ -113,11 +116,7 @@ export function createCommandCenterProvider(
         ),
         ...fallbackCandidates({
           calendar: envelopes.calendar?.status ?? 'loading',
-          gmail: envelopes.gmail?.status ?? 'loading',
-          github: envelopes.github?.status ?? 'loading',
-          aiClaude: envelopes['ai-usage-claude']?.status ?? 'loading',
-          aiCodex: envelopes['ai-usage-codex']?.status ?? 'loading',
-        }, calendar?.events.some((event) => Date.parse(event.end) >= Date.now()) ?? false),
+        }),
       ]);
     },
   };

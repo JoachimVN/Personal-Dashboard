@@ -15,7 +15,7 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'imessage', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),
@@ -27,8 +27,8 @@ export const commandCenterSlotSchema = z.object({
 
 export const commandCenterSchema = z.object({
   hero: commandCenterSlotSchema,
-  secondary: z.array(commandCenterSlotSchema).min(1),
-  tiles: z.tuple([commandCenterSlotSchema, commandCenterSlotSchema, commandCenterSlotSchema]),
+  secondary: z.array(commandCenterSlotSchema).max(3),
+  tiles: z.array(commandCenterSlotSchema).max(3),
 });
 
 export type CommandCenterData = z.infer<typeof commandCenterSchema>;

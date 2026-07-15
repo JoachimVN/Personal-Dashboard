@@ -2,6 +2,7 @@ import type { CommandCenterData } from '@personal-dashboard/shared';
 import type { Candidate, SlotShape } from './types.js';
 
 const SECONDARY_CAROUSEL_LIMIT = 3;
+const TILE_LIMIT = 3;
 
 function selectSlot(
   sorted: Candidate[],
@@ -26,25 +27,20 @@ export function rankCandidates(candidates: Candidate[]): CommandCenterData {
   const usedIds = new Set<string>();
   const hero = selectSlot(sorted, 'hero', usedSources, usedIds);
   const secondaryCandidates = sorted.filter((candidate) => (
-    candidate.id !== hero.id && candidate.shapes.includes('secondary')
+    candidate.id !== hero.id && candidate.kind !== 'fallback' && candidate.shapes.includes('secondary')
   ));
   const secondary = secondaryCandidates
     .filter((candidate) => !usedSources.has(candidate.source))
     .filter((candidate, index, eligible) => eligible.findIndex((other) => other.source === candidate.source) === index)
     .slice(0, SECONDARY_CAROUSEL_LIMIT);
-  if (!secondary.length) {
-    const fallback = secondaryCandidates[0];
-    if (!fallback) throw new Error('No secondary command-center fallback candidate was supplied');
-    secondary.push(fallback);
-  }
   secondary.forEach((candidate) => {
     usedSources.add(candidate.source);
     usedIds.add(candidate.id);
   });
-  const tiles = [
-    selectSlot(sorted, 'tile', usedSources, usedIds),
-    selectSlot(sorted, 'tile', usedSources, usedIds),
-    selectSlot(sorted, 'tile', usedSources, usedIds),
-  ];
-  return { hero, secondary, tiles: [tiles[0], tiles[1], tiles[2]] };
+  const tiles = sorted
+    .filter((candidate) => candidate.kind !== 'fallback' && candidate.shapes.includes('tile'))
+    .filter((candidate) => !usedSources.has(candidate.source) && !usedIds.has(candidate.id))
+    .filter((candidate, index, eligible) => eligible.findIndex((other) => other.source === candidate.source) === index)
+    .slice(0, TILE_LIMIT);
+  return { hero, secondary, tiles };
 }

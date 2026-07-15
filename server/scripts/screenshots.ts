@@ -151,7 +151,7 @@ async function buildPages(): Promise<Page[]> {
       14,
       50,
     ),
-    ...fallbackCandidates({ calendar: 'ready', gmail: 'ready', github: 'ready', aiClaude: 'ready', aiCodex: 'ready' }),
+    ...fallbackCandidates({ calendar: 'ready' }),
   ]);
 
   return [

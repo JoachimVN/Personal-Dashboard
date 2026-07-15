@@ -3,7 +3,7 @@ import { rankCandidates } from './rank.js';
 import type { Candidate } from './types.js';
 
 function candidate(id: string, source: string, score: number, shapes: Candidate['shapes']): Candidate {
-  return { id, source, score, shapes, kind: 'fallback', kicker: id, title: id, detail: id, href: '#/', render: { type: 'text' } };
+  return { id, source, score, shapes, kind: 'calendar', kicker: id, title: id, detail: id, href: '#/', render: { type: 'text' } };
 }
 
 describe('rankCandidates', () => {
@@ -43,6 +43,15 @@ describe('rankCandidates', () => {
       candidate('gmail', 'gmail', 50, ['tile']),
       candidate('ai', 'ai', 40, ['tile']),
     ]);
-    expect(ranked.tiles.map((slot) => slot.id)).toEqual(['gmail', 'ai', 'calendar-tile']);
+    expect(ranked.tiles.map((slot) => slot.id)).toEqual(['gmail', 'ai']);
+  });
+
+  it('leaves secondary empty rather than filling it with generic fallback copy', () => {
+    const ranked = rankCandidates([
+      candidate('calendar', 'calendar', 100, ['hero']),
+      candidate('spotify', 'spotify', 30, ['tile']),
+    ]);
+
+    expect(ranked.secondary).toEqual([]);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { GitHubData, HealthData, SpotifyData, WeatherData } from '@personal-dashboard/shared';
-import { githubCandidates, gmailCandidates, healthCandidates, spotifyCandidates, weatherCandidates } from './sources.js';
+import type { GitHubData, HealthData, NewsData, SpotifyData, WeatherData } from '@personal-dashboard/shared';
+import { githubCandidates, gmailCandidates, healthCandidates, newsCandidates, spotifyCandidates, weatherCandidates } from './sources.js';
 
 describe('githubCandidates', () => {
   const quietDay: GitHubData = {
@@ -22,7 +22,7 @@ describe('githubCandidates', () => {
     };
     const candidate = githubCandidates(data, 7, 50).find((item) => item.id === 'github:contributions');
 
-    expect(candidate?.shapes).toEqual(['secondary', 'tile']);
+    expect(candidate?.shapes).toEqual(['tile']);
   });
 
   it('keeps a recent weekly contribution graph available when today is quiet', () => {
@@ -34,7 +34,7 @@ describe('githubCandidates', () => {
     };
 
     expect(githubCandidates(data, 7, 50)).toContainEqual(expect.objectContaining({
-      id: 'github:recent-contributions', title: '3 contributions this week', shapes: ['secondary', 'tile'],
+      id: 'github:recent-contributions', title: '3 contributions this week', shapes: ['tile'],
     }));
   });
 });
@@ -60,7 +60,7 @@ describe('healthCandidates', () => {
     };
 
     expect(healthCandidates(data)).toContainEqual(expect.objectContaining({
-      id: 'health:activity', kicker: 'Last synced activity', title: '6,800 steps', detail: 'From 2026-07-15', shapes: ['secondary', 'tile'],
+      id: 'health:activity', kicker: 'Last synced activity', title: '6,800 steps', detail: 'From 2026-07-15', shapes: ['tile'],
     }));
   });
 
@@ -76,7 +76,7 @@ describe('healthCandidates', () => {
     };
 
     expect(healthCandidates(data)).toContainEqual(expect.objectContaining({
-      id: 'health:activity', kicker: 'Last synced activity', title: '6,800 steps', detail: 'From 2026-07-15', shapes: ['secondary', 'tile'],
+      id: 'health:activity', kicker: 'Last synced activity', title: '6,800 steps', detail: 'From 2026-07-15', shapes: ['tile'],
     }));
   });
 
@@ -105,6 +105,16 @@ describe('weatherCandidates', () => {
     const [candidate] = weatherCandidates(weather, 25, -10, new Date('2026-07-16T01:00:00').getTime());
 
     expect(candidate).toMatchObject({ id: 'weather:later-today:2026-07-16', kicker: 'Later today', title: '10° to 18°' });
+  });
+});
+
+describe('newsCandidates', () => {
+  it('keeps the latest headline available as a low-priority tile', () => {
+    const data: NewsData = { items: [{ title: 'A useful headline', source: 'Source', url: 'https://example.com/news', publishedAt: '2026-07-16T00:00:00Z' }] };
+
+    expect(newsCandidates(data)).toContainEqual(expect.objectContaining({
+      kicker: 'Source', title: 'A useful headline', shapes: ['tile'],
+    }));
   });
 });
 
@@ -163,6 +173,25 @@ describe('spotifyCandidates', () => {
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-track:long:Baptized In Fear')?.kicker)
       .toBe('New top track this past year');
+  });
+
+  it('allows a genuinely new monthly top artist to use secondary', () => {
+    const data: SpotifyData = {
+      nowPlaying: null,
+      recentlyPlayed: [],
+      topArtists: { shortTerm: [{ id: 'artist-id', name: 'Monthly Artist', genres: [] }], mediumTerm: [], longTerm: [] },
+      topTracks: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      allTime: { artists: [], tracks: [], albums: [] },
+    };
+
+    const candidates = spotifyCandidates(data, {
+      trackShort: false, trackMedium: false, trackLong: false, trackAllTime: false,
+      artistShort: true, artistMedium: false, artistLong: false, artistAllTime: false,
+      albumAllTime: false,
+    });
+
+    expect(candidates.find((candidate) => candidate.id === 'spotify:new-artist:short:artist-id')?.shapes)
+      .toEqual(['secondary', 'tile']);
   });
 
   it('gives true all-time track and artist changes a higher priority than annual changes', () => {

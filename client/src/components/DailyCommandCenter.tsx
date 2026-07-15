@@ -260,9 +260,10 @@ function SecondaryContent({
     const artistId = slot.render.artistId;
     const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? [], ...spotify?.allTime.artists ?? []]
       .find((a) => (a.id ?? a.name) === artistId);
-    return <div className="command-secondary-spotify mt-4">
-      {artist && <Thumb url={artist.imageUrl} size="command-secondary-spotify-artwork" />}
-      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    return <div className="command-secondary-artist mt-4">
+      {artist?.imageUrl && <img src={artist.imageUrl} alt="" className="command-secondary-artist-backdrop" />}
+      <div className="command-secondary-artist-overlay" />
+      <div className="relative min-w-0"><p className="text-base font-semibold text-white">{slot.title}</p><p className="mt-1 text-sm text-white/75">{slot.detail}</p></div>
     </div>;
   }
   if (slot.render.type === 'spotify-album') {
@@ -346,7 +347,7 @@ export function DailyCommandCenter() {
   const secondarySlots = Array.isArray(ranked.secondary)
     ? ranked.secondary
     : [ranked.secondary as unknown as CommandCenterSlot];
-  const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)]!;
+  const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
   const heroRender = ranked.hero.render;
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
@@ -413,7 +414,7 @@ export function DailyCommandCenter() {
       </CommandPanel>
       <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} health={health} />)}</div>
     </div>
-    <CommandPanel href={activeSecondary.href} className={`command-agenda command-panel--${toneFor(activeSecondary)}`} navigable={false}>
+    {activeSecondary && <CommandPanel href={activeSecondary.href} className={`command-agenda command-panel--${toneFor(activeSecondary)}`} navigable={false}>
       <SecondaryCarousel
         items={secondarySlots}
         activeIndex={activeSecondaryIndex}
@@ -423,6 +424,6 @@ export function DailyCommandCenter() {
           <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
         </>}
       />
-    </CommandPanel>
+    </CommandPanel>}
   </section>;
 }

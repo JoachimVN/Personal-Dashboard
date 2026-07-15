@@ -587,6 +587,36 @@ a {
   height: 4.75rem;
 }
 
+.command-secondary-artist {
+  position: relative;
+  display: flex;
+  height: var(--secondary-carousel-media-size);
+  align-items: end;
+  overflow: hidden;
+  border-radius: 1rem;
+  padding: 1rem;
+  isolation: isolate;
+  background: var(--color-track);
+}
+
+.command-secondary-artist-backdrop {
+  position: absolute;
+  inset: -1rem;
+  z-index: -2;
+  width: calc(100% + 2rem);
+  height: calc(100% + 2rem);
+  object-fit: cover;
+  filter: blur(12px);
+  opacity: 0.78;
+}
+
+.command-secondary-artist-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, rgb(7 9 14 / 16%) 0%, rgb(7 9 14 / 86%) 100%);
+}
+
 .command-secondary-album-details {
   display: flex;
   min-width: 0;

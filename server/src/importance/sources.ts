@@ -6,6 +6,7 @@ import type {
   HealthData,
   HueData,
   IMessageData,
+  NewsData,
   SpotifyData,
   WeatherData,
   WidgetStatus,
@@ -95,7 +96,7 @@ export function githubCandidates(
   if (today > 0) {
     candidates.push({
       id: 'github:contributions', source: 'github', kind: 'github', score: 36,
-      shapes: ['secondary', 'tile'], kicker: 'This week on GitHub',
+      shapes: ['tile'], kicker: 'This week on GitHub',
       title: `${today} contributions today`,
       detail: `${data.pullRequests.length} open pull requests`, href: '#/github', render: { type: 'github-contributions' },
     });
@@ -103,7 +104,7 @@ export function githubCandidates(
     const recentWeek = days.slice(-7).reduce((total, day) => total + day.count, 0);
     if (recentWeek > 0) {
       candidates.push({
-        id: 'github:recent-contributions', source: 'github', kind: 'github', score: 27, shapes: ['secondary', 'tile'],
+        id: 'github:recent-contributions', source: 'github', kind: 'github', score: 27, shapes: ['tile'],
         kicker: 'This week on GitHub', title: `${recentWeek} contribution${recentWeek === 1 ? '' : 's'} this week`,
         detail: 'Your recent contribution history', href: '#/github', render: { type: 'github-contributions' },
       });
@@ -189,8 +190,7 @@ export function healthCandidates(data: HealthData | undefined): Candidate[] {
   if (activityDay) {
     const activity = activitySummary(activityDay);
     candidates.push({
-      id: 'health:activity', source: 'health', kind: 'health', score: hasTodayActivity ? 32 : 34,
-      shapes: hasTodayActivity ? ['tile'] : ['secondary', 'tile'],
+      id: 'health:activity', source: 'health', kind: 'health', score: hasTodayActivity ? 32 : 34, shapes: ['tile'],
       kicker: hasTodayActivity ? "Today's activity" : 'Last synced activity',
       title: activity.title,
       detail: hasTodayActivity ? activity.detail : `From ${activityDay.date}`,
@@ -223,7 +223,7 @@ const TIMEFRAME_SHAPES: Record<Timeframe, Candidate['shapes']> = {
   allTime: [...allShapes],
   long: [...allShapes],
   medium: ['secondary', 'tile'],
-  short: ['tile'],
+  short: ['secondary', 'tile'],
 };
 const TIMEFRAME_PERIOD: Record<Timeframe, string> = {
   allTime: 'of all time', long: 'this past year', medium: 'these last few months', short: 'this month',
@@ -280,7 +280,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
   const recent = data.recentlyPlayed[0];
   if (recent && !candidates.length) {
     candidates.push({
-      id: `spotify:recent:${recent.id ?? recent.track}`, source: 'spotify', kind: 'spotify', score: 28, shapes: ['secondary', 'tile'],
+      id: `spotify:recent:${recent.id ?? recent.track}`, source: 'spotify', kind: 'spotify', score: 28, shapes: ['tile'],
       kicker: 'Last played', title: recent.track, detail: recent.artist,
       href: '#/spotify', render: { type: 'spotify-track', trackId: recent.id ?? recent.track },
     });
@@ -410,7 +410,7 @@ export function weatherCandidates(
   const forecast = overnight ? today : data.days[1];
   if (forecast) {
     return [{
-      id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['secondary', 'tile'],
+      id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['tile'],
       kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
       detail: forecast.precipitationMm > 0 ? `${forecast.precipitationMm.toFixed(1)} mm precipitation expected` : `${forecast.dayLabel} looks dry`,
       href: '#/personal', render: { type: 'text' },
@@ -427,6 +427,15 @@ export function hueCandidates(data: HueData | undefined): Candidate[] {
     id: 'hue:lights-on', source: 'hue', kind: 'hue', score: 24, shapes: ['tile'],
     kicker: 'Lights on', title: `${onLights.length} light${onLights.length === 1 ? '' : 's'} active`,
     detail: onRooms.slice(0, 2).join(' · ') || 'Open lights controls', href: '#/personal', render: { type: 'text' },
+  }];
+}
+
+export function newsCandidates(data: NewsData | undefined): Candidate[] {
+  const headline = data?.items[0];
+  if (!headline) return [];
+  return [{
+    id: `news:${headline.url}`, source: 'news', kind: 'news', score: 23, shapes: ['tile'],
+    kicker: headline.source, title: headline.title, detail: 'Latest headline', href: '#/personal', render: { type: 'text' },
   }];
 }
 
@@ -448,56 +457,15 @@ function fallbackCopy(status: WidgetStatus, loading: FallbackCopy, emptyWhenRead
   return emptyWhenReady;
 }
 
-function combineAiStatus(claude: WidgetStatus, codex: WidgetStatus): WidgetStatus {
-  if (claude === 'disabled' && codex === 'disabled') return 'disabled';
-  if (claude === 'loading' || codex === 'loading') return 'loading';
-  if (claude === 'error' && codex === 'error') return 'error';
-  return 'ready';
-}
-
 export function fallbackCandidates(status: {
   calendar: WidgetStatus;
-  gmail: WidgetStatus;
-  github: WidgetStatus;
-  aiClaude: WidgetStatus;
-  aiCodex: WidgetStatus;
-}, hasUpcomingCalendarEvent = false): Candidate[] {
+}): Candidate[] {
   const horizon = fallbackCopy(
     status.calendar,
     { title: 'Building your command center', detail: 'Waiting for the first ranked snapshot.' },
     { title: 'Nothing urgent right now', detail: 'Your command center will adapt as new signals arrive.' },
   );
-  const agenda = fallbackCopy(
-    status.calendar,
-    { title: 'Syncing your day', detail: 'Calendar and activity signals are loading.' },
-    hasUpcomingCalendarEvent
-      ? { title: 'Your next event is above', detail: 'Open Personal for the rest of your day.' }
-      : { title: 'Your day is clear', detail: 'No upcoming calendar items.' },
-  );
-  const inbox = fallbackCopy(
-    status.gmail,
-    { title: 'Syncing mail', detail: 'Waiting for the first snapshot.' },
-    { title: 'Inbox quiet', detail: 'Nothing new to flag.' },
-  );
-  const code = fallbackCopy(
-    status.github,
-    { title: 'Syncing GitHub', detail: 'Waiting for the first snapshot.' },
-    { title: 'Code queue quiet', detail: 'Nothing new to flag.' },
-  );
-  const ai = fallbackCopy(
-    combineAiStatus(status.aiClaude, status.aiCodex),
-    { title: 'Awaiting snapshot', detail: 'Waiting for allowance data.' },
-    { title: 'No allowance data', detail: 'Neither tool reported a quota just now.' },
-  );
-  // Each fallback shares its real counterpart's `source` so rankCandidates' dedup-by-source logic
-  // excludes it once that source's real candidate already fills a slot elsewhere — otherwise a
-  // sparse board (few real signals) reaches for "Inbox: syncing" as filler right next to a real,
-  // already-placed "Inbox: 3 unread" tile, showing the same topic twice under different disguises.
   return [
     { id: 'fallback:horizon', source: 'calendar', kind: 'fallback', score: 1, shapes: ['hero'], kicker: 'Open horizon', title: horizon.title, detail: horizon.detail, href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:agenda', source: 'calendar', kind: 'fallback', score: 1, shapes: ['secondary'], kicker: 'Coming up', title: agenda.title, detail: agenda.detail, href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:inbox', source: 'gmail', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'Inbox', title: inbox.title, detail: inbox.detail, href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:code', source: 'github', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'Code queue', title: code.title, detail: code.detail, href: '#/github', render: { type: 'text' } },
-    { id: 'fallback:ai', source: 'ai-usage', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'AI runway', title: ai.title, detail: ai.detail, href: '#/ai', render: { type: 'text' } },
   ];
 }
