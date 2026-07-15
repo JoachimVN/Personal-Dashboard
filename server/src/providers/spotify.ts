@@ -352,7 +352,11 @@ export function createSpotifyProvider(
         return snapshot;
       } catch (error) {
         const lastGoodSnapshot = await snapshotStore.getSnapshot();
-        if (lastGoodSnapshot && isRateLimitError(error)) return lastGoodSnapshot;
+        // Playback state goes stale immediately: replaying an old track as "Now playing" is
+        // misleading. The longer-lived listening data remains useful during the cooldown.
+        if (lastGoodSnapshot && isRateLimitError(error)) {
+          return { ...lastGoodSnapshot, nowPlaying: null };
+        }
         throw error;
       }
     },
