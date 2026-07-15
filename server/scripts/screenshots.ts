@@ -26,6 +26,7 @@ import {
   gmailCandidates,
   healthCandidates,
   spotifyCandidates,
+  weatherCandidates,
 } from '../src/importance/sources.js';
 import {
   buildAiFixtures,
@@ -44,6 +45,7 @@ import {
 const MOCK_PORT = 4822;
 const CLIENT_PORT = 5199;
 const GMAIL_STALE_MS = 24 * 60 * 60_000;
+const GMAIL_FRESH_MS = 30 * 60_000;
 const VIEWPORT = { width: 1600, height: 900 };
 
 // A capture only overwrites the committed PNG once more than this many pixels differ beyond the
@@ -124,14 +126,27 @@ async function buildPages(): Promise<Page[]> {
   const overviewAiCodexFixture = overviewAiCodex(overviewNow);
   const healthPageFixture = healthFixture(healthNow);
   const githubPageFixture = githubFixture(githubNow);
+  const overviewWeatherFixture = weather(overviewNow);
 
   const overviewCommandCenter = rankCandidates([
     ...calendarCandidates(overviewCalendarFixture, overviewNow.getTime()),
-    ...gmailCandidates(overviewGmailFixture, undefined, GMAIL_STALE_MS),
-    ...githubCandidates(overviewGithubFixture),
+    ...gmailCandidates(overviewGmailFixture, undefined, GMAIL_STALE_MS, GMAIL_FRESH_MS),
+    ...githubCandidates(overviewGithubFixture, 14, 50),
     ...healthCandidates(overviewHealthFixture),
-    ...spotifyCandidates(fixtures.spotifyOverview, overviewGithubFixture),
-    ...aiCandidates([overviewAiClaudeFixture, overviewAiCodexFixture]),
+    ...weatherCandidates(overviewWeatherFixture, 25, -10),
+    ...spotifyCandidates(fixtures.spotifyOverview, {
+      trackShort: false, trackMedium: false, trackLong: false,
+      artistShort: false, artistMedium: false, artistLong: false,
+      album: false,
+    }),
+    ...aiCandidates(
+      [
+        { id: 'claude', label: 'Claude', data: overviewAiClaudeFixture },
+        { id: 'codex', label: 'Codex', data: overviewAiCodexFixture },
+      ],
+      14,
+      50,
+    ),
     ...fallbackCandidates({ calendar: 'ready', gmail: 'ready', github: 'ready', aiClaude: 'ready', aiCodex: 'ready' }),
   ]);
 
@@ -141,7 +156,7 @@ async function buildPages(): Promise<Page[]> {
       widgets: {
         'command-center': envelope(overviewCommandCenter, overviewNow),
         calendar: envelope(overviewCalendarFixture, overviewNow),
-        weather: envelope(weather(overviewNow), overviewNow),
+        weather: envelope(overviewWeatherFixture, overviewNow),
         github: envelope(overviewGithubFixture, overviewNow),
         health: envelope(overviewHealthFixture, overviewNow),
         spotify: envelope(fixtures.spotifyOverview, overviewNow),

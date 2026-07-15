@@ -163,7 +163,8 @@ export function DailyCommandCenter() {
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
     : undefined;
   const heroTrack = heroRender.type === 'spotify-track'
-    ? spotify?.topTracks.shortTerm.find((track) => (track.id ?? track.track) === heroRender.trackId)
+    ? [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? []]
+      .find((track) => (track.id ?? track.track) === heroRender.trackId)
     : undefined;
   const heroKicker = heroEvent ? eventTiming(heroEvent, Date.now()) : ranked.hero.kicker;
   const todayWeather = weather?.days[0];
