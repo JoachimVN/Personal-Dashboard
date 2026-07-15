@@ -582,6 +582,11 @@ a {
   height: var(--secondary-carousel-media-size);
 }
 
+.command-secondary-track-artwork {
+  width: 4.75rem;
+  height: 4.75rem;
+}
+
 .command-secondary-album-details {
   display: flex;
   min-width: 0;

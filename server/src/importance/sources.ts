@@ -4,6 +4,7 @@ import type {
   GitHubData,
   GmailData,
   HealthData,
+  HueData,
   IMessageData,
   SpotifyData,
   WeatherData,
@@ -13,6 +14,31 @@ import { computeDeviation } from '../deviation.js';
 import type { Candidate } from './types.js';
 
 const allShapes = ['hero', 'secondary', 'tile'] as const;
+
+function hasActivityData(day: HealthData['history'][number]): boolean {
+  return [day.steps, day.activeEnergyKcal, day.exerciseMinutes, day.standHours]
+    .some((value) => value !== undefined && value > 0);
+}
+
+function activitySummary(day: HealthData['history'][number]): { title: string; detail: string } {
+  if (day.steps !== undefined) {
+    return {
+      title: `${Math.round(day.steps).toLocaleString()} steps`,
+      detail: 'Open Health for the full activity rings',
+    };
+  }
+  if (day.activeEnergyKcal !== undefined) {
+    return {
+      title: `${Math.round(day.activeEnergyKcal)} active kcal`,
+      detail: [
+        day.exerciseMinutes !== undefined && `${Math.round(day.exerciseMinutes)} min exercise`,
+        day.standHours !== undefined && `${Math.round(day.standHours)} stand hrs`,
+      ].filter((value): value is string => Boolean(value)).join(' · ') || 'Open Health for the full activity rings',
+    };
+  }
+  if (day.exerciseMinutes !== undefined) return { title: `${Math.round(day.exerciseMinutes)} min exercise`, detail: 'Open Health for the full activity rings' };
+  return { title: `${Math.round(day.standHours ?? 0)} stand hrs`, detail: 'Open Health for the full activity rings' };
+}
 
 export function calendarCandidates(data: CalendarData | undefined, now: number): Candidate[] {
   const events = data?.events.filter((event) => Date.parse(event.end) >= now) ?? [];
@@ -66,15 +92,23 @@ export function githubCandidates(
       href: '#/github', render: { type: 'github-contributions' },
     });
   }
-  let contributionTitle = 'No contributions yet today';
-  if (today) contributionTitle = `${today} contributions today`;
-  if (reviews.length) contributionTitle = `${reviews.length} reviews waiting`;
-  candidates.push({
-    id: 'github:contributions', source: 'github', kind: 'github', score: reviews.length ? 47 : 36,
-    shapes: ['secondary', 'tile'], kicker: 'This week on GitHub',
-    title: contributionTitle,
-    detail: `${data.pullRequests.length} open pull requests`, href: '#/github', render: { type: 'github-contributions' },
-  });
+  if (today > 0) {
+    candidates.push({
+      id: 'github:contributions', source: 'github', kind: 'github', score: 36,
+      shapes: ['secondary', 'tile'], kicker: 'This week on GitHub',
+      title: `${today} contributions today`,
+      detail: `${data.pullRequests.length} open pull requests`, href: '#/github', render: { type: 'github-contributions' },
+    });
+  } else {
+    const recentWeek = days.slice(-7).reduce((total, day) => total + day.count, 0);
+    if (recentWeek > 0) {
+      candidates.push({
+        id: 'github:recent-contributions', source: 'github', kind: 'github', score: 27, shapes: ['secondary', 'tile'],
+        kicker: 'This week on GitHub', title: `${recentWeek} contribution${recentWeek === 1 ? '' : 's'} this week`,
+        detail: 'Your recent contribution history', href: '#/github', render: { type: 'github-contributions' },
+      });
+    }
+  }
   return candidates;
 }
 
@@ -95,6 +129,7 @@ export function gmailCandidates(
   const hasUnread = data.unreadThreads > 0;
   const fresh = hasUnread && changedForMs !== undefined && changedForMs < freshThresholdMs;
   const stale = hasUnread && changedForMs !== undefined && changedForMs >= staleThresholdMs;
+  if (stale) return [];
   let score = hasUnread ? 53 : 20;
   let kicker = 'Inbox';
   let detail = oldestUnread?.subject ?? 'No unread thread needs attention';
@@ -103,9 +138,6 @@ export function gmailCandidates(
     score = 78;
     kicker = 'New mail';
     shapes = [...allShapes];
-  } else if (stale) {
-    score = 15;
-    detail = `Sitting untouched for ${Math.floor((changedForMs ?? 0) / 3_600_000)}h — probably nothing urgent`;
   }
   return [{
     id: 'gmail:inbox', source: 'gmail', kind: 'gmail', score,
@@ -152,11 +184,17 @@ export function healthCandidates(data: HealthData | undefined): Candidate[] {
       detail: `${Math.round((steps / data.goals.steps) * 100)}% of your daily goal`, href: '#/health', render: { type: 'health-rings' },
     });
   }
-  if (data.today) {
+  const hasTodayActivity = data.today !== null && hasActivityData(data.today);
+  const activityDay = hasTodayActivity ? data.today : [...data.history].reverse().find(hasActivityData);
+  if (activityDay) {
+    const activity = activitySummary(activityDay);
     candidates.push({
-      id: 'health:activity', source: 'health', kind: 'health', score: 32, shapes: ['secondary', 'tile'],
-      kicker: "Today's activity", title: steps === undefined ? 'Activity is syncing' : `${Math.round(steps).toLocaleString()} steps`,
-      detail: 'Open Health for the full activity rings', href: '#/health', render: { type: 'health-rings' },
+      id: 'health:activity', source: 'health', kind: 'health', score: hasTodayActivity ? 32 : 34,
+      shapes: hasTodayActivity ? ['tile'] : ['secondary', 'tile'],
+      kicker: hasTodayActivity ? "Today's activity" : 'Last synced activity',
+      title: activity.title,
+      detail: hasTodayActivity ? activity.detail : `From ${activityDay.date}`,
+      href: '#/health', render: { type: 'health-rings' },
     });
   }
   return candidates;
@@ -239,12 +277,12 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
   }
 
   // No fresh change to headline — still worth a quiet tile naming your current favorite.
-  const favorite = data.topTracks.shortTerm[0];
-  if (favorite && !candidates.length) {
+  const recent = data.recentlyPlayed[0];
+  if (recent && !candidates.length) {
     candidates.push({
-      id: `spotify:favorite:${favorite.id ?? favorite.track}`, source: 'spotify', kind: 'spotify', score: 25, shapes: ['tile'],
-      kicker: 'Current favorite', title: favorite.track, detail: favorite.artist,
-      href: '#/spotify', render: { type: 'spotify-track', trackId: favorite.id ?? favorite.track },
+      id: `spotify:recent:${recent.id ?? recent.track}`, source: 'spotify', kind: 'spotify', score: 28, shapes: ['secondary', 'tile'],
+      kicker: 'Last played', title: recent.track, detail: recent.artist,
+      href: '#/spotify', render: { type: 'spotify-track', trackId: recent.id ?? recent.track },
     });
   }
 
@@ -346,7 +384,12 @@ export function aiCandidates(
  * a forecast, no history to compare against, so "extreme" here just means "past a configured
  * line" rather than "unusual for you".
  */
-export function weatherCandidates(data: WeatherData | undefined, hotThresholdC: number, coldThresholdC: number): Candidate[] {
+export function weatherCandidates(
+  data: WeatherData | undefined,
+  hotThresholdC: number,
+  coldThresholdC: number,
+  now = Date.now(),
+): Candidate[] {
   const today = data?.days[0];
   if (!today) return [];
   if (today.maxTemperature >= hotThresholdC) {
@@ -363,7 +406,28 @@ export function weatherCandidates(data: WeatherData | undefined, hotThresholdC: 
       detail: `Below your configured comfortable range`, href: '#/personal', render: { type: 'text' },
     }];
   }
+  const overnight = new Date(now).getHours() < 6;
+  const forecast = overnight ? today : data.days[1];
+  if (forecast) {
+    return [{
+      id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['secondary', 'tile'],
+      kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
+      detail: forecast.precipitationMm > 0 ? `${forecast.precipitationMm.toFixed(1)} mm precipitation expected` : `${forecast.dayLabel} looks dry`,
+      href: '#/personal', render: { type: 'text' },
+    }];
+  }
   return [];
+}
+
+export function hueCandidates(data: HueData | undefined): Candidate[] {
+  const onLights = data?.lights.filter((light) => light.on) ?? [];
+  if (!onLights.length) return [];
+  const onRooms = data?.rooms.filter((room) => room.anyOn).map((room) => room.name) ?? [];
+  return [{
+    id: 'hue:lights-on', source: 'hue', kind: 'hue', score: 24, shapes: ['tile'],
+    kicker: 'Lights on', title: `${onLights.length} light${onLights.length === 1 ? '' : 's'} active`,
+    detail: onRooms.slice(0, 2).join(' · ') || 'Open lights controls', href: '#/personal', render: { type: 'text' },
+  }];
 }
 
 interface FallbackCopy {
@@ -397,7 +461,7 @@ export function fallbackCandidates(status: {
   github: WidgetStatus;
   aiClaude: WidgetStatus;
   aiCodex: WidgetStatus;
-}): Candidate[] {
+}, hasUpcomingCalendarEvent = false): Candidate[] {
   const horizon = fallbackCopy(
     status.calendar,
     { title: 'Building your command center', detail: 'Waiting for the first ranked snapshot.' },
@@ -406,7 +470,9 @@ export function fallbackCandidates(status: {
   const agenda = fallbackCopy(
     status.calendar,
     { title: 'Syncing your day', detail: 'Calendar and activity signals are loading.' },
-    { title: 'Your day is clear', detail: 'No upcoming calendar items.' },
+    hasUpcomingCalendarEvent
+      ? { title: 'Your next event is above', detail: 'Open Personal for the rest of your day.' }
+      : { title: 'Your day is clear', detail: 'No upcoming calendar items.' },
   );
   const inbox = fallbackCopy(
     status.gmail,

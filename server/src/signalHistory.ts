@@ -32,4 +32,12 @@ export class SignalHistoryStore {
     `;
     return row ? new Date(row.changed_at) : undefined;
   }
+
+  /** The first observation is a baseline, not a meaningful change. */
+  async hasChangedSinceBaseline(source: string, metric: string): Promise<boolean> {
+    const [row] = await this.database.client<{ count: number }[]>`
+      select count(*)::int as count from signal_history where source = ${source} and metric = ${metric}
+    `;
+    return (row?.count ?? 0) > 1;
+  }
 }

@@ -15,6 +15,7 @@ import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
 import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
+import { latestActivityDay } from '../lib/health';
 import { sectionHref } from '../router';
 import '../sections/spotify/spotify.css';
 
@@ -103,11 +104,12 @@ function CommandPanel({
 }
 
 function Signal({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: HealthData | undefined }>) {
-  const rings = slot.render.type === 'health-rings' && health?.today
+  const activityDay = health ? latestActivityDay(health) : undefined;
+  const rings = slot.render.type === 'health-rings' && health && activityDay
     ? <CompactActivityRings
-        activeEnergyKcal={health.today.activeEnergyKcal ?? 0}
-        exerciseMinutes={health.today.exerciseMinutes ?? 0}
-        standHours={health.today.standHours ?? 0}
+        activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
+        exerciseMinutes={activityDay.exerciseMinutes ?? 0}
+        standHours={activityDay.standHours ?? 0}
         goals={health.goals}
       />
     : undefined;
@@ -247,16 +249,16 @@ function SecondaryContent({
   }
   if (slot.render.type === 'spotify-track') {
     const trackId = slot.render.trackId;
-    const track = [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? []]
+    const track = [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? [], ...spotify?.allTime.tracks ?? [], ...spotify?.recentlyPlayed ?? []]
       .find((item) => (item.id ?? item.track) === trackId);
     return <div className="command-secondary-spotify mt-4">
-      <Thumb url={track?.imageUrl} size="command-secondary-spotify-artwork" />
+      <Thumb url={track?.imageUrl} size="command-secondary-track-artwork" />
       <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
     </div>;
   }
   if (slot.render.type === 'spotify-artist') {
     const artistId = slot.render.artistId;
-    const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? []]
+    const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? [], ...spotify?.allTime.artists ?? []]
       .find((a) => (a.id ?? a.name) === artistId);
     return <div className="command-secondary-spotify mt-4">
       {artist && <Thumb url={artist.imageUrl} size="command-secondary-spotify-artwork" />}
@@ -282,11 +284,12 @@ function SecondaryContent({
       </div>
     </div>;
   }
-  if (slot.render.type === 'health-rings' && health?.today) {
+  const activityDay = health ? latestActivityDay(health) : undefined;
+  if (slot.render.type === 'health-rings' && health && activityDay) {
     return <div className="mt-4"><ActivityRings
-      activeEnergyKcal={health.today.activeEnergyKcal ?? 0}
-      exerciseMinutes={health.today.exerciseMinutes ?? 0}
-      standHours={health.today.standHours ?? 0}
+      activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
+      exerciseMinutes={activityDay.exerciseMinutes ?? 0}
+      standHours={activityDay.standHours ?? 0}
       goals={health.goals}
     /></div>;
   }
@@ -349,7 +352,7 @@ export function DailyCommandCenter() {
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
     : undefined;
   const heroTrack = heroRender.type === 'spotify-track'
-    ? [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? []]
+    ? [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? [], ...spotify?.allTime.tracks ?? []]
       .find((track) => (track.id ?? track.track) === heroRender.trackId)
     : undefined;
   const heroActivity = heroRender.type === 'health-rings' && health?.today ? health : undefined;

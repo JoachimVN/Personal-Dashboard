@@ -5,6 +5,7 @@ import {
   type GitHubData,
   type GmailData,
   type HealthData,
+  type HueData,
   type IMessageData,
   type SpotifyData,
   type WeatherData,
@@ -19,6 +20,7 @@ import {
   githubCandidates,
   gmailCandidates,
   healthCandidates,
+  hueCandidates,
   imessageCandidates,
   spotifyCandidates,
   weatherCandidates,
@@ -38,7 +40,7 @@ function widgetData<T>(envelopes: Record<string, WidgetEnvelope>, id: string): T
  * API is noisy". Spotify's own top-lists only refresh every ~12h, so freshMs is generous (days,
  * not minutes) to give a genuine change real dwell time on the board.
  */
-async function computeSpotifyFreshness(
+export async function computeSpotifyFreshness(
   signalHistory: SignalHistoryStore,
   spotify: SpotifyData | undefined,
   freshMs: number,
@@ -65,7 +67,8 @@ async function computeSpotifyFreshness(
     if (value === undefined) continue;
     await signalHistory.record('spotify', metric, value);
     const changedAt = await signalHistory.lastChangedAt('spotify', metric);
-    fresh[key] = changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+    fresh[key] = await signalHistory.hasChangedSinceBaseline('spotify', metric)
+      && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
   }
   return fresh;
 }
@@ -88,13 +91,15 @@ export function createCommandCenterProvider(
       const gmailChangedAt = await signalHistory.lastChangedAt('gmail', 'unreadThreads');
       const staleForMs = gmailChangedAt ? Date.now() - gmailChangedAt.getTime() : undefined;
       const github = widgetData<GitHubData>(envelopes, 'github');
+      const calendar = widgetData<CalendarData>(envelopes, 'calendar');
       const spotify = widgetData<SpotifyData>(envelopes, 'spotify');
       const spotifyFresh = await computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs);
       return rankCandidates([
-        ...calendarCandidates(widgetData<CalendarData>(envelopes, 'calendar'), Date.now()),
+        ...calendarCandidates(calendar, Date.now()),
         ...gmailCandidates(gmail, staleForMs, config.commandCenter.gmailStaleMs, config.commandCenter.gmailFreshMs),
         ...githubCandidates(github, config.commandCenter.baselineWindowDays, config.commandCenter.baselineDeviationPercent),
         ...healthCandidates(widgetData<HealthData>(envelopes, 'health')),
+        ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),
         ...spotifyCandidates(spotify, spotifyFresh),
         ...weatherCandidates(widgetData<WeatherData>(envelopes, 'weather'), config.commandCenter.weatherHotC, config.commandCenter.weatherColdC),
         ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
@@ -112,7 +117,7 @@ export function createCommandCenterProvider(
           github: envelopes.github?.status ?? 'loading',
           aiClaude: envelopes['ai-usage-claude']?.status ?? 'loading',
           aiCodex: envelopes['ai-usage-codex']?.status ?? 'loading',
-        }),
+        }, calendar?.events.some((event) => Date.parse(event.end) >= Date.now()) ?? false),
       ]);
     },
   };

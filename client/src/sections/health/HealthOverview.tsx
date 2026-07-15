@@ -2,14 +2,16 @@ import type { HealthData } from '@personal-dashboard/shared';
 import { ActivityRings } from '../../components/ActivityRings';
 import { WidgetBody } from '../../components/WidgetCard';
 import { useWidget } from '../../useWidget';
+import { latestActivityDay } from '../../lib/health';
 
 export function HealthOverview() {
   const { envelope, offline } = useWidget<HealthData>('health');
   return (
     <WidgetBody envelope={envelope} offline={offline}>
       {(data) => {
-        const today = data.today;
+        const today = latestActivityDay(data);
         if (!today) return <p className="text-sm text-ink-faint">Health data is waiting for its first sync.</p>;
+        const isToday = data.today === today;
         const steps = today.steps ?? 0;
         const stepProgress = Math.min(100, (steps / data.goals.steps) * 100);
         const signals = [
@@ -21,7 +23,7 @@ export function HealthOverview() {
             <div className="rounded-2xl bg-track/25 p-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">Today’s steps</p>
+                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">{isToday ? 'Today’s steps' : 'Last synced steps'}</p>
                   <p className="mt-1 text-3xl font-semibold tracking-[-0.05em] tabular-nums">{steps.toLocaleString()}</p>
                   <p className="mt-1 text-xs text-ink-muted">of {data.goals.steps.toLocaleString()} step goal</p>
                 </div>
