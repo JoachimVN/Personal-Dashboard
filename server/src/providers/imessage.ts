@@ -92,15 +92,28 @@ function contactName(row: RawContactRow): string | undefined {
   return personalName || row.nickname?.trim() || row.organization?.trim() || row.name?.trim() || undefined;
 }
 
-function contactKeys(handle: string): string[] {
+/** 'exact' keys (same digits, or same email) can only collide across rows for the *same* real
+ * contact — e.g. duplicated across synced Contacts sources with a slightly different name. 'fuzzy'
+ * keys (last-8-digit suffix, for matching a country-prefixed Messages handle to a local number)
+ * can legitimately collide across different people with different country codes, so a conflict
+ * there stays ambiguous. */
+function contactKeys(handle: string): { key: string; kind: 'exact' | 'fuzzy' }[] {
   const trimmed = handle.trim();
   if (!trimmed) return [];
-  if (trimmed.includes('@')) return [`email:${trimmed.toLocaleLowerCase()}`];
+  if (trimmed.includes('@')) return [{ key: `email:${trimmed.toLocaleLowerCase()}`, kind: 'exact' }];
   const digits = trimmed.replace(/\D/g, '').replace(/^00/, '');
   if (!digits) return [];
-  const keys = [`phone:${digits}`];
-  if (digits.length >= 8) keys.push(`phone-suffix:${digits.slice(-8)}`);
+  const keys: { key: string; kind: 'exact' | 'fuzzy' }[] = [{ key: `phone:${digits}`, kind: 'exact' }];
+  if (digits.length >= 8) keys.push({ key: `phone-suffix:${digits.slice(-8)}`, kind: 'fuzzy' });
   return keys;
+}
+
+/** Prefers whichever name has more name parts, then whichever is longer — e.g. "Ada Lovelace" over "Ada". */
+function preferName(a: string, b: string): string {
+  const partsA = a.split(' ').filter(Boolean).length;
+  const partsB = b.split(' ').filter(Boolean).length;
+  if (partsA !== partsB) return partsA > partsB ? a : b;
+  return a.length >= b.length ? a : b;
 }
 
 export function createContactResolver(rows: RawContactRow[]): ContactResolver {
@@ -108,13 +121,19 @@ export function createContactResolver(rows: RawContactRow[]): ContactResolver {
   for (const row of rows) {
     const name = contactName(row);
     if (!row.handle || !name) continue;
-    for (const key of contactKeys(row.handle)) {
+    for (const { key, kind } of contactKeys(row.handle)) {
       const existing = contacts.get(key);
-      contacts.set(key, existing === undefined || existing === name ? name : null);
+      if (existing === undefined || existing === name) {
+        contacts.set(key, name);
+      } else if (kind === 'exact') {
+        contacts.set(key, existing === null ? name : preferName(existing, name));
+      } else {
+        contacts.set(key, null);
+      }
     }
   }
   return (handle) => {
-    for (const key of contactKeys(handle)) {
+    for (const { key } of contactKeys(handle)) {
       const name = contacts.get(key);
       if (name) return name;
     }

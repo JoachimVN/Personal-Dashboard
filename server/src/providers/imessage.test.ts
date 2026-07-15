@@ -132,6 +132,14 @@ describe('createContactResolver', () => {
     expect(resolve('99887766')).toBeUndefined();
   });
 
+  it('prefers the fuller name when the same number is duplicated across synced Contacts sources', () => {
+    const resolve = createContactResolver([
+      contact({ handle: '+47 998 87 766', firstName: 'Ada', lastName: null }),
+      contact({ handle: '+4799887766', firstName: 'Ada', lastName: 'Lovelace' }),
+    ]);
+    expect(resolve('+4799887766')).toBe('Ada Lovelace');
+  });
+
   it('uses organization names when a personal name is unavailable', () => {
     const resolve = createContactResolver([
       contact({ firstName: null, lastName: null, organization: 'Example AS' }),
