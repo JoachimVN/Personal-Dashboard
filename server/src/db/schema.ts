@@ -49,6 +49,7 @@ export const spotifySnapshot = pgTable('spotify_snapshot', {
   id: integer('id').primaryKey(),
   snapshot: jsonb('snapshot'),
   rateLimitedUntil: bigint('rate_limited_until', { mode: 'number' }).notNull().default(0),
+  topDataFetchedAt: bigint('top_data_fetched_at', { mode: 'number' }).notNull().default(0),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

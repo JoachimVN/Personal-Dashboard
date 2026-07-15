@@ -1,0 +1,1 @@
+ALTER TABLE "spotify_snapshot" ADD COLUMN "top_data_fetched_at" bigint DEFAULT 0 NOT NULL;
