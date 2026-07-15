@@ -71,3 +71,51 @@ export function ActivityRings({
     </div>
   );
 }
+
+/** A legend-free, tile-sized version of ActivityRings for compact slots (command-center tiles). */
+export function CompactActivityRings({
+  activeEnergyKcal,
+  exerciseMinutes,
+  standHours,
+  goals,
+}: Readonly<ActivityRingsProps>) {
+  const gradientPrefix = useId().replaceAll(':', '');
+  const rings = [
+    { id: 'move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, start: '#d91f3b', end: '#ff5a8b', track: 'light-dark(#f6c7d2, #4c0717)', radius: 48 },
+    { id: 'exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, start: '#70cc00', end: '#d4ff00', track: 'light-dark(#d8efc4, #173c0a)', radius: 33 },
+    { id: 'stand', value: standHours, goal: goals.standHours, start: '#00b7cb', end: '#48def4', track: 'light-dark(#c3e9ee, #063940)', radius: 18 },
+  ];
+
+  return (
+    <svg viewBox="0 0 120 120" className="h-10 w-10 shrink-0" aria-label="Daily activity rings" role="img">
+      <defs>
+        {rings.map((ring) => (
+          <linearGradient key={ring.id} id={`${gradientPrefix}-compact-${ring.id}-ring-gradient`} x1="20" y1="20" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stopColor={ring.start} />
+            <stop offset="1" stopColor={ring.end} />
+          </linearGradient>
+        ))}
+      </defs>
+      {rings.map((ring) => {
+        const circumference = 2 * Math.PI * ring.radius;
+        const progress = Math.min(Math.max(ring.value / ring.goal, 0), 1);
+        return (
+          <g key={ring.id} transform="rotate(-90 60 60)">
+            <circle cx="60" cy="60" r={ring.radius} fill="none" strokeWidth="14" style={{ stroke: ring.track }} />
+            <circle
+              cx="60"
+              cy="60"
+              r={ring.radius}
+              fill="none"
+              stroke={`url(#${gradientPrefix}-compact-${ring.id}-ring-gradient)`}
+              strokeWidth="14"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={circumference * (1 - progress)}
+            />
+          </g>
+        );
+      })}
+    </svg>
+  );
+}

@@ -4,6 +4,7 @@ import type {
   GitHubData,
   GmailData,
   HealthData,
+  IMessageData,
   SpotifyData,
   WeatherData,
   WidgetStatus,
@@ -112,6 +113,20 @@ export function gmailCandidates(
   }];
 }
 
+export function imessageCandidates(data: IMessageData | undefined, freshMs: number): Candidate[] {
+  const unread = data?.conversations.filter((conversation) => conversation.unreadCount > 0) ?? [];
+  if (!unread.length) return [];
+  const totalUnread = unread.reduce((sum, conversation) => sum + conversation.unreadCount, 0);
+  const latest = unread.reduce((a, b) => (Date.parse(b.timestamp) > Date.parse(a.timestamp) ? b : a));
+  const fresh = Date.now() - Date.parse(latest.timestamp) < freshMs;
+  return [{
+    id: 'imessage:unread', source: 'imessage', kind: 'imessage', score: fresh ? 76 : 40,
+    shapes: fresh ? [...allShapes] : ['tile'], kicker: fresh ? 'New message' : 'Messages',
+    title: `${totalUnread} unread`, detail: `${latest.label}: ${latest.lastMessage}`,
+    href: '#/personal', render: { type: 'text' },
+  }];
+}
+
 export function healthCandidates(data: HealthData | undefined): Candidate[] {
   if (!data) return [];
   const candidates: Candidate[] = [];
@@ -159,7 +174,7 @@ type Timeframe = 'short' | 'medium' | 'long';
 
 /** long_term (years) is the rarest, most notable change; short_term (weeks) churns naturally and
  * shouldn't compete for hero the way a genuinely new all-time favorite should. */
-const TIMEFRAME_SCORE: Record<Timeframe, number> = { long: 85, medium: 65, short: 50 };
+const TIMEFRAME_SCORE: Record<Timeframe, number> = { long: 85, medium: 65, short: 60 };
 const TIMEFRAME_SHAPES: Record<Timeframe, Candidate['shapes']> = {
   long: [...allShapes],
   medium: ['secondary', 'tile'],

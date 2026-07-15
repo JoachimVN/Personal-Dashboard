@@ -10,7 +10,7 @@ import type {
 } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { deg, glyph, weatherLocation } from '../lib/weather';
-import { ActivityRings } from './ActivityRings';
+import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
 import '../sections/spotify/spotify.css';
@@ -50,10 +50,18 @@ function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' {
   return 'personal';
 }
 
-function Signal({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
+function Signal({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: HealthData | undefined }>) {
+  const rings = slot.render.type === 'health-rings' && health?.today
+    ? <CompactActivityRings
+        activeEnergyKcal={health.today.activeEnergyKcal ?? 0}
+        exerciseMinutes={health.today.exerciseMinutes ?? 0}
+        standHours={health.today.standHours ?? 0}
+        goals={health.goals}
+      />
+    : undefined;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      <span className="command-signal-dot" aria-hidden />
+      {rings ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
@@ -166,6 +174,7 @@ export function DailyCommandCenter() {
     ? [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? []]
       .find((track) => (track.id ?? track.track) === heroRender.trackId)
     : undefined;
+  const heroActivity = heroRender.type === 'health-rings' && health?.today ? health : undefined;
   const heroKicker = heroEvent ? eventTiming(heroEvent, Date.now()) : ranked.hero.kicker;
   const todayWeather = weather?.days[0];
 
@@ -185,13 +194,23 @@ export function DailyCommandCenter() {
             <p className="mt-2 text-sm text-ink-muted">{heroEvent?.location || (heroTrack ? heroTrack.artist : ranked.hero.detail)}</p>
           </div>
         </div>
+        {heroActivity?.today && (
+          <div className="mt-4">
+            <ActivityRings
+              activeEnergyKcal={heroActivity.today.activeEnergyKcal ?? 0}
+              exerciseMinutes={heroActivity.today.exerciseMinutes ?? 0}
+              standHours={heroActivity.today.standHours ?? 0}
+              goals={heroActivity.goals}
+            />
+          </div>
+        )}
         <div className="command-weather-row">
           <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
           <div><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p>{weather && <p className="text-[11px] text-ink-faint">📍 {weatherLocation(weather.location)}</p>}</div>
           {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
         </div>
       </div>
-      <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} />)}</div>
+      <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} health={health} />)}</div>
     </div>
     <div className="command-agenda">
       <div className="command-agenda-heading"><p className="command-label">{ranked.secondary.kicker}</p><a href={ranked.secondary.href}>Open section <span aria-hidden>↗</span></a></div>

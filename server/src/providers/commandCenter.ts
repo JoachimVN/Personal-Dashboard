@@ -5,6 +5,7 @@ import {
   type GitHubData,
   type GmailData,
   type HealthData,
+  type IMessageData,
   type SpotifyData,
   type WeatherData,
   type WidgetEnvelope,
@@ -18,6 +19,7 @@ import {
   githubCandidates,
   gmailCandidates,
   healthCandidates,
+  imessageCandidates,
   spotifyCandidates,
   weatherCandidates,
   type SpotifyFreshness,
@@ -92,6 +94,7 @@ export function createCommandCenterProvider(
         ...healthCandidates(widgetData<HealthData>(envelopes, 'health')),
         ...spotifyCandidates(spotify, spotifyFresh),
         ...weatherCandidates(widgetData<WeatherData>(envelopes, 'weather'), config.commandCenter.weatherHotC, config.commandCenter.weatherColdC),
+        ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
         ...aiCandidates(
           [
             { id: 'claude', label: 'Claude', data: widgetData<AiUsageToolData>(envelopes, 'ai-usage-claude') },

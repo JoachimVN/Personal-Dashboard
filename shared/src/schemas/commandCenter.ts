@@ -13,7 +13,7 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'imessage', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

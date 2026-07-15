@@ -25,6 +25,7 @@ import {
   githubCandidates,
   gmailCandidates,
   healthCandidates,
+  imessageCandidates,
   spotifyCandidates,
   weatherCandidates,
 } from '../src/importance/sources.js';
@@ -134,6 +135,7 @@ async function buildPages(): Promise<Page[]> {
     ...githubCandidates(overviewGithubFixture, 14, 50),
     ...healthCandidates(overviewHealthFixture),
     ...weatherCandidates(overviewWeatherFixture, 25, -10),
+    ...imessageCandidates(undefined, GMAIL_FRESH_MS),
     ...spotifyCandidates(fixtures.spotifyOverview, {
       trackShort: false, trackMedium: false, trackLong: false,
       artistShort: false, artistMedium: false, artistLong: false,

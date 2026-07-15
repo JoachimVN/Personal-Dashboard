@@ -60,11 +60,14 @@ const configSchema = z.object({
     weatherHotC: z.number().default(25),
     /** Today's forecast min °C at or below this becomes a "cold today" signal. */
     weatherColdC: z.number().default(-10),
+    /** How recently an unread iMessage must have arrived to count as "new", vs. just sitting unread. */
+    imessageFreshMs: z.number().int().min(60_000).default(30 * 60_000),
   }).default({
     gmailStaleMs: 24 * 60 * 60_000,
     gmailFreshMs: 30 * 60_000,
     baselineWindowDays: 14,
     baselineDeviationPercent: 50,
+    imessageFreshMs: 30 * 60_000,
     spotifyFreshMs: 48 * 60 * 60_000,
     weatherHotC: 25,
     weatherColdC: -10,
