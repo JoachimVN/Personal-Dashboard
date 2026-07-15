@@ -72,6 +72,7 @@ interface TopResponse<T> {
 interface TopData {
   artistsShort: RawArtist[];
   artistsMedium: RawArtist[];
+  artistsLong: RawArtist[];
   tracksShort: RawTrack[];
   tracksMedium: RawTrack[];
   tracksLong: RawTrack[];
@@ -298,12 +299,14 @@ export function createSpotifyProvider(
           // paginated requests at once, which is precisely what triggers long Spotify cooldowns.
           const artistsShort = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8');
           const artistsMedium = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8');
+          const artistsLong = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=8');
           const tracksShort = await getTopTracks(get, 'short_term', TOP_TRACK_HISTORY_LIMIT);
           const tracksMedium = await getTopTracks(get, 'medium_term', TOP_TRACK_HISTORY_LIMIT);
           const tracksLong = await getTopTracks(get, 'long_term', TOP_TRACK_HISTORY_LIMIT);
           topData = {
             artistsShort: artistsShort?.items ?? [],
             artistsMedium: artistsMedium?.items ?? [],
+            artistsLong: artistsLong?.items ?? [],
             tracksShort,
             tracksMedium,
             tracksLong,
@@ -311,9 +314,9 @@ export function createSpotifyProvider(
           // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
           // aren't empty on day one — real observed plays accrue on top from here.
           if (!await historyStore.isSeeded()) {
-            const artistsLong = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');
+            const artistsLongSeed = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');
             await historyStore.seedIfNeeded({
-              artists: (artistsLong?.items ?? []).map(mapArtist),
+              artists: (artistsLongSeed?.items ?? []).map(mapArtist),
               tracks: topData.tracksLong
                 .map(toPlayedTrackInput)
                 .filter((t): t is PlayedTrackInput => t !== undefined),
@@ -377,10 +380,12 @@ export function createSpotifyProvider(
           topArtists: {
             shortTerm: topData?.artistsShort.map(mapArtist) ?? previousSnapshot?.topArtists.shortTerm ?? [],
             mediumTerm: topData?.artistsMedium.map(mapArtist) ?? previousSnapshot?.topArtists.mediumTerm ?? [],
+            longTerm: topData?.artistsLong.map(mapArtist) ?? previousSnapshot?.topArtists.longTerm ?? [],
           },
           topTracks: {
             shortTerm: topData?.tracksShort.map(mapTrack) ?? previousSnapshot?.topTracks.shortTerm ?? [],
             mediumTerm: topData?.tracksMedium.map(mapTrack) ?? previousSnapshot?.topTracks.mediumTerm ?? [],
+            longTerm: topData?.tracksLong.map(mapTrack) ?? previousSnapshot?.topTracks.longTerm ?? [],
           },
           allTime: await historyStore.getAllTime(),
         };

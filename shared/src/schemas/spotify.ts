@@ -80,14 +80,16 @@ export const spotifySchema = z.object({
     })
     .nullable(),
   recentlyPlayed: z.array(trackSchema.extend({ playedAt: z.string() })),
-  /** short_term ≈ last 4 weeks, medium_term ≈ last 6 months (Spotify's windows). */
+  /** short_term ≈ last 4 weeks, medium_term ≈ last 6 months, long_term ≈ several years (Spotify's windows). */
   topArtists: z.object({
     shortTerm: z.array(artistSchema),
     mediumTerm: z.array(artistSchema),
+    longTerm: z.array(artistSchema).default([]),
   }),
   topTracks: z.object({
     shortTerm: z.array(trackSchema),
     mediumTerm: z.array(trackSchema),
+    longTerm: z.array(trackSchema).default([]),
   }),
   allTime: allTimeSchema.default({ artists: [], tracks: [], albums: [] }),
 });

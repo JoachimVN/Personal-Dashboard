@@ -70,7 +70,7 @@ export const healthSchema = z.object({
     exerciseMinutes: z.number(),
     standHours: z.number(),
   }),
-  /** Personal trailing-average comparisons for physiological readings, never medical thresholds. */
+  /** Personal trailing-average comparisons for physiological readings and daily activity totals, never medical thresholds. */
   baseline: z.object({
     windowDays: z.number().int(),
     minimumSamples: z.number().int(),

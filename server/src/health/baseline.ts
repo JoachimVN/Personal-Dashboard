@@ -1,4 +1,5 @@
 import type { HealthData, HealthDay } from '@personal-dashboard/shared';
+import { computeDeviation, type Deviation } from '../deviation.js';
 
 const baselineMetrics = [
   'heartRate',
@@ -7,25 +8,22 @@ const baselineMetrics = [
   'bloodOxygenPercent',
 ] as const;
 
-type BaselineMetric = (typeof baselineMetrics)[number];
+/** Cumulative through the day — a partial morning total always reads "below average" against a
+ * full-day baseline, so only an unusually HIGH reading counts as a real signal for these. */
+const activityMetrics = [
+  'steps',
+  'exerciseMinutes',
+  'standHours',
+] as const;
+
+type BaselineMetric = (typeof baselineMetrics)[number] | (typeof activityMetrics)[number];
 
 export interface HealthBaseline {
   windowDays: number;
   minimumSamples: number;
-  metrics: Partial<Record<BaselineMetric, {
-    average: number;
-    current: number;
-    deviationPercent: number;
-    samples: number;
-    direction: 'above' | 'below';
-    anomalous: boolean;
-  }>>;
+  metrics: Partial<Record<BaselineMetric, Deviation>>;
 }
 
-/**
- * Compares only same-day physiological readings to completed prior days. Cumulative activity
- * values intentionally stay out: a partial morning total is not a health anomaly.
- */
 export function computeHealthBaselines(
   history: HealthDay[],
   today: HealthDay | null,
@@ -36,24 +34,22 @@ export function computeHealthBaselines(
   const priorDays = history
     .filter((day) => day.date !== today.date)
     .slice(-windowDays);
+  const readingsFor = (metric: BaselineMetric) => priorDays
+    .map((day) => day[metric])
+    .filter((value): value is number => value !== undefined);
   const metrics: HealthBaseline['metrics'] = {};
   for (const metric of baselineMetrics) {
     const current = today[metric];
-    const readings = priorDays
-      .map((day) => day[metric])
-      .filter((value): value is number => value !== undefined);
-    if (current === undefined || readings.length < 3) continue;
-    const average = readings.reduce((sum, value) => sum + value, 0) / readings.length;
-    if (average === 0) continue;
-    const deviation = ((current - average) / average) * 100;
-    metrics[metric] = {
-      average,
-      current,
-      deviationPercent: Math.abs(deviation),
-      samples: readings.length,
-      direction: deviation >= 0 ? 'above' : 'below',
-      anomalous: Math.abs(deviation) >= deviationPercent,
-    };
+    if (current === undefined) continue;
+    const deviation = computeDeviation(current, readingsFor(metric), deviationPercent);
+    if (deviation) metrics[metric] = deviation;
+  }
+  for (const metric of activityMetrics) {
+    const current = today[metric];
+    if (current === undefined) continue;
+    const deviation = computeDeviation(current, readingsFor(metric), deviationPercent);
+    if (!deviation) continue;
+    metrics[metric] = deviation.direction === 'above' ? deviation : { ...deviation, anomalous: false };
   }
   return { windowDays, minimumSamples: 3, metrics };
 }
