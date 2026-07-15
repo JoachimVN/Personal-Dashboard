@@ -45,18 +45,21 @@ async function computeSpotifyFreshness(
 ): Promise<SpotifyFreshness> {
   const fresh: SpotifyFreshness = {
     trackShort: false, trackMedium: false, trackLong: false,
+    trackAllTime: false,
     artistShort: false, artistMedium: false, artistLong: false,
-    album: false,
+    artistAllTime: false, albumAllTime: false,
   };
   if (!spotify) return fresh;
   const checks: [keyof SpotifyFreshness, string, string | undefined][] = [
     ['trackShort', 'topTrack:short', spotify.topTracks.shortTerm[0]?.id ?? spotify.topTracks.shortTerm[0]?.track],
     ['trackMedium', 'topTrack:medium', spotify.topTracks.mediumTerm[0]?.id ?? spotify.topTracks.mediumTerm[0]?.track],
     ['trackLong', 'topTrack:long', spotify.topTracks.longTerm[0]?.id ?? spotify.topTracks.longTerm[0]?.track],
+    ['trackAllTime', 'topTrack:all-time', spotify.allTime.tracks[0]?.id ?? spotify.allTime.tracks[0]?.track],
     ['artistShort', 'topArtist:short', spotify.topArtists.shortTerm[0]?.id ?? spotify.topArtists.shortTerm[0]?.name],
     ['artistMedium', 'topArtist:medium', spotify.topArtists.mediumTerm[0]?.id ?? spotify.topArtists.mediumTerm[0]?.name],
     ['artistLong', 'topArtist:long', spotify.topArtists.longTerm[0]?.id ?? spotify.topArtists.longTerm[0]?.name],
-    ['album', 'topAlbum', spotify.allTime.albums[0]?.id ?? spotify.allTime.albums[0]?.name],
+    ['artistAllTime', 'topArtist:all-time', spotify.allTime.artists[0]?.id ?? spotify.allTime.artists[0]?.name],
+    ['albumAllTime', 'topAlbum:all-time', spotify.allTime.albums[0]?.id ?? spotify.allTime.albums[0]?.name],
   ];
   for (const [key, metric, value] of checks) {
     if (value === undefined) continue;

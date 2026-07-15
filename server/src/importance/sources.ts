@@ -165,24 +165,27 @@ export interface SpotifyFreshness {
   trackShort: boolean;
   trackMedium: boolean;
   trackLong: boolean;
+  trackAllTime: boolean;
   artistShort: boolean;
   artistMedium: boolean;
   artistLong: boolean;
-  album: boolean;
+  artistAllTime: boolean;
+  albumAllTime: boolean;
 }
 
-type Timeframe = 'short' | 'medium' | 'long';
+type Timeframe = 'short' | 'medium' | 'long' | 'allTime';
 
 /** Spotify's long_term window is approximately one year; short_term churns naturally and
  * shouldn't compete for hero with a meaningful annual shift. */
-const TIMEFRAME_SCORE: Record<Timeframe, number> = { long: 85, medium: 65, short: 60 };
+const TIMEFRAME_SCORE: Record<Timeframe, number> = { allTime: 90, long: 75, medium: 65, short: 60 };
 const TIMEFRAME_SHAPES: Record<Timeframe, Candidate['shapes']> = {
+  allTime: [...allShapes],
   long: [...allShapes],
   medium: ['secondary', 'tile'],
   short: ['tile'],
 };
 const TIMEFRAME_PERIOD: Record<Timeframe, string> = {
-  long: 'this past year', medium: 'these last few months', short: 'this month',
+  allTime: 'of all time', long: 'this past year', medium: 'these last few months', short: 'this month',
 };
 
 export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyFreshness): Candidate[] {
@@ -190,6 +193,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
   const candidates: Candidate[] = [];
 
   const trackTiers: { key: Timeframe; track: SpotifyData['topTracks']['shortTerm'][number] | undefined; isFresh: boolean }[] = [
+    { key: 'allTime', track: data.allTime.tracks[0], isFresh: fresh.trackAllTime },
     { key: 'long', track: data.topTracks.longTerm[0], isFresh: fresh.trackLong },
     { key: 'medium', track: data.topTracks.mediumTerm[0], isFresh: fresh.trackMedium },
     { key: 'short', track: data.topTracks.shortTerm[0], isFresh: fresh.trackShort },
@@ -205,6 +209,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
   }
 
   const artistTiers: { key: Timeframe; artist: SpotifyData['topArtists']['shortTerm'][number] | undefined; isFresh: boolean }[] = [
+    { key: 'allTime', artist: data.allTime.artists[0], isFresh: fresh.artistAllTime },
     { key: 'long', artist: data.topArtists.longTerm[0], isFresh: fresh.artistLong },
     { key: 'medium', artist: data.topArtists.mediumTerm[0], isFresh: fresh.artistMedium },
     { key: 'short', artist: data.topArtists.shortTerm[0], isFresh: fresh.artistShort },
@@ -221,10 +226,10 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
   }
 
   const topAlbum = data.allTime.albums[0];
-  if (topAlbum && fresh.album) {
+  if (topAlbum && fresh.albumAllTime) {
     candidates.push({
       id: `spotify:new-album:${topAlbum.id ?? topAlbum.name}`, source: 'spotify', kind: 'spotify',
-      score: TIMEFRAME_SCORE.long, shapes: TIMEFRAME_SHAPES.long,
+      score: TIMEFRAME_SCORE.allTime, shapes: TIMEFRAME_SHAPES.allTime,
       kicker: 'New favorite album', title: topAlbum.name, detail: topAlbum.artist.split(',')[0]!.trim(),
       href: '#/spotify', render: { type: 'spotify-album', albumId: topAlbum.id ?? topAlbum.name },
     });

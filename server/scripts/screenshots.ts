@@ -139,7 +139,9 @@ async function buildPages(): Promise<Page[]> {
     ...spotifyCandidates(fixtures.spotifyOverview, {
       trackShort: false, trackMedium: false, trackLong: false,
       artistShort: false, artistMedium: false, artistLong: false,
-      album: false,
+      trackAllTime: false,
+      artistAllTime: false,
+      albumAllTime: false,
     }),
     ...aiCandidates(
       [
