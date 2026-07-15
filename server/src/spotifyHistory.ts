@@ -81,6 +81,8 @@ export interface PlayedTrackInput {
   album: {
     id: string;
     name: string;
+    /** Album-level credit, distinct from the artists on an individual track. */
+    artist?: string;
     imageUrl?: string;
     url?: string;
     releaseDate?: string;
@@ -138,6 +140,11 @@ interface AlbumLike {
   releaseDatePrecision?: ReleaseDatePrecision;
   totalTracks?: number;
   albumType?: AlbumType;
+}
+
+/** A featured track must not replace the album's own credited artist. */
+function albumArtist(track: PlayedTrackInput): string {
+  return track.album.artist || track.artists.map((artist) => artist.name).join(', ');
 }
 
 const byPlayCountDesc = (a: { playCount: number }, b: { playCount: number }) => b.playCount - a.playCount;
@@ -260,7 +267,7 @@ export class SpotifyHistoryStore {
       this.upsertAlbumMetadata({
         id: track.album.id,
         name: track.album.name,
-        artist: track.artists.map((a) => a.name).join(', '),
+        artist: albumArtist(track),
         imageUrl: track.album.imageUrl,
         url: track.album.url,
         releaseDate: track.album.releaseDate,
@@ -305,7 +312,7 @@ export class SpotifyHistoryStore {
       this.upsertAlbumMetadata({
         id: track.album.id,
         name: track.album.name,
-        artist: track.artists.map((a) => a.name).join(', '),
+        artist: albumArtist(track),
         imageUrl: track.album.imageUrl,
         url: track.album.url,
         releaseDate: track.album.releaseDate,
@@ -351,7 +358,7 @@ export class SpotifyHistoryStore {
       this.upsertAlbumMetadata({
         id: track.album.id,
         name: track.album.name,
-        artist: track.artists.map((a) => a.name).join(', '),
+        artist: albumArtist(track),
         imageUrl: track.album.imageUrl,
         url: track.album.url,
         releaseDate: track.album.releaseDate,
@@ -396,7 +403,7 @@ export class SpotifyHistoryStore {
       this.upsertAlbumMetadata({
         id: track.album.id,
         name: track.album.name,
-        artist: track.artists.map((a) => a.name).join(', '),
+        artist: albumArtist(track),
         imageUrl: track.album.imageUrl,
         url: track.album.url,
         releaseDate: track.album.releaseDate,
@@ -533,7 +540,7 @@ export class SpotifyHistoryStore {
       this.upsertAlbumMetadata({
         id: track.album.id,
         name: track.album.name,
-        artist: track.artists.map((a) => a.name).join(', '),
+        artist: albumArtist(track),
         imageUrl: track.album.imageUrl,
         url: track.album.url,
         releaseDate: track.album.releaseDate,

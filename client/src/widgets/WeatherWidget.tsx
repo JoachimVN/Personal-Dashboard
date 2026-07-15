@@ -2,6 +2,7 @@ import type { WeatherData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 import { deg, glyph, weatherLocation } from '../lib/weather';
+import { mapsCoordinatesHref } from '../lib/maps';
 
 export function WeatherWidget() {
   const { envelope, offline } = useWidget<WeatherData>('weather');
@@ -17,7 +18,15 @@ export function WeatherWidget() {
               💨 {Math.round(data.current.windSpeed)} m/s
             </span>
           </div>
-          <p className="text-xs text-ink-faint">📍 {weatherLocation(data.location)}</p>
+          <a
+            href={mapsCoordinatesHref(data.location)}
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-fit items-center gap-1 text-xs text-ink-faint transition hover:text-ink"
+          >
+            <span aria-hidden>📍</span>
+            {weatherLocation(data.location)}
+          </a>
 
           <div className="flex gap-3 overflow-x-auto pb-1 text-center text-xs">
             {data.hours.map((hour) => (

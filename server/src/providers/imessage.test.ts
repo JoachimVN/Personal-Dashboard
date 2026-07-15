@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { DatabaseSync } from 'node:sqlite';
 import {
+  CONVERSATIONS_QUERY,
   createContactResolver,
   decodeAttributedBody,
   mapRows,
@@ -57,6 +59,31 @@ describe('mapRows', () => {
     const mapped = mapRows([row({ isFromMe: 1n, unreadCount: 0n })])[0];
     expect(mapped.isFromMe).toBe(true);
     expect(mapped.unreadCount).toBe(0);
+  });
+});
+
+describe('conversation query', () => {
+  it('previews the newest unread incoming message instead of a later sent reply', () => {
+    const db = new DatabaseSync(':memory:', { readBigInts: true });
+    try {
+      db.exec(`
+        CREATE TABLE chat (ROWID INTEGER PRIMARY KEY, display_name TEXT, chat_identifier TEXT);
+        CREATE TABLE message (ROWID INTEGER PRIMARY KEY, text TEXT, attributedBody BLOB, is_from_me INTEGER, date INTEGER, is_read INTEGER);
+        CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
+        INSERT INTO chat VALUES (1, NULL, '+15550100000');
+        INSERT INTO message VALUES (1, 'Meet at the library?', NULL, 0, 725760000000000000, 0);
+        INSERT INTO message VALUES (2, 'Sounds good', NULL, 1, 725760060000000000, 1);
+        INSERT INTO chat_message_join VALUES (1, 1);
+        INSERT INTO chat_message_join VALUES (1, 2);
+      `);
+
+      const result = db.prepare(CONVERSATIONS_QUERY).get() as unknown as RawIMessageRow;
+      expect(result.text).toBe('Meet at the library?');
+      expect(result.isFromMe).toBe(0n);
+      expect(result.unreadCount).toBe(1n);
+    } finally {
+      db.close();
+    }
   });
 });
 

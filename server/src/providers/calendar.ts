@@ -45,6 +45,7 @@ interface VEvent {
   uid: string;
   summary?: string | { val: string };
   location?: string;
+  description?: string | { val: string };
   status?: string;
   datetype?: string;
   start: Date & { tz?: string };
@@ -124,7 +125,8 @@ function eventFromOccurrence(
     title: text(event.summary) || '(untitled)',
     calendar: calendarName,
     allDay,
-    location: event.location ? text(event.location) : undefined,
+    location: text(event.location).trim() || undefined,
+    description: text(event.description).trim() || undefined,
     start: start.toISOString(),
     end: end.toISOString(),
     // All-day DTSTARTs are date-only (midnight UTC) — read the date

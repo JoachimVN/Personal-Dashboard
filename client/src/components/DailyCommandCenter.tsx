@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import type {
   CalendarData,
   CommandCenterData,
@@ -13,6 +13,7 @@ import { deg, glyph, weatherLocation } from '../lib/weather';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
+import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import '../sections/spotify/spotify.css';
 
 function formatEventDay(event: CalendarData['events'][number]): string {
@@ -48,6 +49,36 @@ function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' {
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
   return 'personal';
+}
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest('a, button, input, select, textarea, [role="button"]'));
+}
+
+function CommandPanel({ href, className, children }: Readonly<{ href: string; className: string; children: ReactNode }>) {
+  const open = () => {
+    window.location.hash = href.slice(1);
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!isInteractiveTarget(event.target) && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      open();
+    }
+  };
+
+  return (
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={(event: MouseEvent<HTMLDivElement>) => {
+        if (!isInteractiveTarget(event.target)) open();
+      }}
+      onKeyDown={onKeyDown}
+      className={`${className} cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--color-accent-personal)`}
+    >
+      {children}
+    </div>
+  );
 }
 
 function Signal({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: HealthData | undefined }>) {
@@ -201,14 +232,29 @@ export function DailyCommandCenter() {
       <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
     </div>
     <div className="command-layout">
-      <div className="command-primary">
+      <CommandPanel href={ranked.hero.href} className="command-primary">
         <p className="command-label">{ranked.hero.kicker}</p>
         <div className="mt-5 flex items-start gap-4">
           {heroTrack && <Thumb url={heroTrack.imageUrl} size="h-16 w-16" />}
           <div className="min-w-0">
             <p className="command-event-time">{heroKicker}</p>
             <p className="command-event-title">{heroEvent?.title ?? heroTrack?.track ?? ranked.hero.title}</p>
-            <p className="mt-2 text-sm text-ink-muted">{heroEvent?.location || (heroTrack ? heroTrack.artist : ranked.hero.detail)}</p>
+            {heroEvent ? (
+              <div className="mt-2 space-y-1.5 text-sm text-ink-muted">
+                {heroEvent.location && (
+                  <p className="flex items-center gap-1.5">
+                    <a href={mapsSearchHref(heroEvent.location)} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1.5 transition hover:text-ink">
+                      <span aria-hidden>📍</span>
+                      <span className="truncate">{heroEvent.location}</span>
+                    </a>
+                  </p>
+                )}
+                {heroEvent.description && (
+                  <p className="line-clamp-2 border-l border-card-border pl-2.5 text-ink-faint">{heroEvent.description}</p>
+                )}
+                {!heroEvent.location && !heroEvent.description && <p>{ranked.hero.detail}</p>}
+              </div>
+            ) : <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{heroTrack ? heroTrack.artist : ranked.hero.detail}</p>}
           </div>
         </div>
         {heroActivity?.today && (
@@ -223,15 +269,15 @@ export function DailyCommandCenter() {
         )}
         <div className="command-weather-row">
           <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
-          <div><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p>{weather && <p className="text-[11px] text-ink-faint">📍 {weatherLocation(weather.location)}</p>}</div>
+          <div><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p>{weather && <a href={mapsCoordinatesHref(weather.location)} target="_blank" rel="noreferrer" className="mt-0.5 flex w-fit items-center gap-1 text-[11px] text-ink-faint transition hover:text-ink"><span aria-hidden>📍</span>{weatherLocation(weather.location)}</a>}</div>
           {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
         </div>
-      </div>
+      </CommandPanel>
       <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} health={health} />)}</div>
     </div>
-    <div className="command-agenda">
-      <div className="command-agenda-heading"><p className="command-label">{ranked.secondary.kicker}</p><a href={ranked.secondary.href}>Open section <span aria-hidden>↗</span></a></div>
+    <CommandPanel href={ranked.secondary.href} className="command-agenda">
+      <div className="command-agenda-heading"><p className="command-label">{ranked.secondary.kicker}</p><span className="command-agenda-link">Open section <span aria-hidden>↗</span></span></div>
       <SecondaryContent slot={ranked.secondary} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
-    </div>
+    </CommandPanel>
   </section>;
 }

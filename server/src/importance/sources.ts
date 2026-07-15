@@ -23,7 +23,8 @@ export function calendarCandidates(data: CalendarData | undefined, now: number):
     candidates.push({
       id: `calendar:event:${next.id}`, source: 'calendar', kind: 'calendar', score: 96, shapes: [...allShapes],
       kicker: 'Next on deck', title: next.title,
-      detail: next.location || (next.allDay ? 'An all-day marker on your calendar' : `${next.startLabel}–${next.endLabel}`),
+      detail: [next.location, next.description].filter((detail): detail is string => Boolean(detail)).join(' · ')
+        || (next.allDay ? 'An all-day marker on your calendar' : `${next.startLabel}–${next.endLabel}`),
       href: '#/personal', render: { type: 'calendar-event', eventId: next.id },
     });
   }

@@ -382,14 +382,14 @@ a {
   background: var(--color-accent-health);
 }
 
-.command-agenda-heading a {
+.command-agenda-link {
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-ink-muted);
   transition: color 160ms ease;
 }
 
-.command-agenda-heading a:hover {
+.command-agenda:hover .command-agenda-link {
   color: var(--color-ink);
 }
 

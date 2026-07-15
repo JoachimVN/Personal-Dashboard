@@ -36,6 +36,7 @@ export interface RawTrack {
   album?: {
     id: string;
     name?: string;
+    artists?: { id: string; name: string }[];
     album_type?: string;
     images?: RawImage[];
     release_date?: string;
@@ -142,6 +143,7 @@ export function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefine
     album: {
       id: track.album.id,
       name: track.album.name ?? 'Unknown album',
+      artist: (track.album.artists?.length ? track.album.artists : track.artists).map((artist) => artist.name).join(', '),
       imageUrl: firstImage(track.album.images),
       url: track.album.external_urls?.spotify,
       releaseDate: track.album.release_date,

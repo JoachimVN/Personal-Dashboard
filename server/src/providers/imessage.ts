@@ -13,8 +13,9 @@ const APPLE_EPOCH_MS = 978307200000;
 const SNIPPET_MAX_LENGTH = 120;
 
 /**
- * One most-recent-message-per-chat row, as returned by the query in fetch(). With
- * `readBigInts: true` every integer column comes back as a bigint, not just the date.
+ * One preview message per chat, as returned by the query in fetch(). For chats with unread
+ * incoming messages, the preview is the newest unread incoming message; otherwise it is the
+ * newest message. With `readBigInts: true` every integer column comes back as a bigint.
  */
 export interface RawIMessageRow {
   chatId: bigint;
@@ -214,7 +215,7 @@ export function mapRows(rows: RawIMessageRow[], resolveContact: ContactResolver 
   });
 }
 
-const CONVERSATIONS_QUERY = `
+export const CONVERSATIONS_QUERY = `
   SELECT
     c.ROWID AS chatId,
     c.display_name AS displayName,
@@ -231,8 +232,16 @@ const CONVERSATIONS_QUERY = `
   FROM chat c
   JOIN chat_message_join cmj ON cmj.chat_id = c.ROWID
   JOIN message m ON m.ROWID = cmj.message_id
-  WHERE m.ROWID = (
-    SELECT MAX(cmj3.message_id) FROM chat_message_join cmj3 WHERE cmj3.chat_id = c.ROWID
+  WHERE m.ROWID = COALESCE(
+    (
+      SELECT MAX(cmj3.message_id)
+      FROM chat_message_join cmj3
+      JOIN message m3 ON m3.ROWID = cmj3.message_id
+      WHERE cmj3.chat_id = c.ROWID AND m3.is_from_me = 0 AND m3.is_read = 0
+    ),
+    (
+      SELECT MAX(cmj3.message_id) FROM chat_message_join cmj3 WHERE cmj3.chat_id = c.ROWID
+    )
   )
   ORDER BY m.date DESC
   LIMIT 15

@@ -9,6 +9,7 @@ export const calendarSchema = z.object({
       calendar: z.string(),
       allDay: z.boolean(),
       location: z.string().optional(),
+      description: z.string().optional(),
       start: z.string(),
       end: z.string(),
       /** Day bucket + time labels, precomputed in the dashboard timezone. */

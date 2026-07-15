@@ -10,6 +10,8 @@ import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { deg, glyph, weatherLocation } from '../../lib/weather';
 import { relativeTime } from '../../lib/time';
+import { sectionHref } from '../../router';
+import { mapsCoordinatesHref } from '../../lib/maps';
 import { TodayBrief } from './TodayBrief';
 
 function Mini({ label, children, wide }: Readonly<{ label: string; children: React.ReactNode; wide?: boolean }>) {
@@ -44,8 +46,15 @@ export function PersonalOverview() {
         <WidgetBody envelope={weather.envelope} offline={weather.offline}>
           {(data) => (
             <span className="flex flex-col">
-              <span className="font-semibold">{glyph(data.current.symbol)} {deg(data.current.temperature)}</span>
-              <span className="text-[10px] text-ink-faint">{weatherLocation(data.location)}</span>
+              <a href={sectionHref('personal')} className="w-fit rounded-md font-semibold transition hover:text-ink">{glyph(data.current.symbol)} {deg(data.current.temperature)}</a>
+              <a
+                href={mapsCoordinatesHref(data.location)}
+                target="_blank"
+                rel="noreferrer"
+                className="flex w-fit items-center gap-1 text-[10px] text-ink-faint underline decoration-card-border underline-offset-2 transition hover:text-ink"
+              >
+                <span aria-hidden>📍</span>{weatherLocation(data.location)}
+              </a>
             </span>
           )}
         </WidgetBody>
