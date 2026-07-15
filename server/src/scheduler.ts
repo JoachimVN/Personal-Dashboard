@@ -11,6 +11,9 @@ export interface Provider<T = unknown> {
   isConfigured(): boolean;
   /** `force` is true for a user-initiated refresh — providers may use it to bypass self-imposed (but not externally-imposed) pacing. */
   fetch(signal: AbortSignal, force: boolean): Promise<T>;
+  /** Optional adaptive schedule, selected after each completed refresh. `refreshMs` remains the
+   * fallback delay and the client-visible cache polling cadence. */
+  nextRefreshMs?(data: T | undefined): number;
 }
 
 interface Entry {
@@ -35,6 +38,7 @@ function sanitizeError(err: unknown): string {
 export class ProviderScheduler {
   private readonly entries = new Map<string, Entry>();
   private readonly settledListeners = new Set<(id: string) => void>();
+  private running = false;
 
   register(provider: Provider): void {
     if (this.entries.has(provider.id)) {
@@ -49,9 +53,11 @@ export class ProviderScheduler {
 
   /** Immediate fetch for every configured provider, then per-provider intervals. */
   start(): void {
+    this.running = true;
     for (const entry of this.entries.values()) {
       if (entry.status === 'disabled') continue;
       void this.refresh(entry.provider.id);
+      if (entry.provider.nextRefreshMs) continue;
       entry.timer = setInterval(
         () => void this.refresh(entry.provider.id),
         entry.provider.refreshMs,
@@ -61,8 +67,10 @@ export class ProviderScheduler {
   }
 
   stop(): void {
+    this.running = false;
     for (const entry of this.entries.values()) {
       if (entry.timer) clearInterval(entry.timer);
+      entry.timer = undefined;
     }
   }
 
@@ -96,11 +104,23 @@ export class ProviderScheduler {
         entry.lastAttemptAt = new Date();
         entry.inFlight = false;
         entry.refreshPromise = undefined;
+        this.scheduleNext(entry);
         for (const listener of this.settledListeners) listener(id);
       }
     })();
 
     return entry.refreshPromise;
+  }
+
+  private scheduleNext(entry: Entry): void {
+    if (!this.running || !entry.provider.nextRefreshMs) return;
+    if (entry.timer) clearTimeout(entry.timer);
+    const delayMs = entry.provider.nextRefreshMs(entry.data);
+    entry.timer = setTimeout(
+      () => void this.refresh(entry.provider.id),
+      Math.max(1_000, delayMs),
+    );
+    entry.timer.unref?.();
   }
 
   /** Notified after every refresh attempt (success or failure) for any provider. Used to let a

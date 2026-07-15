@@ -11,6 +11,11 @@ const API = 'https://api.spotify.com/v1';
 const TOP_DATA_REFRESH_MS = 12 * 60 * 60_000;
 const TOP_TRACK_HISTORY_LIMIT = 100;
 const DEFAULT_RATE_LIMIT_RETRY_MS = 30_000;
+const RECENT_RECONCILIATION_MS = 15 * 60_000;
+const IDLE_PLAYBACK_CHECK_MS = 5 * 60_000;
+const PLAYBACK_FINISH_GRACE_MS = 1_000;
+const MIN_PLAYBACK_CHECK_MS = 5_000;
+const FAILURE_RETRY_MS = 60_000;
 
 // Raw Spotify shapes (only the fields we read).
 interface RawImage {
@@ -219,13 +224,35 @@ export function createSpotifyProvider(
 ): Provider<SpotifyData> {
   let topData: TopData | undefined;
   let topDataFetchedAt = 0;
+  let nextRecentReconciliationAt = 0;
+  let nextAttemptNotBefore = 0;
+
+  const nextRefreshMs = (data: SpotifyData | undefined): number => {
+    const now = Date.now();
+    if (nextAttemptNotBefore > now) return nextAttemptNotBefore - now;
+
+    const untilRecentReconciliation = Math.max(0, nextRecentReconciliationAt - now);
+    const nowPlaying = data?.nowPlaying;
+    const untilPlaybackEnd =
+      nowPlaying?.isPlaying && nowPlaying.progressMs != null && nowPlaying.durationMs != null
+        ? Math.max(
+            MIN_PLAYBACK_CHECK_MS,
+            nowPlaying.durationMs - nowPlaying.progressMs + PLAYBACK_FINISH_GRACE_MS,
+          )
+        : IDLE_PLAYBACK_CHECK_MS;
+
+    return Math.min(untilPlaybackEnd, untilRecentReconciliation);
+  };
 
   return {
     id: 'spotify',
     schema: spotifySchema,
+    // The client still re-reads this cache every 30 seconds so a playback-aware server refresh
+    // appears promptly in the UI. The server itself uses nextRefreshMs below.
     refreshMs: 60_000,
     timeoutMs: 20_000,
     isConfigured: () => oauth !== undefined && readSpotifyToken() !== undefined,
+    nextRefreshMs,
     async fetch(signal) {
       if (!oauth) throw new Error('spotify is not configured');
       try {
@@ -255,9 +282,14 @@ export function createSpotifyProvider(
           return (await res.json()) as T;
         };
 
-        // These are the only Spotify calls made on each one-minute refresh.
+        // Playback is checked at the expected track end (with a low-frequency idle guard).
+        // Recent history is reconciled independently every 15 minutes.
         const current = await get<CurrentlyPlaying>('/me/player/currently-playing');
-        const recent = await get<RecentlyPlayed>('/me/player/recently-played?limit=50');
+        const shouldReconcileRecent = Date.now() >= nextRecentReconciliationAt;
+        const recent = shouldReconcileRecent
+          ? await get<RecentlyPlayed>('/me/player/recently-played?limit=50')
+          : undefined;
+        if (shouldReconcileRecent) nextRecentReconciliationAt = Date.now() + RECENT_RECONCILIATION_MS;
 
         let topDataRefreshed = false;
         if (topDataFetchedAt === 0) topDataFetchedAt = await snapshotStore.getTopDataFetchedAt();
@@ -314,13 +346,15 @@ export function createSpotifyProvider(
           topDataRefreshed = true;
         }
 
-        const recentPlays = (recent?.items ?? [])
-          .map((entry) => {
-            const track = toPlayedTrackInput(entry.track);
-            return track ? { playedAt: entry.played_at, track } : undefined;
-          })
-          .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
-        await historyStore.recordPlays(recentPlays);
+        if (recent) {
+          const recentPlays = recent.items
+            .map((entry) => {
+              const track = toPlayedTrackInput(entry.track);
+              return track ? { playedAt: entry.played_at, track } : undefined;
+            })
+            .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
+          await historyStore.recordPlays(recentPlays);
+        }
 
         const nowPlaying =
           current?.item
@@ -334,10 +368,12 @@ export function createSpotifyProvider(
 
         const snapshot = {
           nowPlaying,
-          recentlyPlayed: (recent?.items ?? []).map((entry) => ({
-            ...mapTrack(entry.track),
-            playedAt: entry.played_at,
-          })),
+          recentlyPlayed: recent
+            ? recent.items.map((entry) => ({
+                ...mapTrack(entry.track),
+                playedAt: entry.played_at,
+              }))
+            : previousSnapshot?.recentlyPlayed ?? [],
           topArtists: {
             shortTerm: topData?.artistsShort.map(mapArtist) ?? previousSnapshot?.topArtists.shortTerm ?? [],
             mediumTerm: topData?.artistsMedium.map(mapArtist) ?? previousSnapshot?.topArtists.mediumTerm ?? [],
@@ -349,9 +385,14 @@ export function createSpotifyProvider(
           allTime: await historyStore.getAllTime(),
         };
         await snapshotStore.setSnapshot(snapshot, topDataRefreshed ? topDataFetchedAt : undefined);
+        nextAttemptNotBefore = 0;
         return snapshot;
       } catch (error) {
         const lastGoodSnapshot = await snapshotStore.getSnapshot();
+        const rateLimitedUntil = await snapshotStore.getRateLimitedUntil();
+        nextAttemptNotBefore = isRateLimitError(error)
+          ? Math.max(rateLimitedUntil, Date.now() + MIN_PLAYBACK_CHECK_MS)
+          : Date.now() + FAILURE_RETRY_MS;
         // Playback state goes stale immediately: replaying an old track as "Now playing" is
         // misleading. The longer-lived listening data remains useful during the cooldown.
         if (lastGoodSnapshot && isRateLimitError(error)) {

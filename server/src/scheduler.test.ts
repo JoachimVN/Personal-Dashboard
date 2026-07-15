@@ -175,6 +175,23 @@ describe('ProviderScheduler', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('uses a provider-directed delay instead of its fixed interval when supplied', async () => {
+    vi.useFakeTimers();
+    const fetch = vi.fn(async () => ({ value: 1 }));
+    scheduler.register(fakeProvider({
+      refreshMs: 10_000,
+      nextRefreshMs: () => 1_000,
+      fetch,
+    }));
+
+    scheduler.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('notifies onSettled listeners after every refresh, success or failure', async () => {
     scheduler.register(fakeProvider({ id: 'a' }));
     scheduler.register(fakeProvider({ id: 'b', fetch: async () => { throw new Error('boom'); } }));

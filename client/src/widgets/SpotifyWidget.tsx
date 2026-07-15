@@ -98,7 +98,13 @@ export function NowPlaying({
     nowPlaying.durationMs && estimatedProgressMs != null
       ? Math.min(100, (estimatedProgressMs / nowPlaying.durationMs) * 100)
       : null;
+  const hasFinished = isPlaying && nowPlaying.durationMs != null && estimatedProgressMs != null
+    && estimatedProgressMs >= nowPlaying.durationMs;
   const year = releaseYear(nowPlaying.releaseDate);
+
+  if (hasFinished) {
+    return <p className="text-sm text-ink-muted">Nothing playing right now.</p>;
+  }
 
   return (
     <div className="flex gap-4">
