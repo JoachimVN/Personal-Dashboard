@@ -27,7 +27,7 @@ export const commandCenterSlotSchema = z.object({
 
 export const commandCenterSchema = z.object({
   hero: commandCenterSlotSchema,
-  secondary: commandCenterSlotSchema,
+  secondary: z.array(commandCenterSlotSchema).min(1),
   tiles: z.tuple([commandCenterSlotSchema, commandCenterSlotSchema, commandCenterSlotSchema]),
 });
 

@@ -225,7 +225,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
     candidates.push({
       id: `spotify:new-album:${topAlbum.id ?? topAlbum.name}`, source: 'spotify', kind: 'spotify',
       score: TIMEFRAME_SCORE.long, shapes: TIMEFRAME_SHAPES.long,
-      kicker: 'New favorite album', title: topAlbum.name, detail: topAlbum.artist,
+      kicker: 'New favorite album', title: topAlbum.name, detail: topAlbum.artist.split(',')[0]!.trim(),
       href: '#/spotify', render: { type: 'spotify-album', albumId: topAlbum.id ?? topAlbum.name },
     });
   }

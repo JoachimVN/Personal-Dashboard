@@ -1,20 +1,50 @@
 import type { CommandCenterData } from '@personal-dashboard/shared';
 import type { Candidate, SlotShape } from './types.js';
 
-const slotShapes: SlotShape[] = ['hero', 'secondary', 'tile', 'tile', 'tile'];
+const SECONDARY_CAROUSEL_LIMIT = 3;
 
-/** Highest score wins each slot, avoiding duplicate sources unless that would leave a slot empty. */
+function selectSlot(
+  sorted: Candidate[],
+  shape: SlotShape,
+  usedSources: Set<string>,
+  usedIds: Set<string>,
+): Candidate {
+  const eligible = sorted.filter((candidate) => candidate.shapes.includes(shape));
+  const selected = eligible.find((candidate) => !usedSources.has(candidate.source) && !usedIds.has(candidate.id))
+    ?? eligible.find((candidate) => !usedIds.has(candidate.id))
+    ?? eligible[0];
+  if (!selected) throw new Error(`No ${shape} command-center fallback candidate was supplied`);
+  usedSources.add(selected.source);
+  usedIds.add(selected.id);
+  return selected;
+}
+
+/** Highest score wins each slot; secondary keeps a short, source-diverse queue for the carousel. */
 export function rankCandidates(candidates: Candidate[]): CommandCenterData {
   const sorted = [...candidates].sort((a, b) => b.score - a.score);
   const usedSources = new Set<string>();
-  const assigned = slotShapes.map((shape) => {
-    const eligible = sorted.filter((candidate) => candidate.shapes.includes(shape));
-    const unused = eligible.find((candidate) => !usedSources.has(candidate.source));
-    const selected = unused ?? eligible[0];
-    if (!selected) throw new Error(`No ${shape} command-center fallback candidate was supplied`);
-    usedSources.add(selected.source);
-    return selected;
+  const usedIds = new Set<string>();
+  const hero = selectSlot(sorted, 'hero', usedSources, usedIds);
+  const secondaryCandidates = sorted.filter((candidate) => (
+    candidate.id !== hero.id && candidate.shapes.includes('secondary')
+  ));
+  const secondary = secondaryCandidates
+    .filter((candidate) => !usedSources.has(candidate.source))
+    .filter((candidate, index, eligible) => eligible.findIndex((other) => other.source === candidate.source) === index)
+    .slice(0, SECONDARY_CAROUSEL_LIMIT);
+  if (!secondary.length) {
+    const fallback = secondaryCandidates[0];
+    if (!fallback) throw new Error('No secondary command-center fallback candidate was supplied');
+    secondary.push(fallback);
+  }
+  secondary.forEach((candidate) => {
+    usedSources.add(candidate.source);
+    usedIds.add(candidate.id);
   });
-  const [hero, secondary, ...tiles] = assigned;
+  const tiles = [
+    selectSlot(sorted, 'tile', usedSources, usedIds),
+    selectSlot(sorted, 'tile', usedSources, usedIds),
+    selectSlot(sorted, 'tile', usedSources, usedIds),
+  ];
   return { hero, secondary, tiles: [tiles[0], tiles[1], tiles[2]] };
 }

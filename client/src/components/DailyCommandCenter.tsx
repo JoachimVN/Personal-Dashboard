@@ -1,4 +1,5 @@
-import { useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { AnimatePresence, MotionConfig, motion } from 'motion/react';
+import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import type {
   CalendarData,
   CommandCenterData,
@@ -16,6 +17,8 @@ import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
 import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { sectionHref } from '../router';
 import '../sections/spotify/spotify.css';
+
+const SECONDARY_CAROUSEL_INTERVAL_MS = 7_000;
 
 function formatEventDay(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
@@ -58,7 +61,12 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest('a, button, input, select, textarea, [role="button"]'));
 }
 
-function CommandPanel({ href, className, children }: Readonly<{ href: string; className: string; children: ReactNode }>) {
+function CommandPanel({
+  href,
+  className,
+  children,
+  navigable = true,
+}: Readonly<{ href: string; className: string; children: ReactNode; navigable?: boolean }>) {
   const open = () => {
     window.location.hash = href.slice(1);
   };
@@ -68,6 +76,8 @@ function CommandPanel({ href, className, children }: Readonly<{ href: string; cl
       open();
     }
   };
+
+  if (!navigable) return <div className={className}>{children}</div>;
 
   return (
     <div
@@ -111,6 +121,88 @@ function Signal({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: He
   );
 }
 
+function SecondaryCarousel({
+  items,
+  activeIndex,
+  onActiveChange,
+  renderItem,
+}: Readonly<{
+  items: CommandCenterSlot[];
+  activeIndex: number;
+  onActiveChange: (index: number) => void;
+  renderItem: (slot: CommandCenterSlot) => ReactNode;
+}>) {
+  const [paused, setPaused] = useState(false);
+  const hasMultipleItems = items.length > 1;
+  const visibleIndex = Math.min(activeIndex, items.length - 1);
+
+  useEffect(() => {
+    onActiveChange(0);
+  }, [items.map((item) => item.id).join('|'), onActiveChange]);
+
+  useEffect(() => {
+    if (!hasMultipleItems || paused) return undefined;
+    const timer = window.setInterval(() => {
+      onActiveChange((activeIndex + 1) % items.length);
+    }, SECONDARY_CAROUSEL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [activeIndex, hasMultipleItems, items.length, onActiveChange, paused]);
+
+  if (!items.length) return null;
+  if (!hasMultipleItems) return <>{renderItem(items[0]!)}</>;
+
+  const goTo = (index: number) => {
+    onActiveChange((index + items.length) % items.length);
+  };
+
+  const pause = () => setPaused(true);
+  const resume = () => setPaused(false);
+
+  return (
+    <MotionConfig reducedMotion="never">
+      <div
+        className="command-secondary-carousel"
+        role="group"
+        aria-roledescription="carousel"
+        aria-label="Upcoming items"
+        onMouseEnter={pause}
+        onMouseLeave={resume}
+        onFocusCapture={pause}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) resume();
+        }}
+      >
+        <div className="command-secondary-carousel-viewport">
+          <AnimatePresence initial={false} mode="wait">
+            <motion.div
+              key={items[visibleIndex]!.id}
+              className="command-secondary-carousel-slide"
+              initial={{ opacity: 0, x: 28, y: 8, scale: 0.985, filter: 'blur(7px)' }}
+              animate={{ opacity: 1, x: 0, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, x: -20, y: -5, scale: 0.99, filter: 'blur(5px)' }}
+              transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {renderItem(items[visibleIndex]!)}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        <div className="command-secondary-carousel-timeline">
+          <div className="command-secondary-carousel-dots" aria-label="Choose a secondary signal">
+            {items.map((item, index) => <button
+              key={item.id}
+              type="button"
+              className={index === visibleIndex ? 'is-active' : undefined}
+              aria-label={`Show ${item.kicker}: ${item.title}`}
+              aria-current={index === visibleIndex ? 'true' : undefined}
+              onClick={() => goTo(index)}
+            />)}
+          </div>
+        </div>
+      </div>
+    </MotionConfig>
+  );
+}
+
 function SecondaryContent({
   slot,
   calendar,
@@ -144,6 +236,15 @@ function SecondaryContent({
   }
   if (slot.render.type === 'spotify-now-playing' && spotify?.nowPlaying) {
     return <div className="mt-4"><NowPlaying nowPlaying={spotify.nowPlaying} fetchedAt={spotifyFetchedAt} /></div>;
+  }
+  if (slot.render.type === 'spotify-track') {
+    const trackId = slot.render.trackId;
+    const track = [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? []]
+      .find((item) => (item.id ?? item.track) === trackId);
+    return <div className="mt-4 flex items-center gap-3">
+      <Thumb url={track?.imageUrl} size="h-12 w-12" />
+      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    </div>;
   }
   if (slot.render.type === 'spotify-artist') {
     const artistId = slot.render.artistId;
@@ -213,10 +314,17 @@ export function DailyCommandCenter() {
   const spotifyEnvelope = useWidget<SpotifyData>('spotify').envelope;
   const spotify = spotifyEnvelope?.data;
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
+  const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
 
   if (!commandCenter) return <CommandCenterSkeleton />;
 
   const ranked = commandCenter;
+  // A running server may be refreshed separately from the Vite client during local development.
+  // Keep the overview usable while the server still returns the pre-carousel single-slot payload.
+  const secondarySlots = Array.isArray(ranked.secondary)
+    ? ranked.secondary
+    : [ranked.secondary as unknown as CommandCenterSlot];
+  const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)]!;
   const heroRender = ranked.hero.render;
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
@@ -283,9 +391,16 @@ export function DailyCommandCenter() {
       </CommandPanel>
       <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} health={health} />)}</div>
     </div>
-    <CommandPanel href={ranked.secondary.href} className={`command-agenda command-panel--${toneFor(ranked.secondary)}`}>
-      <div className="command-agenda-heading"><p className="command-label">{ranked.secondary.kicker}</p><span className="command-agenda-link">Open section <span aria-hidden>↗</span></span></div>
-      <SecondaryContent slot={ranked.secondary} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
+    <CommandPanel href={activeSecondary.href} className={`command-agenda command-panel--${toneFor(activeSecondary)}`} navigable={false}>
+      <SecondaryCarousel
+        items={secondarySlots}
+        activeIndex={activeSecondaryIndex}
+        onActiveChange={setActiveSecondaryIndex}
+        renderItem={(slot) => <>
+          <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><a href={slot.href} className="command-agenda-link">Open section <span aria-hidden>↗</span></a></div>
+          <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
+        </>}
+      />
     </CommandPanel>
   </section>;
 }

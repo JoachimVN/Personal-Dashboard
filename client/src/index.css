@@ -495,14 +495,14 @@ a {
 @media (hover: hover) {
   .command-primary:hover:not(:has(.command-weather-target:hover)),
   .command-agenda:hover {
-    border-color: color-mix(in oklab, var(--panel-accent) 34%, var(--color-card-border));
-    box-shadow: 0 14px 34px color-mix(in oklab, var(--panel-accent) 12%, transparent);
+    border-color: color-mix(in oklab, var(--panel-accent) 27%, var(--color-card-border));
+    box-shadow: 0 14px 34px color-mix(in oklab, var(--panel-accent) 8%, transparent);
     transform: translateY(-2px);
   }
 
   .command-primary:hover:not(:has(.command-weather-target:hover))::before,
   .command-agenda:hover::before {
-    opacity: 1;
+    opacity: 0.72;
     transform: translate3d(0, 0, 0) scale(1);
   }
 
@@ -541,6 +541,53 @@ a {
   display: grid;
   gap: 0.65rem;
   margin-top: 0.9rem;
+}
+
+.command-secondary-carousel {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.command-secondary-carousel-viewport {
+  min-height: 1.25rem;
+  overflow: hidden;
+}
+
+.command-secondary-carousel-slide {
+  width: 100%;
+  will-change: opacity, transform, filter;
+}
+
+.command-secondary-carousel-timeline {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.command-secondary-carousel-dots {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.command-secondary-carousel-dots button {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--color-card-border);
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.command-secondary-carousel-dots button:hover,
+.command-secondary-carousel-dots button:focus-visible,
+.command-secondary-carousel-dots button.is-active {
+  transform: scale(1.5);
+  background: var(--panel-accent);
+}
+
+.command-secondary-carousel-dots button:focus-visible {
+  outline: 2px solid var(--panel-accent);
+  outline-offset: 3px;
 }
 
 .command-agenda-item {
