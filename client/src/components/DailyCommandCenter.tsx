@@ -13,7 +13,8 @@ import { deg, glyph, weatherLocation } from '../lib/weather';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
-import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
+import { mapsSearchHref } from '../lib/maps';
+import { sectionHref } from '../router';
 import '../sections/spotify/spotify.css';
 
 function formatEventDay(event: CalendarData['events'][number]): string {
@@ -45,9 +46,11 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' {
+function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' {
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
+  if (slot.source === 'health') return 'health';
+  if (slot.source === 'spotify') return 'spotify';
   return 'personal';
 }
 
@@ -232,7 +235,7 @@ export function DailyCommandCenter() {
       <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
     </div>
     <div className="command-layout">
-      <CommandPanel href={ranked.hero.href} className="command-primary">
+      <CommandPanel href={ranked.hero.href} className={`command-primary command-panel--${toneFor(ranked.hero)}`}>
         <p className="command-label">{ranked.hero.kicker}</p>
         <div className="mt-5 flex items-start gap-4">
           {heroTrack && <Thumb url={heroTrack.imageUrl} size="h-16 w-16" />}
@@ -268,14 +271,16 @@ export function DailyCommandCenter() {
           </div>
         )}
         <div className="command-weather-row">
-          <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
-          <div><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p>{weather && <a href={mapsCoordinatesHref(weather.location)} target="_blank" rel="noreferrer" className="mt-0.5 flex w-fit items-center gap-1 text-[11px] text-ink-faint transition hover:text-ink"><span aria-hidden>📍</span>{weatherLocation(weather.location)}</a>}</div>
-          {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
+          <a href={sectionHref('personal')} className="command-weather-target" aria-label="Open weather in Personal">
+            <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
+            <div className="min-w-0"><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="truncate text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p>{weather && <p className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint"><span aria-hidden>📍</span>{weatherLocation(weather.location)}</p>}</div>
+            {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
+          </a>
         </div>
       </CommandPanel>
       <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} health={health} />)}</div>
     </div>
-    <CommandPanel href={ranked.secondary.href} className="command-agenda">
+    <CommandPanel href={ranked.secondary.href} className={`command-agenda command-panel--${toneFor(ranked.secondary)}`}>
       <div className="command-agenda-heading"><p className="command-label">{ranked.secondary.kicker}</p><span className="command-agenda-link">Open section <span aria-hidden>↗</span></span></div>
       <SecondaryContent slot={ranked.secondary} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
     </CommandPanel>

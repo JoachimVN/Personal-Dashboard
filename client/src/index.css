@@ -252,25 +252,56 @@ a {
   background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
 }
 
+.command-panel--personal { --panel-accent: var(--color-accent-personal); }
+.command-panel--github { --panel-accent: var(--color-accent-github); }
+.command-panel--ai { --panel-accent: var(--color-accent-ai); }
+.command-panel--health { --panel-accent: var(--color-accent-health); }
+.command-panel--spotify { --panel-accent: var(--color-accent-spotify); }
+
 .command-agenda {
   position: relative;
+  isolation: isolate;
+  overflow: hidden;
   margin-top: 1rem;
   border: 1px solid var(--color-card-border);
   border-radius: 1.4rem;
   padding: 1rem 1.25rem;
-  background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
-  transition: background 200ms ease, border-color 200ms ease;
-}
-
-.command-agenda:hover {
-  background: light-dark(rgb(255 255 255 / 0.52), rgb(2 5 10 / 0.34));
-  border-color: color-mix(in oklab, var(--color-ink) 12%, var(--color-card-border));
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--panel-accent) 3%, transparent), transparent 58%),
+    light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
+  transition: transform 280ms cubic-bezier(.2,.8,.2,1), border-color 240ms ease, box-shadow 240ms ease;
 }
 
 .command-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-width: 0;
   border-radius: 1.4rem;
   padding: 1.25rem;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--panel-accent) 3%, transparent), transparent 58%),
+    light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
+  transition: transform 280ms cubic-bezier(.2,.8,.2,1), border-color 240ms ease, box-shadow 240ms ease;
+}
+
+.command-primary::before,
+.command-agenda::before {
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background: radial-gradient(circle at 14% 8%, color-mix(in oklab, var(--panel-accent) 28%, transparent), transparent 56%);
+  opacity: 0;
+  transform: translate3d(-8%, -5%, 0) scale(0.9);
+  transition: opacity 380ms ease, transform 560ms cubic-bezier(.2,.8,.2,1);
+}
+
+.command-primary > *,
+.command-agenda > * {
+  position: relative;
+  z-index: 1;
 }
 
 .command-event-time {
@@ -295,6 +326,39 @@ a {
   margin-top: 1.75rem;
   padding-top: 1rem;
   border-top: 1px solid var(--color-card-border);
+}
+
+.command-weather-target {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+  margin: -0.45rem -0.35rem;
+  padding: 0.45rem 0.35rem;
+  border-radius: 0.85rem;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), color 180ms ease;
+}
+
+.command-weather-target::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(100deg, color-mix(in oklab, var(--color-accent-personal) 14%, transparent), transparent 70%);
+  opacity: 0;
+  transform: translateX(-12%);
+  transition: opacity 260ms ease, transform 380ms cubic-bezier(.2,.8,.2,1);
+}
+
+.command-weather-target > * {
+  position: relative;
+  z-index: 1;
 }
 
 .command-forecast {
@@ -322,17 +386,34 @@ a {
 }
 
 .command-signal {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.8rem;
   padding: 1rem 0.6rem;
   border-radius: 1rem;
-  transition: background 160ms ease;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1);
 }
 
-.command-signal:hover {
-  background: color-mix(in oklab, var(--color-track) 55%, transparent);
+.command-signal::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--signal-color) 14%, transparent), transparent 76%);
+  opacity: 0;
+  transform: translateX(-14%);
+  transition: opacity 240ms ease, transform 360ms cubic-bezier(.2,.8,.2,1);
+}
+
+.command-signal > * {
+  position: relative;
+  z-index: 1;
 }
 
 .command-signal + .command-signal {
@@ -350,6 +431,8 @@ a {
 .command-signal--personal { --signal-color: var(--color-accent-personal); }
 .command-signal--github { --signal-color: var(--color-accent-github); }
 .command-signal--ai { --signal-color: var(--color-accent-ai); }
+.command-signal--health { --signal-color: var(--color-accent-health); }
+.command-signal--spotify { --signal-color: var(--color-accent-spotify); }
 
 .command-signal-arrow {
   font-size: 0.85rem;
@@ -389,8 +472,49 @@ a {
   transition: color 160ms ease;
 }
 
-.command-agenda:hover .command-agenda-link {
-  color: var(--color-ink);
+@media (hover: hover) {
+  .command-primary:hover:not(:has(.command-weather-target:hover)),
+  .command-agenda:hover {
+    border-color: color-mix(in oklab, var(--panel-accent) 34%, var(--color-card-border));
+    box-shadow: 0 14px 34px color-mix(in oklab, var(--panel-accent) 12%, transparent);
+    transform: translateY(-2px);
+  }
+
+  .command-primary:hover:not(:has(.command-weather-target:hover))::before,
+  .command-agenda:hover::before {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .command-primary:hover .command-weather-row {
+    border-color: color-mix(in oklab, var(--panel-accent) 22%, var(--color-card-border));
+  }
+
+  .command-weather-target:hover {
+    transform: translateY(-1px);
+  }
+
+  .command-weather-target:hover::before {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .command-agenda:hover .command-agenda-link {
+    color: var(--panel-accent);
+  }
+
+  .command-signal:hover {
+    transform: translateY(-1px);
+  }
+
+  .command-signal:hover::before {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .command-signal:hover .command-signal-arrow {
+    color: var(--signal-color);
+  }
 }
 
 .command-agenda-list {
@@ -450,14 +574,10 @@ a {
 .dashboard-section-card {
   min-height: 22rem;
   transform: translateZ(0);
-  transition: border-color 300ms ease, box-shadow 300ms ease;
-}
-
-.dashboard-section-card:hover {
-  border-color: color-mix(in oklab, var(--accent) 27%, var(--color-card-border));
-  box-shadow:
-    0 24px 75px light-dark(rgb(46 55 77 / 0.12), rgb(0 0 0 / 0.4)),
-    inset 0 1px 0 light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.1));
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--accent) 3%, transparent), transparent 42%),
+    var(--color-card);
+  transition: background 320ms ease, border-color 300ms ease, box-shadow 300ms ease;
 }
 
 .dashboard-section-card--personal {
@@ -472,14 +592,9 @@ a {
   right: -9rem;
   border-radius: 999px;
   background: radial-gradient(circle, var(--accent), transparent 72%);
-  opacity: 0.1;
+  opacity: 0.06;
   filter: blur(24px);
   transition: opacity 400ms ease, transform 600ms cubic-bezier(.2,.8,.2,1);
-}
-
-.dashboard-section-card:hover .section-card-aura {
-  opacity: 0.18;
-  transform: scale(1.5) translate(-1rem, 1rem);
 }
 
 .section-icon,
@@ -490,14 +605,49 @@ a {
   box-shadow: inset 0 1px 0 light-dark(rgb(255 255 255 / 0.7), rgb(255 255 255 / 0.05));
 }
 
+.dashboard-section-card .section-icon {
+  border-color: color-mix(in oklab, var(--accent) 18%, var(--color-card-border));
+  background: color-mix(in oklab, var(--accent) 7%, var(--color-card));
+  transition: background 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+}
+
 .section-arrow {
   transition: color 220ms ease, background 220ms ease, transform 350ms cubic-bezier(.2,.8,.2,1);
 }
 
-.dashboard-section-card:hover .section-arrow {
-  color: var(--accent);
-  background: color-mix(in oklab, var(--accent) 9%, var(--color-card));
-  transform: rotate(45deg);
+@media (hover: hover) {
+  .dashboard-section-card:hover {
+    background:
+      linear-gradient(135deg, color-mix(in oklab, var(--accent) 12%, transparent), transparent 55%),
+      var(--color-card);
+    border-color: color-mix(in oklab, var(--accent) 31%, var(--color-card-border));
+    box-shadow:
+      0 24px 75px light-dark(rgb(46 55 77 / 0.12), rgb(0 0 0 / 0.4)),
+      inset 0 1px 0 light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.1));
+  }
+
+  .dashboard-section-card:hover .section-card-aura {
+    opacity: 0.16;
+    transform: scale(1.35) translate(-0.75rem, 0.75rem);
+  }
+
+  .dashboard-section-card:hover .section-icon {
+    border-color: color-mix(in oklab, var(--accent) 38%, var(--color-card-border));
+    background: color-mix(in oklab, var(--accent) 14%, var(--color-card));
+    box-shadow:
+      0 8px 20px color-mix(in oklab, var(--accent) 14%, transparent),
+      inset 0 1px 0 light-dark(rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.08));
+  }
+
+  .dashboard-section-card:hover .section-arrow {
+    color: var(--accent);
+    background: color-mix(in oklab, var(--accent) 12%, var(--color-card));
+    transform: rotate(45deg);
+  }
+
+  .dashboard-section-card:hover .section-card-content + p {
+    border-color: color-mix(in oklab, var(--accent) 20%, var(--color-card-border));
+  }
 }
 
 .dashboard-section-card--personal .section-card-content > div {
@@ -793,6 +943,14 @@ a {
   .dashboard-section-card,
   .section-card-aura,
   .section-arrow,
+  .command-primary,
+  .command-primary::before,
+  .command-agenda,
+  .command-agenda::before,
+  .command-signal,
+  .command-signal::before,
+  .command-weather-target,
+  .command-weather-target::before,
   .action-card,
   .premium-primary-button,
   .premium-secondary-button {
