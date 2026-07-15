@@ -21,17 +21,17 @@ type SkyStop = {
 /* The extra dawn and dusk stops prevent a direct blue-to-orange blend from going muddy.
    Colors are paired light/dark so the same clock produces an appropriate wash in either mode. */
 const SKY_STOPS: readonly SkyStop[] = [
-  { minute: 0, skyA: 'light-dark(#c2d5ff, #1b365f)', skyB: 'light-dark(#8aa4ff, #09152f)' },
-  { minute: 2 * 60 + 30, skyA: 'light-dark(#b7e6e5, #1d5969)', skyB: 'light-dark(#7aa4f5, #0a2943)' },
-  { minute: 5 * 60, skyA: 'light-dark(#c9c9fb, #29316a)', skyB: 'light-dark(#8ea0ee, #12183d)' },
+  { minute: 0, skyA: 'light-dark(#bccfff, #1e407a)', skyB: 'light-dark(#80a0ff, #081634)' },
+  { minute: 2 * 60 + 30, skyA: 'light-dark(#9ddfdc, #0e6a76)', skyB: 'light-dark(#67b5e9, #07364c)' },
+  { minute: 5 * 60, skyA: 'light-dark(#c5b8ee, #4d428c)', skyB: 'light-dark(#8994e7, #1f1c5e)' },
   { minute: 7 * 60 + 30, skyA: 'light-dark(#f4a261, #7a4a2e)', skyB: 'light-dark(#9ac8f5, #1d4a70)' },
   { minute: 10 * 60 + 30, skyA: 'light-dark(#91cdf7, #1f638c)', skyB: 'light-dark(#d6efff, #143455)' },
   { minute: 14 * 60 + 30, skyA: 'light-dark(#9bd8e9, #236e83)', skyB: 'light-dark(#e7edb6, #284460)' },
   { minute: 17 * 60, skyA: 'light-dark(#d8c98b, #66523a)', skyB: 'light-dark(#f3c591, #69414a)' },
   { minute: 19 * 60, skyA: 'light-dark(#f48652, #843647)', skyB: 'light-dark(#ee94bc, #391945)' },
   { minute: 21 * 60 + 30, skyA: 'light-dark(#7d8dd6, #2a416d)', skyB: 'light-dark(#7489d5, #142344)' },
-  { minute: 22 * 60, skyA: 'light-dark(#c2d5ff, #1b365f)', skyB: 'light-dark(#8aa4ff, #09152f)' },
-  { minute: 24 * 60, skyA: 'light-dark(#c2d5ff, #1b365f)', skyB: 'light-dark(#8aa4ff, #09152f)' },
+  { minute: 22 * 60, skyA: 'light-dark(#bccfff, #1e407a)', skyB: 'light-dark(#80a0ff, #081634)' },
+  { minute: 24 * 60, skyA: 'light-dark(#bccfff, #1e407a)', skyB: 'light-dark(#80a0ff, #081634)' },
 ];
 
 function skyFor(now: Date): CSSProperties {
