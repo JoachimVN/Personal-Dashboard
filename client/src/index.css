@@ -493,16 +493,25 @@ a {
 }
 
 @media (hover: hover) {
-  .command-primary:hover:not(:has(.command-weather-target:hover)),
-  .command-agenda:hover {
+  .command-primary:hover:not(:has(.command-weather-target:hover)) {
     border-color: color-mix(in oklab, var(--panel-accent) 27%, var(--color-card-border));
     box-shadow: 0 14px 34px color-mix(in oklab, var(--panel-accent) 8%, transparent);
     transform: translateY(-2px);
   }
 
-  .command-primary:hover:not(:has(.command-weather-target:hover))::before,
-  .command-agenda:hover::before {
+  .command-primary:hover:not(:has(.command-weather-target:hover))::before {
     opacity: 0.72;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .command-agenda:hover {
+    border-color: color-mix(in oklab, var(--panel-accent) 14%, var(--color-card-border));
+    box-shadow: 0 14px 34px color-mix(in oklab, var(--panel-accent) 4%, transparent);
+    transform: translateY(-2px);
+  }
+
+  .command-agenda:hover::before {
+    opacity: 0.35;
     transform: translate3d(0, 0, 0) scale(1);
   }
 
