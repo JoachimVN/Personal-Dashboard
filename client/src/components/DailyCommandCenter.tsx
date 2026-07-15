@@ -260,10 +260,24 @@ function SecondaryContent({
     const artistId = slot.render.artistId;
     const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? [], ...spotify?.allTime.artists ?? []]
       .find((a) => (a.id ?? a.name) === artistId);
-    return <div className="command-secondary-artist mt-4">
-      {artist?.imageUrl && <img src={artist.imageUrl} alt="" className="command-secondary-artist-backdrop" />}
-      <div className="command-secondary-artist-overlay" />
-      <div className="relative min-w-0"><p className="text-base font-semibold text-white">{slot.title}</p><p className="mt-1 text-sm text-white/75">{slot.detail}</p></div>
+    const tracksByTimeframe = {
+      short: spotify?.topTracks.shortTerm ?? [],
+      medium: spotify?.topTracks.mediumTerm ?? [],
+      long: spotify?.topTracks.longTerm ?? [],
+      allTime: spotify?.allTime.tracks ?? [],
+    };
+    const legacyTimeframe = slot.id.split(':')[2];
+    const timeframe = slot.render.timeframe ?? (legacyTimeframe in tracksByTimeframe ? legacyTimeframe as keyof typeof tracksByTimeframe : 'short');
+    const tracks = tracksByTimeframe[timeframe].slice(0, 3);
+    return <div className="command-secondary-spotify mt-4">
+      {artist && <Thumb url={artist.imageUrl} size="command-secondary-spotify-artwork" />}
+      <div className="command-secondary-artist-details">
+        <p className="text-sm font-semibold text-ink">{slot.title}</p>
+        <p className="mt-0.5 text-xs text-ink-muted">{slot.detail}</p>
+        {tracks.length > 0 && <ol className="command-secondary-artist-tracks" aria-label={`Top tracks ${timeframe}`}>
+          {tracks.map((track, index) => <li key={track.id ?? track.track}><span>{index + 1}</span><p>{track.track}</p></li>)}
+        </ol>}
+      </div>
     </div>;
   }
   if (slot.render.type === 'spotify-album') {

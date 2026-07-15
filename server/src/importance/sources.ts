@@ -260,9 +260,9 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
     candidates.push({
       id: `spotify:new-artist:${tier.key}:${tier.artist.id ?? tier.artist.name}`, source: 'spotify', kind: 'spotify',
       score: TIMEFRAME_SCORE[tier.key], shapes: TIMEFRAME_SHAPES[tier.key],
-      kicker: `New top artist ${TIMEFRAME_PERIOD[tier.key]}`, title: tier.artist.name,
-      detail: tier.artist.genres[0] ?? `Your top artist ${TIMEFRAME_PERIOD[tier.key]}`,
-      href: '#/spotify', render: { type: 'spotify-artist', artistId: tier.artist.id ?? tier.artist.name },
+      kicker: `New #1 artist · ${TIMEFRAME_PERIOD[tier.key]}`, title: tier.artist.name,
+      detail: tier.artist.genres[0] ?? 'Took the #1 spot in your recent listening',
+      href: '#/spotify', render: { type: 'spotify-artist', artistId: tier.artist.id ?? tier.artist.name, timeframe: tier.key },
     });
   }
 

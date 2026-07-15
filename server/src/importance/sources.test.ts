@@ -190,8 +190,12 @@ describe('spotifyCandidates', () => {
       albumAllTime: false,
     });
 
-    expect(candidates.find((candidate) => candidate.id === 'spotify:new-artist:short:artist-id')?.shapes)
-      .toEqual(['secondary', 'tile']);
+    expect(candidates.find((candidate) => candidate.id === 'spotify:new-artist:short:artist-id')).toMatchObject({
+      kicker: 'New #1 artist · this month',
+      detail: 'Took the #1 spot in your recent listening',
+      render: { type: 'spotify-artist', artistId: 'artist-id', timeframe: 'short' },
+      shapes: ['secondary', 'tile'],
+    });
   });
 
   it('gives true all-time track and artist changes a higher priority than annual changes', () => {
@@ -218,7 +222,7 @@ describe('spotifyCandidates', () => {
       score: 90,
     });
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-artist:allTime:artist-id')).toMatchObject({
-      kicker: 'New top artist of all time',
+      kicker: 'New #1 artist · of all time',
       score: 90,
     });
   });

@@ -37,6 +37,19 @@ export function rankCandidates(candidates: Candidate[]): CommandCenterData {
     usedSources.add(candidate.source);
     usedIds.add(candidate.id);
   });
+  if (!secondary.length) {
+    const promotedTile = sorted.find((candidate) => (
+      candidate.kind !== 'fallback'
+      && candidate.shapes.includes('tile')
+      && !usedSources.has(candidate.source)
+      && !usedIds.has(candidate.id)
+    ));
+    if (promotedTile) {
+      secondary.push(promotedTile);
+      usedSources.add(promotedTile.source);
+      usedIds.add(promotedTile.id);
+    }
+  }
   const tiles = sorted
     .filter((candidate) => candidate.kind !== 'fallback' && candidate.shapes.includes('tile'))
     .filter((candidate) => !usedSources.has(candidate.source) && !usedIds.has(candidate.id))

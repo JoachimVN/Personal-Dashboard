@@ -6,7 +6,7 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('calendar-agenda'), eventIds: z.array(z.string()) }),
   z.object({ type: z.literal('spotify-now-playing') }),
   z.object({ type: z.literal('spotify-track'), trackId: z.string() }),
-  z.object({ type: z.literal('spotify-artist'), artistId: z.string() }),
+  z.object({ type: z.literal('spotify-artist'), artistId: z.string(), timeframe: z.enum(['short', 'medium', 'long', 'allTime']) }),
   z.object({ type: z.literal('spotify-album'), albumId: z.string() }),
   z.object({ type: z.literal('health-rings') }),
   z.object({ type: z.literal('github-contributions') }),

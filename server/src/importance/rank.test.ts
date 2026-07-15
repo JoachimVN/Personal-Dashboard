@@ -46,12 +46,14 @@ describe('rankCandidates', () => {
     expect(ranked.tiles.map((slot) => slot.id)).toEqual(['gmail', 'ai']);
   });
 
-  it('leaves secondary empty rather than filling it with generic fallback copy', () => {
+  it('promotes the highest-ranked remaining tile when no secondary signal exists', () => {
     const ranked = rankCandidates([
       candidate('calendar', 'calendar', 100, ['hero']),
+      candidate('health', 'health', 34, ['tile']),
       candidate('spotify', 'spotify', 30, ['tile']),
     ]);
 
-    expect(ranked.secondary).toEqual([]);
+    expect(ranked.secondary.map((slot) => slot.id)).toEqual(['health']);
+    expect(ranked.tiles.map((slot) => slot.id)).toEqual(['spotify']);
   });
 });

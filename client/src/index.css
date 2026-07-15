@@ -587,36 +587,6 @@ a {
   height: 4.75rem;
 }
 
-.command-secondary-artist {
-  position: relative;
-  display: flex;
-  height: var(--secondary-carousel-media-size);
-  align-items: end;
-  overflow: hidden;
-  border-radius: 1rem;
-  padding: 1rem;
-  isolation: isolate;
-  background: var(--color-track);
-}
-
-.command-secondary-artist-backdrop {
-  position: absolute;
-  inset: -1rem;
-  z-index: -2;
-  width: calc(100% + 2rem);
-  height: calc(100% + 2rem);
-  object-fit: cover;
-  filter: blur(12px);
-  opacity: 0.78;
-}
-
-.command-secondary-artist-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(180deg, rgb(7 9 14 / 16%) 0%, rgb(7 9 14 / 86%) 100%);
-}
-
 .command-secondary-album-details {
   display: flex;
   min-width: 0;
@@ -624,6 +594,43 @@ a {
   align-self: stretch;
   flex-direction: column;
   justify-content: center;
+}
+
+.command-secondary-artist-details {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-self: stretch;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.command-secondary-artist-tracks {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.55rem;
+}
+
+.command-secondary-artist-tracks li {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+}
+
+.command-secondary-artist-tracks span {
+  flex: 0 0 0.75rem;
+  color: var(--color-ink-faint);
+  font-size: 0.5625rem;
+  font-weight: 700;
+}
+
+.command-secondary-artist-tracks p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .command-secondary-album-meta {
