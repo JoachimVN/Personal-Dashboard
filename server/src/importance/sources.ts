@@ -258,6 +258,65 @@ export interface AiTool {
 /** A weekly window that just rolled over reads as a big same-sample drop, not a gradual decline. */
 const RESET_DROP_PERCENT = 40;
 
+function aiRunwayCandidate(available: AiTool[]): Candidate | undefined {
+  const limits = available.flatMap((tool) => {
+    const data = tool.data!;
+    return [data.fiveHour, data.weekly].filter((window): window is NonNullable<typeof window> => Boolean(window));
+  });
+  if (!limits.length) return undefined;
+
+  const tightest = limits.reduce(
+    (lowest, window) => window.usedPercent > lowest.usedPercent ? window : lowest,
+    limits[0]!,
+  );
+  const remaining = Math.max(0, Math.round(100 - tightest.usedPercent));
+  return {
+    id: 'ai-usage:runway', source: 'ai-usage', kind: 'ai-usage', score: remaining <= 15 ? 86 : 30,
+    shapes: remaining <= 15 ? [...allShapes] : ['tile'], kicker: remaining <= 15 ? 'Running low' : 'AI runway',
+    title: `${remaining}% available`, detail: `Resets ${new Date(tightest.resetsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
+    href: '#/ai', meter: remaining, render: { type: 'text' },
+  };
+}
+
+function aiToolCandidates(
+  tool: AiTool,
+  baselineWindowDays: number,
+  baselineDeviationPercent: number,
+): Candidate[] {
+  const data = tool.data!;
+  const candidates: Candidate[] = [];
+  const last = data.history.at(-1);
+  const prev = data.history.at(-2);
+  if (
+    last?.weeklyUsedPercent !== undefined && prev?.weeklyUsedPercent !== undefined
+    && prev.weeklyUsedPercent - last.weeklyUsedPercent >= RESET_DROP_PERCENT
+  ) {
+    candidates.push({
+      id: `ai-usage:reset:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
+      shapes: ['secondary', 'tile'], kicker: 'Fresh allowance', title: `${tool.label} usage just reset`,
+      detail: `Back down to ${last.weeklyUsedPercent.toFixed(0)}% of the weekly limit`, href: '#/ai', render: { type: 'text' },
+    });
+  }
+
+  // fiveHour, not weekly: a cumulative weekly % naturally climbs through the week regardless of
+  // pace, so comparing it against trailing samples would flag every Friday as "anomalous."
+  const currentFiveHour = data.fiveHour?.usedPercent;
+  if (currentFiveHour === undefined) return candidates;
+  const priorFiveHour = data.history
+    .map((point) => point.fiveHourUsedPercent)
+    .filter((value): value is number => value !== undefined)
+    .slice(-baselineWindowDays);
+  const deviation = computeDeviation(currentFiveHour, priorFiveHour, baselineDeviationPercent);
+  if (deviation?.anomalous && deviation.direction === 'above') {
+    candidates.push({
+      id: `ai-usage:anomaly:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 75, shapes: [...allShapes],
+      kicker: 'Heavy usage', title: `${tool.label} running well above usual`,
+      detail: `${deviation.deviationPercent.toFixed(0)}% above your usual pace`, href: '#/ai', render: { type: 'text' },
+    });
+  }
+  return candidates;
+}
+
 export function aiCandidates(
   tools: AiTool[],
   baselineWindowDays: number,
@@ -266,56 +325,9 @@ export function aiCandidates(
   const available = tools.filter((tool) => tool.data?.available);
   const candidates: Candidate[] = [];
 
-  const limits = available.flatMap((tool) => {
-    const data = tool.data!;
-    return [data.fiveHour, data.weekly].filter((window): window is NonNullable<typeof window> => Boolean(window));
-  });
-  if (limits.length) {
-    const tightest = limits.reduce(
-      (lowest, window) => window.usedPercent > lowest.usedPercent ? window : lowest,
-      limits[0]!,
-    );
-    const remaining = Math.max(0, Math.round(100 - tightest.usedPercent));
-    candidates.push({
-      id: 'ai-usage:runway', source: 'ai-usage', kind: 'ai-usage', score: remaining <= 15 ? 86 : 30,
-      shapes: remaining <= 15 ? [...allShapes] : ['tile'], kicker: remaining <= 15 ? 'Running low' : 'AI runway',
-      title: `${remaining}% available`, detail: `Resets ${new Date(tightest.resetsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
-      href: '#/ai', meter: remaining, render: { type: 'text' },
-    });
-  }
-
-  for (const tool of available) {
-    const history = tool.data!.history;
-    const last = history.at(-1);
-    const prev = history.at(-2);
-    if (
-      last?.weeklyUsedPercent !== undefined && prev?.weeklyUsedPercent !== undefined
-      && prev.weeklyUsedPercent - last.weeklyUsedPercent >= RESET_DROP_PERCENT
-    ) {
-      candidates.push({
-        id: `ai-usage:reset:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
-        shapes: ['secondary', 'tile'], kicker: 'Fresh allowance', title: `${tool.label} usage just reset`,
-        detail: `Back down to ${last.weeklyUsedPercent.toFixed(0)}% of the weekly limit`, href: '#/ai', render: { type: 'text' },
-      });
-    }
-
-    // fiveHour, not weekly: a cumulative weekly % naturally climbs through the week regardless of
-    // pace, so comparing it against trailing samples would flag every Friday as "anomalous."
-    const currentFiveHour = tool.data!.fiveHour?.usedPercent;
-    if (currentFiveHour === undefined) continue;
-    const priorFiveHour = history
-      .map((point) => point.fiveHourUsedPercent)
-      .filter((value): value is number => value !== undefined)
-      .slice(-baselineWindowDays);
-    const deviation = computeDeviation(currentFiveHour, priorFiveHour, baselineDeviationPercent);
-    if (deviation?.anomalous && deviation.direction === 'above') {
-      candidates.push({
-        id: `ai-usage:anomaly:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 75, shapes: [...allShapes],
-        kicker: 'Heavy usage', title: `${tool.label} running well above usual`,
-        detail: `${deviation.deviationPercent.toFixed(0)}% above your usual pace`, href: '#/ai', render: { type: 'text' },
-      });
-    }
-  }
+  const runway = aiRunwayCandidate(available);
+  if (runway) candidates.push(runway);
+  for (const tool of available) candidates.push(...aiToolCandidates(tool, baselineWindowDays, baselineDeviationPercent));
 
   return candidates;
 }
