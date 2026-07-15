@@ -20,6 +20,7 @@ export const commandCenterSlotSchema = z.object({
   title: z.string(),
   detail: z.string(),
   href: z.string(),
+  accent: z.enum(['claude', 'codex']).optional(),
   meter: z.number().min(0).max(100).optional(),
   score: z.number(),
   render: commandCenterRenderSchema,

@@ -302,6 +302,12 @@ export interface AiTool {
   data: AiUsageToolData | undefined;
 }
 
+type AiAccent = 'claude' | 'codex';
+
+function aiAccent(tool: AiTool): AiAccent | undefined {
+  return tool.id === 'claude' || tool.id === 'codex' ? tool.id : undefined;
+}
+
 /** A weekly window that just rolled over reads as a big same-sample drop, not a gradual decline. */
 const RESET_DROP_PERCENT = 40;
 
@@ -309,10 +315,10 @@ function aiRunwayCandidate(available: AiTool[]): Candidate | undefined {
   const limits = available.flatMap((tool) => {
     const data = tool.data!;
     return [
-      data.fiveHour && { label: tool.label, period: '5-hour limit', window: data.fiveHour },
-      data.weekly && { label: tool.label, period: 'weekly limit', window: data.weekly },
-      data.modelWeekly && { label: `${tool.label} ${data.modelWeekly.model}`, period: 'weekly limit', window: data.modelWeekly },
-    ].filter((limit): limit is { label: string; period: string; window: NonNullable<typeof data.fiveHour> } => Boolean(limit));
+      data.fiveHour && { label: tool.label, period: '5-hour limit', window: data.fiveHour, accent: aiAccent(tool) },
+      data.weekly && { label: tool.label, period: 'weekly limit', window: data.weekly, accent: aiAccent(tool) },
+      data.modelWeekly && { label: `${tool.label} ${data.modelWeekly.model}`, period: 'weekly limit', window: data.modelWeekly, accent: aiAccent(tool) },
+    ].filter((limit): limit is { label: string; period: string; window: NonNullable<typeof data.fiveHour>; accent: AiAccent | undefined } => Boolean(limit));
   });
   if (!limits.length) return undefined;
 
@@ -325,7 +331,7 @@ function aiRunwayCandidate(available: AiTool[]): Candidate | undefined {
     id: 'ai-usage:runway', source: 'ai-usage', kind: 'ai-usage', score: remaining <= 15 ? 86 : 30,
     shapes: remaining <= 15 ? [...allShapes] : ['tile'], kicker: remaining <= 15 ? 'Running low' : 'AI runway',
     title: `${remaining}% available`, detail: `${tightest.label} · ${tightest.period} · resets ${new Date(tightest.window.resetsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
-    href: '#/ai', meter: remaining, render: { type: 'text' },
+    href: '#/ai', accent: tightest.accent, meter: remaining, render: { type: 'text' },
   };
 }
 
@@ -345,7 +351,7 @@ function aiToolCandidates(
     candidates.push({
       id: `ai-usage:reset:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
       shapes: ['secondary', 'tile'], kicker: 'Fresh allowance', title: `${tool.label} usage just reset`,
-      detail: `Back down to ${last.weeklyUsedPercent.toFixed(0)}% of the weekly limit`, href: '#/ai', render: { type: 'text' },
+      detail: `Back down to ${last.weeklyUsedPercent.toFixed(0)}% of the weekly limit`, href: '#/ai', accent: aiAccent(tool), render: { type: 'text' },
     });
   }
 
@@ -362,7 +368,7 @@ function aiToolCandidates(
     candidates.push({
       id: `ai-usage:anomaly:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 75, shapes: [...allShapes],
       kicker: 'Heavy usage', title: `${tool.label} running well above usual`,
-      detail: `${deviation.deviationPercent.toFixed(0)}% above your usual pace`, href: '#/ai', render: { type: 'text' },
+      detail: `${deviation.deviationPercent.toFixed(0)}% above your usual pace`, href: '#/ai', accent: aiAccent(tool), render: { type: 'text' },
     });
   }
   return candidates;

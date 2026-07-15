@@ -130,7 +130,7 @@ describe('aiCandidates', () => {
     const runway = aiCandidates([{ id: 'codex', label: 'Codex', data }], 7, 50)
       .find((candidate) => candidate.id === 'ai-usage:runway');
 
-    expect(runway).toMatchObject({ title: '20% available' });
+    expect(runway).toMatchObject({ title: '20% available', accent: 'codex' });
     expect(runway?.detail).toContain('Codex · 5-hour limit');
   });
 });

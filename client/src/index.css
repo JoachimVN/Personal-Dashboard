@@ -23,8 +23,10 @@
   --color-accent-health: light-dark(#d9385a, #ff6f91);
 
   /* Brand accents */
-  --color-claude: light-dark(#2a78d6, #3987e5);
-  --color-codex: light-dark(#1baf7a, #199e70);
+  --color-claude: #de7356;
+  --color-codex: light-dark(#5865d8, #8f7dff);
+  --color-codex-blue: light-dark(#4278db, #72a7ff);
+  --color-codex-purple: light-dark(#7656d9, #b392ff);
 }
 
 /* Glass card recipe — apply only to card-level surfaces; stacked backdrop-filters are expensive on mobile Safari. */
@@ -255,6 +257,8 @@ a {
 .command-panel--personal { --panel-accent: var(--color-accent-personal); }
 .command-panel--github { --panel-accent: var(--color-accent-github); }
 .command-panel--ai { --panel-accent: var(--color-accent-ai); }
+.command-panel--claude { --panel-accent: var(--color-claude); }
+.command-panel--codex { --panel-accent: var(--color-codex); }
 .command-panel--health { --panel-accent: var(--color-accent-health); }
 .command-panel--spotify { --panel-accent: var(--color-accent-spotify); }
 
@@ -465,6 +469,8 @@ a {
 .command-signal--personal { --signal-color: var(--color-accent-personal); }
 .command-signal--github { --signal-color: var(--color-accent-github); }
 .command-signal--ai { --signal-color: var(--color-accent-ai); }
+.command-signal--claude { --signal-color: var(--color-claude); }
+.command-signal--codex { --signal-color: var(--color-codex); }
 .command-signal--health { --signal-color: var(--color-accent-health); }
 .command-signal--spotify { --signal-color: var(--color-accent-spotify); }
 
@@ -931,6 +937,14 @@ a {
   opacity: 0.055;
   filter: blur(20px);
   pointer-events: none;
+}
+
+.ai-tool-panel--codex > section::before {
+  background: linear-gradient(to bottom, transparent, var(--color-codex-blue), var(--color-codex-purple), transparent);
+}
+
+.ai-tool-panel--codex > section::after {
+  background: radial-gradient(circle at 35% 35%, var(--color-codex-blue), var(--color-codex-purple));
 }
 
 .action-card {

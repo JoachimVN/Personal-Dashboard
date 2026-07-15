@@ -54,7 +54,7 @@ function ToolCard({
 
   return (
     <motion.div
-      className="ai-tool-panel"
+      className={`ai-tool-panel${id === 'ai-usage-codex' ? ' ai-tool-panel--codex' : ''}`}
       style={{ '--tool-color': color } as React.CSSProperties}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
