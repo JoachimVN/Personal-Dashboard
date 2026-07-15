@@ -252,7 +252,7 @@ async function loadSpotify(now: Date): Promise<{ overview: SpotifyData; detail: 
 
   const overview: SpotifyData = {
     nowPlaying: { track: 'Blinding Lights', artist: 'The Weeknd', album: 'After Hours', imageUrl: tracks[0].imageUrl, isPlaying: true, progressMs: 58_000, durationMs: 200_000 },
-    recentlyPlayed: [], topArtists: { shortTerm: [], mediumTerm: [] }, topTracks: { shortTerm: [], mediumTerm: [] },
+    recentlyPlayed: [], topArtists: { shortTerm: [], mediumTerm: [], longTerm: [] }, topTracks: { shortTerm: [], mediumTerm: [], longTerm: [] },
     allTime: { artists: [], tracks: [], albums: [] },
   };
 
@@ -266,8 +266,8 @@ async function loadSpotify(now: Date): Promise<{ overview: SpotifyData; detail: 
       { ...tracks[0], playedAt: isoDaysAgo(now, 0, -4.1) },
       { ...oneOffs[2], playedAt: isoDaysAgo(now, 0, -6.3) },
     ],
-    topArtists: { shortTerm: artists, mediumTerm: artists.slice().reverse() },
-    topTracks: { shortTerm: tracks, mediumTerm: tracks.slice().reverse() },
+    topArtists: { shortTerm: artists, mediumTerm: artists.slice().reverse(), longTerm: artists },
+    topTracks: { shortTerm: tracks, mediumTerm: tracks.slice().reverse(), longTerm: tracks },
     allTime: {
       trackedSince: dateDaysAgo(now, 280),
       artists: artists.map((artist, i) => ({ ...artist, playCount: 410 - i * 38 })),

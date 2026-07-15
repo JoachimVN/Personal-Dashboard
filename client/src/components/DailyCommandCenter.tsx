@@ -10,7 +10,7 @@ import type {
 } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { deg, glyph, weatherLocation } from '../lib/weather';
-import { ActivityRings } from './ActivityRings';
+import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
 import '../sections/spotify/spotify.css';
@@ -50,10 +50,18 @@ function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' {
   return 'personal';
 }
 
-function Signal({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
+function Signal({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: HealthData | undefined }>) {
+  const rings = slot.render.type === 'health-rings' && health?.today
+    ? <CompactActivityRings
+        activeEnergyKcal={health.today.activeEnergyKcal ?? 0}
+        exerciseMinutes={health.today.exerciseMinutes ?? 0}
+        standHours={health.today.standHours ?? 0}
+        goals={health.goals}
+      />
+    : undefined;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      <span className="command-signal-dot" aria-hidden />
+      {rings ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
@@ -103,6 +111,23 @@ function SecondaryContent({
   if (slot.render.type === 'spotify-now-playing' && spotify?.nowPlaying) {
     return <div className="mt-4"><NowPlaying nowPlaying={spotify.nowPlaying} fetchedAt={spotifyFetchedAt} /></div>;
   }
+  if (slot.render.type === 'spotify-artist') {
+    const artistId = slot.render.artistId;
+    const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? []]
+      .find((a) => (a.id ?? a.name) === artistId);
+    return <div className="mt-4 flex items-center gap-3">
+      {artist && <Thumb url={artist.imageUrl} size="h-12 w-12" />}
+      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    </div>;
+  }
+  if (slot.render.type === 'spotify-album') {
+    const albumId = slot.render.albumId;
+    const album = spotify?.allTime.albums.find((a) => (a.id ?? a.name) === albumId);
+    return <div className="mt-4 flex items-center gap-3">
+      {album && <Thumb url={album.imageUrl} size="h-12 w-12" />}
+      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    </div>;
+  }
   if (slot.render.type === 'health-rings' && health?.today) {
     return <div className="mt-4"><ActivityRings
       activeEnergyKcal={health.today.activeEnergyKcal ?? 0}
@@ -117,6 +142,34 @@ function SecondaryContent({
   return <div className="mt-4"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-1 text-sm text-ink-muted">{slot.detail}</p></div>;
 }
 
+function CommandCenterSkeleton() {
+  return (
+    <section className="command-center glass" aria-labelledby="command-center-title">
+      <div className="command-center-head">
+        <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
+        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
+      </div>
+      <div className="command-layout animate-pulse">
+        <div className="command-primary space-y-3">
+          <div className="h-3 w-24 rounded bg-track" />
+          <div className="h-6 w-2/3 rounded bg-track" />
+          <div className="h-4 w-1/3 rounded bg-track" />
+          <div className="mt-4 h-10 w-full rounded bg-track" />
+        </div>
+        <div className="command-signals space-y-3">
+          <div className="h-16 rounded bg-track" />
+          <div className="h-16 rounded bg-track" />
+          <div className="h-16 rounded bg-track" />
+        </div>
+      </div>
+      <div className="command-agenda animate-pulse space-y-2">
+        <div className="h-3 w-20 rounded bg-track" />
+        <div className="h-4 w-1/2 rounded bg-track" />
+      </div>
+    </section>
+  );
+}
+
 export function DailyCommandCenter() {
   const commandCenter = useWidget<CommandCenterData>('command-center').envelope?.data;
   const calendar = useWidget<CalendarData>('calendar').envelope?.data;
@@ -127,23 +180,18 @@ export function DailyCommandCenter() {
   const spotify = spotifyEnvelope?.data;
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
 
-  const fallback: CommandCenterData = {
-    hero: { id: 'client:loading-hero', source: 'fallback', kind: 'fallback', score: 0, kicker: 'Overview', title: 'Building your command center', detail: 'Waiting for the first ranked snapshot.', href: '#/personal', render: { type: 'text' } },
-    secondary: { id: 'client:loading-secondary', source: 'fallback', kind: 'fallback', score: 0, kicker: 'Coming up', title: 'Syncing your day', detail: 'Calendar and activity signals are loading.', href: '#/personal', render: { type: 'text' } },
-    tiles: [
-      { id: 'client:loading-inbox', source: 'fallback', kind: 'fallback', score: 0, kicker: 'Inbox', title: 'Syncing mail', detail: 'Waiting for the first snapshot.', href: '#/personal', render: { type: 'text' } },
-      { id: 'client:loading-code', source: 'fallback', kind: 'fallback', score: 0, kicker: 'Code queue', title: 'Syncing GitHub', detail: 'Waiting for the first snapshot.', href: '#/github', render: { type: 'text' } },
-      { id: 'client:loading-ai', source: 'fallback', kind: 'fallback', score: 0, kicker: 'AI runway', title: 'Awaiting snapshot', detail: 'Waiting for allowance data.', href: '#/ai', render: { type: 'text' } },
-    ],
-  };
-  const ranked = commandCenter ?? fallback;
+  if (!commandCenter) return <CommandCenterSkeleton />;
+
+  const ranked = commandCenter;
   const heroRender = ranked.hero.render;
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
     : undefined;
   const heroTrack = heroRender.type === 'spotify-track'
-    ? spotify?.topTracks.shortTerm.find((track) => (track.id ?? track.track) === heroRender.trackId)
+    ? [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? []]
+      .find((track) => (track.id ?? track.track) === heroRender.trackId)
     : undefined;
+  const heroActivity = heroRender.type === 'health-rings' && health?.today ? health : undefined;
   const heroKicker = heroEvent ? eventTiming(heroEvent, Date.now()) : ranked.hero.kicker;
   const todayWeather = weather?.days[0];
 
@@ -163,13 +211,23 @@ export function DailyCommandCenter() {
             <p className="mt-2 text-sm text-ink-muted">{heroEvent?.location || (heroTrack ? heroTrack.artist : ranked.hero.detail)}</p>
           </div>
         </div>
+        {heroActivity?.today && (
+          <div className="mt-4">
+            <ActivityRings
+              activeEnergyKcal={heroActivity.today.activeEnergyKcal ?? 0}
+              exerciseMinutes={heroActivity.today.exerciseMinutes ?? 0}
+              standHours={heroActivity.today.standHours ?? 0}
+              goals={heroActivity.goals}
+            />
+          </div>
+        )}
         <div className="command-weather-row">
           <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
           <div><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p>{weather && <p className="text-[11px] text-ink-faint">📍 {weatherLocation(weather.location)}</p>}</div>
           {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
         </div>
       </div>
-      <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} />)}</div>
+      <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} health={health} />)}</div>
     </div>
     <div className="command-agenda">
       <div className="command-agenda-heading"><p className="command-label">{ranked.secondary.kicker}</p><a href={ranked.secondary.href}>Open section <span aria-hidden>↗</span></a></div>

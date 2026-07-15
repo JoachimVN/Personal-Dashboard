@@ -6,6 +6,8 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('calendar-agenda'), eventIds: z.array(z.string()) }),
   z.object({ type: z.literal('spotify-now-playing') }),
   z.object({ type: z.literal('spotify-track'), trackId: z.string() }),
+  z.object({ type: z.literal('spotify-artist'), artistId: z.string() }),
+  z.object({ type: z.literal('spotify-album'), albumId: z.string() }),
   z.object({ type: z.literal('health-rings') }),
   z.object({ type: z.literal('github-contributions') }),
 ]);
@@ -13,7 +15,7 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'imessage', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

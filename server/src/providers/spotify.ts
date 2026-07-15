@@ -6,9 +6,16 @@ import type { Provider } from '../scheduler.js';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const API = 'https://api.spotify.com/v1';
-const TOP_DATA_REFRESH_MS = 15 * 60_000;
-const TOP_TRACK_HISTORY_LIMIT = 500;
+// Playback needs to feel live; affinity rankings do not. Refreshing top lists twice daily keeps
+// the dashboard useful without repeatedly burning through Spotify's development-app quota.
+const TOP_DATA_REFRESH_MS = 12 * 60 * 60_000;
+const TOP_TRACK_HISTORY_LIMIT = 100;
 const DEFAULT_RATE_LIMIT_RETRY_MS = 30_000;
+const RECENT_RECONCILIATION_MS = 15 * 60_000;
+const IDLE_PLAYBACK_CHECK_MS = 5 * 60_000;
+const PLAYBACK_FINISH_GRACE_MS = 1_000;
+const MIN_PLAYBACK_CHECK_MS = 5_000;
+const FAILURE_RETRY_MS = 60_000;
 
 // Raw Spotify shapes (only the fields we read).
 interface RawImage {
@@ -65,6 +72,7 @@ interface TopResponse<T> {
 interface TopData {
   artistsShort: RawArtist[];
   artistsMedium: RawArtist[];
+  artistsLong: RawArtist[];
   tracksShort: RawTrack[];
   tracksMedium: RawTrack[];
   tracksLong: RawTrack[];
@@ -148,6 +156,37 @@ function isRateLimitError(error: unknown): boolean {
   return error instanceof Error && error.message.startsWith('spotify rate limited');
 }
 
+type SpotifyGet = <T>(path: string) => Promise<T | null>;
+
+function createSpotifyGet(
+  bearer: string,
+  signal: AbortSignal,
+  snapshotStore: SpotifySnapshotStore,
+): SpotifyGet {
+  return async <T>(path: string): Promise<T | null> => {
+    const retryInMs = await snapshotStore.getRateLimitedUntil() - Date.now();
+    if (retryInMs > 0) {
+      throw new Error(`spotify rate limited; retry in ${Math.ceil(retryInMs / 1000)} seconds`);
+    }
+    const res = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${bearer}` },
+      signal,
+    });
+    if (res.status === 204) return null; // e.g. nothing currently playing
+    if (res.status === 429) {
+      const retryAfterSeconds = Number(res.headers.get('retry-after'));
+      const retryAfterMs =
+        Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+          ? retryAfterSeconds * 1000
+          : DEFAULT_RATE_LIMIT_RETRY_MS;
+      await snapshotStore.setRateLimitedUntil(Date.now() + retryAfterMs);
+      throw new Error(`spotify rate limited; retry in ${Math.ceil(retryAfterMs / 1000)} seconds`);
+    }
+    if (!res.ok) throw new Error(`spotify ${path} failed: ${res.status}`);
+    return (await res.json()) as T;
+  };
+}
+
 /**
  * Returns a valid access token, refreshing (and re-persisting) via the stored
  * refresh_token when the current one is within a minute of expiry. Never logs
@@ -210,6 +249,64 @@ async function getTopTracks(
   return results;
 }
 
+/**
+ * Runs the bounded top-list work serially. A fresh process used to fan out dozens of
+ * paginated requests at once, which is precisely what triggers long Spotify cooldowns.
+ */
+async function refreshTopData(get: SpotifyGet, historyStore: SpotifyHistoryStore): Promise<TopData> {
+  const artistsShort = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8');
+  const artistsMedium = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8');
+  const artistsLong = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=8');
+  const tracksShort = await getTopTracks(get, 'short_term', TOP_TRACK_HISTORY_LIMIT);
+  const tracksMedium = await getTopTracks(get, 'medium_term', TOP_TRACK_HISTORY_LIMIT);
+  const tracksLong = await getTopTracks(get, 'long_term', TOP_TRACK_HISTORY_LIMIT);
+  const topData: TopData = {
+    artistsShort: artistsShort?.items ?? [],
+    artistsMedium: artistsMedium?.items ?? [],
+    artistsLong: artistsLong?.items ?? [],
+    tracksShort,
+    tracksMedium,
+    tracksLong,
+  };
+
+  // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
+  // aren't empty on day one — real observed plays accrue on top from here.
+  if (!(await historyStore.isSeeded())) {
+    const artistsLongSeed = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');
+    await historyStore.seedIfNeeded({
+      artists: (artistsLongSeed?.items ?? []).map(mapArtist),
+      tracks: topData.tracksLong
+        .map(toPlayedTrackInput)
+        .filter((t): t is PlayedTrackInput => t !== undefined),
+    });
+  }
+
+  // Album enrichment is useful metadata, but never worth spending live-playback quota on.
+  const pendingAlbumIds = await historyStore.getAlbumIdsNeedingDurations(5);
+  const enrichments: AlbumDetailInput[] = [];
+  for (const id of pendingAlbumIds) {
+    const album = await get<RawAlbumDetail>(`/albums/${id}`).catch(() => null);
+    if (album) enrichments.push(toAlbumDetailInput(album));
+  }
+  await historyStore.enrichAlbumDetails(enrichments);
+
+  await historyStore.mergeArtistMetadata(
+    [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
+  );
+  await historyStore.healTrackMetadata(
+    [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
+      .map(toPlayedTrackInput)
+      .filter((t): t is PlayedTrackInput => t !== undefined),
+  );
+  await historyStore.discoverTracks(
+    [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
+      .map(toPlayedTrackInput)
+      .filter((t): t is PlayedTrackInput => t !== undefined),
+  );
+
+  return topData;
+}
+
 export function createSpotifyProvider(
   oauth: { clientId: string; clientSecret: string } | undefined,
   snapshotStore: SpotifySnapshotStore,
@@ -217,121 +314,68 @@ export function createSpotifyProvider(
 ): Provider<SpotifyData> {
   let topData: TopData | undefined;
   let topDataFetchedAt = 0;
+  let nextRecentReconciliationAt = 0;
+  let nextAttemptNotBefore = 0;
+
+  const nextRefreshMs = (data: SpotifyData | undefined): number => {
+    const now = Date.now();
+    if (nextAttemptNotBefore > now) return nextAttemptNotBefore - now;
+
+    const untilRecentReconciliation = Math.max(0, nextRecentReconciliationAt - now);
+    const nowPlaying = data?.nowPlaying;
+    const untilPlaybackEnd =
+      nowPlaying?.isPlaying && nowPlaying.progressMs != null && nowPlaying.durationMs != null
+        ? Math.max(
+            MIN_PLAYBACK_CHECK_MS,
+            nowPlaying.durationMs - nowPlaying.progressMs + PLAYBACK_FINISH_GRACE_MS,
+          )
+        : IDLE_PLAYBACK_CHECK_MS;
+
+    return Math.min(untilPlaybackEnd, untilRecentReconciliation);
+  };
 
   return {
     id: 'spotify',
     schema: spotifySchema,
+    // The client still re-reads this cache every 30 seconds so a playback-aware server refresh
+    // appears promptly in the UI. The server itself uses nextRefreshMs below.
     refreshMs: 60_000,
     timeoutMs: 20_000,
     isConfigured: () => oauth !== undefined && readSpotifyToken() !== undefined,
+    nextRefreshMs,
     async fetch(signal) {
       if (!oauth) throw new Error('spotify is not configured');
       try {
         const bearer = await accessToken(oauth, signal);
+        const previousSnapshot = await snapshotStore.getSnapshot();
 
-        const get = async <T>(path: string): Promise<T | null> => {
-          const retryInMs = await snapshotStore.getRateLimitedUntil() - Date.now();
-          if (retryInMs > 0) {
-            throw new Error(`spotify rate limited; retry in ${Math.ceil(retryInMs / 1000)} seconds`);
-          }
-          const res = await fetch(`${API}${path}`, {
-            headers: { Authorization: `Bearer ${bearer}` },
-            signal,
-          });
-          if (res.status === 204) return null; // e.g. nothing currently playing
-          if (res.status === 429) {
-            const retryAfterSeconds = Number(res.headers.get('retry-after'));
-            const retryAfterMs =
-              Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
-                ? retryAfterSeconds * 1000
-                : DEFAULT_RATE_LIMIT_RETRY_MS;
-            await snapshotStore.setRateLimitedUntil(Date.now() + retryAfterMs);
-            throw new Error(`spotify rate limited; retry in ${Math.ceil(retryAfterMs / 1000)} seconds`);
-          }
-          if (!res.ok) throw new Error(`spotify ${path} failed: ${res.status}`);
-          return (await res.json()) as T;
-        };
+        const get = createSpotifyGet(bearer, signal, snapshotStore);
 
-        const [current, recent] = await Promise.all([
-          get<CurrentlyPlaying>('/me/player/currently-playing'),
-          get<RecentlyPlayed>('/me/player/recently-played?limit=50'),
-        ]);
+        // Playback is checked at the expected track end (with a low-frequency idle guard).
+        // Recent history is reconciled independently every 15 minutes.
+        const current = await get<CurrentlyPlaying>('/me/player/currently-playing');
+        const shouldReconcileRecent = Date.now() >= nextRecentReconciliationAt;
+        const recent = shouldReconcileRecent
+          ? await get<RecentlyPlayed>('/me/player/recently-played?limit=50')
+          : undefined;
+        if (shouldReconcileRecent) nextRecentReconciliationAt = Date.now() + RECENT_RECONCILIATION_MS;
 
         let topDataRefreshed = false;
-        if (!topData || Date.now() - topDataFetchedAt >= TOP_DATA_REFRESH_MS) {
-          const [artistsShort, artistsMedium, tracksShort, tracksMedium, tracksLong] = await Promise.all([
-            get<TopResponse<RawArtist>>('/me/top/artists?time_range=short_term&limit=8'),
-            get<TopResponse<RawArtist>>('/me/top/artists?time_range=medium_term&limit=8'),
-            getTopTracks(get, 'short_term', TOP_TRACK_HISTORY_LIMIT),
-            getTopTracks(get, 'medium_term', TOP_TRACK_HISTORY_LIMIT),
-            getTopTracks(get, 'long_term', TOP_TRACK_HISTORY_LIMIT),
-          ]);
-          topData = {
-            artistsShort: artistsShort?.items ?? [],
-            artistsMedium: artistsMedium?.items ?? [],
-            tracksShort,
-            tracksMedium,
-            tracksLong,
-          };
+        if (topDataFetchedAt === 0) topDataFetchedAt = await snapshotStore.getTopDataFetchedAt();
+        if (topDataFetchedAt === 0 || Date.now() - topDataFetchedAt >= TOP_DATA_REFRESH_MS) {
+          topData = await refreshTopData(get, historyStore);
           topDataFetchedAt = Date.now();
           topDataRefreshed = true;
         }
 
-        // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
-        // aren't empty on day one — real observed plays accrue on top from here.
-        if (!await historyStore.isSeeded()) {
-          const artistsLong = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');
-          await historyStore.seedIfNeeded({
-            artists: (artistsLong?.items ?? []).map(mapArtist),
-            // The existing all-time view intentionally starts with a bounded rank-weighted seed.
-            // The remaining long-term top items are catalogued below at playCount 0 instead.
-            tracks: topData.tracksLong
-              .slice(0, 100)
-              .map(toPlayedTrackInput)
-              .filter((t): t is PlayedTrackInput => t !== undefined),
-          });
-        }
-
-        const recentPlays = (recent?.items ?? [])
-          .map((entry) => {
-            const track = toPlayedTrackInput(entry.track);
-            return track ? { playedAt: entry.played_at, track } : undefined;
-          })
-          .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
-        await historyStore.recordPlays(recentPlays);
-
-        // Backfill full album duration/metadata once per album (max 5/cycle) — duration needs a
-        // dedicated fetch (doesn't come along for free on track/top-list responses), and the same
-        // response's tracklist also self-heals albumId on any track records that predate that
-        // field. Spotify's Nov 2024 API policy locked the batched "Get Several Albums" endpoint
-        // behind Extended Quota Mode approval (403 for dev-mode apps like this one), but the
-        // singular per-album endpoint is still open, so fetch one at a time. Failures (e.g. a
-        // removed album) are swallowed per-item and simply retried next cycle.
-        const pendingAlbumIds = await historyStore.getAlbumIdsNeedingDurations(5);
-        if (pendingAlbumIds.length > 0) {
-          const details = await Promise.all(
-            pendingAlbumIds.map((id) => get<RawAlbumDetail>(`/albums/${id}`).catch(() => null)),
-          );
-          const enrichments = details
-            .filter((album): album is RawAlbumDetail => album !== null)
-            .map(toAlbumDetailInput);
-          await historyStore.enrichAlbumDetails(enrichments);
-        }
-
-        if (topDataRefreshed) {
-          await historyStore.mergeArtistMetadata(
-            [...topData.artistsShort, ...topData.artistsMedium].map(mapArtist),
-          );
-          await historyStore.healTrackMetadata(
-            [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
-              .map(toPlayedTrackInput)
-              .filter((t): t is PlayedTrackInput => t !== undefined),
-          );
-          await historyStore.discoverTracks(
-            [...topData.tracksShort, ...topData.tracksMedium, ...topData.tracksLong]
-              .map(toPlayedTrackInput)
-              .filter((t): t is PlayedTrackInput => t !== undefined),
-          );
+        if (recent) {
+          const recentPlays = recent.items
+            .map((entry) => {
+              const track = toPlayedTrackInput(entry.track);
+              return track ? { playedAt: entry.played_at, track } : undefined;
+            })
+            .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
+          await historyStore.recordPlays(recentPlays);
         }
 
         const nowPlaying =
@@ -346,27 +390,41 @@ export function createSpotifyProvider(
 
         const snapshot = {
           nowPlaying,
-          recentlyPlayed: (recent?.items ?? []).map((entry) => ({
-            ...mapTrack(entry.track),
-            playedAt: entry.played_at,
-          })),
+          recentlyPlayed: recent
+            ? recent.items.map((entry) => ({
+                ...mapTrack(entry.track),
+                playedAt: entry.played_at,
+              }))
+            : previousSnapshot?.recentlyPlayed ?? [],
           topArtists: {
-            shortTerm: topData.artistsShort.map(mapArtist),
-            mediumTerm: topData.artistsMedium.map(mapArtist),
+            shortTerm: topData?.artistsShort.map(mapArtist) ?? previousSnapshot?.topArtists.shortTerm ?? [],
+            mediumTerm: topData?.artistsMedium.map(mapArtist) ?? previousSnapshot?.topArtists.mediumTerm ?? [],
+            longTerm: topData?.artistsLong.map(mapArtist) ?? previousSnapshot?.topArtists.longTerm ?? [],
           },
           topTracks: {
-            // The UI remains a focused top-100 view; the full 500-per-window catalogue persists
-            // server-side and never inflates every widget response.
-            shortTerm: topData.tracksShort.slice(0, 100).map(mapTrack),
-            mediumTerm: topData.tracksMedium.slice(0, 100).map(mapTrack),
+            shortTerm: topData?.tracksShort.map(mapTrack) ?? previousSnapshot?.topTracks.shortTerm ?? [],
+            mediumTerm: topData?.tracksMedium.map(mapTrack) ?? previousSnapshot?.topTracks.mediumTerm ?? [],
+            longTerm: topData?.tracksLong.map(mapTrack) ?? previousSnapshot?.topTracks.longTerm ?? [],
           },
           allTime: await historyStore.getAllTime(),
         };
-        await snapshotStore.setSnapshot(snapshot);
+        await snapshotStore.setSnapshot(snapshot, topDataRefreshed ? topDataFetchedAt : undefined);
+        nextAttemptNotBefore = 0;
         return snapshot;
       } catch (error) {
         const lastGoodSnapshot = await snapshotStore.getSnapshot();
-        if (lastGoodSnapshot && isRateLimitError(error)) return lastGoodSnapshot;
+        const rateLimitedUntil = await snapshotStore.getRateLimitedUntil();
+        nextAttemptNotBefore = isRateLimitError(error)
+          ? Math.max(rateLimitedUntil, Date.now() + MIN_PLAYBACK_CHECK_MS)
+          : Date.now() + FAILURE_RETRY_MS;
+        // Playback state goes stale immediately: replaying an old track as "Now playing" is
+        // misleading. The longer-lived listening data remains useful during the cooldown.
+        // allTime is a pure local DB read with no Spotify API dependency, so recompute it fresh
+        // even while rate-limited — no reason to keep serving a stale all-time leaderboard just
+        // because live playback data can't be fetched right now.
+        if (lastGoodSnapshot && isRateLimitError(error)) {
+          return { ...lastGoodSnapshot, nowPlaying: null, allTime: await historyStore.getAllTime() };
+        }
         throw error;
       }
     },

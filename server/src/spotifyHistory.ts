@@ -178,15 +178,21 @@ function isEditionLabel(label: string): boolean {
 function editionSuffixStart(name: string): number | undefined {
   const trimmed = name.trim();
   const close = trimmed.at(-1);
-  if (close !== ')' && close !== ']') return undefined;
-
-  const open = close === ')' ? '(' : '[';
-  const start = trimmed.lastIndexOf(open);
-  if (start < 0 || !isEditionLabel(trimmed.slice(start + 1, -1))) return undefined;
-  return start;
+  if (close === ')' || close === ']') {
+    const open = close === ')' ? '(' : '[';
+    const start = trimmed.lastIndexOf(open);
+    if (start >= 0 && isEditionLabel(trimmed.slice(start + 1, -1))) return start;
+  }
+  // Track titles more often carry their edition as a trailing " - Remastered 2015" / " - Explicit"
+  // segment than a parenthetical — same vocabulary, different punctuation.
+  const dashStart = trimmed.lastIndexOf(' - ');
+  if (dashStart >= 0 && isEditionLabel(trimmed.slice(dashStart + 3))) return dashStart;
+  return undefined;
 }
 
-function canonicalAlbumName(name: string): string {
+/** Strips a trailing edition marker — "(Deluxe)", " - Remastered 2015", etc. — so editions of the
+ * same album or track share a grouping key and their plays can be merged before ranking. */
+function canonicalTitle(name: string): string {
   let result = name;
   for (let suffixStart = editionSuffixStart(result); suffixStart !== undefined; suffixStart = editionSuffixStart(result)) {
     result = result.slice(0, suffixStart).trim();
@@ -221,7 +227,12 @@ export class SpotifyHistoryStore {
     return this.seededAt !== undefined;
   }
 
-  /** One-time backfill from Spotify's long_term top lists. No-ops if already seeded. */
+  /**
+   * One-time catalog backfill from Spotify's long_term top lists. No-ops if already seeded.
+   * Seeds tracks at playCount 0 — the all-time leaderboard is meant to reflect only
+   * applyRealStreamCounts (the verified CSV baseline) and organically-observed plays since
+   * tracking began, never a guess derived from short/medium/long_term rank position.
+   */
   async seedIfNeeded(input: { artists: SeedArtistInput[]; tracks: PlayedTrackInput[] }): Promise<void> {
     await this.withWrite(() => this.seedIfNeededInMemory(input));
   }
@@ -231,8 +242,7 @@ export class SpotifyHistoryStore {
 
     for (const artist of input.artists) this.upsertArtistMetadata(artist);
 
-    input.tracks.forEach((track, i) => {
-      const weight = input.tracks.length - i;
+    for (const track of input.tracks) {
       this.tracks[track.id] = {
         id: track.id,
         track: track.name,
@@ -244,7 +254,7 @@ export class SpotifyHistoryStore {
         durationMs: track.durationMs,
         imageUrl: track.album.imageUrl,
         url: track.url,
-        playCount: weight,
+        playCount: 0,
       };
       for (const artist of track.artists) this.upsertArtistMetadata(artist);
       this.upsertAlbumMetadata({
@@ -258,7 +268,7 @@ export class SpotifyHistoryStore {
         totalTracks: track.album.totalTracks,
         albumType: track.album.albumType,
       });
-    });
+    }
 
     this.seededAt = new Date().toISOString();
     this.save();
@@ -577,7 +587,7 @@ export class SpotifyHistoryStore {
 
     // Group album editions (Deluxe/Extended/...) that share a canonical name + artist so their
     // plays combine into one entry instead of each edition separately falling short of
-    // minTrackedTracksPerAlbum — see canonicalAlbumName.
+    // minTrackedTracksPerAlbum — see canonicalTitle.
     const editionGroups = new Map<string, AlbumRecord[]>();
     for (const album of Object.values(this.albums)) {
       if (album.albumType === 'compilation' && !COMPILATION_TYPE_OVERRIDES.has(album.id)) continue;
@@ -585,7 +595,7 @@ export class SpotifyHistoryStore {
       // guest to the album credits (e.g. "The Weeknd" vs "The Weeknd, Ariana Grande"), which would
       // otherwise keep it from grouping with the base edition.
       const primaryArtist = album.artist.split(',')[0]?.trim().toLowerCase() ?? '';
-      const key = `${canonicalAlbumName(album.name).toLowerCase()}|${primaryArtist}`;
+      const key = `${canonicalTitle(album.name).toLowerCase()}|${primaryArtist}`;
       const list = editionGroups.get(key);
       if (list) list.push(album);
       else editionGroups.set(key, [album]);
@@ -598,7 +608,7 @@ export class SpotifyHistoryStore {
         // Prefer the edition whose own name has no edition suffix (the base release) as the
         // display record; fall back to whichever edition has been played the most.
         const canonical =
-          editions.find((a) => canonicalAlbumName(a.name) === a.name) ??
+          editions.find((a) => canonicalTitle(a.name) === a.name) ??
           editions.slice().sort((a, b) => (albumPlayCounts.get(b.id) ?? 0) - (albumPlayCounts.get(a.id) ?? 0))[0];
         return {
           canonical,
@@ -627,11 +637,39 @@ export class SpotifyHistoryStore {
         .filter((artist) => artist.playCount > 0)
         .sort(byPlayCountDesc)
         .slice(0, limit),
-      // A discovered top-item has no play count until we observe it or import a verified count.
-      // Keep it in Postgres, but never present affinity as a fabricated all-time play.
-      tracks: allTracks.filter((track) => track.playCount > 0).sort(byPlayCountDesc).slice(0, limit),
+      tracks: this.mergedTracks(allTracks, limit),
       albums,
     };
+  }
+
+  /**
+   * Groups track editions (remaster/explicit/clean/single-vs-album-cut/...) that share a
+   * canonical title + primary artist, same problem and same fix as the album edition grouping
+   * above — Spotify assigns a distinct track id to each edition, `applyRealStreamCounts` only sets
+   * a verified count on the one id its CSV row named, and ordinary listening can accrue organic
+   * plays on a *different* id for the same song, so without merging neither fragment's count ever
+   * reflects the song's real total.
+   */
+  private mergedTracks(allTracks: TrackRecord[], limit: number): TrackRecord[] {
+    const groups = new Map<string, TrackRecord[]>();
+    for (const track of allTracks) {
+      const primaryArtist = track.artist.split(',')[0]?.trim().toLowerCase() ?? '';
+      const key = `${canonicalTitle(track.track).toLowerCase()}|${primaryArtist}`;
+      const list = groups.get(key);
+      if (list) list.push(track);
+      else groups.set(key, [track]);
+    }
+    return [...groups.values()]
+      .map((editions) => {
+        const playCount = editions.reduce((sum, t) => sum + t.playCount, 0);
+        const canonical =
+          editions.find((t) => canonicalTitle(t.track) === t.track) ??
+          editions.slice().sort(byPlayCountDesc)[0];
+        return { ...canonical, playCount, verified: editions.some((t) => t.verified) ? true : undefined };
+      })
+      .filter((track) => track.playCount > 0)
+      .sort(byPlayCountDesc)
+      .slice(0, limit);
   }
 
   /** Fills in an artist's metadata, preserving any richer values (image/url/genres) already on record rather than overwriting them with blanks from a source that doesn't carry them (e.g. a bare track credit). */

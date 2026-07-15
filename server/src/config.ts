@@ -46,9 +46,32 @@ const configSchema = z.object({
     })
     .default({ stepGoal: 10_000, moveGoalKcal: 290, exerciseGoalMinutes: 30, standGoalHours: 12, historyRetentionDays: 30, baselineWindowDays: 7, baselineDeviationPercent: 15 }),
   commandCenter: z.object({
-    /** How long an unchanged inbox count must persist before it becomes a command-center signal. */
+    /** How long an unchanged inbox count must persist before it's deprioritized as ignored, not urgent. */
     gmailStaleMs: z.number().int().min(60_000).default(24 * 60 * 60_000),
-  }).default({ gmailStaleMs: 24 * 60 * 60_000 }),
+    /** How recently the unread count must have changed to count as "new mail just arrived". */
+    gmailFreshMs: z.number().int().min(60_000).default(30 * 60_000),
+    /** Trailing days used for non-health "is this unusual for me" comparisons (GitHub, AI usage). */
+    baselineWindowDays: z.number().int().min(3).default(14),
+    /** Minimum percentage away from the rolling average before it becomes a signal. */
+    baselineDeviationPercent: z.number().positive().default(50),
+    /** How recently a #1 track/artist/album must have changed to count as a "new favorite" — generous because Spotify's own top-lists only refresh every ~12h. */
+    spotifyFreshMs: z.number().int().min(60_000).default(48 * 60 * 60_000),
+    /** Today's forecast max °C at or above this becomes a "heat today" signal. */
+    weatherHotC: z.number().default(25),
+    /** Today's forecast min °C at or below this becomes a "cold today" signal. */
+    weatherColdC: z.number().default(-10),
+    /** How recently an unread iMessage must have arrived to count as "new", vs. just sitting unread. */
+    imessageFreshMs: z.number().int().min(60_000).default(30 * 60_000),
+  }).default({
+    gmailStaleMs: 24 * 60 * 60_000,
+    gmailFreshMs: 30 * 60_000,
+    baselineWindowDays: 14,
+    baselineDeviationPercent: 50,
+    imessageFreshMs: 30 * 60_000,
+    spotifyFreshMs: 48 * 60 * 60_000,
+    weatherHotC: 25,
+    weatherColdC: -10,
+  }),
   code: z
     .object({
       /** Local parent directory to scan for git repos, per OS. Each immediate subdirectory with a .git and a GitHub-remote origin becomes a launchable project. */

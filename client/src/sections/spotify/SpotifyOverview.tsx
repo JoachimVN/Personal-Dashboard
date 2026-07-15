@@ -40,19 +40,19 @@ function TopSong({ track }: Readonly<{ track: Track }>) {
   const year = track.releaseDate?.slice(0, 4);
   return (
     <div
-      className="flex h-full items-center gap-4 rounded-2xl border border-card-border p-4"
+      className="flex h-full min-h-44 items-stretch gap-4 overflow-hidden rounded-2xl border border-card-border p-4"
       style={{ background: `color-mix(in oklab, ${accent} 9%, var(--color-card))` }}
     >
       {track.imageUrl ? (
         <img
           src={track.imageUrl}
           alt=""
-          className="h-24 w-24 shrink-0 rounded-xl object-cover shadow-lg sm:h-28 sm:w-28"
+          className="w-28 shrink-0 self-stretch rounded-xl object-cover shadow-lg sm:w-36"
         />
       ) : (
-        <div className="h-24 w-24 shrink-0 rounded-xl bg-track sm:h-28 sm:w-28" />
+        <div className="w-28 shrink-0 self-stretch rounded-xl bg-track sm:w-36" />
       )}
-      <div className="min-w-0">
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
           Top song · 4 weeks
         </p>

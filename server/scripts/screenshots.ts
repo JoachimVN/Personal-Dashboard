@@ -25,7 +25,9 @@ import {
   githubCandidates,
   gmailCandidates,
   healthCandidates,
+  imessageCandidates,
   spotifyCandidates,
+  weatherCandidates,
 } from '../src/importance/sources.js';
 import {
   buildAiFixtures,
@@ -44,6 +46,7 @@ import {
 const MOCK_PORT = 4822;
 const CLIENT_PORT = 5199;
 const GMAIL_STALE_MS = 24 * 60 * 60_000;
+const GMAIL_FRESH_MS = 30 * 60_000;
 const VIEWPORT = { width: 1600, height: 900 };
 
 // A capture only overwrites the committed PNG once more than this many pixels differ beyond the
@@ -63,10 +66,8 @@ function envelope<T>(data: T, now: Date = new Date()): WidgetEnvelope<T> {
 
 type Daypart = 'night' | 'morning' | 'day' | 'evening';
 
-// Representative hour for each daypart, matching App.tsx's dayPartFor buckets (night<6,
-// morning<11, day<18, evening<22, else night) — also picked so the overview's "Good evening"/
-// "Good morning" greeting text (a separate client-side computation from the same clock) agrees
-// with the forced daypart instead of contradicting it.
+// Representative hours for the continuous sky and the matching overview greeting. Freezing an
+// exact time keeps screenshots deterministic even though the ambient colors no longer use buckets.
 const DAYPART_HOUR: Record<Daypart, [number, number]> = {
   night: [2, 0], morning: [8, 30], day: [14, 0], evening: [19, 30],
 };
@@ -126,15 +127,29 @@ async function buildPages(): Promise<Page[]> {
   const overviewAiCodexFixture = overviewAiCodex(overviewNow);
   const healthPageFixture = healthFixture(healthNow);
   const githubPageFixture = githubFixture(githubNow);
+  const overviewWeatherFixture = weather(overviewNow);
 
   const overviewCommandCenter = rankCandidates([
     ...calendarCandidates(overviewCalendarFixture, overviewNow.getTime()),
-    ...gmailCandidates(overviewGmailFixture, undefined, GMAIL_STALE_MS),
-    ...githubCandidates(overviewGithubFixture),
+    ...gmailCandidates(overviewGmailFixture, undefined, GMAIL_STALE_MS, GMAIL_FRESH_MS),
+    ...githubCandidates(overviewGithubFixture, 14, 50),
     ...healthCandidates(overviewHealthFixture),
-    ...spotifyCandidates(fixtures.spotifyOverview, overviewGithubFixture),
-    ...aiCandidates([overviewAiClaudeFixture, overviewAiCodexFixture]),
-    ...fallbackCandidates(),
+    ...weatherCandidates(overviewWeatherFixture, 25, -10),
+    ...imessageCandidates(undefined, GMAIL_FRESH_MS),
+    ...spotifyCandidates(fixtures.spotifyOverview, {
+      trackShort: false, trackMedium: false, trackLong: false,
+      artistShort: false, artistMedium: false, artistLong: false,
+      album: false,
+    }),
+    ...aiCandidates(
+      [
+        { id: 'claude', label: 'Claude', data: overviewAiClaudeFixture },
+        { id: 'codex', label: 'Codex', data: overviewAiCodexFixture },
+      ],
+      14,
+      50,
+    ),
+    ...fallbackCandidates({ calendar: 'ready', gmail: 'ready', github: 'ready', aiClaude: 'ready', aiCodex: 'ready' }),
   ]);
 
   return [
@@ -143,7 +158,7 @@ async function buildPages(): Promise<Page[]> {
       widgets: {
         'command-center': envelope(overviewCommandCenter, overviewNow),
         calendar: envelope(overviewCalendarFixture, overviewNow),
-        weather: envelope(weather(overviewNow), overviewNow),
+        weather: envelope(overviewWeatherFixture, overviewNow),
         github: envelope(overviewGithubFixture, overviewNow),
         health: envelope(overviewHealthFixture, overviewNow),
         spotify: envelope(fixtures.spotifyOverview, overviewNow),

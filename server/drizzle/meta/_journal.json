@@ -8,6 +8,13 @@
       "when": 1784049653825,
       "tag": "0000_mute_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784115893143,
+      "tag": "0001_material_weapon_omega",
+      "breakpoints": true
     }
   ]
 }
