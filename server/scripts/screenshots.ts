@@ -63,10 +63,8 @@ function envelope<T>(data: T, now: Date = new Date()): WidgetEnvelope<T> {
 
 type Daypart = 'night' | 'morning' | 'day' | 'evening';
 
-// Representative hour for each daypart, matching App.tsx's dayPartFor buckets (night<6,
-// morning<11, day<18, evening<22, else night) — also picked so the overview's "Good evening"/
-// "Good morning" greeting text (a separate client-side computation from the same clock) agrees
-// with the forced daypart instead of contradicting it.
+// Representative hours for the continuous sky and the matching overview greeting. Freezing an
+// exact time keeps screenshots deterministic even though the ambient colors no longer use buckets.
 const DAYPART_HOUR: Record<Daypart, [number, number]> = {
   night: [2, 0], morning: [8, 30], day: [14, 0], evening: [19, 30],
 };

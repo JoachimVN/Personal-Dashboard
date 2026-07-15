@@ -70,11 +70,27 @@ a {
   isolation: isolate;
 }
 
-/* Sky wash, not a drifting blob farm. Color is driven by --sky-a/--sky-b, which
-   App.tsx sets via [data-daypart] on .app-shell (the app root, so other cards —
-   like .command-center below — can read the same variables) from the real
-   clock. The color has a reason to be there (it's what time it is) instead of
-   decoration for its own sake. Static shape, one soft vertical fade, no grid/noise. */
+/* Sky wash, not a drifting blob farm. App.tsx continually blends --sky-a/--sky-b
+   from the real clock in OKLab, and puts them on .app-shell so the command center
+   shares the same time-of-day color. Static shape, one soft vertical fade, no grid/noise. */
+.app-shell {
+  /* Night fallback for the first paint and browsers that lack color-mix(). */
+  --sky-a: light-dark(#c2d5ff, #1f3e70);
+  --sky-b: light-dark(#8aa4ff, #0b1838);
+  --sky-a-start: light-dark(#c2d5ff, #1f3e70);
+  --sky-a-end: light-dark(#c2d5ff, #1f3e70);
+  --sky-b-start: light-dark(#8aa4ff, #0b1838);
+  --sky-b-end: light-dark(#8aa4ff, #0b1838);
+  --sky-start-weight: 100%;
+}
+
+@supports (color: color-mix(in oklab, red, blue)) {
+  .app-shell {
+    --sky-a: color-mix(in oklab, var(--sky-a-start) var(--sky-start-weight), var(--sky-a-end));
+    --sky-b: color-mix(in oklab, var(--sky-b-start) var(--sky-start-weight), var(--sky-b-end));
+  }
+}
+
 .ambient-aurora {
   position: absolute;
   top: -3rem;
@@ -86,26 +102,6 @@ a {
   filter: blur(70px);
   opacity: 0.55;
   transition: background 1.2s ease;
-}
-
-.app-shell[data-daypart='night'] {
-  --sky-a: light-dark(#c7d2fe, #4c3a8a);
-  --sky-b: light-dark(#a5b4fc, #1e1b4b);
-}
-
-.app-shell[data-daypart='morning'] {
-  --sky-a: light-dark(#fdba74, #8a5a2e);
-  --sky-b: light-dark(#93c5fd, #2c4a72);
-}
-
-.app-shell[data-daypart='day'] {
-  --sky-a: light-dark(#bfdbfe, #2c4a72);
-  --sky-b: light-dark(#e0f2fe, #1c2f4a);
-}
-
-.app-shell[data-daypart='evening'] {
-  --sky-a: light-dark(#fb923c, #7c2d3f);
-  --sky-b: light-dark(#e879a8, #2e1a4a);
 }
 
 /* Section-accent wash layered on top of the sky wash while a section page is

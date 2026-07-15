@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { useHashRoute } from './router';
 import { useDeviceLocation } from './useDeviceLocation';
@@ -9,20 +9,105 @@ import { SystemFooter } from './components/SystemFooter';
 import { DailyCommandCenter } from './components/DailyCommandCenter';
 import { ThemeToggle } from './components/ThemeToggle';
 
-type DayPart = 'night' | 'morning' | 'day' | 'evening';
+// Set to true locally when tuning the continuous sky colors. Never enable for normal use.
+const SHOW_SKY_TIME_DEBUGGER = false;
 
-function dayPartFor(hour: number): DayPart {
-  if (hour < 6) return 'night';
-  if (hour < 11) return 'morning';
-  if (hour < 18) return 'day';
-  if (hour < 22) return 'evening';
-  return 'night';
+type SkyStop = {
+  minute: number;
+  skyA: string;
+  skyB: string;
+};
+
+/* The extra dawn and dusk stops prevent a direct blue-to-orange blend from going muddy.
+   Colors are paired light/dark so the same clock produces an appropriate wash in either mode. */
+const SKY_STOPS: readonly SkyStop[] = [
+  { minute: 0, skyA: 'light-dark(#c2d5ff, #1f3e70)', skyB: 'light-dark(#8aa4ff, #0b1838)' },
+  { minute: 5 * 60, skyA: 'light-dark(#c2d5ff, #1f3e70)', skyB: 'light-dark(#8aa4ff, #0b1838)' },
+  { minute: 7 * 60 + 30, skyA: 'light-dark(#f4a261, #7a4a2e)', skyB: 'light-dark(#9ac8f5, #1d4a70)' },
+  { minute: 10 * 60 + 30, skyA: 'light-dark(#91cdf7, #1f638c)', skyB: 'light-dark(#d6efff, #143455)' },
+  { minute: 14 * 60 + 30, skyA: 'light-dark(#9bd8e9, #236e83)', skyB: 'light-dark(#e7edb6, #284460)' },
+  { minute: 17 * 60, skyA: 'light-dark(#d8c98b, #66523a)', skyB: 'light-dark(#f3c591, #69414a)' },
+  { minute: 19 * 60, skyA: 'light-dark(#f48652, #843647)', skyB: 'light-dark(#ee94bc, #391945)' },
+  { minute: 21 * 60 + 30, skyA: 'light-dark(#7d8dd6, #2a416d)', skyB: 'light-dark(#7489d5, #142344)' },
+  { minute: 22 * 60, skyA: 'light-dark(#c2d5ff, #1f3e70)', skyB: 'light-dark(#8aa4ff, #0b1838)' },
+  { minute: 24 * 60, skyA: 'light-dark(#c2d5ff, #1f3e70)', skyB: 'light-dark(#8aa4ff, #0b1838)' },
+];
+
+function skyFor(now: Date): CSSProperties {
+  const minute = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+  const nextIndex = SKY_STOPS.findIndex((stop) => stop.minute > minute);
+  const end = SKY_STOPS[nextIndex];
+  const start = SKY_STOPS[nextIndex - 1];
+  const progress = (minute - start.minute) / (end.minute - start.minute);
+  const startWeight = `${Math.round((1 - progress) * 1000) / 10}%`;
+
+  return {
+    '--sky-a-start': start.skyA,
+    '--sky-a-end': end.skyA,
+    '--sky-b-start': start.skyB,
+    '--sky-b-end': end.skyB,
+    '--sky-start-weight': startWeight,
+  } as CSSProperties;
 }
 
-/** Fixed decorative layer the glass cards blur against — a sky wash that shifts with the actual
-    time of day, so the color has a reason to be there instead of just sitting for decoration.
-    --sky-a/--sky-b are set on the app root (by daypart) so other cards, like the command center,
-    can pick up the same time-of-day color instead of only this background layer seeing it. */
+function minuteOfDay(now: Date): number {
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+function timeAtMinute(now: Date, minute: number): Date {
+  const preview = new Date(now);
+  preview.setHours(Math.floor(minute / 60), minute % 60, 0, 0);
+  return preview;
+}
+
+function timeLabel(minute: number): string {
+  return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+}
+
+function SkyTimeDebugger({ minute, onMinuteChange }: Readonly<{
+  minute: number;
+  onMinuteChange: Dispatch<SetStateAction<number>>;
+}>) {
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const id = window.setInterval(() => onMinuteChange((current) => (current + 6) % (24 * 60)), 100);
+    return () => window.clearInterval(id);
+  }, [isPlaying, onMinuteChange]);
+
+  return (
+    <section aria-label="Sky time preview" className="fixed inset-x-4 bottom-4 z-50 mx-auto grid max-w-md gap-2 rounded-2xl glass px-4 py-3 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-96">
+      <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.16em] text-ink-muted">
+        Sky preview
+        <span className="flex items-center gap-3">
+          <output className="text-ink">{timeLabel(minute)}</output>
+          <button
+            type="button"
+            onClick={() => setIsPlaying((playing) => !playing)}
+            aria-pressed={isPlaying}
+            className="rounded-lg px-2 py-1 text-[0.65rem] font-semibold tracking-normal text-ink transition hover:bg-track"
+          >
+            {isPlaying ? 'Pause' : 'Play day'}
+          </button>
+        </span>
+      </span>
+      <input
+        type="range"
+        min="0"
+        max="1439"
+        value={minute}
+        onChange={(event) => onMinuteChange(Number(event.target.value))}
+        aria-label="Sky preview time"
+        className="w-full accent-(--color-accent-ai)"
+      />
+      <span className="text-[0.65rem] text-ink-faint">Changes the sky, hero clock, and greeting only.</span>
+    </section>
+  );
+}
+
+/** Fixed decorative layer the glass cards blur against — a sky wash that follows the actual
+    time of day. --sky-a/--sky-b live on the app root so the command center and hero share it. */
 function BackgroundGlow() {
   return (
     <div aria-hidden className="ambient-canvas pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas">
@@ -60,13 +145,13 @@ function useCurrentTime() {
 }
 
 function greetingFor(hour: number): string {
+  if (hour < 6 || hour >= 22) return 'Good night.';
   if (hour < 12) return 'Good morning.';
   if (hour < 18) return 'Good afternoon.';
   return 'Good evening.';
 }
 
-function Overview() {
-  const now = useCurrentTime();
+function Overview({ now }: Readonly<{ now: Date }>) {
   const greeting = greetingFor(now.getHours());
   const runEntrance = !overviewEntranceDone;
   useEffect(() => {
@@ -130,14 +215,17 @@ function Overview() {
 export default function App() {
   const route = useHashRoute();
   const now = useCurrentTime();
+  const [skyDebugMinute, setSkyDebugMinute] = useState(() => minuteOfDay(new Date()));
   useDeviceLocation();
+  const skyNow = SHOW_SKY_TIME_DEBUGGER ? timeAtMinute(now, skyDebugMinute) : now;
 
   return (
     <div
       className="app-shell min-h-screen text-ink selection:bg-(--color-accent-ai)/25"
-      data-daypart={dayPartFor(now.getHours())}
+      style={skyFor(skyNow)}
     >
       <BackgroundGlow />
+      {SHOW_SKY_TIME_DEBUGGER && <SkyTimeDebugger minute={skyDebugMinute} onMinuteChange={setSkyDebugMinute} />}
       {route.view === 'section' && <SectionGlow accentVar={sectionById(route.sectionId).accentVar} />}
       <main className="mx-auto max-w-[78rem] px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 sm:px-8 sm:pt-10 lg:px-10">
         <MotionConfig
@@ -148,7 +236,7 @@ export default function App() {
             <div className="relative grid grid-cols-[minmax(0,1fr)]">
               <AnimatePresence mode="popLayout" initial={false}>
                 {route.view === 'overview' ? (
-                  <Overview key="overview" />
+                  <Overview key="overview" now={skyNow} />
                 ) : (
                   <SectionView key={route.sectionId} section={sectionById(route.sectionId)} />
                 )}
