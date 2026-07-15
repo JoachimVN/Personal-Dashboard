@@ -118,7 +118,10 @@ export function imessageCandidates(data: IMessageData | undefined, freshMs: numb
   const unread = data?.conversations.filter((conversation) => conversation.unreadCount > 0) ?? [];
   if (!unread.length) return [];
   const totalUnread = unread.reduce((sum, conversation) => sum + conversation.unreadCount, 0);
-  const latest = unread.reduce((a, b) => (Date.parse(b.timestamp) > Date.parse(a.timestamp) ? b : a));
+  const latest = unread.reduce(
+    (mostRecent, conversation) => (Date.parse(conversation.timestamp) > Date.parse(mostRecent.timestamp) ? conversation : mostRecent),
+    unread[0]!,
+  );
   const fresh = Date.now() - Date.parse(latest.timestamp) < freshMs;
   return [{
     id: 'imessage:unread', source: 'imessage', kind: 'imessage', score: fresh ? 76 : 40,
