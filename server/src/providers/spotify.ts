@@ -156,6 +156,37 @@ function isRateLimitError(error: unknown): boolean {
   return error instanceof Error && error.message.startsWith('spotify rate limited');
 }
 
+type SpotifyGet = <T>(path: string) => Promise<T | null>;
+
+function createSpotifyGet(
+  bearer: string,
+  signal: AbortSignal,
+  snapshotStore: SpotifySnapshotStore,
+): SpotifyGet {
+  return async <T>(path: string): Promise<T | null> => {
+    const retryInMs = await snapshotStore.getRateLimitedUntil() - Date.now();
+    if (retryInMs > 0) {
+      throw new Error(`spotify rate limited; retry in ${Math.ceil(retryInMs / 1000)} seconds`);
+    }
+    const res = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${bearer}` },
+      signal,
+    });
+    if (res.status === 204) return null; // e.g. nothing currently playing
+    if (res.status === 429) {
+      const retryAfterSeconds = Number(res.headers.get('retry-after'));
+      const retryAfterMs =
+        Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
+          ? retryAfterSeconds * 1000
+          : DEFAULT_RATE_LIMIT_RETRY_MS;
+      await snapshotStore.setRateLimitedUntil(Date.now() + retryAfterMs);
+      throw new Error(`spotify rate limited; retry in ${Math.ceil(retryAfterMs / 1000)} seconds`);
+    }
+    if (!res.ok) throw new Error(`spotify ${path} failed: ${res.status}`);
+    return (await res.json()) as T;
+  };
+}
+
 /**
  * Returns a valid access token, refreshing (and re-persisting) via the stored
  * refresh_token when the current one is within a minute of expiry. Never logs
@@ -260,28 +291,7 @@ export function createSpotifyProvider(
         const bearer = await accessToken(oauth, signal);
         const previousSnapshot = await snapshotStore.getSnapshot();
 
-        const get = async <T>(path: string): Promise<T | null> => {
-          const retryInMs = await snapshotStore.getRateLimitedUntil() - Date.now();
-          if (retryInMs > 0) {
-            throw new Error(`spotify rate limited; retry in ${Math.ceil(retryInMs / 1000)} seconds`);
-          }
-          const res = await fetch(`${API}${path}`, {
-            headers: { Authorization: `Bearer ${bearer}` },
-            signal,
-          });
-          if (res.status === 204) return null; // e.g. nothing currently playing
-          if (res.status === 429) {
-            const retryAfterSeconds = Number(res.headers.get('retry-after'));
-            const retryAfterMs =
-              Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
-                ? retryAfterSeconds * 1000
-                : DEFAULT_RATE_LIMIT_RETRY_MS;
-            await snapshotStore.setRateLimitedUntil(Date.now() + retryAfterMs);
-            throw new Error(`spotify rate limited; retry in ${Math.ceil(retryAfterMs / 1000)} seconds`);
-          }
-          if (!res.ok) throw new Error(`spotify ${path} failed: ${res.status}`);
-          return (await res.json()) as T;
-        };
+        const get = createSpotifyGet(bearer, signal, snapshotStore);
 
         // Playback is checked at the expected track end (with a low-frequency idle guard).
         // Recent history is reconciled independently every 15 minutes.
