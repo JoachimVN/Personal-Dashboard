@@ -23,7 +23,9 @@ async function main() {
   const counts = await sql<{ track_id: string; plays: string }[]>`
     select track_id, count(*)::text as plays from spotify_observed_plays group by track_id
   `;
-  const observedCountByTrack = new Map(counts.map((row) => [row.track_id, Number(row.plays)]));
+  const observedCountByTrack = new Map<string, number>(
+    counts.map((row): [string, number] => [row.track_id, Number(row.plays)]),
+  );
 
   const tracks = await sql<{ id: string; track: string; verified: boolean | null; play_count: number }[]>`
     select id, track, verified, play_count from spotify_tracks
