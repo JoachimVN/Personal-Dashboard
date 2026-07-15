@@ -75,12 +75,12 @@ a {
    shares the same time-of-day color. Static shape, one soft vertical fade, no grid/noise. */
 .app-shell {
   /* Night fallback for the first paint and browsers that lack color-mix(). */
-  --sky-a: light-dark(#c2d5ff, #1f3e70);
-  --sky-b: light-dark(#8aa4ff, #0b1838);
-  --sky-a-start: light-dark(#c2d5ff, #1f3e70);
-  --sky-a-end: light-dark(#c2d5ff, #1f3e70);
-  --sky-b-start: light-dark(#8aa4ff, #0b1838);
-  --sky-b-end: light-dark(#8aa4ff, #0b1838);
+  --sky-a: light-dark(#c2d5ff, #1b365f);
+  --sky-b: light-dark(#8aa4ff, #09152f);
+  --sky-a-start: light-dark(#c2d5ff, #1b365f);
+  --sky-a-end: light-dark(#c2d5ff, #1b365f);
+  --sky-b-start: light-dark(#8aa4ff, #09152f);
+  --sky-b-end: light-dark(#8aa4ff, #09152f);
   --sky-start-weight: 100%;
 }
 
