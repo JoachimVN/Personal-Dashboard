@@ -35,7 +35,7 @@ async function main() {
     const realCount = observedCountByTrack.get(row.id) ?? 0;
     if (realCount === row.play_count) continue;
     await sql`update spotify_tracks set play_count = ${realCount} where id = ${row.id}`;
-    console.log(`  ${row.track}: ${row.play_count} -> ${realCount}`);
+    console.log(`  ${row.track}: ${row.play_count} -> ${String(realCount)}`);
     updated++;
   }
 
@@ -44,7 +44,9 @@ async function main() {
   console.log('If the dashboard server is currently running, restart it to pick up the change.');
 }
 
-main().catch((err) => {
+try {
+  await main();
+} catch (err) {
   console.error('✗ Rebuild failed:', (err as Error).message);
   process.exitCode = 1;
-});
+}
