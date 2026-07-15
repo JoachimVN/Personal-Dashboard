@@ -215,7 +215,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
       score: TIMEFRAME_SCORE[tier.key], shapes: TIMEFRAME_SHAPES[tier.key],
       kicker: `New top artist ${TIMEFRAME_PERIOD[tier.key]}`, title: tier.artist.name,
       detail: tier.artist.genres[0] ?? `Your top artist ${TIMEFRAME_PERIOD[tier.key]}`,
-      href: '#/spotify', render: { type: 'text' },
+      href: '#/spotify', render: { type: 'spotify-artist', artistId: tier.artist.id ?? tier.artist.name },
     });
   }
 
@@ -225,7 +225,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
       id: `spotify:new-album:${topAlbum.id ?? topAlbum.name}`, source: 'spotify', kind: 'spotify',
       score: TIMEFRAME_SCORE.long, shapes: TIMEFRAME_SHAPES.long,
       kicker: 'New favorite album', title: topAlbum.name, detail: topAlbum.artist,
-      href: '#/spotify', render: { type: 'text' },
+      href: '#/spotify', render: { type: 'spotify-album', albumId: topAlbum.id ?? topAlbum.name },
     });
   }
 

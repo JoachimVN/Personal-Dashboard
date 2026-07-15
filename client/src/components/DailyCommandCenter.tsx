@@ -111,6 +111,23 @@ function SecondaryContent({
   if (slot.render.type === 'spotify-now-playing' && spotify?.nowPlaying) {
     return <div className="mt-4"><NowPlaying nowPlaying={spotify.nowPlaying} fetchedAt={spotifyFetchedAt} /></div>;
   }
+  if (slot.render.type === 'spotify-artist') {
+    const artistId = slot.render.artistId;
+    const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? []]
+      .find((a) => (a.id ?? a.name) === artistId);
+    return <div className="mt-4 flex items-center gap-3">
+      {artist && <Thumb url={artist.imageUrl} size="h-12 w-12" />}
+      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    </div>;
+  }
+  if (slot.render.type === 'spotify-album') {
+    const albumId = slot.render.albumId;
+    const album = spotify?.allTime.albums.find((a) => (a.id ?? a.name) === albumId);
+    return <div className="mt-4 flex items-center gap-3">
+      {album && <Thumb url={album.imageUrl} size="h-12 w-12" />}
+      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    </div>;
+  }
   if (slot.render.type === 'health-rings' && health?.today) {
     return <div className="mt-4"><ActivityRings
       activeEnergyKcal={health.today.activeEnergyKcal ?? 0}
