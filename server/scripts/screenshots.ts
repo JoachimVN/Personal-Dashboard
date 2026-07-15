@@ -100,6 +100,7 @@ interface Page {
    * negative scrolls back up. */
   extraScroll?: number;
   daypart: Daypart;
+  frozenAt: number;
   theme: 'light' | 'dark';
   widgets: Record<string, WidgetEnvelope>;
 }
@@ -138,7 +139,7 @@ async function buildPages(): Promise<Page[]> {
 
   return [
     {
-      slug: 'overview', file: '01-overview.png', hash: '', daypart: 'evening', theme: 'dark',
+      slug: 'overview', file: '01-overview.png', hash: '', daypart: 'evening', frozenAt: overviewNow.getTime(), theme: 'dark',
       widgets: {
         'command-center': envelope(overviewCommandCenter, overviewNow),
         calendar: envelope(overviewCalendarFixture, overviewNow),
@@ -150,12 +151,12 @@ async function buildPages(): Promise<Page[]> {
     },
     {
       slug: 'spotify', file: '02-spotify.png', hash: '#/spotify', scrollToText: 'Your rotation', extraScroll: 60,
-      daypart: 'morning', theme: 'dark',
+      daypart: 'morning', frozenAt: spotifyNow.getTime(), theme: 'dark',
       widgets: { spotify: envelope(fixtures.spotifyDetail, spotifyNow) },
     },
     {
       slug: 'health', file: '03-health.png', hash: '#/health', scrollToText: 'Your last 30 days, charted',
-      daypart: 'day', theme: 'light',
+      daypart: 'day', frozenAt: healthNow.getTime(), theme: 'light',
       widgets: { health: envelope(healthPageFixture, healthNow) },
     },
     {
@@ -165,14 +166,14 @@ async function buildPages(): Promise<Page[]> {
       // which drifts once the page's clock is faked to a fixed daypart. extraScroll nudges a
       // little further down past the alignment default so the card's full bottom margin clears.
       slug: 'ai-usage', file: '04-ai-usage.png', hash: '#/ai', scrollToText: 'Weekly window · last 7 d', scrollAlign: 'bottom', extraScroll: 40,
-      daypart: 'night', theme: 'light',
+      daypart: 'night', frozenAt: aiNow.getTime(), theme: 'light',
       widgets: { 'ai-usage-claude': envelope(aiFixtures.claude, aiNow), 'ai-usage-codex': envelope(aiFixtures.codex, aiNow) },
     },
     {
       // Bottom-align the Contributions card, then nudge up past its own bottom caption ("N
       // contributions in the last year") so the crop ends on the grid itself.
       slug: 'github', file: '05-github.png', hash: '#/github', scrollToText: 'Contributions', scrollAlign: 'bottom', extraScroll: -50,
-      daypart: 'morning', theme: 'dark',
+      daypart: 'morning', frozenAt: githubNow.getTime(), theme: 'dark',
       widgets: { github: envelope(githubPageFixture, githubNow) },
     },
   ];
@@ -239,8 +240,8 @@ function sleep(ms: number): Promise<void> {
 /** Runs before any of the page's own scripts, on every navigation in this browser context. Fakes
  * Date so the ambient sky-wash daypart *and* the overview's "Good evening"/"Good morning" greeting
  * (a separate client-side computation off the same clock) agree, regardless of what time this
- * script actually runs at. Only the hour/minute move; the calendar date stays real, so the
- * fixture's "tomorrow"/"Friday" event timing is unaffected.
+ * script actually runs. The fixed timestamp comes from the same per-page reference time used to
+ * build the fixtures, so time-dependent UI such as playback progress cannot drift during capture.
  *
  * Deliberately does *not* also inject a blanket `animation-duration:0s!important` freeze: a
  * 0-duration `infinite` CSS animation's "current frame" is implementation-defined, which made the
@@ -248,10 +249,7 @@ function sleep(ms: number): Promise<void> {
  * `reducedMotion: 'reduce'` option already covers this correctly — the app's CSS has a real
  * `@media (prefers-reduced-motion: reduce)` rule for the equalizer, and Framer Motion's
  * `MotionConfig reducedMotion="user"` (App.tsx) does the same for every motion.* animation. */
-function installPageOverrides({ hour, minute }: { hour: number; minute: number }): void {
-  const target = new Date();
-  target.setHours(hour, minute, 0, 0);
-  const offset = target.getTime() - Date.now();
+function installPageOverrides({ timestamp }: { timestamp: number }): void {
   const RealDate = Date;
   // A Proxy, not a `class ... extends Date`, deliberately — Playwright's addInitScript extracts
   // this function's source via toString() and runs it standalone in the browser, so it can't rely
@@ -259,13 +257,13 @@ function installPageOverrides({ hour, minute }: { hour: number; minute: number }
   // scope; a class declaration here throws "__name is not defined" the moment it's evaluated.
   const FakeDate = new Proxy(RealDate, {
     construct(ctor, args) {
-      return args.length === 0 ? new ctor(RealDate.now() + offset) : new ctor(...(args as []));
+      return args.length === 0 ? new ctor(timestamp) : new ctor(...(args as []));
     },
     apply() {
-      return new RealDate(RealDate.now() + offset).toString();
+      return new RealDate(timestamp).toString();
     },
     get(ctor, prop) {
-      if (prop === 'now') return () => RealDate.now() + offset;
+      if (prop === 'now') return () => timestamp;
       return Reflect.get(ctor, prop);
     },
   });
@@ -379,8 +377,7 @@ async function main() {
         colorScheme: page.theme,
         reducedMotion: 'reduce',
       });
-      const [hour, minute] = DAYPART_HOUR[page.daypart];
-      await context.addInitScript(installPageOverrides, { hour, minute });
+      await context.addInitScript(installPageOverrides, { timestamp: page.frozenAt });
       const pw = await context.newPage();
       await capturePage(pw, page);
       await context.close();
