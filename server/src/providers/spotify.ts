@@ -400,8 +400,11 @@ export function createSpotifyProvider(
           : Date.now() + FAILURE_RETRY_MS;
         // Playback state goes stale immediately: replaying an old track as "Now playing" is
         // misleading. The longer-lived listening data remains useful during the cooldown.
+        // allTime is a pure local DB read with no Spotify API dependency, so recompute it fresh
+        // even while rate-limited — no reason to keep serving a stale all-time leaderboard just
+        // because live playback data can't be fetched right now.
         if (lastGoodSnapshot && isRateLimitError(error)) {
-          return { ...lastGoodSnapshot, nowPlaying: null };
+          return { ...lastGoodSnapshot, nowPlaying: null, allTime: await historyStore.getAllTime() };
         }
         throw error;
       }
