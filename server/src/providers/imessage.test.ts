@@ -134,10 +134,10 @@ describe('createContactResolver', () => {
 
   it('prefers the fuller name when the same number is duplicated across synced Contacts sources', () => {
     const resolve = createContactResolver([
-      contact({ handle: '+47 912 34 567', firstName: 'Ada', lastName: null }),
-      contact({ handle: '+4791234567', firstName: 'Ada', lastName: 'Lovelace' }),
+      contact({ handle: '+47 998 87 766', firstName: 'Ada', lastName: null }),
+      contact({ handle: '+4799887766', firstName: 'Ada', lastName: 'Lovelace' }),
     ]);
-    expect(resolve('+4791234567')).toBe('Ada Lovelace');
+    expect(resolve('+4799887766')).toBe('Ada Lovelace');
   });
 
   it('uses organization names when a personal name is unavailable', () => {
