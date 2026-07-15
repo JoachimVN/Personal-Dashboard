@@ -12,6 +12,7 @@ const baselineMetrics = [
  * full-day baseline, so only an unusually HIGH reading counts as a real signal for these. */
 const activityMetrics = [
   'steps',
+  'activeEnergyKcal',
   'exerciseMinutes',
   'standHours',
 ] as const;
