@@ -173,8 +173,8 @@ export interface SpotifyFreshness {
 
 type Timeframe = 'short' | 'medium' | 'long';
 
-/** long_term (years) is the rarest, most notable change; short_term (weeks) churns naturally and
- * shouldn't compete for hero the way a genuinely new all-time favorite should. */
+/** Spotify's long_term window is approximately one year; short_term churns naturally and
+ * shouldn't compete for hero with a meaningful annual shift. */
 const TIMEFRAME_SCORE: Record<Timeframe, number> = { long: 85, medium: 65, short: 60 };
 const TIMEFRAME_SHAPES: Record<Timeframe, Candidate['shapes']> = {
   long: [...allShapes],
@@ -182,7 +182,7 @@ const TIMEFRAME_SHAPES: Record<Timeframe, Candidate['shapes']> = {
   short: ['tile'],
 };
 const TIMEFRAME_PERIOD: Record<Timeframe, string> = {
-  long: 'of all time', medium: 'these last few months', short: 'this month',
+  long: 'this past year', medium: 'these last few months', short: 'this month',
 };
 
 export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyFreshness): Candidate[] {

@@ -4,8 +4,8 @@ import { useWidget } from '../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
 
-type Range = 'shortTerm' | 'mediumTerm' | 'allTime';
-const RANGE_LABEL: Record<Range, string> = { shortTerm: '4 weeks', mediumTerm: '6 months', allTime: 'All time' };
+type Range = 'shortTerm' | 'mediumTerm' | 'longTerm' | 'allTime';
+const RANGE_LABEL: Record<Range, string> = { shortTerm: '4 weeks', mediumTerm: '6 months', longTerm: '12 months', allTime: 'All time' };
 
 type Track = SpotifyData['topTracks']['shortTerm'][number] & { playCount?: number };
 type Artist = SpotifyData['topArtists']['shortTerm'][number] & { playCount?: number };
@@ -180,7 +180,7 @@ export function NowPlayingWidget() {
 function RangeToggle({ range, onChange }: Readonly<{ range: Range; onChange: (r: Range) => void }>) {
   return (
     <fieldset className="spotify-range-toggle" aria-label="Time range">
-      {(['shortTerm', 'mediumTerm', 'allTime'] as Range[]).map((r) => (
+      {(['shortTerm', 'mediumTerm', 'longTerm', 'allTime'] as Range[]).map((r) => (
         <button key={r} type="button" data-active={r === range} onClick={() => onChange(r)}>
           {RANGE_LABEL[r]}
         </button>

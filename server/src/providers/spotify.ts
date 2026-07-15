@@ -271,7 +271,7 @@ async function refreshTopData(get: SpotifyGet, historyStore: SpotifyHistoryStore
     tracksLong,
   };
 
-  // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
+  // One-time backfill from Spotify's long_term (~12 months) top lists, so all-time stats
   // aren't empty on day one — real observed plays accrue on top from here.
   if (!(await historyStore.isSeeded())) {
     const artistsLongSeed = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');

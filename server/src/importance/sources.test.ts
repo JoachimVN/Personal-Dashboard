@@ -31,4 +31,27 @@ describe('spotifyCandidates', () => {
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-album:album-id')?.detail)
       .toBe('Primary Artist');
   });
+
+  it('labels a long-term top-track change as a past-year signal', () => {
+    const data: SpotifyData = {
+      nowPlaying: null,
+      recentlyPlayed: [],
+      topArtists: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      topTracks: {
+        shortTerm: [],
+        mediumTerm: [],
+        longTerm: [{ track: 'Baptized In Fear', artist: 'The Weeknd' }],
+      },
+      allTime: { artists: [], tracks: [], albums: [] },
+    };
+
+    const candidates = spotifyCandidates(data, {
+      trackShort: false, trackMedium: false, trackLong: true,
+      artistShort: false, artistMedium: false, artistLong: false,
+      album: false,
+    });
+
+    expect(candidates.find((candidate) => candidate.id === 'spotify:new-track:long:Baptized In Fear')?.kicker)
+      .toBe('New top track this past year');
+  });
 });
