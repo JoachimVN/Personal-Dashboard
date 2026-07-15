@@ -56,4 +56,15 @@ describe('rankCandidates', () => {
     expect(ranked.secondary.map((slot) => slot.id)).toEqual(['health']);
     expect(ranked.tiles.map((slot) => slot.id)).toEqual(['spotify']);
   });
+
+  it('does not promote routine Health when a real secondary signal exists', () => {
+    const ranked = rankCandidates([
+      candidate('calendar', 'calendar', 100, ['hero']),
+      candidate('spotify', 'spotify', 60, ['secondary', 'tile']),
+      candidate('health', 'health', 32, ['tile']),
+    ]);
+
+    expect(ranked.secondary.map((slot) => slot.id)).toEqual(['spotify']);
+    expect(ranked.tiles.map((slot) => slot.id)).toEqual(['health']);
+  });
 });

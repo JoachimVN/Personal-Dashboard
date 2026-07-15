@@ -261,7 +261,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
       id: `spotify:new-artist:${tier.key}:${tier.artist.id ?? tier.artist.name}`, source: 'spotify', kind: 'spotify',
       score: TIMEFRAME_SCORE[tier.key], shapes: TIMEFRAME_SHAPES[tier.key],
       kicker: `New #1 artist · ${TIMEFRAME_PERIOD[tier.key]}`, title: tier.artist.name,
-      detail: tier.artist.genres[0] ?? 'Took the #1 spot in your recent listening',
+      detail: '',
       href: '#/spotify', render: { type: 'spotify-artist', artistId: tier.artist.id ?? tier.artist.name, timeframe: tier.key },
     });
   }
@@ -308,19 +308,23 @@ const RESET_DROP_PERCENT = 40;
 function aiRunwayCandidate(available: AiTool[]): Candidate | undefined {
   const limits = available.flatMap((tool) => {
     const data = tool.data!;
-    return [data.fiveHour, data.weekly].filter((window): window is NonNullable<typeof window> => Boolean(window));
+    return [
+      data.fiveHour && { label: tool.label, period: '5-hour limit', window: data.fiveHour },
+      data.weekly && { label: tool.label, period: 'weekly limit', window: data.weekly },
+      data.modelWeekly && { label: `${tool.label} ${data.modelWeekly.model}`, period: 'weekly limit', window: data.modelWeekly },
+    ].filter((limit): limit is { label: string; period: string; window: NonNullable<typeof data.fiveHour> } => Boolean(limit));
   });
   if (!limits.length) return undefined;
 
   const tightest = limits.reduce(
-    (lowest, window) => window.usedPercent > lowest.usedPercent ? window : lowest,
+    (lowest, limit) => limit.window.usedPercent > lowest.window.usedPercent ? limit : lowest,
     limits[0]!,
   );
-  const remaining = Math.max(0, Math.round(100 - tightest.usedPercent));
+  const remaining = Math.max(0, Math.round(100 - tightest.window.usedPercent));
   return {
     id: 'ai-usage:runway', source: 'ai-usage', kind: 'ai-usage', score: remaining <= 15 ? 86 : 30,
     shapes: remaining <= 15 ? [...allShapes] : ['tile'], kicker: remaining <= 15 ? 'Running low' : 'AI runway',
-    title: `${remaining}% available`, detail: `Resets ${new Date(tightest.resetsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
+    title: `${remaining}% available`, detail: `${tightest.label} · ${tightest.period} · resets ${new Date(tightest.window.resetsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
     href: '#/ai', meter: remaining, render: { type: 'text' },
   };
 }

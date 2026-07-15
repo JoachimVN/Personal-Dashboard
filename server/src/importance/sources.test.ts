@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { GitHubData, HealthData, NewsData, SpotifyData, WeatherData } from '@personal-dashboard/shared';
-import { githubCandidates, gmailCandidates, healthCandidates, newsCandidates, spotifyCandidates, weatherCandidates } from './sources.js';
+import type { AiUsageToolData, GitHubData, HealthData, NewsData, SpotifyData, WeatherData } from '@personal-dashboard/shared';
+import { aiCandidates, githubCandidates, gmailCandidates, healthCandidates, newsCandidates, spotifyCandidates, weatherCandidates } from './sources.js';
 
 describe('githubCandidates', () => {
   const quietDay: GitHubData = {
@@ -118,6 +118,23 @@ describe('newsCandidates', () => {
   });
 });
 
+describe('aiCandidates', () => {
+  it('identifies the tightest tool and limit window in the runway detail', () => {
+    const data: AiUsageToolData = {
+      available: true,
+      fiveHour: { usedPercent: 80, resetsAt: '2026-07-16T21:59:00.000Z' },
+      weekly: { usedPercent: 50, resetsAt: '2026-07-20T21:59:00.000Z' },
+      history: [],
+    };
+
+    const runway = aiCandidates([{ id: 'codex', label: 'Codex', data }], 7, 50)
+      .find((candidate) => candidate.id === 'ai-usage:runway');
+
+    expect(runway).toMatchObject({ title: '20% available' });
+    expect(runway?.detail).toContain('Codex · 5-hour limit');
+  });
+});
+
 describe('spotifyCandidates', () => {
   it('uses the primary artist for a newly surfaced album', () => {
     const data: SpotifyData = {
@@ -192,7 +209,7 @@ describe('spotifyCandidates', () => {
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-artist:short:artist-id')).toMatchObject({
       kicker: 'New #1 artist · this month',
-      detail: 'Took the #1 spot in your recent listening',
+      detail: '',
       render: { type: 'spotify-artist', artistId: 'artist-id', timeframe: 'short' },
       shapes: ['secondary', 'tile'],
     });

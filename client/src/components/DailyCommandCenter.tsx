@@ -16,6 +16,7 @@ import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
 import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
+import { rampColor } from '../lib/contributions';
 import { sectionHref } from '../router';
 import '../sections/spotify/spotify.css';
 
@@ -103,7 +104,7 @@ function CommandPanel({
   );
 }
 
-function Signal({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: HealthData | undefined }>) {
+function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined }>) {
   const activityDay = health ? latestActivityDay(health) : undefined;
   const rings = slot.render.type === 'health-rings' && health && activityDay
     ? <CompactActivityRings
@@ -113,13 +114,21 @@ function Signal({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: He
         goals={health.goals}
       />
     : undefined;
+  const contributionDays = slot.render.type === 'github-contributions'
+    ? github?.contributions.days.slice(-7)
+    : undefined;
+  const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
       {rings ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
-        <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>
+        {contributionDays?.length
+          ? <div className="command-contribution-squares" aria-label="Contributions over the last seven days">
+              {contributionDays.map((day) => <span key={day.date} aria-hidden style={{ backgroundColor: rampColor(day.count, maxContributions) }} />)}
+            </div>
+          : <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>}
         {slot.meter !== undefined && (
           <span className={`command-meter${slot.meter <= 15 ? ' command-meter--low' : ''}`}>
             <span style={{ width: `${Math.min(100, Math.max(0, slot.meter))}%` }} />
@@ -268,15 +277,16 @@ function SecondaryContent({
     };
     const legacyTimeframe = slot.id.split(':')[2];
     const timeframe = slot.render.timeframe ?? (legacyTimeframe in tracksByTimeframe ? legacyTimeframe as keyof typeof tracksByTimeframe : 'short');
-    const tracks = tracksByTimeframe[timeframe].slice(0, 3);
+    const tracks = tracksByTimeframe[timeframe]
+      .filter((track) => track.artist.split(', ').includes(artist?.name ?? slot.title))
+      .slice(0, 3);
     return <div className="command-secondary-spotify mt-4">
       {artist && <Thumb url={artist.imageUrl} size="command-secondary-spotify-artwork" />}
       <div className="command-secondary-artist-details">
         <p className="text-sm font-semibold text-ink">{slot.title}</p>
-        <p className="mt-0.5 text-xs text-ink-muted">{slot.detail}</p>
-        {tracks.length > 0 && <ol className="command-secondary-artist-tracks" aria-label={`Top tracks ${timeframe}`}>
+        {tracks.length > 0 && <><p className="command-secondary-artist-track-label">Top tracks</p><ol className="command-secondary-artist-tracks" aria-label={`Top tracks by ${slot.title} ${timeframe}`}>
           {tracks.map((track, index) => <li key={track.id ?? track.track}><span>{index + 1}</span><p>{track.track}</p></li>)}
-        </ol>}
+        </ol></>}
       </div>
     </div>;
   }
@@ -426,7 +436,7 @@ export function DailyCommandCenter() {
           </div>
         </div>
       </CommandPanel>
-      <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} health={health} />)}</div>
+      <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} />)}</div>
     </div>
     {activeSecondary && <CommandPanel href={activeSecondary.href} className={`command-agenda command-panel--${toneFor(activeSecondary)}`} navigable={false}>
       <SecondaryCarousel

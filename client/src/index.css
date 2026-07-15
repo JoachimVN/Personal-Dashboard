@@ -448,6 +448,20 @@ a {
   box-shadow: 0 0 10px color-mix(in oklab, var(--signal-color) 55%, transparent);
 }
 
+.command-contribution-squares {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 1rem;
+  margin-top: 0.25rem;
+}
+
+.command-contribution-squares span {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 3px;
+}
+
 .command-signal--personal { --signal-color: var(--color-accent-personal); }
 .command-signal--github { --signal-color: var(--color-accent-github); }
 .command-signal--ai { --signal-color: var(--color-accent-ai); }
@@ -608,7 +622,16 @@ a {
 .command-secondary-artist-tracks {
   display: grid;
   gap: 0.2rem;
+  margin-top: 0.25rem;
+}
+
+.command-secondary-artist-track-label {
   margin-top: 0.55rem;
+  color: var(--color-ink-faint);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .command-secondary-artist-tracks li {
