@@ -13,7 +13,7 @@ import { deg, glyph, weatherLocation } from '../lib/weather';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
-import { mapsSearchHref } from '../lib/maps';
+import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { sectionHref } from '../router';
 import '../sections/spotify/spotify.css';
 
@@ -271,11 +271,14 @@ export function DailyCommandCenter() {
           </div>
         )}
         <div className="command-weather-row">
-          <a href={sectionHref('personal')} className="command-weather-target" aria-label="Open weather in Personal">
-            <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
-            <div className="min-w-0"><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="truncate text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p>{weather && <p className="mt-0.5 flex items-center gap-1 text-[11px] text-ink-faint"><span aria-hidden>📍</span>{weatherLocation(weather.location)}</p>}</div>
-            {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
-          </a>
+          <div className="command-weather-target">
+            <a href={sectionHref('personal')} className="command-weather-summary" aria-label="Open weather in Personal">
+              <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
+              <div className="min-w-0"><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="truncate text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p></div>
+              {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
+            </a>
+            {weather && <a href={mapsCoordinatesHref(weather.location)} target="_blank" rel="noreferrer" className="command-weather-location"><span aria-hidden>📍</span>{weatherLocation(weather.location)}</a>}
+          </div>
         </div>
       </CommandPanel>
       <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} health={health} />)}</div>
