@@ -80,7 +80,7 @@ function SkyTimeDebugger({ minute, onMinuteChange }: Readonly<{
   return (
     <section aria-label="Sky time preview" className="fixed inset-x-4 bottom-4 z-50 mx-auto grid max-w-md gap-2 rounded-2xl glass px-4 py-3 shadow-2xl sm:inset-x-auto sm:right-6 sm:w-96">
       <span className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-[0.16em] text-ink-muted">
-        Sky preview
+        <span>Sky preview</span>
         <span className="flex items-center gap-3">
           <output className="text-ink">{timeLabel(minute)}</output>
           <button
