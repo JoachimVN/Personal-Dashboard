@@ -20,8 +20,8 @@ const snapshot: SpotifyData = {
     durationMs: 180_000,
   },
   recentlyPlayed: [],
-  topArtists: { shortTerm: [], mediumTerm: [] },
-  topTracks: { shortTerm: [], mediumTerm: [] },
+  topArtists: { shortTerm: [], mediumTerm: [], longTerm: [] },
+  topTracks: { shortTerm: [], mediumTerm: [], longTerm: [] },
   allTime: { artists: [], tracks: [], albums: [] },
 };
 
@@ -46,7 +46,7 @@ describe('Spotify provider', () => {
       getSnapshot: vi.fn().mockResolvedValue(snapshot),
       setRateLimitedUntil: vi.fn().mockResolvedValue(undefined),
     };
-    const historyStore = {};
+    const historyStore = { getAllTime: vi.fn().mockResolvedValue(snapshot.allTime) };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
       status: 429,
       headers: { 'retry-after': '30' },
