@@ -782,6 +782,34 @@ a {
   white-space: nowrap;
 }
 
+/* Non-date lead cell (PR repo, mail sender) styled like the agenda's time column. */
+.command-agenda-item .command-agenda-lead {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-hours {
+  display: flex;
+  gap: 1.15rem;
+}
+
+.command-hour {
+  display: grid;
+  gap: 0.15rem;
+  text-align: center;
+  font-size: 0.625rem;
+  color: var(--color-ink-faint);
+}
+
+.command-hour strong {
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .dashboard-section-heading {
   margin: 2.5rem 0 1rem;
   padding: 0 0.25rem;
