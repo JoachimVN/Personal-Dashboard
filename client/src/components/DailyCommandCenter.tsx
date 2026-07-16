@@ -1,5 +1,5 @@
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { useEffect, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type {
   CalendarData,
   CommandCenterData,
@@ -69,12 +69,10 @@ function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'healt
   return 'personal';
 }
 
-function isInteractiveTarget(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest('a, button, input, select, textarea, [role="button"]'));
-}
-
 function AiToolMark({ accent, className }: Readonly<{ accent: CommandCenterSlot['accent']; className: string }>) {
-  const Icon = accent === 'claude' ? ClaudeIcon : accent === 'codex' ? OpenAiIcon : undefined;
+  let Icon: typeof ClaudeIcon | undefined;
+  if (accent === 'claude') Icon = ClaudeIcon;
+  else if (accent === 'codex') Icon = OpenAiIcon;
   if (!Icon) return null;
   const color = accent === 'codex' ? 'var(--color-openai-mark)' : 'var(--color-claude)';
   return <Icon className={className} style={{ color }} />;
@@ -88,32 +86,16 @@ function GitHubMark({ className }: Readonly<{ className: string }>) {
 
 function CommandPanel({
   href,
+  label,
   className,
   children,
   navigable = true,
-}: Readonly<{ href: string; className: string; children: ReactNode; navigable?: boolean }>) {
-  const open = () => {
-    window.location.hash = href.slice(1);
-  };
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!isInteractiveTarget(event.target) && (event.key === 'Enter' || event.key === ' ')) {
-      event.preventDefault();
-      open();
-    }
-  };
-
+}: Readonly<{ href: string; label: string; className: string; children: ReactNode; navigable?: boolean }>) {
   if (!navigable) return <div className={className}>{children}</div>;
 
   return (
-    <div
-      role="link"
-      tabIndex={0}
-      onClick={(event: MouseEvent<HTMLDivElement>) => {
-        if (!isInteractiveTarget(event.target)) open();
-      }}
-      onKeyDown={onKeyDown}
-      className={`${className} cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-(--color-accent-personal)`}
-    >
+    <div className={`${className} cursor-pointer`}>
+      <a href={href} aria-label={label} className="command-panel-stretched-link" />
       {children}
     </div>
   );
@@ -200,7 +182,7 @@ function SecondaryCarousel({
     <MotionConfig reducedMotion="never">
       <div
         className="command-secondary-carousel"
-        role="group"
+        role="region"
         aria-roledescription="carousel"
         aria-label="Upcoming items"
         onMouseEnter={pause}
@@ -241,16 +223,118 @@ function SecondaryCarousel({
   );
 }
 
-function SecondaryContent({
+function CalendarAgendaSecondary({ slot, calendar }: Readonly<{ slot: CommandCenterSlot; calendar: CalendarData | undefined }>): ReactNode {
+  if (slot.render.type !== 'calendar-agenda') return null;
+  const agenda = slot.render.eventIds
+    .map((id) => calendar?.events.find((event) => event.id === id))
+    .filter((event): event is CalendarData['events'][number] => event !== undefined);
+  if (!agenda.length) return null;
+  return <div className="command-agenda-list mt-4">
+    {agenda.map((event) => <div key={event.id} className="command-agenda-item">
+      <time dateTime={event.start}>{formatEventDay(event)}</time><span>{event.title}</span>
+    </div>)}
+  </div>;
+}
+
+function SpotifyNowPlayingSecondary({ spotify, spotifyFetchedAt }: Readonly<{ spotify: SpotifyData | undefined; spotifyFetchedAt: string | undefined }>): ReactNode {
+  if (!spotify?.nowPlaying) return null;
+  return <div className="mt-4"><NowPlaying nowPlaying={spotify.nowPlaying} fetchedAt={spotifyFetchedAt} className="command-secondary-spotify" artworkClassName="command-secondary-spotify-artwork" /></div>;
+}
+
+function SpotifyTrackSecondary({ slot, spotify }: Readonly<{ slot: CommandCenterSlot; spotify: SpotifyData | undefined }>): ReactNode {
+  if (slot.render.type !== 'spotify-track') return null;
+  const trackId = slot.render.trackId;
+  const track = [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? [], ...spotify?.allTime.tracks ?? [], ...spotify?.recentlyPlayed ?? []]
+    .find((item) => (item.id ?? item.track) === trackId);
+  return <div className="command-secondary-spotify mt-4">
+    <Thumb url={track?.imageUrl} size="command-secondary-track-artwork" />
+    <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+  </div>;
+}
+
+function SpotifyArtistSecondary({ slot, spotify }: Readonly<{ slot: CommandCenterSlot; spotify: SpotifyData | undefined }>): ReactNode {
+  if (slot.render.type !== 'spotify-artist') return null;
+  const artistId = slot.render.artistId;
+  const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? [], ...spotify?.allTime.artists ?? []]
+    .find((a) => (a.id ?? a.name) === artistId);
+  const tracksByTimeframe = {
+    short: spotify?.topTracks.shortTerm ?? [],
+    medium: spotify?.topTracks.mediumTerm ?? [],
+    long: spotify?.topTracks.longTerm ?? [],
+    allTime: spotify?.allTime.tracks ?? [],
+  };
+  const legacyTimeframe = slot.id.split(':')[2];
+  const timeframe = slot.render.timeframe ?? (legacyTimeframe in tracksByTimeframe ? legacyTimeframe as keyof typeof tracksByTimeframe : 'short');
+  const tracks = tracksByTimeframe[timeframe]
+    .filter((track) => track.artist.split(', ').includes(artist?.name ?? slot.title))
+    .slice(0, 3);
+  return <div className="command-secondary-spotify mt-4">
+    {artist && <Thumb url={artist.imageUrl} size="command-secondary-artist-artwork" />}
+    <div className="command-secondary-artist-details">
+      <p className="text-sm font-semibold text-ink">{slot.title}</p>
+      {tracks.length > 0 && <><p className="command-secondary-artist-track-label">Top tracks</p><ol className="command-secondary-artist-tracks" aria-label={`Top tracks by ${slot.title} ${timeframe}`}>
+        {tracks.map((track, index) => <li key={track.id ?? track.track}><span>{index + 1}</span><p>{track.track}</p></li>)}
+      </ol></>}
+    </div>
+  </div>;
+}
+
+function SpotifyAlbumSecondary({ slot, spotify }: Readonly<{ slot: CommandCenterSlot; spotify: SpotifyData | undefined }>): ReactNode {
+  if (slot.render.type !== 'spotify-album') return null;
+  const albumId = slot.render.albumId;
+  const album = spotify?.allTime.albums.find((a) => (a.id ?? a.name) === albumId);
+  const albumMeta = [
+    { label: 'Released', value: album?.releaseDate?.slice(0, 4) },
+    { label: 'Length', value: formatAlbumDuration(album?.totalDurationMs) },
+  ].filter((item): item is { label: string; value: string } => Boolean(item.value));
+  return <div className="command-secondary-spotify mt-4">
+    {album && <Thumb url={album.imageUrl} size="command-secondary-spotify-artwork" />}
+    <div className="command-secondary-album-details">
+      <p className="line-clamp-2 text-base font-semibold leading-tight text-ink">{slot.title}</p>
+      <p className="mt-1 truncate text-sm text-ink-muted">{album?.artist.split(',')[0]?.trim() ?? slot.detail}</p>
+      {albumMeta.length > 0 && <dl className="command-secondary-album-meta">
+        {albumMeta.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}
+      </dl>}
+      {album?.totalTracks && <p className="mt-2 text-xs text-ink-faint">{album.totalTracks} tracks</p>}
+    </div>
+  </div>;
+}
+
+function HealthRingsSecondary({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: HealthData | undefined }>): ReactNode {
+  const activityDay = health ? latestActivityDay(health) : undefined;
+  if (slot.render.type !== 'health-rings' || !health || !activityDay) return null;
+  return <div className="mt-4"><ActivityRings
+    activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
+    exerciseMinutes={activityDay.exerciseMinutes ?? 0}
+    standHours={activityDay.standHours ?? 0}
+    goals={health.goals}
+  /></div>;
+}
+
+function GithubContributionsSecondary({
   slot,
-  calendar,
-  spotify,
-  spotifyFetchedAt,
-  health,
   github,
   hoveredDay,
   onHover,
 }: Readonly<{
+  slot: CommandCenterSlot;
+  github: GitHubData | undefined;
+  hoveredDay: { date: string; count: number } | null;
+  onHover: (day: { date: string; count: number } | null) => void;
+}>): ReactNode {
+  if (slot.render.type !== 'github-contributions' || !github) return null;
+  return <div className="mt-4"><ContributionGrid data={github} hovered={hoveredDay} onHover={onHover} /></div>;
+}
+
+function FallbackSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
+  const toolMark = <AiToolMark accent={slot.accent} className="h-10 w-10 shrink-0" />;
+  return <div className={slot.accent ? 'command-secondary-ai mt-4' : 'mt-4'}>
+    {toolMark}
+    <div><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-1 text-sm text-ink-muted">{slot.detail}</p></div>
+  </div>;
+}
+
+function SecondaryContent(props: Readonly<{
   slot: CommandCenterSlot;
   calendar: CalendarData | undefined;
   spotify: SpotifyData | undefined;
@@ -259,92 +343,18 @@ function SecondaryContent({
   github: GitHubData | undefined;
   hoveredDay: { date: string; count: number } | null;
   onHover: (day: { date: string; count: number } | null) => void;
-}>) {
-  if (slot.render.type === 'calendar-agenda') {
-    const agenda = slot.render.eventIds
-      .map((id) => calendar?.events.find((event) => event.id === id))
-      .filter((event): event is CalendarData['events'][number] => event !== undefined);
-    if (agenda.length) {
-      return <div className="command-agenda-list mt-4">
-        {agenda.map((event) => <div key={event.id} className="command-agenda-item">
-          <time dateTime={event.start}>{formatEventDay(event)}</time><span>{event.title}</span>
-        </div>)}
-      </div>;
-    }
+}>): ReactNode {
+  const { slot, calendar, spotify, spotifyFetchedAt, health, github, hoveredDay, onHover } = props;
+  switch (slot.render.type) {
+    case 'calendar-agenda': return CalendarAgendaSecondary({ slot, calendar }) ?? <FallbackSecondary slot={slot} />;
+    case 'spotify-now-playing': return SpotifyNowPlayingSecondary({ spotify, spotifyFetchedAt }) ?? <FallbackSecondary slot={slot} />;
+    case 'spotify-track': return SpotifyTrackSecondary({ slot, spotify }) ?? <FallbackSecondary slot={slot} />;
+    case 'spotify-artist': return SpotifyArtistSecondary({ slot, spotify }) ?? <FallbackSecondary slot={slot} />;
+    case 'spotify-album': return SpotifyAlbumSecondary({ slot, spotify }) ?? <FallbackSecondary slot={slot} />;
+    case 'health-rings': return HealthRingsSecondary({ slot, health }) ?? <FallbackSecondary slot={slot} />;
+    case 'github-contributions': return GithubContributionsSecondary({ slot, github, hoveredDay, onHover }) ?? <FallbackSecondary slot={slot} />;
+    default: return <FallbackSecondary slot={slot} />;
   }
-  if (slot.render.type === 'spotify-now-playing' && spotify?.nowPlaying) {
-    return <div className="mt-4"><NowPlaying nowPlaying={spotify.nowPlaying} fetchedAt={spotifyFetchedAt} className="command-secondary-spotify" artworkClassName="command-secondary-spotify-artwork" /></div>;
-  }
-  if (slot.render.type === 'spotify-track') {
-    const trackId = slot.render.trackId;
-    const track = [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? [], ...spotify?.allTime.tracks ?? [], ...spotify?.recentlyPlayed ?? []]
-      .find((item) => (item.id ?? item.track) === trackId);
-    return <div className="command-secondary-spotify mt-4">
-      <Thumb url={track?.imageUrl} size="command-secondary-track-artwork" />
-      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
-    </div>;
-  }
-  if (slot.render.type === 'spotify-artist') {
-    const artistId = slot.render.artistId;
-    const artist = [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? [], ...spotify?.allTime.artists ?? []]
-      .find((a) => (a.id ?? a.name) === artistId);
-    const tracksByTimeframe = {
-      short: spotify?.topTracks.shortTerm ?? [],
-      medium: spotify?.topTracks.mediumTerm ?? [],
-      long: spotify?.topTracks.longTerm ?? [],
-      allTime: spotify?.allTime.tracks ?? [],
-    };
-    const legacyTimeframe = slot.id.split(':')[2];
-    const timeframe = slot.render.timeframe ?? (legacyTimeframe in tracksByTimeframe ? legacyTimeframe as keyof typeof tracksByTimeframe : 'short');
-    const tracks = tracksByTimeframe[timeframe]
-      .filter((track) => track.artist.split(', ').includes(artist?.name ?? slot.title))
-      .slice(0, 3);
-    return <div className="command-secondary-spotify mt-4">
-      {artist && <Thumb url={artist.imageUrl} size="command-secondary-artist-artwork" />}
-      <div className="command-secondary-artist-details">
-        <p className="text-sm font-semibold text-ink">{slot.title}</p>
-        {tracks.length > 0 && <><p className="command-secondary-artist-track-label">Top tracks</p><ol className="command-secondary-artist-tracks" aria-label={`Top tracks by ${slot.title} ${timeframe}`}>
-          {tracks.map((track, index) => <li key={track.id ?? track.track}><span>{index + 1}</span><p>{track.track}</p></li>)}
-        </ol></>}
-      </div>
-    </div>;
-  }
-  if (slot.render.type === 'spotify-album') {
-    const albumId = slot.render.albumId;
-    const album = spotify?.allTime.albums.find((a) => (a.id ?? a.name) === albumId);
-    const albumMeta = [
-      { label: 'Released', value: album?.releaseDate?.slice(0, 4) },
-      { label: 'Length', value: formatAlbumDuration(album?.totalDurationMs) },
-    ].filter((item): item is { label: string; value: string } => Boolean(item.value));
-    return <div className="command-secondary-spotify mt-4">
-      {album && <Thumb url={album.imageUrl} size="command-secondary-spotify-artwork" />}
-      <div className="command-secondary-album-details">
-        <p className="line-clamp-2 text-base font-semibold leading-tight text-ink">{slot.title}</p>
-        <p className="mt-1 truncate text-sm text-ink-muted">{album?.artist.split(',')[0]?.trim() ?? slot.detail}</p>
-        {albumMeta.length > 0 && <dl className="command-secondary-album-meta">
-          {albumMeta.map((item) => <div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}
-        </dl>}
-        {album?.totalTracks && <p className="mt-2 text-xs text-ink-faint">{album.totalTracks} tracks</p>}
-      </div>
-    </div>;
-  }
-  const activityDay = health ? latestActivityDay(health) : undefined;
-  if (slot.render.type === 'health-rings' && health && activityDay) {
-    return <div className="mt-4"><ActivityRings
-      activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
-      exerciseMinutes={activityDay.exerciseMinutes ?? 0}
-      standHours={activityDay.standHours ?? 0}
-      goals={health.goals}
-    /></div>;
-  }
-  if (slot.render.type === 'github-contributions' && github) {
-    return <div className="mt-4"><ContributionGrid data={github} hovered={hoveredDay} onHover={onHover} /></div>;
-  }
-  const toolMark = <AiToolMark accent={slot.accent} className="h-10 w-10 shrink-0" />;
-  return <div className={slot.accent ? 'command-secondary-ai mt-4' : 'mt-4'}>
-    {toolMark}
-    <div><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-1 text-sm text-ink-muted">{slot.detail}</p></div>
-  </div>;
 }
 
 function CommandCenterSkeleton() {
@@ -413,7 +423,11 @@ export function DailyCommandCenter() {
       <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
     </div>
     <div className="command-layout">
-      <CommandPanel href={ranked.hero.href} className={`command-primary command-panel--${toneFor(ranked.hero)}`}>
+      <CommandPanel
+        href={ranked.hero.href}
+        label={`Open ${ranked.hero.kicker}: ${heroEvent?.title ?? heroTrack?.track ?? ranked.hero.title}`}
+        className={`command-primary command-panel--${toneFor(ranked.hero)}`}
+      >
         <p className="command-label">{ranked.hero.kicker}</p>
         <div className="mt-5 flex items-start gap-4">
           {heroTrack && <Thumb url={heroTrack.imageUrl} size="h-16 w-16" />}
@@ -461,7 +475,11 @@ export function DailyCommandCenter() {
       </CommandPanel>
       <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} />)}</div>
     </div>
-    {activeSecondary && <CommandPanel href={activeSecondary.href} className={`command-agenda command-panel--${toneFor(activeSecondary)}`}>
+    {activeSecondary && <CommandPanel
+      href={activeSecondary.href}
+      label={`Open ${activeSecondary.kicker}: ${activeSecondary.title}`}
+      className={`command-agenda command-panel--${toneFor(activeSecondary)}`}
+    >
       <SecondaryCarousel
         items={secondarySlots}
         activeIndex={activeSecondaryIndex}

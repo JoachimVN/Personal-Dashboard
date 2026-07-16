@@ -310,6 +310,19 @@ a {
   z-index: 1;
 }
 
+.command-primary > .command-panel-stretched-link,
+.command-agenda > .command-panel-stretched-link {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.command-panel-stretched-link:focus-visible {
+  outline: 2px solid var(--color-accent-personal);
+  outline-offset: 4px;
+}
+
 .command-event-time {
   font-size: 0.75rem;
   font-weight: 650;

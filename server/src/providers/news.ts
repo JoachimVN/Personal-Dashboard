@@ -18,14 +18,14 @@ export interface NewsFeed {
  */
 export function selectNewsItems(feedItems: NewsItem[][]): NewsItem[] {
   const groups = feedItems
-    .map((items) => items.filter((item) => item.url).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)))
+    .map((items) => items.filter((item) => item.url).toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)))
     .filter((items) => items.length > 0);
   const leading = groups.map(([item]) => item);
   const remaining = groups.flatMap(([, ...items]) => items);
 
   return [
-    ...leading.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
-    ...remaining.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+    ...leading.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+    ...remaining.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
   ].slice(0, MAX_ITEMS);
 }
 
