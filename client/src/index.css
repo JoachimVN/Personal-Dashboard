@@ -25,6 +25,7 @@
   /* Brand accents */
   --color-claude: #de7356;
   --color-openai-mark: light-dark(#0f0f0f, #fafafa);
+  --color-github-mark: light-dark(#24292e, #fafbfc);
   --color-codex: light-dark(#5b6ee1, #9895ff);
   --color-codex-blue: light-dark(#4b84e8, #7eafff);
   --color-codex-purple: light-dark(#7863df, #b49dff);

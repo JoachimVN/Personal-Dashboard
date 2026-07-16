@@ -134,7 +134,7 @@ export function overviewCalendar(now: Date): CalendarData {
     events: [
       {
         id: 'ev1', title: 'Cinema — The Odyssey', calendar: 'Personal', allDay: false,
-        location: `${odysseyDurationLabel} · with Sam`, start: odysseyStart.toISOString(), end: odysseyEnd.toISOString(),
+        location: 'Northstar Cinema', description: `${odysseyDurationLabel} · with Sam`, start: odysseyStart.toISOString(), end: odysseyEnd.toISOString(),
         date: odysseyStart.toISOString().slice(0, 10), startLabel: hhmm(odysseyStart), endLabel: hhmm(odysseyEnd),
       },
       {
@@ -152,7 +152,18 @@ export function overviewGithub(now: Date): GitHubData {
     pullRequests: [
       { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(now, -2) },
     ],
-    contributions: { total: 512, days: [{ date: dateDaysAgo(now, 0), count: 2 }] },
+    contributions: {
+      total: 512,
+      days: [
+        { date: dateDaysAgo(now, 6), count: 3 },
+        { date: dateDaysAgo(now, 5), count: 5 },
+        { date: dateDaysAgo(now, 4), count: 1 },
+        { date: dateDaysAgo(now, 3), count: 4 },
+        { date: dateDaysAgo(now, 2), count: 0 },
+        { date: dateDaysAgo(now, 1), count: 2 },
+        { date: dateDaysAgo(now, 0), count: 0 },
+      ],
+    },
     repoHealth: [],
   };
 }

@@ -80,6 +80,12 @@ function AiToolMark({ accent, className }: Readonly<{ accent: CommandCenterSlot[
   return <Icon className={className} style={{ color }} />;
 }
 
+function GitHubMark({ className }: Readonly<{ className: string }>) {
+  return <svg viewBox="-1.5 -1.5 27 27" fill="currentColor" aria-hidden className={className}>
+    <path d="M12 .297C5.373.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.011-1.232-.016-2.235-3.338.724-4.042-1.416-4.042-1.416-.546-1.385-1.333-1.754-1.333-1.754-1.089-.745.083-.73.083-.73 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.419-1.305.762-1.605-2.665-.305-5.467-1.332-5.467-5.93 0-1.31.465-2.38 1.235-3.22-.124-.303-.535-1.523.117-3.176 0 0 1.008-.322 3.3 1.23A11.498 11.498 0 0 1 12 6.002c1.02.005 2.045.138 3.003.404 2.29-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.118 3.176.77.84 1.233 1.91 1.233 3.22 0 4.61-2.807 5.622-5.479 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.898-.015 3.293 0 .32.216.694.825.576C20.565 22.092 24 17.592 24 12.297 24 5.67 18.627.297 12 .297Z" />
+  </svg>;
+}
+
 function CommandPanel({
   href,
   className,
@@ -128,9 +134,12 @@ function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; gi
     : undefined;
   const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
   const toolMark = slot.accent ? <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" /> : undefined;
+  const githubMark = slot.source === 'github' && slot.render.type === 'github-contributions'
+    ? <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />
+    : undefined;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      {rings ?? toolMark ?? <span className="command-signal-dot" aria-hidden />}
+      {rings ?? toolMark ?? githubMark ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
