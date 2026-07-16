@@ -27,7 +27,7 @@ function formatEventDay(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
   if (event.date === today) return event.allDay ? 'Today' : event.startLabel;
   return new Date(`${event.date}T12:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'short',
+    weekday: 'long',
     day: 'numeric',
   });
 }

@@ -27,7 +27,7 @@ function eventLabel(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
   if (event.date === today) return event.allDay ? 'all day' : event.startLabel;
   const dateAtMidday = `${event.date}T12:00:00`;
-  const day = `${new Date(dateAtMidday).toLocaleDateString('en-GB', { weekday: 'short' })} `;
+  const day = `${new Date(dateAtMidday).toLocaleDateString('en-GB', { weekday: 'long' })} `;
   return `${day}${event.allDay ? 'all day' : event.startLabel}`;
 }
 

@@ -764,7 +764,7 @@ a {
 
 .command-agenda-item {
   display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr);
+  grid-template-columns: 6.5rem minmax(0, 1fr);
   gap: 0.8rem;
   font-size: 0.78rem;
 }
@@ -772,6 +772,7 @@ a {
 .command-agenda-item time {
   color: var(--color-ink-faint);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .command-agenda-item span {
