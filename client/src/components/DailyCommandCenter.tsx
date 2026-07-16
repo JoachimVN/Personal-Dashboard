@@ -90,11 +90,19 @@ function CommandPanel({
   className,
   children,
   navigable = true,
-}: Readonly<{ href: string; label: string; className: string; children: ReactNode; navigable?: boolean }>) {
+  fullCardLink = false,
+}: Readonly<{
+  href: string;
+  label: string;
+  className: string;
+  children: ReactNode;
+  navigable?: boolean;
+  fullCardLink?: boolean;
+}>) {
   if (!navigable) return <div className={className}>{children}</div>;
 
   return (
-    <div className={`${className} cursor-pointer`}>
+    <div className={`${className} cursor-pointer${fullCardLink ? ' command-panel--full-link' : ''}`}>
       <a href={href} aria-label={label} className="command-panel-stretched-link" />
       {children}
     </div>
@@ -478,13 +486,14 @@ export function DailyCommandCenter() {
       href={activeSecondary.href}
       label={`Open ${activeSecondary.kicker}: ${activeSecondary.title}`}
       className={`command-agenda command-panel--${toneFor(activeSecondary)}`}
+      fullCardLink
     >
       <SecondaryCarousel
         items={secondarySlots}
         activeIndex={activeSecondaryIndex}
         onActiveChange={setActiveSecondaryIndex}
         renderItem={(slot) => <>
-          <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><a href={slot.href} className="command-agenda-link">Open section <span aria-hidden>↗</span></a></div>
+          <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>
           <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
         </>}
       />

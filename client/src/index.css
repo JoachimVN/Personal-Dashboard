@@ -318,6 +318,19 @@ a {
   border-radius: inherit;
 }
 
+.command-panel--full-link > .command-panel-stretched-link {
+  z-index: 2;
+}
+
+.command-panel--full-link > .command-secondary-carousel {
+  z-index: auto;
+}
+
+.command-panel--full-link .command-secondary-carousel-dots {
+  position: relative;
+  z-index: 3;
+}
+
 .command-panel-stretched-link:focus-visible {
   outline: 2px solid var(--color-accent-personal);
   outline-offset: 4px;
