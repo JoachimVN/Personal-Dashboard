@@ -62,6 +62,28 @@ describe('ProviderScheduler', () => {
     expect(envelope.error).toBe('fetch-failed');
   });
 
+  it('hydrates persisted data before a first refresh can fail', async () => {
+    const fetchedAt = new Date('2026-07-17T00:00:00.000Z');
+    scheduler.register(
+      fakeProvider({
+        loadCached: async () => ({ data: { value: 7 }, fetchedAt }),
+        fetch: async () => {
+          throw new Error('GitHub unavailable');
+        },
+      }),
+    );
+
+    scheduler.start();
+    await vi.waitFor(() => {
+      expect(scheduler.getEnvelope('fake')).toMatchObject({
+        status: 'stale',
+        data: { value: 7 },
+        fetchedAt: fetchedAt.toISOString(),
+        error: 'fetch-failed',
+      });
+    });
+  });
+
   it('reports error when the first fetch fails and no data exists', async () => {
     scheduler.register(
       fakeProvider({

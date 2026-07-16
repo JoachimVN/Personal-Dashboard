@@ -3,6 +3,7 @@ import type { Database } from '../db/client.js';
 import type { ServerEnv } from '../env.js';
 import type { Provider } from '../scheduler.js';
 import { HealthStore } from '../healthStore.js';
+import { GitHubSnapshotStore } from '../githubSnapshot.js';
 import { UsageHistoryStore } from '../usageHistory.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
@@ -47,6 +48,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
     config.aiUsage.historyRetentionDays * 24 * 60 * 60_000,
   );
   const spotifySnapshot = new SpotifySnapshotStore(database);
+  const githubSnapshot = new GitHubSnapshotStore(database);
   const spotifyHistory = new SpotifyHistoryStore(database);
   return {
     weather,
@@ -57,7 +59,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
         weather,
         createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
         createGmailProvider(env.google),
-        createGitHubProvider(env.github),
+        createGitHubProvider(env.github, githubSnapshot),
         createClaudeUsageProvider(config.aiUsage.claudeRefreshMs, usageHistory),
         createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
         createNewsProvider(config.news.feeds),

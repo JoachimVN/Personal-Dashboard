@@ -1,5 +1,6 @@
 import { Octokit } from 'octokit';
 import { githubSchema, type GitHubData } from '@personal-dashboard/shared';
+import type { GitHubSnapshotStore } from '../githubSnapshot.js';
 import type { Provider } from '../scheduler.js';
 
 export interface RawEvent {
@@ -168,6 +169,7 @@ function activitySummary(commits: ActivityCommit[] | undefined, fallback: string
 
 export function createGitHubProvider(
   auth: { token: string; username: string } | undefined,
+  snapshotStore?: GitHubSnapshotStore,
 ): Provider<GitHubData> {
   return {
     id: 'github',
@@ -175,6 +177,7 @@ export function createGitHubProvider(
     refreshMs: 10 * 60_000,
     timeoutMs: 20_000,
     isConfigured: () => auth !== undefined,
+    loadCached: () => snapshotStore?.getSnapshot() ?? Promise.resolve(undefined),
     async fetch(signal) {
       if (!auth) throw new Error('github is not configured');
       const octokit = new Octokit({ auth: auth.token });
@@ -294,7 +297,7 @@ export function createGitHubProvider(
 
       const calendar = contributions.user.contributionsCollection.contributionCalendar;
 
-      return {
+      const data: GitHubData = {
         activity,
         pullRequests: [
           ...(authored.data.items as SearchItem[]).map((item) => toPr(item, 'author')),
@@ -320,6 +323,8 @@ export function createGitHubProvider(
         },
         repoHealth: health,
       };
+      await snapshotStore?.setSnapshot(data);
+      return data;
     },
   };
 }
