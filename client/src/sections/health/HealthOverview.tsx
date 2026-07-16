@@ -1,8 +1,221 @@
-import type { HealthData } from '@personal-dashboard/shared';
+import { useEffect, useState } from 'react';
+import type { HealthData, HealthDay } from '@personal-dashboard/shared';
+import { animate, motion, useMotionValue } from 'motion/react';
 import { ActivityRings } from '../../components/ActivityRings';
 import { WidgetBody } from '../../components/WidgetCard';
 import { useWidget } from '../../useWidget';
 import { latestActivityDay } from '../../lib/health';
+
+const STEPS_COLOR = 'var(--color-accent-personal)';
+
+/** Same entity colors as the 30-day trend charts, so a metric keeps its hue everywhere. */
+const VITALS = [
+  { key: 'heartRate', label: 'Average', unit: 'bpm', color: 'light-dark(#d9385a, #f43f5e)' },
+  { key: 'restingHeartRate', label: 'Resting', unit: 'bpm', color: 'light-dark(#3b6fd4, #5b87e5)' },
+  { key: 'walkingHeartRate', label: 'Walking', unit: 'bpm', color: 'light-dark(#b45309, #d97706)' },
+  { key: 'bloodOxygenPercent', label: 'SpO₂', unit: '%', color: 'light-dark(#0e7490, #22d3ee)' },
+] as const;
+
+type VitalKey = (typeof VITALS)[number]['key'];
+
+/** The hero steps figure counts up on mount: arrival, not decoration. */
+function CountUp({ value }: Readonly<{ value: number }>) {
+  const progress = useMotionValue(0);
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    const controls = animate(progress, value, { duration: 1.1, ease: [0.22, 1, 0.36, 1] });
+    const unsubscribe = progress.on('change', (v) => setDisplay(Math.round(v)));
+    return () => {
+      controls.stop();
+      unsubscribe();
+    };
+  }, [value, progress]);
+  return <>{display.toLocaleString()}</>;
+}
+
+function StepsHero({ steps, goal, isToday }: Readonly<{ steps: number; goal: number; isToday: boolean }>) {
+  const progress = Math.min(100, goal > 0 ? (steps / goal) * 100 : 0);
+  return (
+    <div className="rounded-2xl bg-track/25 p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">
+            {isToday ? 'Today’s steps' : 'Last synced steps'}
+          </p>
+          <p className="mt-1 text-4xl font-semibold tracking-[-0.05em]">
+            <CountUp value={steps} />
+          </p>
+          <p className="mt-1 text-xs text-ink-muted">of {goal.toLocaleString()} step goal</p>
+        </div>
+        <span className="rounded-full bg-(--color-accent-personal)/12 px-2.5 py-1 text-xs font-semibold tabular-nums text-(--color-accent-personal)">
+          {Math.round(progress)}%
+        </span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-track">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: STEPS_COLOR }}
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** The last week of steps as columns against the goal; hover or tap a day for its exact count. */
+function WeekOfSteps({ history, goal }: Readonly<{ history: HealthDay[]; goal: number }>) {
+  const [active, setActive] = useState<number | null>(null);
+  const days = history.slice(-7);
+  if (days.length < 2) {
+    return (
+      <div className="grid place-items-center rounded-2xl bg-track/25 p-3.5 text-xs text-ink-faint">
+        The week chart unlocks after a couple of synced days.
+      </div>
+    );
+  }
+  const max = Math.max(goal, ...days.map((d) => d.steps ?? 0), 1);
+  const activeDay = active == null ? null : days[active];
+  const total = days.reduce((sum, d) => sum + (d.steps ?? 0), 0);
+  const readout = activeDay
+    ? `${new Date(`${activeDay.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · ${(activeDay.steps ?? 0).toLocaleString()} steps`
+    : `${total.toLocaleString()} steps this week`;
+
+  return (
+    <div className="flex min-w-0 flex-col rounded-2xl bg-track/25 p-3.5">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">Steps · last {days.length} days</p>
+        <p className="truncate text-[11px] tabular-nums text-ink-muted">{readout}</p>
+      </div>
+      <div className="relative min-h-24 flex-1">
+        {/* Goal threshold across the whole bar area */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 z-10"
+          style={{
+            bottom: `${(goal / max) * 100}%`,
+            borderTop: `1px dashed color-mix(in oklab, ${STEPS_COLOR} 55%, transparent)`,
+          }}
+        />
+        <div
+          className="flex h-full items-end gap-1.5"
+          onPointerLeave={(e) => {
+            if (e.pointerType === 'mouse') setActive(null);
+          }}
+        >
+          {days.map((day, i) => {
+            const steps = day.steps ?? 0;
+            const met = steps >= goal;
+            let opacity = 0.4;
+            if (met) opacity = 0.9;
+            if (active === i) opacity = 1;
+            return (
+              <div
+                key={day.date}
+                className="flex h-full flex-1 cursor-pointer items-end justify-center"
+                onPointerEnter={() => setActive(i)}
+                onPointerDown={() => setActive(i)}
+              >
+                <motion.div
+                  className="w-full max-w-6 rounded-t-[4px]"
+                  style={{ background: STEPS_COLOR, opacity }}
+                  initial={{ height: 0 }}
+                  animate={{ height: `${Math.max((steps / max) * 100, 3)}%` }}
+                  transition={{ duration: 0.7, delay: 0.1 + i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                  aria-label={`${day.date}: ${steps.toLocaleString()} steps`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-1 flex gap-1.5">
+        {days.map((day, i) => (
+          <span
+            key={day.date}
+            className={`flex-1 text-center text-[9px] ${active === i ? 'font-semibold text-ink' : 'text-ink-faint'}`}
+          >
+            {new Date(`${day.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'narrow' })}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** ~2-week single-series sparkline; the metric's identity comes from the dot + label beside it. */
+function VitalSparkline({ history, metric, color }: Readonly<{ history: HealthDay[]; metric: VitalKey; color: string }>) {
+  const values = history
+    .slice(-14)
+    .map((day) => day[metric])
+    .filter((v): v is number => v != null);
+  if (values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 1);
+  const W = 56;
+  const H = 16;
+  const xAt = (i: number) => (i / (values.length - 1)) * W;
+  const yAt = (v: number) => 2 + (H - 4) * (1 - (v - min) / span);
+  const line = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(v)}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-4 w-14 shrink-0" aria-hidden>
+      <motion.path
+        d={line}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.55}
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.9, ease: 'easeOut', delay: 0.4 }}
+      />
+      <circle cx={xAt(values.length - 1)} cy={yAt(values.at(-1)!)} r={2} fill={color} stroke="var(--color-card)" strokeWidth={1} />
+    </svg>
+  );
+}
+
+function Vitals({ today, history }: Readonly<{ today: HealthDay; history: HealthDay[] }>) {
+  const readings = VITALS.map((vital) => ({ ...vital, value: today[vital.key] })).filter(
+    (vital): vital is (typeof VITALS)[number] & { value: number } => vital.value != null,
+  );
+  if (readings.length === 0) return null;
+  return (
+    <div className="rounded-2xl bg-track/25 p-3.5">
+      <div className="mb-2.5 flex items-center gap-2">
+        <span className="grid h-6 w-6 place-items-center rounded-lg bg-rose-500/15 text-rose-400" aria-hidden>
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor">
+            <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
+          </svg>
+        </span>
+        <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">Vitals · 2-week trend</p>
+      </div>
+      <div className="space-y-2">
+        {readings.map((vital, i) => (
+          <motion.div
+            key={vital.key}
+            className="flex items-center gap-2.5"
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.15 + i * 0.07, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: vital.color }} />
+            <span className="w-14 shrink-0 text-xs text-ink-muted">{vital.label}</span>
+            <span className="text-sm font-semibold tabular-nums">
+              {Math.round(vital.value)} <span className="text-[10px] font-medium text-ink-faint">{vital.unit}</span>
+            </span>
+            <span className="ml-auto">
+              <VitalSparkline history={history} metric={vital.key} color={vital.color} />
+            </span>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function HealthOverview() {
   const { envelope, offline } = useWidget<HealthData>('health');
@@ -12,43 +225,17 @@ export function HealthOverview() {
         const today = latestActivityDay(data);
         if (!today) return <p className="text-sm text-ink-faint">Health data is waiting for its first sync.</p>;
         const isToday = data.today === today;
-        const steps = today.steps ?? 0;
-        const stepProgress = Math.min(100, (steps / data.goals.steps) * 100);
-        const signals = [
-          today.heartRate != null && { label: 'Average heart rate', value: `${Math.round(today.heartRate)} bpm`, tone: 'text-rose-300' },
-          today.bloodOxygenPercent != null && { label: 'Blood oxygen', value: `${Math.round(today.bloodOxygenPercent)}%`, tone: 'text-cyan-300' },
-        ].filter((signal): signal is { label: string; value: string; tone: string } => Boolean(signal));
         return (
-          <div className="grid gap-3 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(20rem,1.25fr)]">
-            <div className="rounded-2xl bg-track/25 p-3.5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">{isToday ? 'Today’s steps' : 'Last synced steps'}</p>
-                  <p className="mt-1 text-3xl font-semibold tracking-[-0.05em] tabular-nums">{steps.toLocaleString()}</p>
-                  <p className="mt-1 text-xs text-ink-muted">of {data.goals.steps.toLocaleString()} step goal</p>
-                </div>
-                <span className="rounded-full bg-(--color-accent-personal)/12 px-2.5 py-1 text-xs font-semibold tabular-nums text-(--color-accent-personal)">{Math.round(stepProgress)}%</span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-track">
-                <div className="h-full rounded-full bg-(--color-accent-personal) transition-[width] duration-500" style={{ width: `${stepProgress}%` }} />
-              </div>
-              {signals.length > 0 && (
-                <div className={`mt-4 grid gap-2 border-t border-card-border pt-3 ${signals.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                  {signals.map((signal) => (
-                    <div key={signal.label} className="min-w-0">
-                      <p className="truncate text-[10px] uppercase tracking-[0.1em] text-ink-faint">{signal.label}</p>
-                      <p className={`mt-1 text-sm font-semibold tabular-nums ${signal.tone}`}>{signal.value}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(12rem,0.95fr)_minmax(0,1.25fr)_minmax(13rem,1fr)_minmax(13rem,1fr)]">
+            <StepsHero steps={today.steps ?? 0} goal={data.goals.steps} isToday={isToday} />
+            <WeekOfSteps history={data.history} goal={data.goals.steps} />
             <ActivityRings
               activeEnergyKcal={today.activeEnergyKcal ?? 0}
               exerciseMinutes={today.exerciseMinutes ?? 0}
               standHours={today.standHours ?? 0}
               goals={data.goals}
             />
+            <Vitals today={today} history={data.history} />
           </div>
         );
       }}
