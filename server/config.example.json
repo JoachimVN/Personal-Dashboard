@@ -12,5 +12,8 @@
       "darwin": "/Users/you/GitHub",
       "win32": "C:\\Users\\you\\GitHub"
     }
+  },
+  "widgets": {
+    "hue": { "enabled": false }
   }
 }

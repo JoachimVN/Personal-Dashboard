@@ -11,6 +11,7 @@ interface WidgetCardProps<T> {
 }
 
 export function WidgetCard<T>({ title, envelope, offline, children, errorFallback }: WidgetCardProps<T>) {
+  if (envelope?.status === 'disabled') return null;
   return (
     <WidgetShell title={title} badge={<StaleBadge envelope={envelope} />}>
       <WidgetBody envelope={envelope} offline={offline} errorFallback={errorFallback}>
@@ -18,6 +19,11 @@ export function WidgetCard<T>({ title, envelope, offline, children, errorFallbac
       </WidgetBody>
     </WidgetShell>
   );
+}
+
+/** True once the server reports this widget was turned off in config.json (vs. still loading, or on but unconfigured). */
+export function isWidgetDisabled(envelope: WidgetEnvelope<unknown> | null): boolean {
+  return envelope?.status === 'disabled';
 }
 
 /** Amber "updated Xm ago" pill shown while a widget serves cached data after a failed refresh. */

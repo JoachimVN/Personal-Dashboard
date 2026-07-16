@@ -7,7 +7,7 @@ import type {
   WeatherData,
 } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
-import { WidgetBody } from '../../components/WidgetCard';
+import { isWidgetDisabled, WidgetBody } from '../../components/WidgetCard';
 import { deg, glyph, weatherLocation } from '../../lib/weather';
 import { relativeTime } from '../../lib/time';
 import { sectionHref } from '../../router';
@@ -42,93 +42,105 @@ export function PersonalOverview() {
   return (
     <div className="grid grid-cols-2 gap-x-3 gap-y-3">
       <TodayBrief />
-      <Mini label="Weather">
-        <WidgetBody envelope={weather.envelope} offline={weather.offline}>
-          {(data) => (
-            <span className="flex flex-col">
-              <a href={sectionHref('personal')} className="w-fit rounded-md font-semibold transition hover:text-ink">{glyph(data.current.symbol)} {deg(data.current.temperature)}</a>
-              <a
-                href={mapsCoordinatesHref(data.location)}
-                target="_blank"
-                rel="noreferrer"
-                className="flex w-fit items-center gap-1 text-[10px] text-ink-faint underline decoration-card-border underline-offset-2 transition hover:text-ink"
-              >
-                <span aria-hidden>📍</span>{weatherLocation(data.location)}
-              </a>
-            </span>
-          )}
-        </WidgetBody>
-      </Mini>
-      <Mini label="Mail">
-        <WidgetBody envelope={gmail.envelope} offline={gmail.offline}>
-          {(data) => (
-            <span>
-              <span className="font-semibold tabular-nums">{data.unreadThreads}</span>{' '}
-              <span className="text-ink-muted">unread</span>
-            </span>
-          )}
-        </WidgetBody>
-      </Mini>
-      <Mini label="Next up" wide>
-        <WidgetBody envelope={calendar.envelope} offline={calendar.offline}>
-          {(data) => {
-            const next = data.events[0];
-            return next ? (
-              <span className="flex items-baseline gap-2">
-                <span className="shrink-0 tabular-nums text-ink-muted">{eventLabel(next)}</span>
-                <span className="truncate font-medium">{next.title}</span>
+      {!isWidgetDisabled(weather.envelope) && (
+        <Mini label="Weather">
+          <WidgetBody envelope={weather.envelope} offline={weather.offline}>
+            {(data) => (
+              <span className="flex flex-col">
+                <a href={sectionHref('personal')} className="w-fit rounded-md font-semibold transition hover:text-ink">{glyph(data.current.symbol)} {deg(data.current.temperature)}</a>
+                <a
+                  href={mapsCoordinatesHref(data.location)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-fit items-center gap-1 text-[10px] text-ink-faint underline decoration-card-border underline-offset-2 transition hover:text-ink"
+                >
+                  <span aria-hidden>📍</span>{weatherLocation(data.location)}
+                </a>
               </span>
-            ) : (
-              <span className="text-ink-faint">Nothing scheduled</span>
-            );
-          }}
-        </WidgetBody>
-      </Mini>
-      <Mini label="Lights">
-        <WidgetBody envelope={hue.envelope} offline={hue.offline}>
-          {(data) => {
-            const on = data.lights.filter((light) => light.on).length;
-            return (
+            )}
+          </WidgetBody>
+        </Mini>
+      )}
+      {!isWidgetDisabled(gmail.envelope) && (
+        <Mini label="Mail">
+          <WidgetBody envelope={gmail.envelope} offline={gmail.offline}>
+            {(data) => (
               <span>
-                <span className="font-semibold tabular-nums">{on}</span>{' '}
-                <span className="text-ink-muted">/ {data.lights.length} on</span>
-              </span>
-            );
-          }}
-        </WidgetBody>
-      </Mini>
-      <Mini label="Messages">
-        <WidgetBody envelope={imessage.envelope} offline={imessage.offline}>
-          {(data) => {
-            const unread = data.conversations.reduce((sum, c) => sum + c.unreadCount, 0);
-            return unread > 0 ? (
-              <span>
-                <span className="font-semibold tabular-nums">{unread}</span>{' '}
+                <span className="font-semibold tabular-nums">{data.unreadThreads}</span>{' '}
                 <span className="text-ink-muted">unread</span>
               </span>
-            ) : (
-              <span className="text-ink-faint">All caught up</span>
-            );
-          }}
-        </WidgetBody>
-      </Mini>
-      <Mini label="Latest news" wide>
-        <WidgetBody envelope={news.envelope} offline={news.offline}>
-          {(data) => {
-            const item = data.items[0];
-            return item ? (
-              <span className="flex items-baseline gap-2">
-                <span className="truncate font-medium">{item.title}</span>
-                <span className="ml-auto shrink-0 text-xs text-ink-faint">
-                  {relativeTime(item.publishedAt)}
+            )}
+          </WidgetBody>
+        </Mini>
+      )}
+      {!isWidgetDisabled(calendar.envelope) && (
+        <Mini label="Next up" wide>
+          <WidgetBody envelope={calendar.envelope} offline={calendar.offline}>
+            {(data) => {
+              const next = data.events[0];
+              return next ? (
+                <span className="flex items-baseline gap-2">
+                  <span className="shrink-0 tabular-nums text-ink-muted">{eventLabel(next)}</span>
+                  <span className="truncate font-medium">{next.title}</span>
                 </span>
-              </span>
-            ) : (
-              <span className="text-ink-faint">No headlines</span>
-            );
-          }}
-        </WidgetBody>
-      </Mini>
+              ) : (
+                <span className="text-ink-faint">Nothing scheduled</span>
+              );
+            }}
+          </WidgetBody>
+        </Mini>
+      )}
+      {!isWidgetDisabled(hue.envelope) && (
+        <Mini label="Lights">
+          <WidgetBody envelope={hue.envelope} offline={hue.offline}>
+            {(data) => {
+              const on = data.lights.filter((light) => light.on).length;
+              return (
+                <span>
+                  <span className="font-semibold tabular-nums">{on}</span>{' '}
+                  <span className="text-ink-muted">/ {data.lights.length} on</span>
+                </span>
+              );
+            }}
+          </WidgetBody>
+        </Mini>
+      )}
+      {!isWidgetDisabled(imessage.envelope) && (
+        <Mini label="Messages">
+          <WidgetBody envelope={imessage.envelope} offline={imessage.offline}>
+            {(data) => {
+              const unread = data.conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+              return unread > 0 ? (
+                <span>
+                  <span className="font-semibold tabular-nums">{unread}</span>{' '}
+                  <span className="text-ink-muted">unread</span>
+                </span>
+              ) : (
+                <span className="text-ink-faint">All caught up</span>
+              );
+            }}
+          </WidgetBody>
+        </Mini>
+      )}
+      {!isWidgetDisabled(news.envelope) && (
+        <Mini label="Latest news" wide>
+          <WidgetBody envelope={news.envelope} offline={news.offline}>
+            {(data) => {
+              const item = data.items[0];
+              return item ? (
+                <span className="flex items-baseline gap-2">
+                  <span className="truncate font-medium">{item.title}</span>
+                  <span className="ml-auto shrink-0 text-xs text-ink-faint">
+                    {relativeTime(item.publishedAt)}
+                  </span>
+                </span>
+              ) : (
+                <span className="text-ink-faint">No headlines</span>
+              );
+            }}
+          </WidgetBody>
+        </Mini>
+      )}
     </div>
   );
 }

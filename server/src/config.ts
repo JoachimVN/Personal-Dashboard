@@ -78,6 +78,8 @@ const configSchema = z.object({
       reposRoot: z.object({ darwin: z.string().optional(), win32: z.string().optional() }).default({}),
     })
     .default({ reposRoot: {} }),
+  /** Per-widget on/off switch, keyed by provider id (e.g. "hue"). Absent id or `enabled: true` = on. Explicit `enabled: false` hides the widget entirely, distinct from "not configured". */
+  widgets: z.record(z.string(), z.object({ enabled: z.boolean() })).default({}),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
