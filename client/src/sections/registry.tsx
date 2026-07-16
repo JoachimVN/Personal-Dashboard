@@ -7,10 +7,12 @@ import { SpotifyOverview } from './spotify/SpotifyOverview';
 import { SpotifyDetail } from './spotify/SpotifyDetail';
 import { PersonalOverview } from './personal/PersonalOverview';
 import { PersonalDetail } from './personal/PersonalDetail';
+import { WeatherOverview } from './weather/WeatherOverview';
+import { WeatherDetail } from './weather/WeatherDetail';
 import { HealthOverview } from './health/HealthOverview';
 import { HealthDetail } from './health/HealthDetail';
 
-export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'health'] as const;
+export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 export interface SectionDef {
@@ -63,6 +65,15 @@ export const SECTIONS: SectionDef[] = [
     accentVar: '--color-accent-personal',
     Overview: PersonalOverview,
     Detail: PersonalDetail,
+  },
+  {
+    id: 'weather',
+    title: 'Weather',
+    label: 'Sky',
+    description: 'Conditions, sun and moon',
+    accentVar: '--color-accent-weather',
+    Overview: WeatherOverview,
+    Detail: WeatherDetail,
   },
   {
     id: 'health',

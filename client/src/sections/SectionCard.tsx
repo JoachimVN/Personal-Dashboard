@@ -42,6 +42,15 @@ function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
       </svg>
     );
   }
+  if (id === 'weather') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="9" r="3.5" stroke="var(--accent)" />
+        <path d="M9 2.5v1.4M9 14.1v1.4M2.5 9h1.4M14.1 9h1.4M4.4 4.4l1 1M12.6 12.6l1 1M13.6 4.4l-1 1M5.4 12.6l-1 1" stroke="var(--accent)" />
+        <path d="M13 20.5h5.2a3.3 3.3 0 0 0 .6-6.55A4.6 4.6 0 0 0 10 12.9a3.6 3.6 0 0 0 .4 7.6H13Z" fill="var(--color-card)" />
+      </svg>
+    );
+  }
   if (id === 'health') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">

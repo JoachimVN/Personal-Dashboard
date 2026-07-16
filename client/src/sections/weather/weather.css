@@ -1,0 +1,49 @@
+/* Weather section design tokens + flourishes, kept out of index.css so the
+   section is self-contained (same pattern as spotify.css). Sun-gold accent:
+   the one hue clearly distinct from the five existing section accents. */
+:root {
+  --color-accent-weather: light-dark(#b5750a, #ffb84d);
+}
+
+@media (min-width: 1024px) {
+  .dashboard-section-card--weather {
+    grid-column: span 12;
+  }
+}
+
+/* ── Sun arc ─────────────────────────────────────────────────────────────── */
+
+/* The sun dot travels the arc via stroke-dash tricks on a guide path; the glow
+   pulses gently so daylight feels alive without being loud. */
+.weather-sun-dot {
+  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--color-accent-weather) 80%, transparent));
+}
+
+@keyframes weather-sun-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
+.weather-sun-glow {
+  animation: weather-sun-breathe 5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .weather-sun-glow { animation: none; }
+}
+
+/* ── Detail tiles ────────────────────────────────────────────────────────── */
+
+.weather-tile {
+  border-radius: 1.25rem;
+  background: color-mix(in oklab, var(--color-track) 25%, transparent);
+  padding: 0.875rem;
+  min-width: 0;
+}
+
+/* Compass needle rotates to the wind direction with a springy CSS transition
+   (the value only changes on refresh, so a transition beats re-rendering motion). */
+.weather-compass-needle {
+  transform-origin: 50% 50%;
+  transition: transform 900ms cubic-bezier(0.34, 1.3, 0.4, 1);
+}

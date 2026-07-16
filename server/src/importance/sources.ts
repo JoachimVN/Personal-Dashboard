@@ -488,14 +488,14 @@ export function weatherCandidates(
     return [{
       id: 'weather:hot', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
       kicker: 'Heat today', title: `${Math.round(today.maxTemperature)}° expected`,
-      detail: `Above your configured comfortable range`, href: '#/personal', render: { type: 'weather-hours' },
+      detail: `Above your configured comfortable range`, href: '#/weather', render: { type: 'weather-hours' },
     }];
   }
   if (today.minTemperature <= coldThresholdC) {
     return [{
       id: 'weather:cold', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
       kicker: 'Cold today', title: `${Math.round(today.minTemperature)}° expected`,
-      detail: `Below your configured comfortable range`, href: '#/personal', render: { type: 'weather-hours' },
+      detail: `Below your configured comfortable range`, href: '#/weather', render: { type: 'weather-hours' },
     }];
   }
   const overnight = new Date(now).getHours() < 6;
@@ -505,7 +505,7 @@ export function weatherCandidates(
       id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['tile'],
       kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
       detail: forecast.precipitationMm > 0 ? `${forecast.precipitationMm.toFixed(1)} mm precipitation expected` : `${weekdayFullFmt.format(new Date(`${forecast.date}T12:00:00Z`))} looks dry`,
-      href: '#/personal', render: { type: 'text' },
+      href: '#/weather', render: { type: 'text' },
     }];
   }
   return [];

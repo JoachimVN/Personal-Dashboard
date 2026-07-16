@@ -107,18 +107,41 @@ async function resolvedArtistPhoto(name: string, fallbackSeed: string): Promise<
 // ── Overview page (calendar + weather + a quiet day of tiles) ──────────────────────────────────
 
 export function weather(now: Date): WeatherData {
+  const day = (offset: number) => new Date(now.getTime() + offset * 86_400_000);
+  const weekday = (offset: number) => day(offset).toLocaleDateString('en-GB', { weekday: 'short' });
+  const sunrise = daysFromNowAt(now, 0, 5, 42);
+  const sunset = daysFromNowAt(now, 0, 21, 8);
   return {
     location: { lat: 40.71, lon: -74.01, name: 'New York' },
-    current: { temperature: 18, windSpeed: 2.6, symbol: 'partlycloudy_day' },
+    current: {
+      temperature: 18, windSpeed: 2.6, windDirectionDeg: 224, humidity: 58, uvIndex: 4.2,
+      precipitationMm: 0, symbol: 'partlycloudy_day',
+    },
     hours: [
-      { time: iso(now, 1), hourLabel: '14', temperature: 18, precipitationMm: 0, symbol: 'partlycloudy_day' },
-      { time: iso(now, 2), hourLabel: '15', temperature: 19, precipitationMm: 0, symbol: 'clearsky_day' },
-      { time: iso(now, 3), hourLabel: '16', temperature: 17, precipitationMm: 0, symbol: 'fair_day' },
-      { time: iso(now, 4), hourLabel: '17', temperature: 16, precipitationMm: 0.1, symbol: 'lightrain' },
+      { time: iso(now, 1), hourLabel: '14', temperature: 18, precipitationMm: 0, uvIndex: 4.2, symbol: 'partlycloudy_day' },
+      { time: iso(now, 2), hourLabel: '15', temperature: 19, precipitationMm: 0, uvIndex: 4.6, symbol: 'clearsky_day' },
+      { time: iso(now, 3), hourLabel: '16', temperature: 19, precipitationMm: 0, uvIndex: 3.8, symbol: 'clearsky_day' },
+      { time: iso(now, 4), hourLabel: '17', temperature: 17, precipitationMm: 0.1, uvIndex: 2.4, symbol: 'fair_day' },
+      { time: iso(now, 5), hourLabel: '18', temperature: 16, precipitationMm: 0.3, uvIndex: 1.5, symbol: 'lightrain' },
+      { time: iso(now, 6), hourLabel: '19', temperature: 15, precipitationMm: 0.8, uvIndex: 0.7, symbol: 'rain' },
+      { time: iso(now, 7), hourLabel: '20', temperature: 14, precipitationMm: 0.4, uvIndex: 0.2, symbol: 'lightrain' },
+      { time: iso(now, 8), hourLabel: '21', temperature: 14, precipitationMm: 0, uvIndex: 0, symbol: 'partlycloudy_night' },
+      { time: iso(now, 9), hourLabel: '22', temperature: 13, precipitationMm: 0, uvIndex: 0, symbol: 'fair_night' },
+      { time: iso(now, 10), hourLabel: '23', temperature: 13, precipitationMm: 0, uvIndex: 0, symbol: 'clearsky_night' },
+      { time: iso(now, 11), hourLabel: '00', temperature: 12, precipitationMm: 0, uvIndex: 0, symbol: 'clearsky_night' },
+      { time: iso(now, 12), hourLabel: '01', temperature: 12, precipitationMm: 0, uvIndex: 0, symbol: 'clearsky_night' },
     ],
     days: [
-      { date: dateDaysAgo(now, 0), dayLabel: 'Wed', minTemperature: 14, maxTemperature: 20, precipitationMm: 0.4, symbol: 'partlycloudy_day' },
+      { date: dateDaysAgo(now, 0), dayLabel: weekday(0), minTemperature: 14, maxTemperature: 20, precipitationMm: 0.4, symbol: 'partlycloudy_day' },
+      { date: dateDaysAgo(now, -1), dayLabel: weekday(1), minTemperature: 13, maxTemperature: 22, precipitationMm: 0, symbol: 'clearsky_day' },
+      { date: dateDaysAgo(now, -2), dayLabel: weekday(2), minTemperature: 15, maxTemperature: 24, precipitationMm: 0, symbol: 'clearsky_day' },
+      { date: dateDaysAgo(now, -3), dayLabel: weekday(3), minTemperature: 16, maxTemperature: 21, precipitationMm: 2.8, symbol: 'rainshowers_day' },
+      { date: dateDaysAgo(now, -4), dayLabel: weekday(4), minTemperature: 13, maxTemperature: 17, precipitationMm: 6.1, symbol: 'rain' },
+      { date: dateDaysAgo(now, -5), dayLabel: weekday(5), minTemperature: 12, maxTemperature: 18, precipitationMm: 1.2, symbol: 'partlycloudy_day' },
+      { date: dateDaysAgo(now, -6), dayLabel: weekday(6), minTemperature: 14, maxTemperature: 20, precipitationMm: 0, symbol: 'fair_day' },
     ],
+    sun: { sunrise: sunrise.toISOString(), sunset: sunset.toISOString() },
+    moon: { phaseDeg: 132, moonrise: daysFromNowAt(now, 0, 16, 24).toISOString(), moonset: daysFromNowAt(now, 0, 2, 51).toISOString() },
   };
 }
 
