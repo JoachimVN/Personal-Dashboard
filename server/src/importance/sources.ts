@@ -407,10 +407,14 @@ function aiResetCandidates(available: AiTool[]): Candidate[] {
     .map((resetsAt) => Date.parse(resetsAt));
   const sharedReset = resetTimes.length === resets.length
     && Math.max(...resetTimes) - Math.min(...resetTimes) <= 60 * 60_000;
+  const usageLabel = (reset: (typeof resets)[number]) => `${reset.tool.label} ${reset.usedPercent.toFixed(0)}%`;
   const detail = sharedReset
-    ? `${resets.map((reset) => `${reset.tool.label} ${reset.usedPercent.toFixed(0)}%`).join(' · ')} · clean slates until ${resetLabel(resets[0]!.resetsAt!)}`
+    ? `${resets.map(usageLabel).join(' · ')} · clean slates until ${resetLabel(resets[0]!.resetsAt!)}`
     : resets
-      .map((reset) => `${reset.tool.label} ${reset.usedPercent.toFixed(0)}%${reset.resetsAt ? ` until ${resetLabel(reset.resetsAt)}` : ''}`)
+      .map((reset) => {
+        const untilSuffix = reset.resetsAt ? ` until ${resetLabel(reset.resetsAt)}` : '';
+        return `${usageLabel(reset)}${untilSuffix}`;
+      })
       .join(' · ');
   return [{
     id: `ai-usage:reset:${resets.map((reset) => reset.tool.id).sort((a, b) => a.localeCompare(b)).join('+')}`,
