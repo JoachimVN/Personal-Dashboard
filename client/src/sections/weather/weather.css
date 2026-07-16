@@ -2,7 +2,10 @@
    section is self-contained (same pattern as spotify.css). Sun-gold accent:
    the one hue clearly distinct from the five existing section accents. */
 :root {
-  --color-accent-weather: light-dark(#b5750a, #ffb84d);
+  /* The old light-mode value (#b5750a) was a dull, desaturated brown — much duller
+     than every sibling accent (AI purple, GitHub blue, Spotify green, ...), which is
+     why fills/glows/bars built from it read as muddy instead of warm. */
+  --color-accent-weather: light-dark(#d97706, #ffb84d);
 }
 
 @media (min-width: 1024px) {
@@ -14,14 +17,12 @@
 /* ── Sun arc ─────────────────────────────────────────────────────────────── */
 
 /* The sun dot travels the arc via stroke-dash tricks on a guide path; the glow
-   pulses gently so daylight feels alive without being loud. */
-.weather-sun-dot {
-  filter: drop-shadow(0 0 6px color-mix(in oklab, var(--color-accent-weather) 80%, transparent));
-}
-
+   pulses gently so daylight feels alive without being loud. The core's own radial
+   gradient does the shading — no drop-shadow here, or it doubles up with the glow
+   circle behind it and washes the whole thing out. */
 @keyframes weather-sun-breathe {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 0.95; }
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.85; }
 }
 
 .weather-sun-glow {

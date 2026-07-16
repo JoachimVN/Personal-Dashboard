@@ -195,24 +195,25 @@ function nextMoonEventLabel(phaseDeg: number): string {
   return `${name} in ${rounded} ${rounded === 1 ? 'day' : 'days'}`;
 }
 
-/** The moon itself is the card; everything else is one caption line. */
+/** A small widget, not a full card: the disc sits beside its one caption line. */
 function MoonPanel({ moon }: Readonly<{ moon: NonNullable<WeatherData['moon']> }>) {
   const illumination = Math.round(moonIllumination(moon.phaseDeg) * 100);
   return (
-    <div className="flex flex-col items-center gap-3 py-1">
+    <div className="flex items-center gap-3">
       <motion.div
         initial={{ opacity: 0, scale: 0.88 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.15 }}
+        className="shrink-0"
         style={{
-          filter: `drop-shadow(0 0 ${8 + illumination * 0.22}px light-dark(rgb(118 136 163 / ${0.12 + illumination * 0.003}), rgb(231 237 248 / ${0.1 + illumination * 0.004})))`,
+          filter: `drop-shadow(0 0 ${5 + illumination * 0.14}px light-dark(rgb(118 136 163 / ${0.12 + illumination * 0.003}), rgb(231 237 248 / ${0.1 + illumination * 0.004})))`,
         }}
       >
-        <MoonDisc phaseDeg={moon.phaseDeg} size={140} />
+        <MoonDisc phaseDeg={moon.phaseDeg} size={52} />
       </motion.div>
-      <div className="text-center">
-        <p className="text-lg font-semibold tracking-[-0.02em]">{moonPhaseName(moon.phaseDeg)}</p>
-        <p className="mt-0.5 text-xs text-ink-muted">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold tracking-[-0.01em]">{moonPhaseName(moon.phaseDeg)}</p>
+        <p className="mt-0.5 truncate text-xs text-ink-muted">
           {illumination}% lit · {nextMoonEventLabel(moon.phaseDeg)}
         </p>
       </div>
@@ -458,7 +459,7 @@ export function WeatherDetail() {
 
       <div className="mt-6">
         <DetailSectionHeading label="Sky" title="Sun & moon" detail="Where the sun is in its day, and what the moon is doing tonight." />
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr]">
           <WidgetShell title="Daylight">
             <WidgetBody envelope={envelope} offline={offline}>
               {(data) =>

@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { motion } from 'motion/react';
 import { moonIllumination, moonPhaseName } from '../../lib/weather';
 import { useSkyNow } from '../../lib/skyTime';
@@ -8,10 +8,24 @@ const CX = 110;
 const CY = 104;
 const R = 88;
 const ARC_LENGTH = Math.PI * R;
+const REVEAL_TRANSITION = { duration: 1.1, ease: [0.22, 1, 0.36, 1] as const, delay: 0.15 };
+const SUN_APPEAR_TRANSITION = { delay: 0.9, type: 'spring' as const, stiffness: 260, damping: 18 };
+const INSTANT = { duration: 0 };
+const CORE_RADIUS = 6.5;
+const GLOW_RADIUS = 36;
 
 function arcPoint(fraction: number): { x: number; y: number } {
   const angle = Math.PI * fraction;
   return { x: CX - R * Math.cos(angle), y: CY - R * Math.sin(angle) };
+}
+
+/** The arc-fraction buffer needed for the sun to dip `depth` px below the horizon (y = CY).
+ * Deriving this from a fixed depth — not a fixed time — is what keeps the dip the same size
+ * in every season: a time-based buffer (e.g. "20 minutes") covers a much shallower dip on a
+ * 19-hour summer day than an 8-hour winter one, which is what let the old version mount the
+ * sun and glow while they were still mostly above the horizon — the visible "pop". */
+function bufferFractionForDepth(depth: number): number {
+  return Math.asin(Math.min(1, depth / R)) / Math.PI;
 }
 
 function timeLabel(iso: string): string {
@@ -38,6 +52,19 @@ export function SunArc({ sunrise, sunset, compact }: Readonly<SunArcProps>) {
   const gradientId = `${useId().replaceAll(':', '')}-sun`;
   // Follows the sky-preview slider when it's on, so the arc scrubs with the sky.
   const now = useSkyNow().getTime();
+
+  // The reveal animation (arc draw-in, sun pop-in) should only ever play once per mount.
+  // Every later render — whether from a real 30s tick or the debug slider firing every
+  // 100ms — must snap straight to its target, or a scrub through the day looks laggy:
+  // each new frame would kick off another full eased transition instead of tracking 1:1.
+  const enteredRef = useRef(false);
+  useEffect(() => {
+    enteredRef.current = true;
+  }, []);
+  const entering = !enteredRef.current;
+  const sweepTransition = entering ? REVEAL_TRANSITION : INSTANT;
+  const sunAppearTransition = entering ? SUN_APPEAR_TRANSITION : INSTANT;
+
   if (!sunrise || !sunset) {
     return (
       <p className="text-sm text-ink-faint">
@@ -48,9 +75,21 @@ export function SunArc({ sunrise, sunset, compact }: Readonly<SunArcProps>) {
 
   const rise = Date.parse(sunrise);
   const set = Date.parse(sunset);
-  const fraction = Math.min(1, Math.max(0, (now - rise) / (set - rise)));
+  const dayMs = set - rise;
+  const fraction = Math.min(1, Math.max(0, (now - rise) / dayMs));
   const sunUp = now >= rise && now <= set;
-  const sun = arcPoint(fraction);
+  const rawFraction = (now - rise) / dayMs;
+  // The glow isn't clipped by the horizon (see below), so unlike the core it needs to be fully
+  // below it — depth > its own radius — before the whole group mounts, or it pops in still
+  // half-visible. That makes the glow's buffer, not the smaller core's, the one that matters.
+  const glowBuffer = bufferFractionForDepth(GLOW_RADIUS + 8);
+  const sunVisible = rawFraction >= -glowBuffer && rawFraction <= 1 + glowBuffer;
+  const sun = arcPoint(Math.min(1 + glowBuffer, Math.max(-glowBuffer, rawFraction)));
+  // 1 at the true rise/set instant, smoothly down to 0 at the edge of the glow's buffer — the
+  // core is purely geometric (the horizon clip does all the work), but the glow isn't clipped,
+  // so it needs its own fade to avoid popping in fully-formed below the horizon.
+  const overshoot = rawFraction < 0 ? -rawFraction : Math.max(0, rawFraction - 1);
+  const glowFade = 1 - Math.min(1, overshoot / glowBuffer);
 
   let caption = daylightLabel(sunrise, sunset);
   if (now < rise) caption = `Sun rises ${timeLabel(sunrise)} · ${caption}`;
@@ -58,12 +97,32 @@ export function SunArc({ sunrise, sunset, compact }: Readonly<SunArcProps>) {
 
   return (
     <div className="min-w-0">
-      <svg viewBox="0 0 220 118" className="w-full" role="img" aria-label={`Sunrise ${timeLabel(sunrise)}, sunset ${timeLabel(sunset)}`}>
+      <svg viewBox="-16 -26 252 144" className="w-full" role="img" aria-label={`Sunrise ${timeLabel(sunrise)}, sunset ${timeLabel(sunset)}`}>
         <defs>
           <linearGradient id={gradientId} x1="22" y1="104" x2="198" y2="104" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="var(--color-accent-weather)" stopOpacity="0.35" />
             <stop offset="1" stopColor="var(--color-accent-weather)" />
           </linearGradient>
+          {/* A true radial fade reads as a soft bloom; a blurred flat circle instead leaves a
+              visible edge where the blur runs out — that was the hard "ring" around the old sun.
+              Two stops only: any extra midpoint stop puts a kink in the falloff rate, which
+              still reads as a faint ring even without a hard edge. */}
+          <radialGradient id={`${gradientId}-glow`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="var(--color-accent-weather)" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="var(--color-accent-weather)" stopOpacity="0" />
+          </radialGradient>
+          {/* Off-center highlight (same trick as the moon disc) so the core reads as a lit
+              sphere instead of a flat tinted dot. */}
+          <radialGradient id={`${gradientId}-core`} cx="36%" cy="30%" r="80%">
+            <stop offset="0" stopColor="light-dark(#fffaf0, #fff6db)" />
+            <stop offset="55%" stopColor="light-dark(#ffdb93, #ffd27a)" />
+            <stop offset="100%" stopColor="var(--color-accent-weather)" />
+          </radialGradient>
+          {/* Anything below the horizon line is invisible — this is what lets the sun rise up
+              out of / sink back below the horizon instead of popping in and out. */}
+          <clipPath id={`${gradientId}-horizon`}>
+            <rect x="-1000" y="-1000" width="2000" height={1000 + CY} />
+          </clipPath>
         </defs>
         {/* Horizon */}
         <line x1="8" y1="104" x2="212" y2="104" stroke="var(--color-card-border)" strokeWidth="1" />
@@ -75,7 +134,8 @@ export function SunArc({ sunrise, sunset, compact }: Readonly<SunArcProps>) {
           strokeWidth="2.5"
           strokeLinecap="round"
         />
-        {/* Elapsed daylight sweep, drawn in on mount */}
+        {/* Elapsed daylight sweep, drawn in on mount, stopped a hair short of the sun itself —
+            running the thick line straight into the ball made it look like a lollipop. */}
         {sunUp && (
           <motion.path
             d={`M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`}
@@ -85,28 +145,32 @@ export function SunArc({ sunrise, sunset, compact }: Readonly<SunArcProps>) {
             strokeLinecap="round"
             strokeDasharray={ARC_LENGTH}
             initial={{ strokeDashoffset: ARC_LENGTH }}
-            animate={{ strokeDashoffset: ARC_LENGTH * (1 - fraction) }}
-            transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+            animate={{ strokeDashoffset: ARC_LENGTH - Math.max(0, fraction * ARC_LENGTH - CORE_RADIUS - 2) }}
+            transition={sweepTransition}
           />
         )}
-        {/* The sun itself */}
-        {sunUp && (
+        {/* The sun itself: a wide, subtle bloom behind a clean gradient-lit core. */}
+        {sunVisible && (
           <motion.g
-            initial={{ opacity: 0, scale: 0.4 }}
+            initial={entering ? { opacity: 0, scale: 0.4 } : false}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.9, type: 'spring', stiffness: 260, damping: 18 }}
+            transition={sunAppearTransition}
             style={{ transformOrigin: `${sun.x}px ${sun.y}px` }}
           >
-            <circle className="weather-sun-glow" cx={sun.x} cy={sun.y} r="11" fill="var(--color-accent-weather)" opacity="0.25" />
-            <circle
-              className="weather-sun-dot"
-              cx={sun.x}
-              cy={sun.y}
-              r="5.5"
-              fill="var(--color-accent-weather)"
-              stroke="var(--color-card)"
-              strokeWidth="2"
-            />
+            {/* Not clipped by the horizon — clipping a soft gradient circle at a hard line left
+                a lopsided "chopped blob" shape whenever the sun neared the edges of the day.
+                `glowFade` (a separate wrapper, so it multiplies with the CSS breathing animation
+                rather than being overridden by it) fades it out before that would ever show. */}
+            <g opacity={glowFade}>
+              <circle className="weather-sun-glow" cx={sun.x} cy={sun.y} r={GLOW_RADIUS} fill={`url(#${gradientId}-glow)`} />
+            </g>
+            {/* The core sinks below the horizon geometrically, via the clip — no fade. */}
+            <g clipPath={`url(#${gradientId}-horizon)`}>
+              <circle className="weather-sun-dot" cx={sun.x} cy={sun.y} r={CORE_RADIUS} fill={`url(#${gradientId}-core)`} />
+              {/* A hairline rim lifts the ball off the line ending inside it, without the thick
+                  dark-donut look a full-strength stroke had before. */}
+              <circle cx={sun.x} cy={sun.y} r={CORE_RADIUS} fill="none" stroke="var(--color-card)" strokeWidth="0.6" opacity="0.5" />
+            </g>
           </motion.g>
         )}
         {/* Sunrise / sunset endpoints */}
