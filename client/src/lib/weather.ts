@@ -88,6 +88,15 @@ export function moonIllumination(phaseDeg: number): number {
   return (1 - Math.cos((phaseDeg * Math.PI) / 180)) / 2;
 }
 
+/** Steadman-style apparent temperature (the BOM approximation): combines humidity's evaporative-cooling
+ * loss and wind's convective loss in one formula, so it works across the whole temperature range
+ * instead of switching between separate wind-chill and heat-index formulas. */
+export function feelsLike(temperature: number, humidity: number | undefined, windSpeed: number): number {
+  if (humidity == null) return temperature;
+  const vapourPressure = (humidity / 100) * 6.105 * Math.exp((17.27 * temperature) / (237.7 + temperature));
+  return temperature + 0.33 * vapourPressure - 0.7 * windSpeed - 4;
+}
+
 export function weatherLocation(location: { lat: number; lon: number; name?: string }): string {
   if (location.name) return location.name;
   const latitude = `${Math.abs(location.lat).toFixed(2)}° ${location.lat >= 0 ? 'N' : 'S'}`;

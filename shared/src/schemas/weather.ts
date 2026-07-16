@@ -32,6 +32,9 @@ export const weatherSchema = z.object({
       temperature: z.number(),
       precipitationMm: z.number(),
       uvIndex: z.number().optional(),
+      windSpeed: z.number().optional(),
+      /** Relative humidity, 0–100. */
+      humidity: z.number().optional(),
       symbol,
     }),
   ),
@@ -45,6 +48,12 @@ export const weatherSchema = z.object({
       minTemperature: z.number(),
       maxTemperature: z.number(),
       precipitationMm: z.number(),
+      /** Peak clear-sky UV index across the day; absent when MET didn't report one for any entry. */
+      maxUvIndex: z.number().optional(),
+      /** Peak wind speed across the day, m/s. */
+      maxWindSpeed: z.number().optional(),
+      /** Relative humidity at the entry nearest midday, 0–100. */
+      humidity: z.number().optional(),
       symbol,
     }),
   ),

@@ -1,23 +1,52 @@
 import { useId, useState } from 'react';
 import type { WeatherData } from '@personal-dashboard/shared';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { SystemFooter } from '../../components/SystemFooter';
 import { useWidget } from '../../useWidget';
-import { deg, glyph, moonIllumination, moonPhaseName, symbolLabel, uvLevel, weatherLocation, windCompass } from '../../lib/weather';
+import { deg, feelsLike, glyph, moonIllumination, moonPhaseName, symbolLabel, uvLevel, weatherLocation, windCompass } from '../../lib/weather';
 import { mapsCoordinatesHref } from '../../lib/maps';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
-import { MoonDisc, SunArc } from './astro';
+import { MoonDisc, SunArc, timeLabel } from './astro';
 import './weather.css';
 
 const PRECIP_COLOR = 'light-dark(#0d7fc4, #5ec2ff)';
+const TEMP_COLOR = 'var(--color-accent-weather)';
+const UV_COLOR = 'light-dark(#c99a06, #ffd666)';
+const WIND_COLOR = 'light-dark(#0f8a7f, #4dd9c4)';
+const HUMIDITY_COLOR = 'light-dark(#6d5fd6, #b8a6ff)';
+/** Apple-Weather-style UV ramp: a fixed vertical gradient over the WHO 0–11 scale (top =
+ * extreme, bottom = low), sourced from `uvLevel()` so the colors never drift from the gauge. */
+const UV_GRADIENT_STOPS = [11, 8, 6, 3, 0].map((v) => ({ offset: (11 - v) / 11, color: uvLevel(v).color }));
 
 /* ── Intro signals ─────────────────────────────────────────────────────────── */
 
+/** Sun and moon, folded into the hero itself rather than a separate section — they're part of
+ * "right now" just as much as temperature is. */
+function HeroSky({ data }: Readonly<{ data: WeatherData }>) {
+  if (!data.sun && !data.moon) return null;
+  return (
+    <div className="mt-4 border-t border-card-border pt-4">
+      {data.sun ? (
+        <SunArc sunrise={data.sun.sunrise} sunset={data.sun.sunset} compact />
+      ) : (
+        <p className="text-xs text-ink-faint">Sun times are syncing.</p>
+      )}
+      {data.moon && (
+        <div className="mt-3">
+          <MoonPanel moon={data.moon} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WeatherSignals({ data }: Readonly<{ data: WeatherData }>) {
   const today = data.days[0];
+  const feels = feelsLike(data.current.temperature, data.current.humidity, data.current.windSpeed);
+  const showFeelsLike = Math.abs(feels - data.current.temperature) >= 1;
   return (
-    <div className="detail-signal-panel">
+    <div className="detail-signal-panel lg:w-[22rem]">
       <div className="flex items-center gap-4">
         <span className="text-5xl" aria-hidden>{glyph(data.current.symbol)}</span>
         <div>
@@ -26,6 +55,7 @@ function WeatherSignals({ data }: Readonly<{ data: WeatherData }>) {
             {symbolLabel(data.current.symbol)}
             {today && <span className="text-ink-faint"> · {deg(today.minTemperature)} / {deg(today.maxTemperature)}</span>}
           </p>
+          {showFeelsLike && <p className="mt-0.5 text-xs text-ink-faint">Feels like {deg(feels)}</p>}
         </div>
       </div>
       <a
@@ -37,6 +67,7 @@ function WeatherSignals({ data }: Readonly<{ data: WeatherData }>) {
         <span aria-hidden>📍</span>
         {weatherLocation(data.location)}
       </a>
+      <HeroSky data={data} />
     </div>
   );
 }
@@ -147,7 +178,7 @@ function UvTile({ uvIndex }: Readonly<{ uvIndex: number }>) {
 }
 
 function PrecipitationTile({ data }: Readonly<{ data: WeatherData }>) {
-  const next12h = Math.round(data.hours.reduce((sum, hour) => sum + hour.precipitationMm, 0) * 10) / 10;
+  const next12h = Math.round(data.hours.slice(0, 12).reduce((sum, hour) => sum + hour.precipitationMm, 0) * 10) / 10;
   const nextHour = data.current.precipitationMm ?? data.hours[0]?.precipitationMm ?? 0;
   return (
     <Tile label="Precipitation">
@@ -216,19 +247,67 @@ function MoonPanel({ moon }: Readonly<{ moon: NonNullable<WeatherData['moon']> }
         <p className="mt-0.5 truncate text-xs text-ink-muted">
           {illumination}% lit · {nextMoonEventLabel(moon.phaseDeg)}
         </p>
+        {(moon.moonrise || moon.moonset) && (
+          <p className="mt-0.5 truncate text-xs tabular-nums text-ink-faint">
+            {moon.moonrise ? `↑ ${timeLabel(moon.moonrise)}` : 'no moonrise today'}
+            {moon.moonrise && moon.moonset && '   '}
+            {moon.moonset && `↓ ${timeLabel(moon.moonset)}`}
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-/* ── Next 12 hours ─────────────────────────────────────────────────────────── */
+/* ── Next 24 hours ─────────────────────────────────────────────────────────── */
 
 const CHART_W = 100;
 const CHART_H = 34;
 
-function HourlyChart({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
+/** Condition glyphs, one per hour slot — rendered once above whichever stat is selected, so
+ * switching tabs never changes the card's height and hovering any chart dims the same strip. */
+function HourGlyphStrip({ hours, active }: Readonly<{ hours: WeatherData['hours']; active: number | null }>) {
+  return (
+    <div className="mb-2 flex text-base" aria-hidden>
+      {hours.map((hour, i) => (
+        <span key={hour.time} className={`flex-1 text-center transition-opacity ${active != null && active !== i ? 'opacity-35' : ''}`}>
+          {glyph(hour.symbol)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function HourAxisLabels({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
+  return (
+    <div className="mt-1 flex justify-between text-[10px] tabular-nums text-ink-faint">
+      {hours.map((hour, i) => (
+        <span key={hour.time} className={`flex-1 text-center ${i % 2 === 1 ? 'invisible sm:visible' : ''}`}>
+          {hour.hourLabel}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Bottom readout row shared by every hourly chart, so all five stay exactly the same height. */
+function HourlyReadout({ text, unit }: Readonly<{ text: string; unit: string }>) {
+  return (
+    <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-card-border pt-2">
+      <p className="min-w-0 truncate text-[11px] tabular-nums text-ink-muted">{text}</p>
+      <p className="shrink-0 text-[9px] uppercase tracking-[0.12em] text-ink-faint">{unit}</p>
+    </div>
+  );
+}
+
+interface HourlyChartProps {
+  hours: WeatherData['hours'];
+  active: number | null;
+  onActiveChange: (index: number | null) => void;
+}
+
+function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProps>) {
   const gradientId = `${useId().replaceAll(':', '')}-hourly`;
-  const [active, setActive] = useState<number | null>(null);
   if (hours.length < 2) return <p className="text-sm text-ink-faint">Hourly forecast is syncing.</p>;
 
   const temps = hours.map((h) => h.temperature);
@@ -238,14 +317,13 @@ function HourlyChart({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
   const yAt = (t: number) => CHART_H - ((t - min) / (max - min)) * CHART_H;
   const line = temps.map((t, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(t)}`).join(' ');
 
-  const rainMax = Math.max(...hours.map((h) => h.precipitationMm));
   const totalRain = Math.round(hours.reduce((sum, h) => sum + h.precipitationMm, 0) * 10) / 10;
   const peak = temps.indexOf(Math.max(...temps));
 
   const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const i = Math.min(hours.length - 1, Math.max(0, Math.floor(((event.clientX - rect.left) / rect.width) * hours.length)));
-    setActive(i);
+    onActiveChange(i);
   };
 
   let readout = `peak ${deg(temps[peak])} at ${hours[peak].hourLabel}:00`;
@@ -258,17 +336,6 @@ function HourlyChart({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
 
   return (
     <div>
-      {/* Condition strip, one glyph per hour slot so it lines up with the plot and labels */}
-      <div className="mb-2 flex text-base" aria-hidden>
-        {hours.map((hour, i) => (
-          <span
-            key={hour.time}
-            className={`flex-1 text-center transition-opacity ${active != null && active !== i ? 'opacity-35' : ''}`}
-          >
-            {glyph(hour.symbol)}
-          </span>
-        ))}
-      </div>
       <div className="relative">
         <svg
           viewBox={`0 0 ${CHART_W} ${CHART_H}`}
@@ -277,12 +344,12 @@ function HourlyChart({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
           aria-label={`Temperature over the next ${hours.length} hours`}
           onPointerMove={readNearest}
           onPointerDown={readNearest}
-          onPointerLeave={() => setActive(null)}
+          onPointerLeave={() => onActiveChange(null)}
         >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="var(--color-accent-weather)" stopOpacity="0.2" />
-              <stop offset="1" stopColor="var(--color-accent-weather)" stopOpacity="0" />
+              <stop offset="0" stopColor={TEMP_COLOR} stopOpacity="0.2" />
+              <stop offset="1" stopColor={TEMP_COLOR} stopOpacity="0" />
             </linearGradient>
             {/* Left-to-right reveal. Animating pathLength instead breaks into dashes when
                 combined with non-scaling-stroke, since dashes are measured in screen space. */}
@@ -308,7 +375,7 @@ function HourlyChart({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
             <path
               d={line}
               fill="none"
-              stroke="var(--color-accent-weather)"
+              stroke={TEMP_COLOR}
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -318,7 +385,7 @@ function HourlyChart({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
               <path
                 key={hour.time}
                 d={`M${xAt(i)},${yAt(hour.temperature)} l0.01,0`}
-                stroke="var(--color-accent-weather)"
+                stroke={TEMP_COLOR}
                 strokeWidth={active === i ? 5 : 3.5}
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
@@ -334,101 +401,334 @@ function HourlyChart({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
           />
         )}
       </div>
-      {/* Rain, on its own scale below the same time axis (never a second y-axis) */}
-      {rainMax > 0 && (
-        <div className="mt-1 flex h-8 items-end" aria-label="Precipitation per hour">
-          {hours.map((hour, i) => (
-            <div key={hour.time} className="flex h-full flex-1 items-end justify-center">
-              {hour.precipitationMm > 0 && (
-                <motion.div
-                  className="w-1/2 max-w-4 rounded-t-[3px]"
-                  style={{ background: PRECIP_COLOR, opacity: active == null || active === i ? 0.85 : 0.4 }}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${Math.max((hour.precipitationMm / rainMax) * 100, 12)}%` }}
-                  transition={{ duration: 0.7, delay: 0.5 + i * 0.03, ease: [0.22, 1, 0.36, 1] }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="mt-1 flex justify-between text-[10px] tabular-nums text-ink-faint">
-        {hours.map((hour, i) => (
-          <span key={hour.time} className={`flex-1 text-center ${i % 2 === 1 ? 'invisible sm:visible' : ''}`}>
-            {hour.hourLabel}
-          </span>
-        ))}
-      </div>
-      <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-card-border pt-2">
-        <p className="min-w-0 truncate text-[11px] tabular-nums text-ink-muted">{readout}</p>
-        <p className="shrink-0 text-[9px] uppercase tracking-[0.12em] text-ink-faint">°C{rainMax > 0 ? ' · mm' : ''}</p>
-      </div>
+      <HourAxisLabels hours={hours} />
+      <HourlyReadout text={readout} unit={`°C${totalRain > 0 ? ' · mm' : ''}`} />
     </div>
   );
 }
 
-/* ── Week ahead ────────────────────────────────────────────────────────────── */
-
-function WeekAhead({ data }: Readonly<{ data: WeatherData }>) {
-  const [active, setActive] = useState<number | null>(null);
-  const days = data.days;
-  if (days.length === 0) return <p className="text-sm text-ink-faint">The forecast is syncing.</p>;
-  const weekMin = Math.min(...days.map((d) => d.minTemperature));
-  const weekMax = Math.max(...days.map((d) => d.maxTemperature));
-  const span = Math.max(weekMax - weekMin, 1);
+/** Rain-only hourly view — always draws the full-height bar row, even dry, so a 0mm stretch
+ * still animates in like every other tab instead of collapsing to a bare line of text. */
+function HourlyRainChart({ hours, active, onActiveChange }: Readonly<HourlyChartProps>) {
+  const rainMax = Math.max(...hours.map((h) => h.precipitationMm), 0);
+  const totalRain = Math.round(hours.reduce((sum, h) => sum + h.precipitationMm, 0) * 10) / 10;
 
   return (
-    <div onPointerLeave={() => setActive(null)}>
+    <div>
+      <div className="flex h-32 items-end" aria-label="Precipitation per hour" onPointerLeave={() => onActiveChange(null)}>
+        {hours.map((hour, i) => (
+          <div key={hour.time} className="flex h-full flex-1 items-end justify-center" onPointerEnter={() => onActiveChange(i)}>
+            {hour.precipitationMm > 0 && (
+              <motion.div
+                className="w-1/2 max-w-5 rounded-t-[4px]"
+                style={{ background: PRECIP_COLOR, opacity: active == null || active === i ? 0.85 : 0.4 }}
+                initial={{ height: 0 }}
+                animate={{ height: `${Math.max((hour.precipitationMm / Math.max(rainMax, 1)) * 100, 8)}%` }}
+                transition={{ duration: 0.7, delay: 0.1 + i * 0.03, ease: [0.22, 1, 0.36, 1] }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <HourAxisLabels hours={hours} />
+      <HourlyReadout
+        text={rainMax > 0 ? `${totalRain} mm total over the next ${hours.length} h` : `no rain expected in the next ${hours.length} h`}
+        unit="mm"
+      />
+    </div>
+  );
+}
+
+/** Generic hourly line chart for a single numeric stat (UV, wind, humidity) — same visual
+ * language as `HourlyChart`'s temperature line, minus the rain bars, which are stat-specific. */
+function HourlyLineChart({
+  hours,
+  valueOf,
+  format,
+  unit,
+  color,
+  domain,
+  verticalGradientStops,
+  active,
+  onActiveChange,
+}: Readonly<
+  HourlyChartProps & {
+    valueOf: (hour: WeatherData['hours'][number]) => number | undefined;
+    format: (value: number) => string;
+    unit: string;
+    color: string;
+    /** Overrides the default "fit to this hour window" domain — needed when the vertical
+     * position must mean something fixed, e.g. UV's WHO 0–11 scale. */
+    domain?: readonly [number, number];
+    /** Apple-Weather-style vertical ramp (top → bottom) used for the fill, line and points
+     * instead of the flat translucent-fade `color`. Stops are fractions along the chart height. */
+    verticalGradientStops?: readonly { offset: number; color: string }[];
+  }
+>) {
+  const gradientId = `${useId().replaceAll(':', '')}-hourlystat`;
+  const points = hours.map((hour, i) => ({ i, hour, value: valueOf(hour) })).filter((p): p is { i: number; hour: WeatherData['hours'][number]; value: number } => p.value != null);
+  if (points.length < 2) return <p className="text-sm text-ink-faint">Not enough data for this stat yet.</p>;
+
+  const values = points.map((p) => p.value);
+  const [min, max] = domain ?? [Math.max(0, Math.floor(Math.min(...values) - 1)), Math.ceil(Math.max(...values) + 1)];
+  const xAt = (i: number) => ((i + 0.5) / hours.length) * CHART_W;
+  const yAt = (v: number) => CHART_H - ((v - min) / (max - min || 1)) * CHART_H;
+  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${xAt(p.i)},${yAt(p.value)}`).join(' ');
+  const paint = verticalGradientStops ? `url(#${gradientId})` : color;
+
+  const peak = points.reduce((best, p) => (p.value > best.value ? p : best), points[0]);
+  let readout = `peak ${format(peak.value)} at ${peak.hour.hourLabel}:00`;
+  if (active != null) {
+    const point = points.find((p) => p.i === active);
+    if (point) readout = `${point.hour.hourLabel}:00 · ${format(point.value)}`;
+  }
+
+  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const i = Math.min(hours.length - 1, Math.max(0, Math.floor(((event.clientX - rect.left) / rect.width) * hours.length)));
+    onActiveChange(i);
+  };
+
+  return (
+    <div>
+      <div className="relative">
+        <svg
+          viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+          preserveAspectRatio="none"
+          className="h-32 w-full touch-none"
+          onPointerMove={readNearest}
+          onPointerDown={readNearest}
+          onPointerLeave={() => onActiveChange(null)}
+        >
+          <defs>
+            {verticalGradientStops ? (
+              <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={CHART_H}>
+                {verticalGradientStops.map((stop) => (
+                  <stop key={stop.offset} offset={stop.offset} stopColor={stop.color} />
+                ))}
+              </linearGradient>
+            ) : (
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={color} stopOpacity="0.2" />
+                <stop offset="1" stopColor={color} stopOpacity="0" />
+              </linearGradient>
+            )}
+            <clipPath id={`${gradientId}-reveal`}>
+              <motion.rect x="0" y="0" height={CHART_H} initial={{ width: 0 }} animate={{ width: CHART_W }} transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }} />
+            </clipPath>
+          </defs>
+          {[0, CHART_H / 2, CHART_H].map((y) => (
+            <line key={y} x1={0} y1={y} x2={CHART_W} y2={y} stroke="var(--color-card-border)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          ))}
+          <g clipPath={`url(#${gradientId}-reveal)`}>
+            <path
+              d={`${line} L${xAt(points.at(-1)!.i)},${CHART_H} L${xAt(points[0].i)},${CHART_H} Z`}
+              fill={`url(#${gradientId})`}
+              fillOpacity={verticalGradientStops ? 0.55 : undefined}
+            />
+            <path d={line} fill="none" stroke={paint} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+            {points.map((p) => (
+              <path
+                key={p.hour.time}
+                d={`M${xAt(p.i)},${yAt(p.value)} l0.01,0`}
+                stroke={paint}
+                strokeWidth={active === p.i ? 5 : 3.5}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+          </g>
+        </svg>
+        {active != null && (
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 w-px bg-ink-faint/40" style={{ left: `${(xAt(active) / CHART_W) * 100}%` }} />
+        )}
+      </div>
+      <HourAxisLabels hours={hours} />
+      <HourlyReadout text={readout} unit={unit} />
+    </div>
+  );
+}
+
+const HOURLY_TABS: { key: HourlyStatKey; label: string }[] = [
+  { key: 'temperature', label: 'Temperature' },
+  { key: 'rain', label: 'Rain' },
+  { key: 'uv', label: 'UV' },
+  { key: 'wind', label: 'Wind' },
+  { key: 'humidity', label: 'Humidity' },
+];
+
+type HourlyStatKey = 'temperature' | 'rain' | 'uv' | 'wind' | 'humidity';
+
+/** Today's hour-by-hour, switchable per stat — the daily counterpart to `WeekAheadSection`,
+ * so "when will it rain / when's UV highest" has an answer for today, not just the week.
+ * The glyph strip and active-hour hover state live here, above the tab switch, so every
+ * stat renders inside the exact same frame and crossfades instead of jumping in height. */
+function HourlySection({ data }: Readonly<{ data: WeatherData }>) {
+  const [stat, setStat] = useState<HourlyStatKey>('temperature');
+  const [active, setActive] = useState<number | null>(null);
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Hourly stat">
+        {HOURLY_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={stat === tab.key}
+            onClick={() => {
+              setStat(tab.key);
+              setActive(null);
+            }}
+            className={`weather-stat-tab ${stat === tab.key ? 'weather-stat-tab--active' : ''}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <HourGlyphStrip hours={data.hours} active={active} />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={stat}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {stat === 'temperature' && <HourlyChart hours={data.hours} active={active} onActiveChange={setActive} />}
+          {stat === 'rain' && <HourlyRainChart hours={data.hours} active={active} onActiveChange={setActive} />}
+          {stat === 'uv' && (
+            <HourlyLineChart hours={data.hours} valueOf={(h) => h.uvIndex} format={(v) => v.toFixed(1)} unit="" color={UV_COLOR} domain={[0, 11]} verticalGradientStops={UV_GRADIENT_STOPS} active={active} onActiveChange={setActive} />
+          )}
+          {stat === 'wind' && (
+            <HourlyLineChart hours={data.hours} valueOf={(h) => h.windSpeed} format={(v) => `${Math.round(v)} m/s`} unit="m/s" color={WIND_COLOR} active={active} onActiveChange={setActive} />
+          )}
+          {stat === 'humidity' && (
+            <HourlyLineChart hours={data.hours} valueOf={(h) => h.humidity} format={(v) => `${Math.round(v)}%`} unit="%" color={HUMIDITY_COLOR} active={active} onActiveChange={setActive} />
+          )}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ── Week ahead: switchable stats ─────────────────────────────────────────── */
+
+type Day = WeatherData['days'][number];
+type BarStatKey = 'temperature' | 'precipitation' | 'uv' | 'wind' | 'humidity';
+
+interface StatMeta {
+  label: string;
+  color: string;
+  domainMax?: number;
+  value: (day: Day) => number | undefined;
+  format: (value: number) => string;
+}
+
+const BAR_STATS: Record<BarStatKey, StatMeta> = {
+  temperature: {
+    label: 'Temperature',
+    color: TEMP_COLOR,
+    value: (day) => day.maxTemperature,
+    format: (value) => deg(value),
+  },
+  precipitation: {
+    label: 'Rain',
+    color: PRECIP_COLOR,
+    value: (day) => day.precipitationMm,
+    format: (value) => (value > 0 ? `${value} mm` : '—'),
+  },
+  uv: {
+    label: 'UV',
+    color: UV_COLOR,
+    domainMax: 11,
+    value: (day) => day.maxUvIndex,
+    format: (value) => value.toFixed(1),
+  },
+  wind: {
+    label: 'Wind',
+    color: WIND_COLOR,
+    value: (day) => day.maxWindSpeed,
+    format: (value) => `${Math.round(value)} m/s`,
+  },
+  humidity: {
+    label: 'Humidity',
+    color: HUMIDITY_COLOR,
+    domainMax: 100,
+    value: (day) => day.humidity,
+    format: (value) => `${Math.round(value)}%`,
+  },
+};
+
+const STAT_TABS: { key: BarStatKey; label: string }[] = (Object.keys(BAR_STATS) as BarStatKey[]).map((key) => ({
+  key,
+  label: BAR_STATS[key].label,
+}));
+
+/** One bar per day for a single stat — every tab (including temperature) reads identically:
+ * day, glyph, a bar growing from the left, and the day's value. */
+function WeekStatBars({ days, stat }: Readonly<{ days: Day[]; stat: BarStatKey }>) {
+  const meta = BAR_STATS[stat];
+  const values = days.map(meta.value).filter((value): value is number => value != null);
+  if (values.length === 0) return <p className="text-sm text-ink-faint">Not enough data for this stat yet.</p>;
+  const max = Math.max(meta.domainMax ?? 0, ...values, 1);
+
+  return (
+    <div>
       {days.map((day, i) => {
-        const left = ((day.minTemperature - weekMin) / span) * 100;
-        const width = Math.max(((day.maxTemperature - day.minTemperature) / span) * 100, 4);
+        const value = meta.value(day);
+        const barValue = value == null ? null : Math.max(value, 0);
         const isToday = i === 0;
-        const showCurrent = isToday
-          && data.current.temperature >= day.minTemperature
-          && data.current.temperature <= day.maxTemperature;
+        const barColor = stat === 'uv' && value != null ? uvLevel(value).color : meta.color;
         return (
           <motion.div
             key={day.date}
-            className={`grid grid-cols-[2.9rem_1.75rem_3.4rem_1fr] items-center gap-3 rounded-xl px-2 py-2.5 transition-colors sm:grid-cols-[3.25rem_2rem_4rem_1fr] ${active === i ? 'bg-track/30' : ''}`}
-            onPointerEnter={() => setActive(i)}
+            className="grid grid-cols-[2.9rem_1.75rem_1fr_3.4rem] items-center gap-3 rounded-xl px-2 py-2.5 sm:grid-cols-[3.25rem_2rem_1fr_3.8rem]"
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.08 + i * 0.05, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <span className={`text-sm ${isToday ? 'font-semibold' : 'text-ink-muted'}`}>{isToday ? 'Today' : day.dayLabel}</span>
             <span className="text-lg" aria-hidden>{glyph(day.symbol)}</span>
-            <span className="text-right text-xs tabular-nums" style={{ color: day.precipitationMm > 0 ? PRECIP_COLOR : 'var(--color-ink-faint)' }}>
-              {day.precipitationMm > 0 ? `${day.precipitationMm} mm` : '—'}
-            </span>
-            <div className="grid grid-cols-[2rem_1fr_2rem] items-center gap-2">
-              <span className="text-right text-sm tabular-nums text-ink-faint">{deg(day.minTemperature)}</span>
-              <div className="relative h-1.5 rounded-full bg-track">
+            <div className="relative h-1.5 rounded-full bg-track">
+              {barValue != null && (
                 <motion.div
-                  className="absolute inset-y-0 rounded-full"
-                  style={{
-                    left: `${left}%`,
-                    background: 'linear-gradient(90deg, color-mix(in oklab, var(--color-accent-weather) 45%, transparent), var(--color-accent-weather))',
-                  }}
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{ background: barColor }}
                   initial={{ width: 0 }}
-                  animate={{ width: `${width}%` }}
+                  animate={{ width: `${Math.max((barValue / max) * 100, barValue > 0 ? 3 : 0)}%` }}
                   transition={{ delay: 0.2 + i * 0.05, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                 />
-                {showCurrent && (
-                  <span
-                    aria-label={`Now: ${deg(data.current.temperature)}`}
-                    className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink"
-                    style={{
-                      left: `${((data.current.temperature - weekMin) / span) * 100}%`,
-                      boxShadow: '0 0 0 2px var(--color-card)',
-                    }}
-                  />
-                )}
-              </div>
-              <span className="text-sm font-medium tabular-nums">{deg(day.maxTemperature)}</span>
+              )}
             </div>
+            <span className="text-right text-sm tabular-nums text-ink-faint">{value != null ? meta.format(value) : '—'}</span>
           </motion.div>
         );
       })}
+    </div>
+  );
+}
+
+function WeekAheadSection({ data }: Readonly<{ data: WeatherData }>) {
+  const [stat, setStat] = useState<BarStatKey>('temperature');
+  return (
+    <div>
+      <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Week-ahead stat">
+        {STAT_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            aria-selected={stat === tab.key}
+            onClick={() => setStat(tab.key)}
+            className={`weather-stat-tab ${stat === tab.key ? 'weather-stat-tab--active' : ''}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {/* Rows keep the same key across stat switches (day.date, unaffected by `stat`), so only
+          the bar width/value re-render — the day label and glyph never remount or re-animate. */}
+      <WeekStatBars days={data.days} stat={stat} />
     </div>
   );
 }
@@ -450,51 +750,27 @@ export function WeatherDetail() {
         </WidgetBody>
       </DetailIntro>
 
-      <DetailSectionHeading label="Now" title="Current conditions" detail="Wind, humidity, UV and rain, as of the latest forecast." />
-      <WidgetShell title="Conditions">
+      <DetailSectionHeading label="Hourly" title="The next 24 hours" detail="Switch stats to see when today's rain, UV, wind or humidity peaks — not just temperature." />
+      <WidgetShell title="Hour by hour">
         <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <ConditionTiles data={data} />}
+          {(data) => <HourlySection data={data} />}
         </WidgetBody>
       </WidgetShell>
 
       <div className="mt-6">
-        <DetailSectionHeading label="Sky" title="Sun & moon" detail="Where the sun is in its day, and what the moon is doing tonight." />
-        <div className="grid gap-4 lg:grid-cols-[1.8fr_1fr]">
-          <WidgetShell title="Daylight">
-            <WidgetBody envelope={envelope} offline={offline}>
-              {(data) =>
-                data.sun ? (
-                  <SunArc sunrise={data.sun.sunrise} sunset={data.sun.sunset} />
-                ) : (
-                  <p className="text-sm text-ink-faint">Sun times are syncing.</p>
-                )
-              }
-            </WidgetBody>
-          </WidgetShell>
-          <WidgetShell title="Moon">
-            <WidgetBody envelope={envelope} offline={offline}>
-              {(data) =>
-                data.moon ? <MoonPanel moon={data.moon} /> : <p className="text-sm text-ink-faint">Moon data is syncing.</p>
-              }
-            </WidgetBody>
-          </WidgetShell>
-        </div>
-      </div>
-
-      <div className="mt-6">
-        <DetailSectionHeading label="Hourly" title="The next 12 hours" detail="Temperature with rain below it, hour by hour. Tap or hover an hour for its exact values." />
-        <WidgetShell title="Hour by hour">
+        <DetailSectionHeading label="Outlook" title="The week ahead" detail="Switch stats to compare temperature, rain, UV, wind or humidity across the week." />
+        <WidgetShell title="7-day forecast">
           <WidgetBody envelope={envelope} offline={offline}>
-            {(data) => <HourlyChart hours={data.hours} />}
+            {(data) => <WeekAheadSection data={data} />}
           </WidgetBody>
         </WidgetShell>
       </div>
 
       <div className="mt-6">
-        <DetailSectionHeading label="Outlook" title="The week ahead" detail="Each day's range on the week's shared temperature scale. The dot marks where the temperature sits right now." />
-        <WidgetShell title="7-day forecast">
+        <DetailSectionHeading label="Now" title="Current conditions" detail="Wind, humidity, UV and rain, as of the latest forecast." />
+        <WidgetShell title="Conditions">
           <WidgetBody envelope={envelope} offline={offline}>
-            {(data) => <WeekAhead data={data} />}
+            {(data) => <ConditionTiles data={data} />}
           </WidgetBody>
         </WidgetShell>
       </div>

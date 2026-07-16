@@ -103,7 +103,7 @@ export function WeatherOverview() {
     <WidgetBody envelope={envelope} offline={offline}>
       {(data) => {
         const today = data.days[0];
-        const rain12h = Math.round(data.hours.reduce((sum, hour) => sum + hour.precipitationMm, 0) * 10) / 10;
+        const rain12h = Math.round(data.hours.slice(0, 12).reduce((sum, hour) => sum + hour.precipitationMm, 0) * 10) / 10;
         return (
           <div className="grid items-center gap-x-6 gap-y-4 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.2fr)_minmax(13rem,0.9fr)]">
             <div>
@@ -122,7 +122,7 @@ export function WeatherOverview() {
                 {rain12h > 0 && <Chip value={`${rain12h} mm`} label="rain next 12 h" />}
               </div>
             </div>
-            <HourSparkline hours={data.hours} />
+            <HourSparkline hours={data.hours.slice(0, 12)} />
             <div className="flex items-center gap-4">
               {data.sun && (
                 <div className="min-w-0 flex-1">

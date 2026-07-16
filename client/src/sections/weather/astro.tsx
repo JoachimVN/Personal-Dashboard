@@ -28,7 +28,7 @@ function bufferFractionForDepth(depth: number): number {
   return Math.asin(Math.min(1, depth / R)) / Math.PI;
 }
 
-function timeLabel(iso: string): string {
+export function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 

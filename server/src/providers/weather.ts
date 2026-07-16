@@ -215,13 +215,15 @@ export function createWeatherProvider(
 
       const hours = series
         .filter((entry) => entry.data.next_1_hours)
-        .slice(0, 12)
+        .slice(0, 24)
         .map((entry) => ({
           time: entry.time,
           hourLabel: hourFmt.format(new Date(entry.time)),
           temperature: entry.data.instant.details.air_temperature,
           precipitationMm: entry.data.next_1_hours?.details?.precipitation_amount ?? 0,
           uvIndex: entry.data.instant.details.ultraviolet_index_clear_sky,
+          windSpeed: entry.data.instant.details.wind_speed,
+          humidity: entry.data.instant.details.relative_humidity,
           symbol: symbolOf(entry),
         }));
 
@@ -248,12 +250,21 @@ export function createWeatherProvider(
         );
         // Represent the day by the entry nearest 12:00 local.
         const midday = closestToMidday(entries, hourFmt);
+        const uvValues = entries
+          .map((entry) => entry.data.instant.details.ultraviolet_index_clear_sky)
+          .filter((value): value is number => value != null);
+        const windValues = entries
+          .map((entry) => entry.data.instant.details.wind_speed)
+          .filter((value): value is number => value != null);
         return {
           date,
           dayLabel: weekdayFmt.format(new Date(`${date}T12:00:00Z`)),
           minTemperature: Math.min(...temps),
           maxTemperature: Math.max(...temps),
           precipitationMm: Math.round(precipitationMm * 10) / 10,
+          maxUvIndex: uvValues.length > 0 ? Math.max(...uvValues) : undefined,
+          maxWindSpeed: windValues.length > 0 ? Math.max(...windValues) : undefined,
+          humidity: midday.data.instant.details.relative_humidity,
           symbol: symbolOf(midday),
         };
       });
