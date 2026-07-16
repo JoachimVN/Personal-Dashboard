@@ -580,7 +580,7 @@ export function DailyCommandCenter() {
         <div className="mt-5 flex items-start gap-4">
           {heroTrack && <Thumb url={heroTrack.imageUrl} size="h-16 w-16" />}
           <div className="min-w-0">
-            <p className="command-event-time">{heroKicker}</p>
+            {heroKicker !== ranked.hero.kicker && <p className="command-event-time">{heroKicker}</p>}
             <p className="command-event-title">{heroEvent?.title ?? heroTrack?.track ?? ranked.hero.title}</p>
             {heroEvent ? (
               <div className="mt-2 space-y-1.5 text-sm text-ink-muted">
