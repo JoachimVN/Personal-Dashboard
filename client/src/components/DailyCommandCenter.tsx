@@ -180,9 +180,8 @@ function SecondaryCarousel({
 
   return (
     <MotionConfig reducedMotion="never">
-      <div
+      <section
         className="command-secondary-carousel"
-        role="region"
         aria-roledescription="carousel"
         aria-label="Upcoming items"
         onMouseEnter={pause}
@@ -218,7 +217,7 @@ function SecondaryCarousel({
             />)}
           </div>
         </div>
-      </div>
+      </section>
     </MotionConfig>
   );
 }
