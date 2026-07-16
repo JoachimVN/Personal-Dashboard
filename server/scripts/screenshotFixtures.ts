@@ -123,11 +123,11 @@ export function weather(now: Date): WeatherData {
 }
 
 export function overviewCalendar(now: Date): CalendarData {
-  const odysseyStart = daysFromNowAt(now, 2, 19, 15); // Friday
+  const odysseyStart = daysFromNowAt(now, 1, 19, 15); // Friday 17 July in the frozen capture
   const ODYSSEY_DURATION_MIN = 2 * 60 + 53;
   const odysseyEnd = new Date(odysseyStart.getTime() + ODYSSEY_DURATION_MIN * 60_000);
   const odysseyDurationLabel = `${Math.floor(ODYSSEY_DURATION_MIN / 60)}h ${ODYSSEY_DURATION_MIN % 60}m`;
-  const standupStart = daysFromNowAt(now, 1, 9, 30);
+  const standupStart = daysFromNowAt(now, 2, 9, 30);
   const standupEnd = new Date(standupStart.getTime() + 30 * 60_000);
 
   return {

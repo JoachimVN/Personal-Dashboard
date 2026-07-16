@@ -77,9 +77,9 @@ const DAYPART_HOUR: Record<Daypart, [number, number]> = {
  * against the real generation time instead and renders nonsense once the browser clock is faked. */
 function referenceNow(daypart: Daypart): Date {
   const [hour, minute] = DAYPART_HOUR[daypart];
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d;
+  // Keep the synthetic calendar anchored to Thursday 16 July 2026 so the cinema fixture is
+  // always the following Friday 17 July, regardless of when screenshots are regenerated.
+  return new Date(2026, 6, 16, hour, minute, 0, 0);
 }
 
 interface Page {
