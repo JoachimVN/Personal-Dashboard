@@ -16,6 +16,9 @@ import type { Candidate } from './types.js';
 
 const allShapes = ['hero', 'secondary', 'tile'] as const;
 
+// forecast.dayLabel is abbreviated for the widget's narrow column; card copy reads better with the full name.
+const weekdayFullFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long' });
+
 function hasActivityData(day: HealthData['history'][number]): boolean {
   return [day.steps, day.activeEnergyKcal, day.exerciseMinutes, day.standHours]
     .some((value) => value !== undefined && value > 0);
@@ -501,7 +504,7 @@ export function weatherCandidates(
     return [{
       id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['tile'],
       kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
-      detail: forecast.precipitationMm > 0 ? `${forecast.precipitationMm.toFixed(1)} mm precipitation expected` : `${forecast.dayLabel} looks dry`,
+      detail: forecast.precipitationMm > 0 ? `${forecast.precipitationMm.toFixed(1)} mm precipitation expected` : `${weekdayFullFmt.format(new Date(`${forecast.date}T12:00:00Z`))} looks dry`,
       href: '#/personal', render: { type: 'text' },
     }];
   }
