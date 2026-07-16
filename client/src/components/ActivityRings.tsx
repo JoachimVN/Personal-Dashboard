@@ -8,6 +8,11 @@ interface ActivityRingsProps {
   goals: HealthData['goals'];
 }
 
+interface CompactActivityRingsProps extends ActivityRingsProps {
+  /** Rendered size in CSS pixels; defaults to the command-center tile size. */
+  size?: number;
+}
+
 export function ActivityRings({
   activeEnergyKcal,
   exerciseMinutes,
@@ -78,7 +83,8 @@ export function CompactActivityRings({
   exerciseMinutes,
   standHours,
   goals,
-}: Readonly<ActivityRingsProps>) {
+  size = 40,
+}: Readonly<CompactActivityRingsProps>) {
   const gradientPrefix = useId().replaceAll(':', '');
   const rings = [
     { id: 'move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, start: '#d91f3b', end: '#ff5a8b', track: 'light-dark(#f6c7d2, #4c0717)', radius: 48 },
@@ -87,7 +93,7 @@ export function CompactActivityRings({
   ];
 
   return (
-    <svg viewBox="0 0 120 120" className="h-10 w-10 shrink-0" aria-label="Daily activity rings" role="img">
+    <svg viewBox="0 0 120 120" style={{ width: size, height: size }} className="shrink-0" aria-label="Daily activity rings" role="img">
       <defs>
         {rings.map((ring) => (
           <linearGradient key={ring.id} id={`${gradientPrefix}-compact-${ring.id}-ring-gradient`} x1="20" y1="20" x2="100" y2="100" gradientUnits="userSpaceOnUse">

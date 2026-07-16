@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { HealthData, HealthDay } from '@personal-dashboard/shared';
 import { animate, motion, useMotionValue } from 'motion/react';
-import { ActivityRings } from '../../components/ActivityRings';
+import { CompactActivityRings } from '../../components/ActivityRings';
 import { WidgetBody } from '../../components/WidgetCard';
 import { useWidget } from '../../useWidget';
 import { latestActivityDay } from '../../lib/health';
@@ -33,23 +33,39 @@ function CountUp({ value }: Readonly<{ value: number }>) {
   return <>{display.toLocaleString()}</>;
 }
 
-function StepsHero({ steps, goal, isToday }: Readonly<{ steps: number; goal: number; isToday: boolean }>) {
+/** Steps hero and the fitness rings share one card — the rings stay full size, no Move/Exercise/Stand legend. */
+function StepsAndFitness({
+  steps,
+  goal,
+  isToday,
+  today,
+  goals,
+}: Readonly<{ steps: number; goal: number; isToday: boolean; today: HealthDay; goals: HealthData['goals'] }>) {
   const progress = Math.min(100, goal > 0 ? (steps / goal) * 100 : 0);
   return (
     <div className="rounded-2xl bg-track/25 p-3.5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">
-            {isToday ? 'Today’s steps' : 'Last synced steps'}
-          </p>
-          <p className="mt-1 text-4xl font-semibold tracking-[-0.05em]">
+      <div className="flex items-center gap-4">
+        <CompactActivityRings
+          activeEnergyKcal={today.activeEnergyKcal ?? 0}
+          exerciseMinutes={today.exerciseMinutes ?? 0}
+          standHours={today.standHours ?? 0}
+          goals={goals}
+          size={128}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-ink-faint">
+              {isToday ? 'Today’s steps' : 'Last synced steps'}
+            </p>
+            <span className="shrink-0 rounded-full bg-(--color-accent-personal)/12 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-(--color-accent-personal)">
+              {Math.round(progress)}%
+            </span>
+          </div>
+          <p className="mt-1 text-3xl font-semibold tracking-[-0.05em]">
             <CountUp value={steps} />
           </p>
           <p className="mt-1 text-xs text-ink-muted">of {goal.toLocaleString()} step goal</p>
         </div>
-        <span className="rounded-full bg-(--color-accent-personal)/12 px-2.5 py-1 text-xs font-semibold tabular-nums text-(--color-accent-personal)">
-          {Math.round(progress)}%
-        </span>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-track">
         <motion.div
@@ -146,6 +162,7 @@ function WeekOfSteps({ history, goal }: Readonly<{ history: HealthDay[]; goal: n
 
 /** ~2-week single-series sparkline; the metric's identity comes from the dot + label beside it. */
 function VitalSparkline({ history, metric, color }: Readonly<{ history: HealthDay[]; metric: VitalKey; color: string }>) {
+  const revealId = `${useId().replaceAll(':', '')}-vital-reveal`;
   const values = history
     .slice(-14)
     .map((day) => day[metric])
@@ -154,26 +171,49 @@ function VitalSparkline({ history, metric, color }: Readonly<{ history: HealthDa
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(max - min, 1);
-  const W = 56;
-  const H = 16;
+  const W = 96;
+  const H = 18;
   const xAt = (i: number) => (i / (values.length - 1)) * W;
   const yAt = (v: number) => 2 + (H - 4) * (1 - (v - min) / span);
   const line = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(v)}`).join(' ');
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-4 w-14 shrink-0" aria-hidden>
-      <motion.path
-        d={line}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={0.55}
-        initial={{ pathLength: 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ duration: 0.9, ease: 'easeOut', delay: 0.4 }}
-      />
-      <circle cx={xAt(values.length - 1)} cy={yAt(values.at(-1)!)} r={2} fill={color} stroke="var(--color-card)" strokeWidth={1} />
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-5 w-full" aria-hidden>
+      <defs>
+        {/* Left-to-right reveal via a clip, not pathLength: pathLength's dasharray is measured
+            in screen space, which fragments into gaps once vector-effect="non-scaling-stroke"
+            and preserveAspectRatio="none" stretch this non-uniformly (see HourSparkline). */}
+        <clipPath id={revealId}>
+          <motion.rect
+            x="0"
+            y="0"
+            height={H}
+            initial={{ width: 0 }}
+            animate={{ width: W }}
+            transition={{ duration: 0.9, ease: 'easeOut', delay: 0.4 }}
+          />
+        </clipPath>
+      </defs>
+      <g clipPath={`url(#${revealId})`}>
+        <path
+          d={line}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+          opacity={0.55}
+        />
+        {/* A stroked zero-length segment stays a true circle under the non-uniform
+            stretch from preserveAspectRatio="none"; an actual <circle> would smear into an ellipse. */}
+        <path
+          d={`M${xAt(values.length - 1)},${yAt(values.at(-1)!)} l0.01,0`}
+          stroke={color}
+          strokeWidth={4}
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
     </svg>
   );
 }
@@ -204,10 +244,10 @@ function Vitals({ today, history }: Readonly<{ today: HealthDay; history: Health
           >
             <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: vital.color }} />
             <span className="w-14 shrink-0 text-xs text-ink-muted">{vital.label}</span>
-            <span className="text-sm font-semibold tabular-nums">
+            <span className="w-16 shrink-0 text-sm font-semibold tabular-nums">
               {Math.round(vital.value)} <span className="text-[10px] font-medium text-ink-faint">{vital.unit}</span>
             </span>
-            <span className="ml-auto">
+            <span className="min-w-0 flex-1">
               <VitalSparkline history={history} metric={vital.key} color={vital.color} />
             </span>
           </motion.div>
@@ -226,15 +266,15 @@ export function HealthOverview() {
         if (!today) return <p className="text-sm text-ink-faint">Health data is waiting for its first sync.</p>;
         const isToday = data.today === today;
         return (
-          <div className="grid gap-3 lg:grid-cols-[minmax(12rem,0.95fr)_minmax(0,1.25fr)_minmax(13rem,1fr)_minmax(13rem,1fr)]">
-            <StepsHero steps={today.steps ?? 0} goal={data.goals.steps} isToday={isToday} />
-            <WeekOfSteps history={data.history} goal={data.goals.steps} />
-            <ActivityRings
-              activeEnergyKcal={today.activeEnergyKcal ?? 0}
-              exerciseMinutes={today.exerciseMinutes ?? 0}
-              standHours={today.standHours ?? 0}
+          <div className="grid gap-3 lg:grid-cols-3">
+            <StepsAndFitness
+              steps={today.steps ?? 0}
+              goal={data.goals.steps}
+              isToday={isToday}
+              today={today}
               goals={data.goals}
             />
+            <WeekOfSteps history={data.history} goal={data.goals.steps} />
             <Vitals today={today} history={data.history} />
           </div>
         );
