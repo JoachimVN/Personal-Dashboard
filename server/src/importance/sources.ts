@@ -97,7 +97,7 @@ export function githubCandidates(
     candidates.push({
       id: 'github:contributions', source: 'github', kind: 'github', score: 36,
       shapes: ['tile'], kicker: 'This week on GitHub',
-      title: `${today} contributions today`,
+      title: `${today} contribution${today === 1 ? '' : 's'} today`,
       detail: `${data.pullRequests.length} open pull requests`, href: '#/github', render: { type: 'github-contributions' },
     });
   } else {
@@ -174,7 +174,7 @@ export function healthCandidates(data: HealthData | undefined): Candidate[] {
       id: `health:baseline:${metric}`, source: 'health', kind: 'health', score: 82, shapes: [...allShapes],
       kicker: 'Personal baseline', title: `${metric.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim()} ${value.deviationPercent.toFixed(0)}% ${value.direction}`,
       detail: `${value.current.toFixed(0)} today · usual ${value.average.toFixed(0)} across ${value.samples} days`,
-      href: '#/health', render: { type: 'health-rings' },
+      href: '#/health', render: { type: 'text' },
     });
   }
   const steps = data.today?.steps;

@@ -70,3 +70,26 @@ export function UsageMeter({
     </div>
   );
 }
+
+/** Claude omits the 5-hour quota entirely when no session is active. Treat a confirmed zero
+ * local total as an empty window, rather than making token count look like the quota state. */
+export function ZeroUsageMeter({
+  label,
+  color,
+}: Readonly<{
+  label: string;
+  color: string;
+}>) {
+  return (
+    <div>
+      <div className="mb-1 flex items-baseline text-xs">
+        <span className="text-ink-muted">{label}</span>
+        <span className="ml-auto font-semibold tabular-nums">0%</span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-track">
+        <motion.div className="h-full rounded-full" initial={{ width: 0 }} animate={{ width: '0%' }} style={{ backgroundColor: color }} />
+      </div>
+      <p className="mt-1 text-[11px] text-ink-faint">No active window</p>
+    </div>
+  );
+}

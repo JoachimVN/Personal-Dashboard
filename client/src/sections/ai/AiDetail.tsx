@@ -4,7 +4,7 @@ import { relativeTime } from '../../lib/time';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../../components/WidgetCard';
-import { FIVE_HOUR_MS, UsageMeter, WEEKLY_MS } from './UsageMeter';
+import { FIVE_HOUR_MS, UsageMeter, WEEKLY_MS, ZeroUsageMeter } from './UsageMeter';
 import { UsageHistoryChart } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
@@ -27,10 +27,12 @@ function WindowUnavailable({
   label,
   status,
   tokens,
+  color,
 }: Readonly<{
   label: string;
   status: AiUsageToolData['fiveHourStatus'];
   tokens?: number;
+  color: string;
 }>) {
   if (status === 'unlimited') {
     return (
@@ -41,6 +43,7 @@ function WindowUnavailable({
       </div>
     );
   }
+  if (tokens === 0) return <ZeroUsageMeter label={label} color={color} />;
   return tokens !== undefined ? <TokenRow label={label} tokens={tokens} /> : null;
 }
 
@@ -48,8 +51,9 @@ function ToolCard({
   id,
   label,
   color,
+  iconColor = color,
   icon: Icon,
-}: Readonly<{ id: string; label: string; color: string; icon: React.ComponentType<ToolIconProps> }>) {
+}: Readonly<{ id: string; label: string; color: string; iconColor?: string; icon: React.ComponentType<ToolIconProps> }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   return (
@@ -61,7 +65,7 @@ function ToolCard({
     >
       <WidgetShell
         title={label}
-        icon={<Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} />}
+        icon={<Icon className="h-3.5 w-3.5 shrink-0" style={{ color: iconColor }} />}
         badge={
           <div className="flex items-center gap-2">
             <StaleBadge envelope={envelope} />
@@ -82,7 +86,7 @@ function ToolCard({
                   windowMs={FIVE_HOUR_MS}
                 />
               ) : (
-                <WindowUnavailable label="5 hours" status={data.fiveHourStatus} tokens={data.tokens?.fiveHour} />
+                <WindowUnavailable label="5 hours" status={data.fiveHourStatus} tokens={data.tokens?.fiveHour} color={color} />
               )}
               {data.weekly ? (
                 <UsageMeter
@@ -93,7 +97,7 @@ function ToolCard({
                   windowMs={WEEKLY_MS}
                 />
               ) : (
-                <WindowUnavailable label="Weekly" status={data.weeklyStatus} tokens={data.tokens?.weekly} />
+                <WindowUnavailable label="Weekly" status={data.weeklyStatus} tokens={data.tokens?.weekly} color={color} />
               )}
               {data.modelWeekly && (
                 <UsageMeter

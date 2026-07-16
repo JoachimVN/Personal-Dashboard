@@ -22,7 +22,7 @@ describe('githubCandidates', () => {
     };
     const candidate = githubCandidates(data, 7, 50).find((item) => item.id === 'github:contributions');
 
-    expect(candidate?.shapes).toEqual(['tile']);
+    expect(candidate).toMatchObject({ title: '1 contribution today', shapes: ['tile'] });
   });
 
   it('keeps a recent weekly contribution graph available when today is quiet', () => {
@@ -88,6 +88,28 @@ describe('healthCandidates', () => {
 
     expect(healthCandidates(data)).toContainEqual(expect.objectContaining({
       id: 'health:activity', title: '9 active kcal', detail: 'Open Health for the full activity rings',
+    }));
+  });
+
+  it('shows the actual metric for a genuine health baseline anomaly', () => {
+    const data: HealthData = {
+      today: { date: '2026-07-16', restingHeartRate: 80 },
+      history: [],
+      updatedAt: '2026-07-16T12:00:00.000Z',
+      goals: { steps: 10_000, activeEnergyKcal: 290, exerciseMinutes: 30, standHours: 12 },
+      baseline: {
+        windowDays: 7,
+        minimumSamples: 3,
+        metrics: {
+          restingHeartRate: { average: 60, current: 80, deviationPercent: 33, samples: 7, direction: 'above', anomalous: true },
+        },
+      },
+    };
+
+    expect(healthCandidates(data)).toContainEqual(expect.objectContaining({
+      id: 'health:baseline:restingHeartRate',
+      title: 'Resting Heart Rate 33% above',
+      render: { type: 'text' },
     }));
   });
 });

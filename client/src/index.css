@@ -24,9 +24,10 @@
 
   /* Brand accents */
   --color-claude: #de7356;
-  --color-codex: light-dark(#5865d8, #8f7dff);
-  --color-codex-blue: light-dark(#4278db, #72a7ff);
-  --color-codex-purple: light-dark(#7656d9, #b392ff);
+  --color-openai-mark: light-dark(#0f0f0f, #fafafa);
+  --color-codex: light-dark(#5b6ee1, #9895ff);
+  --color-codex-blue: light-dark(#4b84e8, #7eafff);
+  --color-codex-purple: light-dark(#7863df, #b49dff);
 }
 
 /* Glass card recipe — apply only to card-level surfaces; stacked backdrop-filters are expensive on mobile Safari. */
@@ -602,9 +603,21 @@ a {
   height: var(--secondary-carousel-media-size);
 }
 
+.command-secondary-artist-artwork {
+  width: 5.5rem;
+  height: 5.5rem;
+}
+
 .command-secondary-track-artwork {
   width: 4.75rem;
   height: 4.75rem;
+}
+
+.command-secondary-ai {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  height: var(--secondary-carousel-media-size);
 }
 
 .command-secondary-album-details {

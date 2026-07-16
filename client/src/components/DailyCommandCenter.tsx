@@ -17,6 +17,7 @@ import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
 import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
+import { ClaudeIcon, OpenAiIcon } from '../sections/ai/ToolIcons';
 import { sectionHref } from '../router';
 import '../sections/spotify/spotify.css';
 
@@ -72,6 +73,13 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest('a, button, input, select, textarea, [role="button"]'));
 }
 
+function AiToolMark({ accent, className }: Readonly<{ accent: CommandCenterSlot['accent']; className: string }>) {
+  const Icon = accent === 'claude' ? ClaudeIcon : accent === 'codex' ? OpenAiIcon : undefined;
+  if (!Icon) return null;
+  const color = accent === 'codex' ? 'var(--color-openai-mark)' : 'var(--color-claude)';
+  return <Icon className={className} style={{ color }} />;
+}
+
 function CommandPanel({
   href,
   className,
@@ -119,9 +127,10 @@ function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; gi
     ? github?.contributions.days.slice(-7)
     : undefined;
   const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
+  const toolMark = slot.accent ? <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" /> : undefined;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      {rings ?? <span className="command-signal-dot" aria-hidden />}
+      {rings ?? toolMark ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
@@ -282,7 +291,7 @@ function SecondaryContent({
       .filter((track) => track.artist.split(', ').includes(artist?.name ?? slot.title))
       .slice(0, 3);
     return <div className="command-secondary-spotify mt-4">
-      {artist && <Thumb url={artist.imageUrl} size="command-secondary-spotify-artwork" />}
+      {artist && <Thumb url={artist.imageUrl} size="command-secondary-artist-artwork" />}
       <div className="command-secondary-artist-details">
         <p className="text-sm font-semibold text-ink">{slot.title}</p>
         {tracks.length > 0 && <><p className="command-secondary-artist-track-label">Top tracks</p><ol className="command-secondary-artist-tracks" aria-label={`Top tracks by ${slot.title} ${timeframe}`}>
@@ -322,7 +331,11 @@ function SecondaryContent({
   if (slot.render.type === 'github-contributions' && github) {
     return <div className="mt-4"><ContributionGrid data={github} hovered={hoveredDay} onHover={onHover} /></div>;
   }
-  return <div className="mt-4"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-1 text-sm text-ink-muted">{slot.detail}</p></div>;
+  const toolMark = <AiToolMark accent={slot.accent} className="h-10 w-10 shrink-0" />;
+  return <div className={slot.accent ? 'command-secondary-ai mt-4' : 'mt-4'}>
+    {toolMark}
+    <div><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-1 text-sm text-ink-muted">{slot.detail}</p></div>
+  </div>;
 }
 
 function CommandCenterSkeleton() {

@@ -17,7 +17,8 @@ function limitLabel(
   tokens?: number,
 ) {
   if (limit) return `${Math.round(limit.usedPercent)}%`;
-  if (tokens !== undefined) return `${formatCompactNumber(tokens)} tok`;
+  if (tokens === 0) return '0%';
+  if (tokens !== undefined) return `${formatCompactNumber(tokens)} tokens`;
   return status === 'unlimited' ? 'No limit' : '—';
 }
 
@@ -33,14 +34,15 @@ function ToolRow({
   id,
   label,
   color,
+  iconColor = color,
   icon: Icon,
-}: Readonly<{ id: string; label: string; color: string; icon: React.ComponentType<ToolIconProps> }>) {
+}: Readonly<{ id: string; label: string; color: string; iconColor?: string; icon: React.ComponentType<ToolIconProps> }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   return (
     <div>
       <div className="mb-1.5 flex items-center gap-2 text-sm">
-        <Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} />
+        <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: iconColor }} />
         <span className="font-medium">{label}</span>
         <span className="ml-auto">
           <UsageRefreshButton label={label} refreshing={refreshing} onRefresh={refresh} />

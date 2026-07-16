@@ -38,4 +38,14 @@ describe('computeHealthBaselines', () => {
       anomalous: false,
     });
   });
+
+  it('does not compare a partial-day average heart rate with completed days', () => {
+    const baseline = computeHealthBaselines([
+      { date: '2026-07-01', heartRate: 90 },
+      { date: '2026-07-02', heartRate: 94 },
+      { date: '2026-07-03', heartRate: 92 },
+    ], { date: '2026-07-04', heartRate: 69 }, 7, 15);
+
+    expect(baseline?.metrics.heartRate).toBeUndefined();
+  });
 });
