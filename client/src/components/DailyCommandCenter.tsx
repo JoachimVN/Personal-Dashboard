@@ -1,15 +1,19 @@
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type {
+  AiUsageToolData,
   CalendarData,
   CommandCenterData,
   CommandCenterSlot,
   GitHubData,
+  GmailData,
   HealthData,
   SpotifyData,
   WeatherData,
 } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
+import { UsageSparkline } from '../sections/ai/UsageHistoryChart';
+import { WEEKLY_MS } from '../sections/ai/UsageMeter';
 import { deg, glyph, weatherLocation } from '../lib/weather';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
@@ -27,7 +31,7 @@ function formatEventDay(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
   if (event.date === today) return event.allDay ? 'Today' : event.startLabel;
   return new Date(`${event.date}T12:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'short',
+    weekday: 'long',
     day: 'numeric',
   });
 }
@@ -90,11 +94,19 @@ function CommandPanel({
   className,
   children,
   navigable = true,
-}: Readonly<{ href: string; label: string; className: string; children: ReactNode; navigable?: boolean }>) {
+  fullCardLink = false,
+}: Readonly<{
+  href: string;
+  label: string;
+  className: string;
+  children: ReactNode;
+  navigable?: boolean;
+  fullCardLink?: boolean;
+}>) {
   if (!navigable) return <div className={className}>{children}</div>;
 
   return (
-    <div className={`${className} cursor-pointer`}>
+    <div className={`${className} cursor-pointer${fullCardLink ? ' command-panel--full-link' : ''}`}>
       <a href={href} aria-label={label} className="command-panel-stretched-link" />
       {children}
     </div>
@@ -116,12 +128,17 @@ function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; gi
     : undefined;
   const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
   const toolMark = slot.accent ? <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" /> : undefined;
+  const dualToolMarks = !slot.accent && slot.render.type === 'ai-usage-tool' && slot.render.toolIds.length > 1
+    ? <span className="flex shrink-0 flex-col items-center gap-0.5">
+        {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
+      </span>
+    : undefined;
   const githubMark = slot.source === 'github' && slot.render.type === 'github-contributions'
     ? <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />
     : undefined;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      {rings ?? toolMark ?? githubMark ?? <span className="command-signal-dot" aria-hidden />}
+      {rings ?? toolMark ?? dualToolMarks ?? githubMark ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
@@ -325,6 +342,117 @@ function GithubContributionsSecondary({
   return <div className="mt-4"><ContributionGrid data={github} hovered={hoveredDay} onHover={onHover} /></div>;
 }
 
+type AiUsageByTool = Readonly<{ claude: AiUsageToolData | undefined; codex: AiUsageToolData | undefined }>;
+
+const DAY_MS = 24 * 60 * 60_000;
+
+/** `"Jane Doe" <jane@example.com>` → `Jane Doe`, falling back to the bare address. */
+function senderName(from: string): string {
+  const name = from.replace(/<[^>]*>/g, '').replaceAll('"', '').trim();
+  return name || from.replace(/[<>]/g, '').trim();
+}
+
+function GithubReviewList({ github, skip = 0 }: Readonly<{ github: GitHubData | undefined; skip?: number }>): ReactNode {
+  const reviews = github?.pullRequests.filter((pr) => pr.role === 'review-requested').slice(skip, skip + 4) ?? [];
+  if (!reviews.length) return null;
+  return <div className="command-agenda-list mt-4">
+    {reviews.map((pr) => <div key={`${pr.repo}#${pr.number}`} className="command-agenda-item">
+      <span className="command-agenda-lead">{pr.repo}</span><span>{pr.title}</span>
+    </div>)}
+  </div>;
+}
+
+function GmailThreadList({
+  threadIds,
+  gmail,
+  className = 'command-agenda-list mt-4',
+}: Readonly<{ threadIds: string[]; gmail: GmailData | undefined; className?: string }>): ReactNode {
+  const threads = threadIds
+    .map((id) => gmail?.threads.find((thread) => thread.id === id))
+    .filter((thread): thread is GmailData['threads'][number] => thread !== undefined);
+  if (!threads.length) return null;
+  return <div className={className}>
+    {threads.map((thread) => <div key={thread.id} className="command-agenda-item">
+      <span className="command-agenda-lead">{senderName(thread.from)}</span><span>{thread.subject}</span>
+    </div>)}
+  </div>;
+}
+
+type AiUsageRender = Extract<CommandCenterSlot['render'], { type: 'ai-usage-tool' }>;
+
+function aiToolColor(toolId: AiUsageRender['toolIds'][number]): string {
+  return toolId === 'codex' ? 'var(--color-codex)' : 'var(--color-claude)';
+}
+
+/** One sparkline per tool; several overlay in one box — same time window, same fixed 0–100% scale. */
+function AiUsageTrend({ render, aiUsage }: Readonly<{
+  render: AiUsageRender;
+  aiUsage: AiUsageByTool;
+}>): ReactNode {
+  const lines = render.toolIds
+    .map((toolId) => ({ toolId, history: aiUsage[toolId]?.history }))
+    .filter((line): line is { toolId: AiUsageRender['toolIds'][number]; history: NonNullable<AiUsageToolData['history']> } =>
+      Boolean(line.history?.length));
+  if (!lines.length) return null;
+  return <div className="relative">
+    {lines.map((line, index) => <div key={line.toolId} className={index > 0 ? 'absolute inset-0' : undefined}>
+      <UsageSparkline
+        points={line.history}
+        metric={render.metric === 'fiveHour' ? 'fiveHourUsedPercent' : 'weeklyUsedPercent'}
+        windowMs={render.metric === 'fiveHour' ? DAY_MS : WEEKLY_MS}
+        color={aiToolColor(line.toolId)}
+      />
+    </div>)}
+  </div>;
+}
+
+function GithubReviewsSecondary({ slot, github }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined }>): ReactNode {
+  if (slot.render.type !== 'github-reviews') return null;
+  return GithubReviewList({ github });
+}
+
+function GmailThreadsSecondary({ slot, gmail }: Readonly<{ slot: CommandCenterSlot; gmail: GmailData | undefined }>): ReactNode {
+  if (slot.render.type !== 'gmail-threads') return null;
+  const list = GmailThreadList({ threadIds: slot.render.threadIds, gmail, className: 'command-agenda-list mt-3' });
+  if (!list) return null;
+  return <>
+    <p className="mt-4 text-sm font-semibold text-ink">{slot.title}</p>
+    {list}
+  </>;
+}
+
+function WeatherHoursSecondary({ slot, weather }: Readonly<{ slot: CommandCenterSlot; weather: WeatherData | undefined }>): ReactNode {
+  if (slot.render.type !== 'weather-hours' || !weather?.hours.length) return null;
+  return <>
+    <p className="mt-4 text-sm font-semibold text-ink">{slot.title}</p>
+    <div className="command-hours mt-3" aria-label="Hourly forecast">
+      {weather.hours.slice(0, 6).map((hour) => <div key={hour.time} className="command-hour">
+        <span>{hour.hourLabel}</span>
+        <span aria-hidden className="text-base leading-none">{glyph(hour.symbol)}</span>
+        <strong>{deg(hour.temperature)}</strong>
+      </div>)}
+    </div>
+    <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>
+  </>;
+}
+
+function AiUsageSecondary({ slot, aiUsage }: Readonly<{ slot: CommandCenterSlot; aiUsage: AiUsageByTool }>): ReactNode {
+  if (slot.render.type !== 'ai-usage-tool') return null;
+  const trend = AiUsageTrend({ render: slot.render, aiUsage });
+  if (!trend) return null;
+  const toolIds = slot.render.toolIds;
+  return <div className="command-secondary-ai mt-4">
+    <div className="flex shrink-0 flex-col items-center gap-2">
+      {toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className={toolIds.length > 1 ? 'h-6 w-6' : 'h-10 w-10'} />)}
+    </div>
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-semibold text-ink">{slot.title}</p>
+      <div className="mt-2">{trend}</div>
+      <p className="mt-1.5 text-[11px] tabular-nums text-ink-faint">{slot.detail}</p>
+    </div>
+  </div>;
+}
+
 function FallbackSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
   const toolMark = <AiToolMark accent={slot.accent} className="h-10 w-10 shrink-0" />;
   return <div className={slot.accent ? 'command-secondary-ai mt-4' : 'mt-4'}>
@@ -340,10 +468,13 @@ function SecondaryContent(props: Readonly<{
   spotifyFetchedAt: string | undefined;
   health: HealthData | undefined;
   github: GitHubData | undefined;
+  gmail: GmailData | undefined;
+  weather: WeatherData | undefined;
+  aiUsage: AiUsageByTool;
   hoveredDay: { date: string; count: number } | null;
   onHover: (day: { date: string; count: number } | null) => void;
 }>): ReactNode {
-  const { slot, calendar, spotify, spotifyFetchedAt, health, github, hoveredDay, onHover } = props;
+  const { slot, calendar, spotify, spotifyFetchedAt, health, github, gmail, weather, aiUsage, hoveredDay, onHover } = props;
   switch (slot.render.type) {
     case 'calendar-agenda': return CalendarAgendaSecondary({ slot, calendar }) ?? <FallbackSecondary slot={slot} />;
     case 'spotify-now-playing': return SpotifyNowPlayingSecondary({ spotify, spotifyFetchedAt }) ?? <FallbackSecondary slot={slot} />;
@@ -352,6 +483,10 @@ function SecondaryContent(props: Readonly<{
     case 'spotify-album': return SpotifyAlbumSecondary({ slot, spotify }) ?? <FallbackSecondary slot={slot} />;
     case 'health-rings': return HealthRingsSecondary({ slot, health }) ?? <FallbackSecondary slot={slot} />;
     case 'github-contributions': return GithubContributionsSecondary({ slot, github, hoveredDay, onHover }) ?? <FallbackSecondary slot={slot} />;
+    case 'github-reviews': return GithubReviewsSecondary({ slot, github }) ?? <FallbackSecondary slot={slot} />;
+    case 'gmail-threads': return GmailThreadsSecondary({ slot, gmail }) ?? <FallbackSecondary slot={slot} />;
+    case 'weather-hours': return WeatherHoursSecondary({ slot, weather }) ?? <FallbackSecondary slot={slot} />;
+    case 'ai-usage-tool': return AiUsageSecondary({ slot, aiUsage }) ?? <FallbackSecondary slot={slot} />;
     default: return <FallbackSecondary slot={slot} />;
   }
 }
@@ -390,6 +525,11 @@ export function DailyCommandCenter() {
   const weather = useWidget<WeatherData>('weather').envelope?.data;
   const github = useWidget<GitHubData>('github').envelope?.data;
   const health = useWidget<HealthData>('health').envelope?.data;
+  const gmail = useWidget<GmailData>('gmail').envelope?.data;
+  const aiUsage: AiUsageByTool = {
+    claude: useWidget<AiUsageToolData>('ai-usage-claude').envelope?.data,
+    codex: useWidget<AiUsageToolData>('ai-usage-codex').envelope?.data,
+  };
   const spotifyEnvelope = useWidget<SpotifyData>('spotify').envelope;
   const spotify = spotifyEnvelope?.data;
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
@@ -415,6 +555,15 @@ export function DailyCommandCenter() {
   const heroActivity = heroRender.type === 'health-rings' && health?.today ? health : undefined;
   const heroKicker = heroEvent ? eventTiming(heroEvent, Date.now()) : ranked.hero.kicker;
   const todayWeather = weather?.days[0];
+  // Richer hero bodies for signals whose title/detail alone undersell them. The GitHub list skips
+  // the first PR because the hero title already names it.
+  let heroExtra: ReactNode = null;
+  if (heroRender.type === 'github-reviews') heroExtra = GithubReviewList({ github, skip: 1 });
+  else if (heroRender.type === 'gmail-threads') heroExtra = GmailThreadList({ threadIds: heroRender.threadIds, gmail });
+  else if (heroRender.type === 'ai-usage-tool') {
+    const trend = AiUsageTrend({ render: heroRender, aiUsage });
+    if (trend) heroExtra = <div className="mt-4 max-w-sm">{trend}</div>;
+  }
 
   return <section className="command-center glass" aria-labelledby="command-center-title">
     <div className="command-center-head">
@@ -431,7 +580,7 @@ export function DailyCommandCenter() {
         <div className="mt-5 flex items-start gap-4">
           {heroTrack && <Thumb url={heroTrack.imageUrl} size="h-16 w-16" />}
           <div className="min-w-0">
-            <p className="command-event-time">{heroKicker}</p>
+            {heroKicker !== ranked.hero.kicker && <p className="command-event-time">{heroKicker}</p>}
             <p className="command-event-title">{heroEvent?.title ?? heroTrack?.track ?? ranked.hero.title}</p>
             {heroEvent ? (
               <div className="mt-2 space-y-1.5 text-sm text-ink-muted">
@@ -448,9 +597,12 @@ export function DailyCommandCenter() {
                 )}
                 {!heroEvent.location && !heroEvent.description && <p>{ranked.hero.detail}</p>}
               </div>
-            ) : <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{heroTrack ? heroTrack.artist : ranked.hero.detail}</p>}
+            ) : heroRender.type !== 'gmail-threads' || !heroExtra ? (
+              <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{heroTrack ? heroTrack.artist : ranked.hero.detail}</p>
+            ) : null}
           </div>
         </div>
+        {heroExtra}
         {heroActivity?.today && (
           <div className="mt-4">
             <ActivityRings
@@ -478,14 +630,15 @@ export function DailyCommandCenter() {
       href={activeSecondary.href}
       label={`Open ${activeSecondary.kicker}: ${activeSecondary.title}`}
       className={`command-agenda command-panel--${toneFor(activeSecondary)}`}
+      fullCardLink
     >
       <SecondaryCarousel
         items={secondarySlots}
         activeIndex={activeSecondaryIndex}
         onActiveChange={setActiveSecondaryIndex}
         renderItem={(slot) => <>
-          <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><a href={slot.href} className="command-agenda-link">Open section <span aria-hidden>↗</span></a></div>
-          <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} hoveredDay={hoveredDay} onHover={setHoveredDay} />
+          <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>
+          <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} gmail={gmail} weather={weather} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
         </>}
       />
     </CommandPanel>}

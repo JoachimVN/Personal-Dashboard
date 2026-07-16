@@ -318,6 +318,19 @@ a {
   border-radius: inherit;
 }
 
+.command-panel--full-link > .command-panel-stretched-link {
+  z-index: 2;
+}
+
+.command-panel--full-link > .command-secondary-carousel {
+  z-index: auto;
+}
+
+.command-panel--full-link .command-secondary-carousel-dots {
+  position: relative;
+  z-index: 3;
+}
+
 .command-panel-stretched-link:focus-visible {
   outline: 2px solid var(--color-accent-personal);
   outline-offset: 4px;
@@ -751,7 +764,7 @@ a {
 
 .command-agenda-item {
   display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr);
+  grid-template-columns: 6.5rem minmax(0, 1fr);
   gap: 0.8rem;
   font-size: 0.78rem;
 }
@@ -759,6 +772,7 @@ a {
 .command-agenda-item time {
   color: var(--color-ink-faint);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .command-agenda-item span {
@@ -766,6 +780,34 @@ a {
   font-weight: 520;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Non-date lead cell (PR repo, mail sender) styled like the agenda's time column. */
+.command-agenda-item .command-agenda-lead {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-hours {
+  display: flex;
+  gap: 1.15rem;
+}
+
+.command-hour {
+  display: grid;
+  gap: 0.15rem;
+  text-align: center;
+  font-size: 0.625rem;
+  color: var(--color-ink-faint);
+}
+
+.command-hour strong {
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .dashboard-section-heading {

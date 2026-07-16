@@ -79,7 +79,7 @@ export function githubCandidates(
     candidates.push({
       id: `github:review:${reviews[0].repo}:${reviews[0].number}`, source: 'github', kind: 'github', score: 91,
       shapes: [...allShapes], kicker: reviews.length > 1 ? `${reviews.length} reviews waiting` : 'Review requested',
-      title: reviews[0].title, detail: reviews[0].repo, href: '#/github', render: { type: 'text' },
+      title: reviews[0].title, detail: reviews[0].repo, href: '#/github', render: { type: 'github-reviews' },
     });
   }
   // Only an unusually HIGH day is a signal — a quiet day isn't a "code anomaly" worth surfacing.
@@ -133,17 +133,19 @@ export function gmailCandidates(
   if (stale) return [];
   let score = hasUnread ? 53 : 20;
   let kicker = 'Inbox';
-  let detail = oldestUnread?.subject ?? 'No unread thread needs attention';
+  const detail = oldestUnread?.subject ?? 'No unread thread needs attention';
   let shapes: Candidate['shapes'] = ['tile'];
   if (fresh) {
     score = 78;
     kicker = 'New mail';
     shapes = [...allShapes];
   }
+  const unreadIds = data.threads.filter((thread) => thread.unread).slice(0, 3).map((thread) => thread.id);
   return [{
     id: 'gmail:inbox', source: 'gmail', kind: 'gmail', score,
     shapes, kicker, title: `${data.unreadThreads} unread`, detail,
-    href: '#/personal', render: { type: 'text' },
+    href: '#/personal',
+    render: unreadIds.length ? { type: 'gmail-threads', threadIds: unreadIds } : { type: 'text' },
   }];
 }
 
@@ -311,14 +313,33 @@ function aiAccent(tool: AiTool): AiAccent | undefined {
 /** A weekly window that just rolled over reads as a big same-sample drop, not a gradual decline. */
 const RESET_DROP_PERCENT = 40;
 
+/**
+ * "09:00" when it lands today, "Thu 09:00" later in the week, "Wed 23 Jul" when it's near a full
+ * week out — a bare weekday that far ahead reads as tomorrow, not seven days from now.
+ */
+function resetLabel(resetsAt: string, now = Date.now()): string {
+  const reset = new Date(resetsAt);
+  const time = reset.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  if (reset.toDateString() === new Date(now).toDateString()) return time;
+  if (reset.getTime() - now >= 6 * 24 * 60 * 60_000) {
+    return reset.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  return `${reset.toLocaleDateString('en-GB', { weekday: 'short' })} ${time}`;
+}
+
+function aiUsageRender(accents: (AiAccent | undefined)[], metric: 'fiveHour' | 'weekly'): Candidate['render'] {
+  const toolIds = accents.filter((accent): accent is AiAccent => accent !== undefined);
+  return toolIds.length ? { type: 'ai-usage-tool', toolIds, metric } : { type: 'text' };
+}
+
 function aiRunwayCandidate(available: AiTool[]): Candidate | undefined {
   const limits = available.flatMap((tool) => {
     const data = tool.data!;
     return [
-      data.fiveHour && { label: tool.label, period: '5-hour limit', window: data.fiveHour, accent: aiAccent(tool) },
-      data.weekly && { label: tool.label, period: 'weekly limit', window: data.weekly, accent: aiAccent(tool) },
-      data.modelWeekly && { label: `${tool.label} ${data.modelWeekly.model}`, period: 'weekly limit', window: data.modelWeekly, accent: aiAccent(tool) },
-    ].filter((limit): limit is { label: string; period: string; window: NonNullable<typeof data.fiveHour>; accent: AiAccent | undefined } => Boolean(limit));
+      data.fiveHour && { label: tool.label, period: '5-hour limit', metric: 'fiveHour' as const, window: data.fiveHour, accent: aiAccent(tool) },
+      data.weekly && { label: tool.label, period: 'weekly limit', metric: 'weekly' as const, window: data.weekly, accent: aiAccent(tool) },
+      data.modelWeekly && { label: `${tool.label} ${data.modelWeekly.model}`, period: 'weekly limit', metric: 'weekly' as const, window: data.modelWeekly, accent: aiAccent(tool) },
+    ].filter((limit): limit is { label: string; period: string; metric: 'fiveHour' | 'weekly'; window: NonNullable<typeof data.fiveHour>; accent: AiAccent | undefined } => Boolean(limit));
   });
   if (!limits.length) return undefined;
 
@@ -330,9 +351,78 @@ function aiRunwayCandidate(available: AiTool[]): Candidate | undefined {
   return {
     id: 'ai-usage:runway', source: 'ai-usage', kind: 'ai-usage', score: remaining <= 15 ? 86 : 30,
     shapes: remaining <= 15 ? [...allShapes] : ['tile'], kicker: remaining <= 15 ? 'Running low' : 'AI runway',
-    title: `${remaining}% available`, detail: `${tightest.label} · ${tightest.period} · resets ${new Date(tightest.window.resetsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
-    href: '#/ai', accent: tightest.accent, meter: remaining, render: { type: 'text' },
+    title: `${remaining}% available`, detail: `${tightest.label} · ${tightest.period} · resets ${resetLabel(tightest.window.resetsAt)}`,
+    href: '#/ai', accent: tightest.accent, meter: remaining, render: aiUsageRender([tightest.accent], tightest.metric),
   };
+}
+
+interface WeeklyReset {
+  tool: AiTool;
+  /** Post-reset weekly percent. */
+  usedPercent: number;
+  drop: number;
+  resetsAt: string | undefined;
+}
+
+function weeklyReset(tool: AiTool): WeeklyReset | undefined {
+  const data = tool.data!;
+  const last = data.history.at(-1);
+  const prev = data.history.at(-2);
+  if (last?.weeklyUsedPercent === undefined || prev?.weeklyUsedPercent === undefined) return undefined;
+  const drop = prev.weeklyUsedPercent - last.weeklyUsedPercent;
+  if (drop < RESET_DROP_PERCENT) return undefined;
+  // Some providers zero the percentage before rolling resetsAt forward — an expired timestamp
+  // isn't a clean-slate horizon, so treat it as unknown rather than saying "until <yesterday>".
+  const resetsAt = data.weekly && Date.parse(data.weekly.resetsAt) > Date.now() ? data.weekly.resetsAt : undefined;
+  return { tool, usedPercent: last.weeklyUsedPercent, drop, resetsAt };
+}
+
+/**
+ * Weekly windows roll over on fixed schedules, so both tools resetting in the same sample is
+ * systematic, not coincidence — and the ranker only ever seats one ai-usage candidate per board.
+ * Merging keeps the second tool's reset from being silently dropped every week.
+ */
+function aiResetCandidates(available: AiTool[]): Candidate[] {
+  const resets = available
+    .map(weeklyReset)
+    .filter((reset): reset is WeeklyReset => reset !== undefined);
+  if (!resets.length) return [];
+  if (resets.length === 1) {
+    const reset = resets[0]!;
+    return [{
+      id: `ai-usage:reset:${reset.tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
+      shapes: ['secondary', 'tile'], kicker: 'Fresh allowance', title: `${reset.tool.label} usage just reset`,
+      detail: reset.resetsAt
+        ? `Back down to ${reset.usedPercent.toFixed(0)}% · clean slate until ${resetLabel(reset.resetsAt)}`
+        : `Back down to ${reset.usedPercent.toFixed(0)}% of the weekly limit`,
+      href: '#/ai', accent: aiAccent(reset.tool), render: aiUsageRender([aiAccent(reset.tool)], 'weekly'),
+    }];
+  }
+  // Both resets landed within one sampling gap, so the next weekly resets normally all but
+  // coincide — one shared "until X" reads cleanest. After a long gap (machine asleep) they can
+  // genuinely diverge; then each tool gets its own time.
+  const resetTimes = resets
+    .map((reset) => reset.resetsAt)
+    .filter((resetsAt): resetsAt is string => resetsAt !== undefined)
+    .map((resetsAt) => Date.parse(resetsAt));
+  const sharedReset = resetTimes.length === resets.length
+    && Math.max(...resetTimes) - Math.min(...resetTimes) <= 60 * 60_000;
+  const usageLabel = (reset: (typeof resets)[number]) => `${reset.tool.label} ${reset.usedPercent.toFixed(0)}%`;
+  const detail = sharedReset
+    ? `${resets.map(usageLabel).join(' · ')} · clean slates until ${resetLabel(resets[0]!.resetsAt!)}`
+    : resets
+      .map((reset) => {
+        const untilSuffix = reset.resetsAt ? ` until ${resetLabel(reset.resetsAt)}` : '';
+        return `${usageLabel(reset)}${untilSuffix}`;
+      })
+      .join(' · ');
+  return [{
+    id: `ai-usage:reset:${resets.map((reset) => reset.tool.id).sort((a, b) => a.localeCompare(b)).join('+')}`,
+    source: 'ai-usage', kind: 'ai-usage', score: 66, shapes: ['secondary', 'tile'],
+    kicker: 'Fresh allowance', title: `${resets.map((reset) => reset.tool.label).join(' & ')} usage just reset`,
+    detail,
+    href: '#/ai', render: aiUsageRender(resets.map((reset) => aiAccent(reset.tool)), 'weekly'),
+  }];
 }
 
 function aiToolCandidates(
@@ -342,18 +432,6 @@ function aiToolCandidates(
 ): Candidate[] {
   const data = tool.data!;
   const candidates: Candidate[] = [];
-  const last = data.history.at(-1);
-  const prev = data.history.at(-2);
-  if (
-    last?.weeklyUsedPercent !== undefined && prev?.weeklyUsedPercent !== undefined
-    && prev.weeklyUsedPercent - last.weeklyUsedPercent >= RESET_DROP_PERCENT
-  ) {
-    candidates.push({
-      id: `ai-usage:reset:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
-      shapes: ['secondary', 'tile'], kicker: 'Fresh allowance', title: `${tool.label} usage just reset`,
-      detail: `Back down to ${last.weeklyUsedPercent.toFixed(0)}% of the weekly limit`, href: '#/ai', accent: aiAccent(tool), render: { type: 'text' },
-    });
-  }
 
   // fiveHour, not weekly: a cumulative weekly % naturally climbs through the week regardless of
   // pace, so comparing it against trailing samples would flag every Friday as "anomalous."
@@ -368,7 +446,7 @@ function aiToolCandidates(
     candidates.push({
       id: `ai-usage:anomaly:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 75, shapes: [...allShapes],
       kicker: 'Heavy usage', title: `${tool.label} running well above usual`,
-      detail: `${deviation.deviationPercent.toFixed(0)}% above your usual pace`, href: '#/ai', accent: aiAccent(tool), render: { type: 'text' },
+      detail: `${deviation.deviationPercent.toFixed(0)}% above your usual pace`, href: '#/ai', accent: aiAccent(tool), render: aiUsageRender([aiAccent(tool)], 'fiveHour'),
     });
   }
   return candidates;
@@ -384,6 +462,7 @@ export function aiCandidates(
 
   const runway = aiRunwayCandidate(available);
   if (runway) candidates.push(runway);
+  candidates.push(...aiResetCandidates(available));
   for (const tool of available) candidates.push(...aiToolCandidates(tool, baselineWindowDays, baselineDeviationPercent));
 
   return candidates;
@@ -406,14 +485,14 @@ export function weatherCandidates(
     return [{
       id: 'weather:hot', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
       kicker: 'Heat today', title: `${Math.round(today.maxTemperature)}° expected`,
-      detail: `Above your configured comfortable range`, href: '#/personal', render: { type: 'text' },
+      detail: `Above your configured comfortable range`, href: '#/personal', render: { type: 'weather-hours' },
     }];
   }
   if (today.minTemperature <= coldThresholdC) {
     return [{
       id: 'weather:cold', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
       kicker: 'Cold today', title: `${Math.round(today.minTemperature)}° expected`,
-      detail: `Below your configured comfortable range`, href: '#/personal', render: { type: 'text' },
+      detail: `Below your configured comfortable range`, href: '#/personal', render: { type: 'weather-hours' },
     }];
   }
   const overnight = new Date(now).getHours() < 6;

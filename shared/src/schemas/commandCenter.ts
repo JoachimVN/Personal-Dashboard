@@ -10,6 +10,16 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('spotify-album'), albumId: z.string() }),
   z.object({ type: z.literal('health-rings') }),
   z.object({ type: z.literal('github-contributions') }),
+  z.object({ type: z.literal('github-reviews') }),
+  z.object({ type: z.literal('gmail-threads'), threadIds: z.array(z.string()) }),
+  z.object({ type: z.literal('weather-hours') }),
+  z.object({
+    type: z.literal('ai-usage-tool'),
+    /** One trend line per tool, overlaid on the same 0–100% scale when there are several. */
+    toolIds: z.array(z.enum(['claude', 'codex'])).min(1),
+    /** Which quota window the card is about — drives the trend line and leading summary stat. */
+    metric: z.enum(['fiveHour', 'weekly']),
+  }),
 ]);
 
 export const commandCenterSlotSchema = z.object({
