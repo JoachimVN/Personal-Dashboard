@@ -491,9 +491,9 @@ export function githubFixture(now: Date): GitHubData {
     ],
     contributions: { total: githubDays.reduce((sum, day) => sum + day.count, 0), days: githubDays },
     repoHealth: [
-      { fullName: 'yourname/personal-dashboard', stars: 12, ciStatus: 'success', ciUrl: '#', latestRelease: 'v1.4.0', url: '#' },
-      { fullName: 'yourname/weekend-project', stars: 3, ciStatus: 'running', ciUrl: '#', url: '#' },
-      { fullName: 'yourname/dotfiles', stars: 41, ciStatus: 'none', url: '#' },
+      { fullName: 'yourname/personal-dashboard', stars: 12, ciStatus: 'success', ciUrl: '#', latestRelease: 'v1.4.0', url: '#', lastPushedAt: iso(now, -3) },
+      { fullName: 'yourname/weekend-project', stars: 3, ciStatus: 'running', ciUrl: '#', url: '#', lastPushedAt: iso(now, -26) },
+      { fullName: 'yourname/dotfiles', stars: 41, ciStatus: 'none', url: '#', lastPushedAt: iso(now, -14 * 24) },
     ],
   };
 }

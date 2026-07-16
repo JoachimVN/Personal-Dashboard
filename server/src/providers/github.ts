@@ -207,6 +207,7 @@ export function createGitHubProvider(
             ciUrl: run?.html_url,
             latestRelease: release?.data.tag_name,
             url: repoInfo.data.html_url,
+            lastPushedAt: repoInfo.data.pushed_at ?? repoInfo.data.created_at,
           };
         }),
       );
