@@ -1164,8 +1164,8 @@ a {
     grid-column: span 2;
   }
 
-  .arrangeable-grid--personal > :nth-child(1),
-  .arrangeable-grid--personal > :nth-child(4) {
+  /* Five cards: whatever sits first goes full-width, the rest pair up 2×2. */
+  .arrangeable-grid--personal > :nth-child(1) {
     grid-column: span 2;
   }
 }
