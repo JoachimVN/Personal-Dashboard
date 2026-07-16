@@ -1,6 +1,7 @@
 import type { HealthData, HealthDay } from '@personal-dashboard/shared';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
+import { latestActivityDay } from '../../lib/health';
 import { useWidget } from '../../useWidget';
 import { HealthWidget } from '../../widgets/HealthWidget';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
@@ -57,12 +58,13 @@ function HistoryTable({ days }: Readonly<{ days: HealthDay[] }>) {
 }
 
 function HealthSignals({ data }: Readonly<{ data: HealthData }>) {
-  const today = data.today;
+  const today = latestActivityDay(data);
+  const isToday = data.today === today;
   return (
     <div className="detail-signal-panel">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-xs font-medium text-ink-muted">Today’s movement</p>
+          <p className="text-xs font-medium text-ink-muted">{isToday ? 'Today’s movement' : 'Last synced movement'}</p>
           <p className="mt-1 text-3xl font-semibold tracking-[-0.06em] tabular-nums">{(today?.steps ?? 0).toLocaleString()} <span className="text-base font-medium text-ink-faint">steps</span></p>
         </div>
         {today?.heartRate != null && <p className="text-sm font-semibold text-rose-300">♥ {Math.round(today.heartRate)} bpm</p>}

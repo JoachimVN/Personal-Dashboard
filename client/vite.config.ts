@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:4822';
+
 export default defineConfig({
   plugins: [
     react(),
@@ -32,7 +34,7 @@ export default defineConfig({
     proxy: {
       // Dev server only — kept on a different port than the launchd-managed production
       // `npm start` instance (4821) so a dev session never fights it for the port.
-      '/api': 'http://localhost:4822',
+      '/api': apiProxyTarget,
     },
   },
 });

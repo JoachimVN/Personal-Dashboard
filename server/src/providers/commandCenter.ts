@@ -5,7 +5,9 @@ import {
   type GitHubData,
   type GmailData,
   type HealthData,
+  type HueData,
   type IMessageData,
+  type NewsData,
   type SpotifyData,
   type WeatherData,
   type WidgetEnvelope,
@@ -19,7 +21,9 @@ import {
   githubCandidates,
   gmailCandidates,
   healthCandidates,
+  hueCandidates,
   imessageCandidates,
+  newsCandidates,
   spotifyCandidates,
   weatherCandidates,
   type SpotifyFreshness,
@@ -38,31 +42,35 @@ function widgetData<T>(envelopes: Record<string, WidgetEnvelope>, id: string): T
  * API is noisy". Spotify's own top-lists only refresh every ~12h, so freshMs is generous (days,
  * not minutes) to give a genuine change real dwell time on the board.
  */
-async function computeSpotifyFreshness(
+export async function computeSpotifyFreshness(
   signalHistory: SignalHistoryStore,
   spotify: SpotifyData | undefined,
   freshMs: number,
 ): Promise<SpotifyFreshness> {
   const fresh: SpotifyFreshness = {
     trackShort: false, trackMedium: false, trackLong: false,
+    trackAllTime: false,
     artistShort: false, artistMedium: false, artistLong: false,
-    album: false,
+    artistAllTime: false, albumAllTime: false,
   };
   if (!spotify) return fresh;
   const checks: [keyof SpotifyFreshness, string, string | undefined][] = [
     ['trackShort', 'topTrack:short', spotify.topTracks.shortTerm[0]?.id ?? spotify.topTracks.shortTerm[0]?.track],
     ['trackMedium', 'topTrack:medium', spotify.topTracks.mediumTerm[0]?.id ?? spotify.topTracks.mediumTerm[0]?.track],
     ['trackLong', 'topTrack:long', spotify.topTracks.longTerm[0]?.id ?? spotify.topTracks.longTerm[0]?.track],
+    ['trackAllTime', 'topTrack:all-time', spotify.allTime.tracks[0]?.id ?? spotify.allTime.tracks[0]?.track],
     ['artistShort', 'topArtist:short', spotify.topArtists.shortTerm[0]?.id ?? spotify.topArtists.shortTerm[0]?.name],
     ['artistMedium', 'topArtist:medium', spotify.topArtists.mediumTerm[0]?.id ?? spotify.topArtists.mediumTerm[0]?.name],
     ['artistLong', 'topArtist:long', spotify.topArtists.longTerm[0]?.id ?? spotify.topArtists.longTerm[0]?.name],
-    ['album', 'topAlbum', spotify.allTime.albums[0]?.id ?? spotify.allTime.albums[0]?.name],
+    ['artistAllTime', 'topArtist:all-time', spotify.allTime.artists[0]?.id ?? spotify.allTime.artists[0]?.name],
+    ['albumAllTime', 'topAlbum:all-time', spotify.allTime.albums[0]?.id ?? spotify.allTime.albums[0]?.name],
   ];
   for (const [key, metric, value] of checks) {
     if (value === undefined) continue;
     await signalHistory.record('spotify', metric, value);
     const changedAt = await signalHistory.lastChangedAt('spotify', metric);
-    fresh[key] = changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+    fresh[key] = await signalHistory.hasChangedSinceBaseline('spotify', metric)
+      && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
   }
   return fresh;
 }
@@ -85,13 +93,16 @@ export function createCommandCenterProvider(
       const gmailChangedAt = await signalHistory.lastChangedAt('gmail', 'unreadThreads');
       const staleForMs = gmailChangedAt ? Date.now() - gmailChangedAt.getTime() : undefined;
       const github = widgetData<GitHubData>(envelopes, 'github');
+      const calendar = widgetData<CalendarData>(envelopes, 'calendar');
       const spotify = widgetData<SpotifyData>(envelopes, 'spotify');
       const spotifyFresh = await computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs);
       return rankCandidates([
-        ...calendarCandidates(widgetData<CalendarData>(envelopes, 'calendar'), Date.now()),
+        ...calendarCandidates(calendar, Date.now()),
         ...gmailCandidates(gmail, staleForMs, config.commandCenter.gmailStaleMs, config.commandCenter.gmailFreshMs),
         ...githubCandidates(github, config.commandCenter.baselineWindowDays, config.commandCenter.baselineDeviationPercent),
         ...healthCandidates(widgetData<HealthData>(envelopes, 'health')),
+        ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),
+        ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
         ...spotifyCandidates(spotify, spotifyFresh),
         ...weatherCandidates(widgetData<WeatherData>(envelopes, 'weather'), config.commandCenter.weatherHotC, config.commandCenter.weatherColdC),
         ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
@@ -105,10 +116,6 @@ export function createCommandCenterProvider(
         ),
         ...fallbackCandidates({
           calendar: envelopes.calendar?.status ?? 'loading',
-          gmail: envelopes.gmail?.status ?? 'loading',
-          github: envelopes.github?.status ?? 'loading',
-          aiClaude: envelopes['ai-usage-claude']?.status ?? 'loading',
-          aiCodex: envelopes['ai-usage-codex']?.status ?? 'loading',
         }),
       ]);
     },

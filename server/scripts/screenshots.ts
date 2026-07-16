@@ -1,8 +1,9 @@
 // Generates README screenshots against fake, fully-anonymized data (screenshotFixtures.ts): the
 // overview (hero + command center) plus the Spotify, Health, AI usage, and GitHub detail pages.
 // The overview's command-center ranking runs through the *real* scoring code (importance/
-// sources.ts + rank.ts), so that page's output always matches actual behavior. Boots a throwaway
-// mock API on :4822, points a scratch Vite client dev server at it, and drives headless Chromium
+// sources.ts + rank.ts); only two invisible-on-first-paint carousel previews are added to show its
+// affordance. Boots a throwaway
+// mock API on :4823, points a scratch Vite client dev server at it, and drives headless Chromium
 // via Playwright to capture each page. Runs both locally (npm run screenshots -w server) and in
 // CI (.github/workflows/screenshots.yml) — Playwright handles browser provisioning on both.
 //
@@ -16,14 +17,13 @@ import { fileURLToPath } from 'node:url';
 import { chromium, type Page as PlaywrightPage } from 'playwright';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
-import type { WidgetEnvelope } from '@personal-dashboard/shared';
+import type { CommandCenterSlot, WidgetEnvelope } from '@personal-dashboard/shared';
 import { rankCandidates } from '../src/importance/rank.js';
 import {
   aiCandidates,
   calendarCandidates,
   fallbackCandidates,
   githubCandidates,
-  gmailCandidates,
   healthCandidates,
   imessageCandidates,
   spotifyCandidates,
@@ -38,14 +38,13 @@ import {
   overviewAiCodex,
   overviewCalendar,
   overviewGithub,
-  overviewGmail,
   overviewHealth,
   weather,
 } from './screenshotFixtures.js';
 
-const MOCK_PORT = 4822;
+// Keep the throwaway capture API separate from the normal development server on 4822.
+const MOCK_PORT = 4823;
 const CLIENT_PORT = 5199;
-const GMAIL_STALE_MS = 24 * 60 * 60_000;
 const GMAIL_FRESH_MS = 30 * 60_000;
 const VIEWPORT = { width: 1600, height: 900 };
 
@@ -64,12 +63,12 @@ function envelope<T>(data: T, now: Date = new Date()): WidgetEnvelope<T> {
   return { id: 'x', status: 'ready', data, fetchedAt: iso, lastAttemptAt: iso, refreshMs: 60_000 };
 }
 
-type Daypart = 'night' | 'morning' | 'day' | 'evening';
+type Daypart = 'night' | 'dawn' | 'morning' | 'day' | 'evening';
 
 // Representative hours for the continuous sky and the matching overview greeting. Freezing an
 // exact time keeps screenshots deterministic even though the ambient colors no longer use buckets.
 const DAYPART_HOUR: Record<Daypart, [number, number]> = {
-  night: [2, 0], morning: [8, 30], day: [14, 0], evening: [19, 30],
+  night: [2, 0], dawn: [5, 30], morning: [8, 30], day: [14, 0], evening: [19, 30],
 };
 
 /** Mirrors the in-browser FakeDate init script's target time — used so a widget envelope's
@@ -78,9 +77,9 @@ const DAYPART_HOUR: Record<Daypart, [number, number]> = {
  * against the real generation time instead and renders nonsense once the browser clock is faked. */
 function referenceNow(daypart: Daypart): Date {
   const [hour, minute] = DAYPART_HOUR[daypart];
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d;
+  // Keep the synthetic calendar anchored to Thursday 16 July 2026 so the cinema fixture is
+  // always the following Friday 17 July, regardless of when screenshots are regenerated.
+  return new Date(2026, 6, 16, hour, minute, 0, 0);
 }
 
 interface Page {
@@ -115,13 +114,12 @@ async function buildPages(): Promise<Page[]> {
   const spotifyNow = referenceNow('morning');
   const healthNow = referenceNow('day');
   const aiNow = referenceNow('night');
-  const githubNow = referenceNow('morning');
+  const githubNow = referenceNow('dawn');
 
   const fixtures = await loadFixtures(spotifyNow);
   const aiFixtures = buildAiFixtures(aiNow);
   const overviewCalendarFixture = overviewCalendar(overviewNow);
   const overviewGithubFixture = overviewGithub(overviewNow);
-  const overviewGmailFixture = overviewGmail(overviewNow);
   const overviewHealthFixture = overviewHealth(overviewNow);
   const overviewAiClaudeFixture = overviewAiClaude(overviewNow);
   const overviewAiCodexFixture = overviewAiCodex(overviewNow);
@@ -129,9 +127,8 @@ async function buildPages(): Promise<Page[]> {
   const githubPageFixture = githubFixture(githubNow);
   const overviewWeatherFixture = weather(overviewNow);
 
-  const overviewCommandCenter = rankCandidates([
+  const overviewRanked = rankCandidates([
     ...calendarCandidates(overviewCalendarFixture, overviewNow.getTime()),
-    ...gmailCandidates(overviewGmailFixture, undefined, GMAIL_STALE_MS, GMAIL_FRESH_MS),
     ...githubCandidates(overviewGithubFixture, 14, 50),
     ...healthCandidates(overviewHealthFixture),
     ...weatherCandidates(overviewWeatherFixture, 25, -10),
@@ -139,7 +136,9 @@ async function buildPages(): Promise<Page[]> {
     ...spotifyCandidates(fixtures.spotifyOverview, {
       trackShort: false, trackMedium: false, trackLong: false,
       artistShort: false, artistMedium: false, artistLong: false,
-      album: false,
+      trackAllTime: false,
+      artistAllTime: false,
+      albumAllTime: false,
     }),
     ...aiCandidates(
       [
@@ -149,8 +148,25 @@ async function buildPages(): Promise<Page[]> {
       14,
       50,
     ),
-    ...fallbackCandidates({ calendar: 'ready', gmail: 'ready', github: 'ready', aiClaude: 'ready', aiCodex: 'ready' }),
+    ...fallbackCandidates({ calendar: 'ready' }),
   ]);
+  const nowPlaying = overviewRanked.secondary.find((slot) => slot.id === 'spotify:now-playing');
+  if (!nowPlaying) throw new Error('Overview screenshot requires the now-playing secondary slot');
+  // The overview capture starts on now-playing, but keeps two synthetic, never-initially-visible
+  // previews so the screenshot demonstrates the carousel affordance without claiming real data.
+  const carouselPreviews: CommandCenterSlot[] = [
+    {
+      id: 'screenshot:carousel:preview-1', source: 'screenshot', kind: 'fallback', score: 0,
+      kicker: 'Preview', title: 'Another useful signal', detail: 'Carousel preview for the README screenshot.',
+      href: '#/personal', render: { type: 'text' },
+    },
+    {
+      id: 'screenshot:carousel:preview-2', source: 'screenshot', kind: 'fallback', score: 0,
+      kicker: 'Preview', title: 'One more useful signal', detail: 'Carousel preview for the README screenshot.',
+      href: '#/personal', render: { type: 'text' },
+    },
+  ];
+  const overviewCommandCenter = { ...overviewRanked, secondary: [nowPlaying, ...carouselPreviews] };
 
   return [
     {
@@ -188,7 +204,7 @@ async function buildPages(): Promise<Page[]> {
       // Bottom-align the Contributions card, then nudge up past its own bottom caption ("N
       // contributions in the last year") so the crop ends on the grid itself.
       slug: 'github', file: '05-github.png', hash: '#/github', scrollToText: 'Contributions', scrollAlign: 'bottom', extraScroll: -50,
-      daypart: 'morning', frozenAt: githubNow.getTime(), theme: 'dark',
+      daypart: 'dawn', frozenAt: githubNow.getTime(), theme: 'dark',
       widgets: { github: envelope(githubPageFixture, githubNow) },
     },
   ];
@@ -351,6 +367,18 @@ async function capturePage(pw: PlaywrightPage, page: Page): Promise<void> {
     await sleep(400);
   }
 
+  // The overview intentionally has three carousel positions. Pin the capture to the first,
+  // now-playing slide so a slow local bundle or a long fixture fetch cannot catch a transition.
+  if (page.slug === 'overview') {
+    const carousel = pw.locator('.command-secondary-carousel');
+    const firstCarouselDot = pw.locator('.command-secondary-carousel-dots button').first();
+    if (await firstCarouselDot.count()) {
+      await carousel.evaluate((element) => element.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+      await firstCarouselDot.evaluate((button: HTMLButtonElement) => button.click());
+      await sleep(500);
+    }
+  }
+
   const buf = await pw.screenshot({ type: 'png' });
   const outFile = path.join(outDir, page.file);
   const changed = saveIfChanged(buf, outFile);
@@ -371,6 +399,7 @@ async function main() {
   const viteCli = path.resolve(repoRoot, 'node_modules/vite/bin/vite.js');
   const vite: ChildProcess = spawn(process.execPath, [viteCli, '--port', String(CLIENT_PORT), '--strictPort'], {
     cwd: path.resolve(repoRoot, 'client'),
+    env: { ...process.env, VITE_API_PROXY_TARGET: `http://localhost:${MOCK_PORT}` },
     stdio: 'ignore',
   });
   await waitForHttp(`http://localhost:${CLIENT_PORT}`, 20_000);

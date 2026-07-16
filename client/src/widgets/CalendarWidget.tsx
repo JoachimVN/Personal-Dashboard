@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { CalendarData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
+import { mapsSearchHref } from '../lib/maps';
 
 /** Stable per-calendar dot color derived from the calendar's name; readable in both modes. */
 function calendarColor(name: string): string {
@@ -9,6 +10,14 @@ function calendarColor(name: string): string {
   for (const char of name) hash = Math.trunc(hash * 31 + (char.codePointAt(0) ?? 0));
   const hue = Math.abs(hash) % 360;
   return `light-dark(hsl(${hue} 55% 42%), hsl(${hue} 55% 65%))`;
+}
+
+function NoteIcon() {
+  return (
+    <svg aria-hidden viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="mt-0.5 h-3.5 w-3.5 shrink-0">
+      <path d="M3.5 2.75h9v10.5h-9zM5.5 6h5M5.5 8.5h5" />
+    </svg>
+  );
 }
 
 function dayHeading(date: string): string {
@@ -70,8 +79,20 @@ export function CalendarWidget() {
                           <span className="truncate font-medium">{event.title}</span>
                         </span>
                         {event.location && (
-                          <span className="block truncate text-xs text-ink-faint">
-                            {event.location}
+                          <a
+                            href={mapsSearchHref(event.location)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-ink-faint transition hover:text-ink"
+                          >
+                            <span aria-hidden className="shrink-0">📍</span>
+                            <span className="truncate">{event.location}</span>
+                          </a>
+                        )}
+                        {event.description && (
+                          <span className="mt-1.5 flex gap-1.5 border-l border-card-border pl-2 text-xs text-ink-muted">
+                            <NoteIcon />
+                            <span className="line-clamp-2 whitespace-pre-line">{event.description}</span>
                           </span>
                         )}
                       </span>

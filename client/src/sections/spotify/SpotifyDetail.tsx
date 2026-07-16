@@ -16,7 +16,7 @@ export function SpotifyDetail() {
       <DetailSectionHeading
         label="On repeat"
         title="Your rotation"
-        detail="Toggle the top cards between the last 4 weeks, the last 6 months, and all time — all-time counts and top albums build up the longer this dashboard keeps running."
+        detail="Toggle the top cards between 4 weeks, 6 months, 12 months, and all time — all-time counts and top albums build up the longer this dashboard keeps running."
       />
       <div className="space-y-4">
         <TopArtistsWidget />

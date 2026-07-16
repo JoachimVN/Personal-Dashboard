@@ -123,18 +123,18 @@ export function weather(now: Date): WeatherData {
 }
 
 export function overviewCalendar(now: Date): CalendarData {
-  const odysseyStart = daysFromNowAt(now, 2, 19, 15); // Friday
+  const odysseyStart = daysFromNowAt(now, 1, 19, 15); // Friday 17 July in the frozen capture
   const ODYSSEY_DURATION_MIN = 2 * 60 + 53;
   const odysseyEnd = new Date(odysseyStart.getTime() + ODYSSEY_DURATION_MIN * 60_000);
   const odysseyDurationLabel = `${Math.floor(ODYSSEY_DURATION_MIN / 60)}h ${ODYSSEY_DURATION_MIN % 60}m`;
-  const standupStart = daysFromNowAt(now, 1, 9, 30);
+  const standupStart = daysFromNowAt(now, 2, 9, 30);
   const standupEnd = new Date(standupStart.getTime() + 30 * 60_000);
 
   return {
     events: [
       {
         id: 'ev1', title: 'Cinema — The Odyssey', calendar: 'Personal', allDay: false,
-        location: `${odysseyDurationLabel} · with Sam`, start: odysseyStart.toISOString(), end: odysseyEnd.toISOString(),
+        location: 'Northstar Cinema', description: `${odysseyDurationLabel} · with Sam`, start: odysseyStart.toISOString(), end: odysseyEnd.toISOString(),
         date: odysseyStart.toISOString().slice(0, 10), startLabel: hhmm(odysseyStart), endLabel: hhmm(odysseyEnd),
       },
       {
@@ -152,7 +152,18 @@ export function overviewGithub(now: Date): GitHubData {
     pullRequests: [
       { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(now, -2) },
     ],
-    contributions: { total: 512, days: [{ date: dateDaysAgo(now, 0), count: 2 }] },
+    contributions: {
+      total: 512,
+      days: [
+        { date: dateDaysAgo(now, 6), count: 3 },
+        { date: dateDaysAgo(now, 5), count: 5 },
+        { date: dateDaysAgo(now, 4), count: 1 },
+        { date: dateDaysAgo(now, 3), count: 4 },
+        { date: dateDaysAgo(now, 2), count: 0 },
+        { date: dateDaysAgo(now, 1), count: 2 },
+        { date: dateDaysAgo(now, 0), count: 0 },
+      ],
+    },
     repoHealth: [],
   };
 }

@@ -4,7 +4,9 @@ import type {
   GitHubData,
   GmailData,
   HealthData,
+  HueData,
   IMessageData,
+  NewsData,
   SpotifyData,
   WeatherData,
   WidgetStatus,
@@ -13,6 +15,31 @@ import { computeDeviation } from '../deviation.js';
 import type { Candidate } from './types.js';
 
 const allShapes = ['hero', 'secondary', 'tile'] as const;
+
+function hasActivityData(day: HealthData['history'][number]): boolean {
+  return [day.steps, day.activeEnergyKcal, day.exerciseMinutes, day.standHours]
+    .some((value) => value !== undefined && value > 0);
+}
+
+function activitySummary(day: HealthData['history'][number]): { title: string; detail: string } {
+  if (day.steps !== undefined) {
+    return {
+      title: `${Math.round(day.steps).toLocaleString()} steps`,
+      detail: 'Open Health for the full activity rings',
+    };
+  }
+  if (day.activeEnergyKcal !== undefined) {
+    return {
+      title: `${Math.round(day.activeEnergyKcal)} active kcal`,
+      detail: [
+        day.exerciseMinutes !== undefined && `${Math.round(day.exerciseMinutes)} min exercise`,
+        day.standHours !== undefined && `${Math.round(day.standHours)} stand hrs`,
+      ].filter((value): value is string => Boolean(value)).join(' · ') || 'Open Health for the full activity rings',
+    };
+  }
+  if (day.exerciseMinutes !== undefined) return { title: `${Math.round(day.exerciseMinutes)} min exercise`, detail: 'Open Health for the full activity rings' };
+  return { title: `${Math.round(day.standHours ?? 0)} stand hrs`, detail: 'Open Health for the full activity rings' };
+}
 
 export function calendarCandidates(data: CalendarData | undefined, now: number): Candidate[] {
   const events = data?.events.filter((event) => Date.parse(event.end) >= now) ?? [];
@@ -23,7 +50,8 @@ export function calendarCandidates(data: CalendarData | undefined, now: number):
     candidates.push({
       id: `calendar:event:${next.id}`, source: 'calendar', kind: 'calendar', score: 96, shapes: [...allShapes],
       kicker: 'Next on deck', title: next.title,
-      detail: next.location || (next.allDay ? 'An all-day marker on your calendar' : `${next.startLabel}–${next.endLabel}`),
+      detail: [next.location, next.description].filter((detail): detail is string => Boolean(detail)).join(' · ')
+        || (next.allDay ? 'An all-day marker on your calendar' : `${next.startLabel}–${next.endLabel}`),
       href: '#/personal', render: { type: 'calendar-event', eventId: next.id },
     });
   }
@@ -65,15 +93,23 @@ export function githubCandidates(
       href: '#/github', render: { type: 'github-contributions' },
     });
   }
-  let contributionTitle = 'No contributions yet today';
-  if (today) contributionTitle = `${today} contributions today`;
-  if (reviews.length) contributionTitle = `${reviews.length} reviews waiting`;
-  candidates.push({
-    id: 'github:contributions', source: 'github', kind: 'github', score: reviews.length ? 47 : 36,
-    shapes: ['secondary', 'tile'], kicker: 'This week on GitHub',
-    title: contributionTitle,
-    detail: `${data.pullRequests.length} open pull requests`, href: '#/github', render: { type: 'github-contributions' },
-  });
+  if (today > 0) {
+    candidates.push({
+      id: 'github:contributions', source: 'github', kind: 'github', score: 36,
+      shapes: ['tile'], kicker: 'This week on GitHub',
+      title: `${today} contribution${today === 1 ? '' : 's'} today`,
+      detail: `${data.pullRequests.length} open pull requests`, href: '#/github', render: { type: 'github-contributions' },
+    });
+  } else {
+    const recentWeek = days.slice(-7).reduce((total, day) => total + day.count, 0);
+    if (recentWeek > 0) {
+      candidates.push({
+        id: 'github:recent-contributions', source: 'github', kind: 'github', score: 27, shapes: ['tile'],
+        kicker: 'This week on GitHub', title: `${recentWeek} contribution${recentWeek === 1 ? '' : 's'} this week`,
+        detail: 'Your recent contribution history', href: '#/github', render: { type: 'github-contributions' },
+      });
+    }
+  }
   return candidates;
 }
 
@@ -94,6 +130,7 @@ export function gmailCandidates(
   const hasUnread = data.unreadThreads > 0;
   const fresh = hasUnread && changedForMs !== undefined && changedForMs < freshThresholdMs;
   const stale = hasUnread && changedForMs !== undefined && changedForMs >= staleThresholdMs;
+  if (stale) return [];
   let score = hasUnread ? 53 : 20;
   let kicker = 'Inbox';
   let detail = oldestUnread?.subject ?? 'No unread thread needs attention';
@@ -102,9 +139,6 @@ export function gmailCandidates(
     score = 78;
     kicker = 'New mail';
     shapes = [...allShapes];
-  } else if (stale) {
-    score = 15;
-    detail = `Sitting untouched for ${Math.floor((changedForMs ?? 0) / 3_600_000)}h — probably nothing urgent`;
   }
   return [{
     id: 'gmail:inbox', source: 'gmail', kind: 'gmail', score,
@@ -117,7 +151,10 @@ export function imessageCandidates(data: IMessageData | undefined, freshMs: numb
   const unread = data?.conversations.filter((conversation) => conversation.unreadCount > 0) ?? [];
   if (!unread.length) return [];
   const totalUnread = unread.reduce((sum, conversation) => sum + conversation.unreadCount, 0);
-  const latest = unread.reduce((a, b) => (Date.parse(b.timestamp) > Date.parse(a.timestamp) ? b : a));
+  const latest = unread.reduce(
+    (mostRecent, conversation) => (Date.parse(conversation.timestamp) > Date.parse(mostRecent.timestamp) ? conversation : mostRecent),
+    unread[0]!,
+  );
   const fresh = Date.now() - Date.parse(latest.timestamp) < freshMs;
   return [{
     id: 'imessage:unread', source: 'imessage', kind: 'imessage', score: fresh ? 76 : 40,
@@ -137,7 +174,7 @@ export function healthCandidates(data: HealthData | undefined): Candidate[] {
       id: `health:baseline:${metric}`, source: 'health', kind: 'health', score: 82, shapes: [...allShapes],
       kicker: 'Personal baseline', title: `${metric.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()).trim()} ${value.deviationPercent.toFixed(0)}% ${value.direction}`,
       detail: `${value.current.toFixed(0)} today · usual ${value.average.toFixed(0)} across ${value.samples} days`,
-      href: '#/health', render: { type: 'health-rings' },
+      href: '#/health', render: { type: 'text' },
     });
   }
   const steps = data.today?.steps;
@@ -148,11 +185,16 @@ export function healthCandidates(data: HealthData | undefined): Candidate[] {
       detail: `${Math.round((steps / data.goals.steps) * 100)}% of your daily goal`, href: '#/health', render: { type: 'health-rings' },
     });
   }
-  if (data.today) {
+  const hasTodayActivity = data.today !== null && hasActivityData(data.today);
+  const activityDay = hasTodayActivity ? data.today : [...data.history].reverse().find(hasActivityData);
+  if (activityDay) {
+    const activity = activitySummary(activityDay);
     candidates.push({
-      id: 'health:activity', source: 'health', kind: 'health', score: 32, shapes: ['secondary', 'tile'],
-      kicker: "Today's activity", title: steps === undefined ? 'Activity is syncing' : `${Math.round(steps).toLocaleString()} steps`,
-      detail: 'Open Health for the full activity rings', href: '#/health', render: { type: 'health-rings' },
+      id: 'health:activity', source: 'health', kind: 'health', score: hasTodayActivity ? 32 : 34, shapes: ['tile'],
+      kicker: hasTodayActivity ? "Today's activity" : 'Last synced activity',
+      title: activity.title,
+      detail: hasTodayActivity ? activity.detail : `From ${activityDay.date}`,
+      href: '#/health', render: { type: 'health-rings' },
     });
   }
   return candidates;
@@ -164,24 +206,27 @@ export interface SpotifyFreshness {
   trackShort: boolean;
   trackMedium: boolean;
   trackLong: boolean;
+  trackAllTime: boolean;
   artistShort: boolean;
   artistMedium: boolean;
   artistLong: boolean;
-  album: boolean;
+  artistAllTime: boolean;
+  albumAllTime: boolean;
 }
 
-type Timeframe = 'short' | 'medium' | 'long';
+type Timeframe = 'short' | 'medium' | 'long' | 'allTime';
 
-/** long_term (years) is the rarest, most notable change; short_term (weeks) churns naturally and
- * shouldn't compete for hero the way a genuinely new all-time favorite should. */
-const TIMEFRAME_SCORE: Record<Timeframe, number> = { long: 85, medium: 65, short: 60 };
+/** Spotify's long_term window is approximately one year; short_term churns naturally and
+ * shouldn't compete for hero with a meaningful annual shift. */
+const TIMEFRAME_SCORE: Record<Timeframe, number> = { allTime: 90, long: 75, medium: 65, short: 60 };
 const TIMEFRAME_SHAPES: Record<Timeframe, Candidate['shapes']> = {
+  allTime: [...allShapes],
   long: [...allShapes],
   medium: ['secondary', 'tile'],
-  short: ['tile'],
+  short: ['secondary', 'tile'],
 };
 const TIMEFRAME_PERIOD: Record<Timeframe, string> = {
-  long: 'of all time', medium: 'these last few months', short: 'this month',
+  allTime: 'of all time', long: 'this past year', medium: 'these last few months', short: 'this month',
 };
 
 export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyFreshness): Candidate[] {
@@ -189,6 +234,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
   const candidates: Candidate[] = [];
 
   const trackTiers: { key: Timeframe; track: SpotifyData['topTracks']['shortTerm'][number] | undefined; isFresh: boolean }[] = [
+    { key: 'allTime', track: data.allTime.tracks[0], isFresh: fresh.trackAllTime },
     { key: 'long', track: data.topTracks.longTerm[0], isFresh: fresh.trackLong },
     { key: 'medium', track: data.topTracks.mediumTerm[0], isFresh: fresh.trackMedium },
     { key: 'short', track: data.topTracks.shortTerm[0], isFresh: fresh.trackShort },
@@ -204,6 +250,7 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
   }
 
   const artistTiers: { key: Timeframe; artist: SpotifyData['topArtists']['shortTerm'][number] | undefined; isFresh: boolean }[] = [
+    { key: 'allTime', artist: data.allTime.artists[0], isFresh: fresh.artistAllTime },
     { key: 'long', artist: data.topArtists.longTerm[0], isFresh: fresh.artistLong },
     { key: 'medium', artist: data.topArtists.mediumTerm[0], isFresh: fresh.artistMedium },
     { key: 'short', artist: data.topArtists.shortTerm[0], isFresh: fresh.artistShort },
@@ -213,29 +260,29 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
     candidates.push({
       id: `spotify:new-artist:${tier.key}:${tier.artist.id ?? tier.artist.name}`, source: 'spotify', kind: 'spotify',
       score: TIMEFRAME_SCORE[tier.key], shapes: TIMEFRAME_SHAPES[tier.key],
-      kicker: `New top artist ${TIMEFRAME_PERIOD[tier.key]}`, title: tier.artist.name,
-      detail: tier.artist.genres[0] ?? `Your top artist ${TIMEFRAME_PERIOD[tier.key]}`,
-      href: '#/spotify', render: { type: 'spotify-artist', artistId: tier.artist.id ?? tier.artist.name },
+      kicker: `New #1 artist · ${TIMEFRAME_PERIOD[tier.key]}`, title: tier.artist.name,
+      detail: '',
+      href: '#/spotify', render: { type: 'spotify-artist', artistId: tier.artist.id ?? tier.artist.name, timeframe: tier.key },
     });
   }
 
   const topAlbum = data.allTime.albums[0];
-  if (topAlbum && fresh.album) {
+  if (topAlbum && fresh.albumAllTime) {
     candidates.push({
       id: `spotify:new-album:${topAlbum.id ?? topAlbum.name}`, source: 'spotify', kind: 'spotify',
-      score: TIMEFRAME_SCORE.long, shapes: TIMEFRAME_SHAPES.long,
-      kicker: 'New favorite album', title: topAlbum.name, detail: topAlbum.artist,
+      score: TIMEFRAME_SCORE.allTime, shapes: TIMEFRAME_SHAPES.allTime,
+      kicker: 'New favorite album', title: topAlbum.name, detail: topAlbum.artist.split(',')[0]!.trim(),
       href: '#/spotify', render: { type: 'spotify-album', albumId: topAlbum.id ?? topAlbum.name },
     });
   }
 
   // No fresh change to headline — still worth a quiet tile naming your current favorite.
-  const favorite = data.topTracks.shortTerm[0];
-  if (favorite && !candidates.length) {
+  const recent = data.recentlyPlayed[0];
+  if (recent && !candidates.length) {
     candidates.push({
-      id: `spotify:favorite:${favorite.id ?? favorite.track}`, source: 'spotify', kind: 'spotify', score: 25, shapes: ['tile'],
-      kicker: 'Current favorite', title: favorite.track, detail: favorite.artist,
-      href: '#/spotify', render: { type: 'spotify-track', trackId: favorite.id ?? favorite.track },
+      id: `spotify:recent:${recent.id ?? recent.track}`, source: 'spotify', kind: 'spotify', score: 28, shapes: ['tile'],
+      kicker: 'Last played', title: recent.track, detail: recent.artist,
+      href: '#/spotify', render: { type: 'spotify-track', trackId: recent.id ?? recent.track },
     });
   }
 
@@ -255,26 +302,36 @@ export interface AiTool {
   data: AiUsageToolData | undefined;
 }
 
+type AiAccent = 'claude' | 'codex';
+
+function aiAccent(tool: AiTool): AiAccent | undefined {
+  return tool.id === 'claude' || tool.id === 'codex' ? tool.id : undefined;
+}
+
 /** A weekly window that just rolled over reads as a big same-sample drop, not a gradual decline. */
 const RESET_DROP_PERCENT = 40;
 
 function aiRunwayCandidate(available: AiTool[]): Candidate | undefined {
   const limits = available.flatMap((tool) => {
     const data = tool.data!;
-    return [data.fiveHour, data.weekly].filter((window): window is NonNullable<typeof window> => Boolean(window));
+    return [
+      data.fiveHour && { label: tool.label, period: '5-hour limit', window: data.fiveHour, accent: aiAccent(tool) },
+      data.weekly && { label: tool.label, period: 'weekly limit', window: data.weekly, accent: aiAccent(tool) },
+      data.modelWeekly && { label: `${tool.label} ${data.modelWeekly.model}`, period: 'weekly limit', window: data.modelWeekly, accent: aiAccent(tool) },
+    ].filter((limit): limit is { label: string; period: string; window: NonNullable<typeof data.fiveHour>; accent: AiAccent | undefined } => Boolean(limit));
   });
   if (!limits.length) return undefined;
 
   const tightest = limits.reduce(
-    (lowest, window) => window.usedPercent > lowest.usedPercent ? window : lowest,
+    (lowest, limit) => limit.window.usedPercent > lowest.window.usedPercent ? limit : lowest,
     limits[0]!,
   );
-  const remaining = Math.max(0, Math.round(100 - tightest.usedPercent));
+  const remaining = Math.max(0, Math.round(100 - tightest.window.usedPercent));
   return {
     id: 'ai-usage:runway', source: 'ai-usage', kind: 'ai-usage', score: remaining <= 15 ? 86 : 30,
     shapes: remaining <= 15 ? [...allShapes] : ['tile'], kicker: remaining <= 15 ? 'Running low' : 'AI runway',
-    title: `${remaining}% available`, detail: `Resets ${new Date(tightest.resetsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
-    href: '#/ai', meter: remaining, render: { type: 'text' },
+    title: `${remaining}% available`, detail: `${tightest.label} · ${tightest.period} · resets ${new Date(tightest.window.resetsAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`,
+    href: '#/ai', accent: tightest.accent, meter: remaining, render: { type: 'text' },
   };
 }
 
@@ -294,7 +351,7 @@ function aiToolCandidates(
     candidates.push({
       id: `ai-usage:reset:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
       shapes: ['secondary', 'tile'], kicker: 'Fresh allowance', title: `${tool.label} usage just reset`,
-      detail: `Back down to ${last.weeklyUsedPercent.toFixed(0)}% of the weekly limit`, href: '#/ai', render: { type: 'text' },
+      detail: `Back down to ${last.weeklyUsedPercent.toFixed(0)}% of the weekly limit`, href: '#/ai', accent: aiAccent(tool), render: { type: 'text' },
     });
   }
 
@@ -311,7 +368,7 @@ function aiToolCandidates(
     candidates.push({
       id: `ai-usage:anomaly:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 75, shapes: [...allShapes],
       kicker: 'Heavy usage', title: `${tool.label} running well above usual`,
-      detail: `${deviation.deviationPercent.toFixed(0)}% above your usual pace`, href: '#/ai', render: { type: 'text' },
+      detail: `${deviation.deviationPercent.toFixed(0)}% above your usual pace`, href: '#/ai', accent: aiAccent(tool), render: { type: 'text' },
     });
   }
   return candidates;
@@ -337,7 +394,12 @@ export function aiCandidates(
  * a forecast, no history to compare against, so "extreme" here just means "past a configured
  * line" rather than "unusual for you".
  */
-export function weatherCandidates(data: WeatherData | undefined, hotThresholdC: number, coldThresholdC: number): Candidate[] {
+export function weatherCandidates(
+  data: WeatherData | undefined,
+  hotThresholdC: number,
+  coldThresholdC: number,
+  now = Date.now(),
+): Candidate[] {
   const today = data?.days[0];
   if (!today) return [];
   if (today.maxTemperature >= hotThresholdC) {
@@ -354,7 +416,37 @@ export function weatherCandidates(data: WeatherData | undefined, hotThresholdC: 
       detail: `Below your configured comfortable range`, href: '#/personal', render: { type: 'text' },
     }];
   }
+  const overnight = new Date(now).getHours() < 6;
+  const forecast = overnight ? today : data.days[1];
+  if (forecast) {
+    return [{
+      id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['tile'],
+      kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
+      detail: forecast.precipitationMm > 0 ? `${forecast.precipitationMm.toFixed(1)} mm precipitation expected` : `${forecast.dayLabel} looks dry`,
+      href: '#/personal', render: { type: 'text' },
+    }];
+  }
   return [];
+}
+
+export function hueCandidates(data: HueData | undefined): Candidate[] {
+  const onLights = data?.lights.filter((light) => light.on) ?? [];
+  if (!onLights.length) return [];
+  const onRooms = data?.rooms.filter((room) => room.anyOn).map((room) => room.name) ?? [];
+  return [{
+    id: 'hue:lights-on', source: 'hue', kind: 'hue', score: 24, shapes: ['tile'],
+    kicker: 'Lights on', title: `${onLights.length} light${onLights.length === 1 ? '' : 's'} active`,
+    detail: onRooms.slice(0, 2).join(' · ') || 'Open lights controls', href: '#/personal', render: { type: 'text' },
+  }];
+}
+
+export function newsCandidates(data: NewsData | undefined): Candidate[] {
+  const headline = data?.items[0];
+  if (!headline) return [];
+  return [{
+    id: `news:${headline.url}`, source: 'news', kind: 'news', score: 23, shapes: ['tile'],
+    kicker: headline.source, title: headline.title, detail: 'Latest headline', href: '#/personal', render: { type: 'text' },
+  }];
 }
 
 interface FallbackCopy {
@@ -375,54 +467,15 @@ function fallbackCopy(status: WidgetStatus, loading: FallbackCopy, emptyWhenRead
   return emptyWhenReady;
 }
 
-function combineAiStatus(claude: WidgetStatus, codex: WidgetStatus): WidgetStatus {
-  if (claude === 'disabled' && codex === 'disabled') return 'disabled';
-  if (claude === 'loading' || codex === 'loading') return 'loading';
-  if (claude === 'error' && codex === 'error') return 'error';
-  return 'ready';
-}
-
 export function fallbackCandidates(status: {
   calendar: WidgetStatus;
-  gmail: WidgetStatus;
-  github: WidgetStatus;
-  aiClaude: WidgetStatus;
-  aiCodex: WidgetStatus;
 }): Candidate[] {
   const horizon = fallbackCopy(
     status.calendar,
     { title: 'Building your command center', detail: 'Waiting for the first ranked snapshot.' },
     { title: 'Nothing urgent right now', detail: 'Your command center will adapt as new signals arrive.' },
   );
-  const agenda = fallbackCopy(
-    status.calendar,
-    { title: 'Syncing your day', detail: 'Calendar and activity signals are loading.' },
-    { title: 'Your day is clear', detail: 'No upcoming calendar items.' },
-  );
-  const inbox = fallbackCopy(
-    status.gmail,
-    { title: 'Syncing mail', detail: 'Waiting for the first snapshot.' },
-    { title: 'Inbox quiet', detail: 'Nothing new to flag.' },
-  );
-  const code = fallbackCopy(
-    status.github,
-    { title: 'Syncing GitHub', detail: 'Waiting for the first snapshot.' },
-    { title: 'Code queue quiet', detail: 'Nothing new to flag.' },
-  );
-  const ai = fallbackCopy(
-    combineAiStatus(status.aiClaude, status.aiCodex),
-    { title: 'Awaiting snapshot', detail: 'Waiting for allowance data.' },
-    { title: 'No allowance data', detail: 'Neither tool reported a quota just now.' },
-  );
-  // Each fallback shares its real counterpart's `source` so rankCandidates' dedup-by-source logic
-  // excludes it once that source's real candidate already fills a slot elsewhere — otherwise a
-  // sparse board (few real signals) reaches for "Inbox: syncing" as filler right next to a real,
-  // already-placed "Inbox: 3 unread" tile, showing the same topic twice under different disguises.
   return [
     { id: 'fallback:horizon', source: 'calendar', kind: 'fallback', score: 1, shapes: ['hero'], kicker: 'Open horizon', title: horizon.title, detail: horizon.detail, href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:agenda', source: 'calendar', kind: 'fallback', score: 1, shapes: ['secondary'], kicker: 'Coming up', title: agenda.title, detail: agenda.detail, href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:inbox', source: 'gmail', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'Inbox', title: inbox.title, detail: inbox.detail, href: '#/personal', render: { type: 'text' } },
-    { id: 'fallback:code', source: 'github', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'Code queue', title: code.title, detail: code.detail, href: '#/github', render: { type: 'text' } },
-    { id: 'fallback:ai', source: 'ai-usage', kind: 'fallback', score: 1, shapes: ['tile'], kicker: 'AI runway', title: ai.title, detail: ai.detail, href: '#/ai', render: { type: 'text' } },
   ];
 }

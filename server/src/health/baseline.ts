@@ -2,21 +2,24 @@ import type { HealthData, HealthDay } from '@personal-dashboard/shared';
 import { computeDeviation, type Deviation } from '../deviation.js';
 
 const baselineMetrics = [
-  'heartRate',
   'restingHeartRate',
   'walkingHeartRate',
   'bloodOxygenPercent',
 ] as const;
 
+/** A daily average heart rate is incomplete until the day is over. Comparing an early-morning
+ * sample with completed days creates false "below baseline" signals, so it is not ranked. */
+
 /** Cumulative through the day — a partial morning total always reads "below average" against a
  * full-day baseline, so only an unusually HIGH reading counts as a real signal for these. */
 const activityMetrics = [
   'steps',
+  'activeEnergyKcal',
   'exerciseMinutes',
   'standHours',
 ] as const;
 
-type BaselineMetric = (typeof baselineMetrics)[number] | (typeof activityMetrics)[number];
+type BaselineMetric = 'heartRate' | (typeof baselineMetrics)[number] | (typeof activityMetrics)[number];
 
 export interface HealthBaseline {
   windowDays: number;

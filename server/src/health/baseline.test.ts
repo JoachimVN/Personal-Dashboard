@@ -25,4 +25,27 @@ describe('computeHealthBaselines', () => {
       { date: '2026-07-02', heartRate: 61 },
     ], { date: '2026-07-03', heartRate: 80 }, 7, 15)?.metrics.heartRate).toBeUndefined();
   });
+
+  it('does not flag a partial day with low active energy as a baseline anomaly', () => {
+    const baseline = computeHealthBaselines([
+      { date: '2026-07-01', activeEnergyKcal: 420 },
+      { date: '2026-07-02', activeEnergyKcal: 510 },
+      { date: '2026-07-03', activeEnergyKcal: 470 },
+    ], { date: '2026-07-04', activeEnergyKcal: 9 }, 7, 15);
+
+    expect(baseline?.metrics.activeEnergyKcal).toMatchObject({
+      direction: 'below',
+      anomalous: false,
+    });
+  });
+
+  it('does not compare a partial-day average heart rate with completed days', () => {
+    const baseline = computeHealthBaselines([
+      { date: '2026-07-01', heartRate: 90 },
+      { date: '2026-07-02', heartRate: 94 },
+      { date: '2026-07-03', heartRate: 92 },
+    ], { date: '2026-07-04', heartRate: 69 }, 7, 15);
+
+    expect(baseline?.metrics.heartRate).toBeUndefined();
+  });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SpotifyData } from '@personal-dashboard/shared';
-import { createSpotifyProvider } from './spotify.js';
+import { createSpotifyProvider, toPlayedTrackInput } from './spotify.js';
 
 vi.mock('../spotifyToken.js', () => ({
   readSpotifyToken: () => ({
@@ -40,6 +40,22 @@ function jsonResponse(body: unknown): Response {
 }
 
 describe('Spotify provider', () => {
+  it('uses the album-level artist rather than a featured track artist', () => {
+    const track = {
+      ...rawTrack,
+      artists: [
+        { id: 'weeknd', name: 'The Weeknd' },
+        { id: 'lana', name: 'Lana Del Rey' },
+      ],
+      album: {
+        ...rawTrack.album,
+        artists: [{ id: 'weeknd', name: 'The Weeknd' }],
+      },
+    };
+
+    expect(toPlayedTrackInput(track)?.album.artist).toBe('The Weeknd');
+  });
+
   it('hides stale now-playing data while preserving the cached snapshot after a rate limit', async () => {
     const snapshotStore = {
       getRateLimitedUntil: vi.fn().mockResolvedValue(0),

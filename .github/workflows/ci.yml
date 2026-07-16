@@ -3,8 +3,13 @@ name: CI
 on:
   push:
     branches: [main, dev]
+    # Screenshot-only bot commits must not create a new concurrent run that cancels this one.
+    paths-ignore:
+      - 'docs/screenshots/**'
   pull_request:
     branches: [main, dev]
+    paths-ignore:
+      - 'docs/screenshots/**'
 
 concurrency:
   group: ci-${{ github.ref }}

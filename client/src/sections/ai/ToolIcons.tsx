@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 
-/** Official brand marks (path data via simple-icons / lobehub); fill follows currentColor so they tint to the tool accent. */
+/** Tool marks follow currentColor so they tint to the tool accent. */
 export type ToolIconProps = Readonly<{ className?: string; style?: CSSProperties }>;
 
 export function ClaudeIcon({ className, style }: ToolIconProps) {

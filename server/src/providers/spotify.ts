@@ -36,6 +36,7 @@ export interface RawTrack {
   album?: {
     id: string;
     name?: string;
+    artists?: { id: string; name: string }[];
     album_type?: string;
     images?: RawImage[];
     release_date?: string;
@@ -142,6 +143,7 @@ export function toPlayedTrackInput(track: RawTrack): PlayedTrackInput | undefine
     album: {
       id: track.album.id,
       name: track.album.name ?? 'Unknown album',
+      artist: (track.album.artists?.length ? track.album.artists : track.artists).map((artist) => artist.name).join(', '),
       imageUrl: firstImage(track.album.images),
       url: track.album.external_urls?.spotify,
       releaseDate: track.album.release_date,
@@ -269,7 +271,7 @@ async function refreshTopData(get: SpotifyGet, historyStore: SpotifyHistoryStore
     tracksLong,
   };
 
-  // One-time backfill from Spotify's long_term (~years) top lists, so all-time stats
+  // One-time backfill from Spotify's long_term (~12 months) top lists, so all-time stats
   // aren't empty on day one — real observed plays accrue on top from here.
   if (!(await historyStore.isSeeded())) {
     const artistsLongSeed = await get<TopResponse<RawArtist>>('/me/top/artists?time_range=long_term&limit=50');

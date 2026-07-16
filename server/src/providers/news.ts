@@ -4,9 +4,29 @@ import type { Provider } from '../scheduler.js';
 
 const MAX_ITEMS = 12;
 
+type NewsItem = NewsData['items'][number];
+
 export interface NewsFeed {
   name: string;
   url: string;
+}
+
+/**
+ * Keep the news card useful when one high-volume feed publishes several newer
+ * stories than the others. Each healthy feed gets its newest headline first;
+ * the remaining slots are then filled by recency.
+ */
+export function selectNewsItems(feedItems: NewsItem[][]): NewsItem[] {
+  const groups = feedItems
+    .map((items) => items.filter((item) => item.url).toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)))
+    .filter((items) => items.length > 0);
+  const leading = groups.map(([item]) => item);
+  const remaining = groups.flatMap(([, ...items]) => items);
+
+  return [
+    ...leading.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+    ...remaining.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+  ].slice(0, MAX_ITEMS);
 }
 
 export function createNewsProvider(feeds: NewsFeed[]): Provider<NewsData> {
@@ -33,11 +53,7 @@ export function createNewsProvider(feeds: NewsFeed[]): Provider<NewsData> {
       const fulfilled = results.filter((result) => result.status === 'fulfilled');
       if (fulfilled.length === 0) throw new Error('all feeds failed');
       return {
-        items: fulfilled
-          .flatMap((result) => result.value)
-          .filter((item) => item.url)
-          .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
-          .slice(0, MAX_ITEMS),
+        items: selectNewsItems(fulfilled.map((result) => result.value)),
       };
     },
   };

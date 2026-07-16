@@ -8,8 +8,12 @@ name: Privacy guard
 on:
   push:
     branches: [main, dev]
+    paths-ignore:
+      - 'docs/screenshots/**'
   pull_request:
     branches: [main, dev]
+    paths-ignore:
+      - 'docs/screenshots/**'
 
 jobs:
   guard:

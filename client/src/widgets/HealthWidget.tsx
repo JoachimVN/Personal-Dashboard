@@ -4,6 +4,7 @@ import { ActivityRings } from '../components/ActivityRings';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
+import { latestActivityDay } from '../lib/health';
 
 const accent = 'var(--color-accent-personal)';
 
@@ -147,7 +148,7 @@ function StepsTrend({ history, goal }: Readonly<{ history: HealthDay[]; goal: nu
 }
 
 function HealthBody({ data }: Readonly<{ data: HealthData }>) {
-  const t = data.today;
+  const t = latestActivityDay(data);
   if (!t && data.history.length === 0) {
     return (
       <p className="text-sm text-ink-faint">
@@ -158,6 +159,9 @@ function HealthBody({ data }: Readonly<{ data: HealthData }>) {
 
   return (
     <div className="space-y-4">
+      {data.today !== t && t && (
+        <p className="text-xs text-ink-faint">Showing the last synced activity from {t.date}.</p>
+      )}
       <div className="space-y-3">
         <Bar label="Steps" value={t?.steps ?? 0} goal={data.goals.steps} unit="" />
       </div>

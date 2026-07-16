@@ -18,9 +18,9 @@ const ITEMS: ArrangeableItem[] = [
   { id: 'calendar', label: 'Calendar', render: () => <CalendarWidget /> },
   { id: 'health', label: 'Health', render: () => <PersonalHealthEntry /> },
   { id: 'gmail', label: 'Mail', render: () => <GmailWidget /> },
+  { id: 'imessage', label: 'Messages', render: () => <IMessageWidget /> },
   { id: 'news', label: 'News', render: () => <NewsWidget /> },
   { id: 'hue', label: 'Lights', render: () => <HueWidget /> },
-  { id: 'imessage', label: 'Messages', render: () => <IMessageWidget /> },
 ];
 
 function PersonalHealthEntry() {

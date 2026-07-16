@@ -6,7 +6,7 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('calendar-agenda'), eventIds: z.array(z.string()) }),
   z.object({ type: z.literal('spotify-now-playing') }),
   z.object({ type: z.literal('spotify-track'), trackId: z.string() }),
-  z.object({ type: z.literal('spotify-artist'), artistId: z.string() }),
+  z.object({ type: z.literal('spotify-artist'), artistId: z.string(), timeframe: z.enum(['short', 'medium', 'long', 'allTime']) }),
   z.object({ type: z.literal('spotify-album'), albumId: z.string() }),
   z.object({ type: z.literal('health-rings') }),
   z.object({ type: z.literal('github-contributions') }),
@@ -15,11 +15,12 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'imessage', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),
   href: z.string(),
+  accent: z.enum(['claude', 'codex']).optional(),
   meter: z.number().min(0).max(100).optional(),
   score: z.number(),
   render: commandCenterRenderSchema,
@@ -27,8 +28,8 @@ export const commandCenterSlotSchema = z.object({
 
 export const commandCenterSchema = z.object({
   hero: commandCenterSlotSchema,
-  secondary: commandCenterSlotSchema,
-  tiles: z.tuple([commandCenterSlotSchema, commandCenterSlotSchema, commandCenterSlotSchema]),
+  secondary: z.array(commandCenterSlotSchema).max(3),
+  tiles: z.array(commandCenterSlotSchema).max(3),
 });
 
 export type CommandCenterData = z.infer<typeof commandCenterSchema>;
