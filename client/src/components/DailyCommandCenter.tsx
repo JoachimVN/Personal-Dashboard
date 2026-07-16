@@ -615,7 +615,7 @@ export function DailyCommandCenter() {
         )}
         <div className="command-weather-row">
           <div className="command-weather-target">
-            <a href={sectionHref('personal')} className="command-weather-summary" aria-label="Open weather in Personal">
+            <a href={sectionHref('weather')} className="command-weather-summary" aria-label="Open weather">
               <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
               <div className="min-w-0"><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="truncate text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p></div>
               {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
