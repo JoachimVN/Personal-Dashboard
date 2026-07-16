@@ -461,7 +461,7 @@ export function DailyCommandCenter() {
       </CommandPanel>
       <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} />)}</div>
     </div>
-    {activeSecondary && <CommandPanel href={activeSecondary.href} className={`command-agenda command-panel--${toneFor(activeSecondary)}`} navigable={false}>
+    {activeSecondary && <CommandPanel href={activeSecondary.href} className={`command-agenda command-panel--${toneFor(activeSecondary)}`}>
       <SecondaryCarousel
         items={secondarySlots}
         activeIndex={activeSecondaryIndex}
