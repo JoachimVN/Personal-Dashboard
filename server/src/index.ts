@@ -14,7 +14,7 @@ import { createCommandCenterProvider } from './providers/commandCenter.js';
 import { SignalHistoryStore } from './signalHistory.js';
 import { createIssue, issueErrorCode, parseIssueInput } from './issues.js';
 import { availableProjects, codeActionError, launchCodeAction } from './codeSession.js';
-import { listOwnedRepos } from './providers/github.js';
+import { createOwnedReposCache, listOwnedRepos } from './providers/github.js';
 import { todayInZone } from './providers/health.js';
 
 const env = loadEnv();
@@ -42,6 +42,7 @@ scheduler.start();
 const layoutStore = new LayoutStore(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.data/layout.json'),
 );
+const ownedReposCache = createOwnedReposCache();
 
 const AI_USAGE_WIDGET_IDS = new Set(['ai-usage-claude', 'ai-usage-codex']);
 
@@ -180,8 +181,13 @@ app.get('/api/github/repos', async (_req, res) => {
     return;
   }
   try {
-    res.json({ repos: await listOwnedRepos(env.github) });
-  } catch {
+    const { repos, stale } = await ownedReposCache(env.github);
+    if (stale) console.warn('[github/repos] serving cached repositories after upstream failure');
+    res.json({ repos });
+  } catch (error) {
+    // Never log the raw error here — it can carry the auth token in its request URL/headers.
+    const status = typeof error === 'object' && error !== null && 'status' in error ? (error as { status?: unknown }).status : undefined;
+    console.error(`[github/repos] failed (status ${status ?? 'unknown'})`);
     res.status(502).json({ error: 'github-repos-failed' });
   }
 });
@@ -197,6 +203,7 @@ app.post('/api/github/issues', async (req, res) => {
     res.status(201).json(await createIssue(env.githubIssuesToken, issue));
   } catch (error) {
     const code = issueErrorCode(error);
+    if (code === 'github-write-failed') console.error(`[github/issues] failed (${code})`);
     res.status(code === 'invalid-issue' || code === 'repo-not-allowed' ? 400 : 502).json({ error: code });
   }
 });
