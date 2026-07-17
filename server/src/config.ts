@@ -60,6 +60,10 @@ const configSchema = z.object({
     weatherHotC: z.number().default(25),
     /** Today's forecast min °C at or below this becomes a "cold today" signal. */
     weatherColdC: z.number().default(-10),
+    /** Today's forecast peak wind speed (m/s) at or above this becomes a "windy today" signal. */
+    weatherWindMs: z.number().default(12),
+    /** Today's forecast peak UV index at or above this becomes a "high UV" signal (8 = WHO "very high"). */
+    weatherUvHigh: z.number().default(8),
     /** How recently an unread iMessage must have arrived to count as "new", vs. just sitting unread. */
     imessageFreshMs: z.number().int().min(60_000).default(30 * 60_000),
     /** How recently a Steam achievement must have unlocked to surface as a signal. Advanced tuning — leave at the default. */
@@ -73,6 +77,8 @@ const configSchema = z.object({
     spotifyFreshMs: 48 * 60 * 60_000,
     weatherHotC: 25,
     weatherColdC: -10,
+    weatherWindMs: 12,
+    weatherUvHigh: 8,
     steamAchievementFreshMs: 7 * 24 * 60 * 60_000,
   }),
   code: z

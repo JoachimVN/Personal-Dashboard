@@ -12,7 +12,10 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('github-contributions') }),
   z.object({ type: z.literal('github-reviews') }),
   z.object({ type: z.literal('gmail-threads'), threadIds: z.array(z.string()) }),
-  z.object({ type: z.literal('weather-hours') }),
+  z.object({
+    type: z.literal('weather-signal'),
+    kind: z.enum(['severe', 'hot', 'cold', 'rain', 'wind', 'uv', 'sunset', 'moon']),
+  }),
   z.object({
     type: z.literal('ai-usage-tool'),
     /** One trend line per tool, overlaid on the same 0–100% scale when there are several. */

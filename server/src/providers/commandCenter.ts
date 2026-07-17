@@ -107,7 +107,13 @@ export function createCommandCenterProvider(
         ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
         ...spotifyCandidates(spotify, spotifyFresh),
         ...steamCandidates(widgetData<SteamData>(envelopes, 'steam'), config.commandCenter.steamAchievementFreshMs),
-        ...weatherCandidates(widgetData<WeatherData>(envelopes, 'weather'), config.commandCenter.weatherHotC, config.commandCenter.weatherColdC),
+        ...weatherCandidates(
+          widgetData<WeatherData>(envelopes, 'weather'),
+          config.commandCenter.weatherHotC,
+          config.commandCenter.weatherColdC,
+          config.commandCenter.weatherWindMs,
+          config.commandCenter.weatherUvHigh,
+        ),
         ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
         ...aiCandidates(
           [

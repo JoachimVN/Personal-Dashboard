@@ -15,7 +15,7 @@ import type {
 import { useWidget } from '../useWidget';
 import { UsageSparkline } from '../sections/ai/UsageHistoryChart';
 import { WEEKLY_MS } from '../sections/ai/UsageMeter';
-import { deg, glyph, weatherLocation } from '../lib/weather';
+import { deg, glyph, moonPhaseName, weatherLocation } from '../lib/weather';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
@@ -24,6 +24,8 @@ import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
 import { ClaudeIcon, OpenAiIcon } from '../sections/ai/ToolIcons';
 import { sectionHref } from '../router';
+import { UvGauge, WindGauge } from '../sections/weather/WeatherOverview';
+import { MoonDisc, SunArc } from '../sections/weather/astro';
 import '../sections/spotify/spotify.css';
 
 const SECONDARY_CAROUSEL_INTERVAL_MS = 7_000;
@@ -90,6 +92,12 @@ function AiToolMark({ accent, className }: Readonly<{ accent: CommandCenterSlot[
   return <Icon className={className} style={{ color }} />;
 }
 
+type WeatherSignalRender = Extract<CommandCenterSlot['render'], { type: 'weather-signal' }>;
+
+const WEATHER_KIND_GLYPH: Record<WeatherSignalRender['kind'], string> = {
+  severe: '⛈️', hot: '🌡️', cold: '🥶', rain: '🌧️', wind: '💨', uv: '☀️', sunset: '🌇', moon: '🌕',
+};
+
 function GitHubMark({ className }: Readonly<{ className: string }>) {
   return <svg viewBox="-1.5 -1.5 27 27" fill="currentColor" aria-hidden className={className}>
     <path d="M12 .297C5.373.297 0 5.67 0 12.297c0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.011-1.232-.016-2.235-3.338.724-4.042-1.416-4.042-1.416-.546-1.385-1.333-1.754-1.333-1.754-1.089-.745.083-.73.083-.73 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.419-1.305.762-1.605-2.665-.305-5.467-1.332-5.467-5.93 0-1.31.465-2.38 1.235-3.22-.124-.303-.535-1.523.117-3.176 0 0 1.008-.322 3.3 1.23A11.498 11.498 0 0 1 12 6.002c1.02.005 2.045.138 3.003.404 2.29-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.873.118 3.176.77.84 1.233 1.91 1.233 3.22 0 4.61-2.807 5.622-5.479 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.898-.015 3.293 0 .32.216.694.825.576C20.565 22.092 24 17.592 24 12.297 24 5.67 18.627.297 12 .297Z" />
@@ -144,9 +152,12 @@ function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; gi
   const githubMark = slot.source === 'github' && slot.render.type === 'github-contributions'
     ? <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />
     : undefined;
+  const weatherMark = slot.render.type === 'weather-signal'
+    ? <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>
+    : undefined;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      {rings ?? toolMark ?? dualToolMarks ?? githubMark ?? <span className="command-signal-dot" aria-hidden />}
+      {rings ?? toolMark ?? dualToolMarks ?? githubMark ?? weatherMark ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
@@ -469,19 +480,56 @@ function GmailThreadsSecondary({ slot, gmail }: Readonly<{ slot: CommandCenterSl
   </>;
 }
 
-function WeatherHoursSecondary({ slot, weather }: Readonly<{ slot: CommandCenterSlot; weather: WeatherData | undefined }>): ReactNode {
-  if (slot.render.type !== 'weather-hours' || !weather?.hours.length) return null;
+function WeatherHourlyRows({ weather }: Readonly<{ weather: WeatherData }>): ReactNode {
+  if (!weather.hours.length) return null;
+  return <div className="command-hours mt-3" aria-label="Hourly forecast">
+    {weather.hours.slice(0, 6).map((hour) => <div key={hour.time} className="command-hour">
+      <span>{hour.hourLabel}</span>
+      <span aria-hidden className="text-base leading-none">{glyph(hour.symbol)}</span>
+      <strong>{deg(hour.temperature)}</strong>
+    </div>)}
+  </div>;
+}
+
+/** Shared by every "here's the next few hours" kind (severe/hot/cold/rain) — only the
+ * server-supplied title/detail differ between them. */
+function WeatherHourlyStrip({ title, detail, weather }: Readonly<{ title: string; detail: string; weather: WeatherData }>): ReactNode {
+  if (!weather.hours.length) return null;
   return <>
-    <p className="mt-4 text-sm font-semibold text-ink">{slot.title}</p>
-    <div className="command-hours mt-3" aria-label="Hourly forecast">
-      {weather.hours.slice(0, 6).map((hour) => <div key={hour.time} className="command-hour">
-        <span>{hour.hourLabel}</span>
-        <span aria-hidden className="text-base leading-none">{glyph(hour.symbol)}</span>
-        <strong>{deg(hour.temperature)}</strong>
-      </div>)}
-    </div>
-    <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>
+    <p className="mt-4 text-sm font-semibold text-ink">{title}</p>
+    <WeatherHourlyRows weather={weather} />
+    <p className="mt-2 text-[11px] text-ink-faint">{detail}</p>
   </>;
+}
+
+function WeatherSignalSecondary({ slot, weather }: Readonly<{ slot: CommandCenterSlot; weather: WeatherData | undefined }>): ReactNode {
+  if (slot.render.type !== 'weather-signal' || !weather) return null;
+  const { kind } = slot.render;
+  if (kind === 'wind') {
+    return <div className="command-secondary-ai mt-4">
+      <WindGauge speed={weather.current.windSpeed} directionDeg={weather.current.windDirectionDeg} />
+      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    </div>;
+  }
+  if (kind === 'uv' && weather.current.uvIndex != null) {
+    return <div className="command-secondary-ai mt-4">
+      <UvGauge uvIndex={weather.current.uvIndex} />
+      <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    </div>;
+  }
+  if (kind === 'sunset' && weather.sun) {
+    return <div className="mt-4"><SunArc sunrise={weather.sun.sunrise} sunset={weather.sun.sunset} /></div>;
+  }
+  if (kind === 'moon' && weather.moon) {
+    return <div className="mt-4 flex items-center gap-4">
+      <MoonDisc phaseDeg={weather.moon.phaseDeg} size={72} />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-ink">{moonPhaseName(weather.moon.phaseDeg)}</p>
+        <p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p>
+      </div>
+    </div>;
+  }
+  return <WeatherHourlyStrip title={slot.title} detail={slot.detail} weather={weather} />;
 }
 
 function AiUsageSecondary({ slot, aiUsage }: Readonly<{ slot: CommandCenterSlot; aiUsage: AiUsageByTool }>): ReactNode {
@@ -534,7 +582,7 @@ function SecondaryContent(props: Readonly<{
     case 'github-contributions': return GithubContributionsSecondary({ slot, github, hoveredDay, onHover }) ?? <FallbackSecondary slot={slot} />;
     case 'github-reviews': return GithubReviewsSecondary({ slot, github }) ?? <FallbackSecondary slot={slot} />;
     case 'gmail-threads': return GmailThreadsSecondary({ slot, gmail }) ?? <FallbackSecondary slot={slot} />;
-    case 'weather-hours': return WeatherHoursSecondary({ slot, weather }) ?? <FallbackSecondary slot={slot} />;
+    case 'weather-signal': return WeatherSignalSecondary({ slot, weather }) ?? <FallbackSecondary slot={slot} />;
     case 'ai-usage-tool': return AiUsageSecondary({ slot, aiUsage }) ?? <FallbackSecondary slot={slot} />;
     case 'steam-now-playing': return SteamNowPlayingSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     case 'steam-achievement': return SteamAchievementSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
@@ -570,9 +618,13 @@ function CommandCenterSkeleton() {
   );
 }
 
-function heroExtraFor(render: CommandCenterData['hero']['render'], github: GitHubData | undefined, gmail: GmailData | undefined, aiUsage: AiUsageByTool): ReactNode {
+function heroExtraFor(hero: CommandCenterData['hero'], github: GitHubData | undefined, gmail: GmailData | undefined, aiUsage: AiUsageByTool, weather: WeatherData | undefined): ReactNode {
+  const { render } = hero;
   if (render.type === 'github-reviews') return GithubReviewList({ github, skip: 1 });
   if (render.type === 'gmail-threads') return GmailThreadList({ threadIds: render.threadIds, gmail });
+  if (render.type === 'weather-signal' && render.kind === 'severe' && weather) {
+    return <div className="mt-4"><WeatherHourlyRows weather={weather} /></div>;
+  }
   if (render.type !== 'ai-usage-tool') return null;
 
   const trend = AiUsageTrend({ render, aiUsage });
@@ -711,7 +763,7 @@ export function DailyCommandCenter() {
   const heroKicker = heroEvent ? eventTiming(heroEvent, Date.now()) : ranked.hero.kicker;
   // Richer hero bodies for signals whose title/detail alone undersell them. The GitHub list skips
   // the first PR because the hero title already names it.
-  const heroExtra = heroExtraFor(heroRender, github, gmail, aiUsage);
+  const heroExtra = heroExtraFor(ranked.hero, github, gmail, aiUsage, weather);
 
   return <section className="command-center glass" aria-labelledby="command-center-title">
     <div className="command-center-head">

@@ -19,7 +19,7 @@ function MiniStat({ label, value, children }: Readonly<{ label: string; value: s
 
 /** Same needle-on-a-compass language as the detail page's wind tile, just small enough to sit
  * in a row of three — a glyph alone can't say "which way", the needle can. */
-function WindGauge({ speed, directionDeg }: Readonly<{ speed: number; directionDeg?: number }>) {
+export function WindGauge({ speed, directionDeg }: Readonly<{ speed: number; directionDeg?: number }>) {
   const toward = directionDeg == null ? null : (directionDeg + 180) % 360;
   const direction = directionDeg == null ? '' : ` ${windCompass(directionDeg)}`;
   return (
@@ -39,7 +39,7 @@ function WindGauge({ speed, directionDeg }: Readonly<{ speed: number; directionD
 }
 
 /** Circular counterpart to the detail page's humidity bar — a ring reads faster at this size than a bar. */
-function HumidityGauge({ humidity }: Readonly<{ humidity: number }>) {
+export function HumidityGauge({ humidity }: Readonly<{ humidity: number }>) {
   const r = 12;
   const circumference = 2 * Math.PI * r;
   return (
@@ -56,7 +56,7 @@ function HumidityGauge({ humidity }: Readonly<{ humidity: number }>) {
 }
 
 /** Small version of the detail page's UV arc, colored from the same WHO band as its `uvLevel()` label. */
-function UvGauge({ uvIndex }: Readonly<{ uvIndex: number }>) {
+export function UvGauge({ uvIndex }: Readonly<{ uvIndex: number }>) {
   const level = uvLevel(uvIndex);
   const fraction = Math.min(uvIndex / 11, 1);
   const r = 12;
