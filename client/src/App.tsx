@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties, type Dispatch, type SetStateAc
 import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react';
 import { useHashRoute } from './router';
 import { useDeviceLocation } from './useDeviceLocation';
+import { SkyTimeContext } from './lib/skyTime';
 import { SECTIONS, sectionById } from './sections/registry';
 import { SectionCard } from './sections/SectionCard';
 import { SectionView } from './sections/SectionView';
@@ -102,7 +103,7 @@ function SkyTimeDebugger({ minute, onMinuteChange }: Readonly<{
         aria-label="Sky preview time"
         className="w-full accent-(--color-accent-ai)"
       />
-      <span className="text-[0.65rem] text-ink-faint">Changes the sky, hero clock, and greeting only.</span>
+      <span className="text-[0.65rem] text-ink-faint">Changes the sky, hero clock, greeting, and daylight arc only.</span>
     </section>
   );
 }
@@ -221,6 +222,7 @@ export default function App() {
   const skyNow = SHOW_SKY_TIME_DEBUGGER ? timeAtMinute(now, skyDebugMinute) : now;
 
   return (
+    <SkyTimeContext.Provider value={skyNow}>
     <div
       className="app-shell min-h-screen text-ink selection:bg-(--color-accent-ai)/25"
       style={skyFor(skyNow)}
@@ -247,5 +249,6 @@ export default function App() {
         </MotionConfig>
       </main>
     </div>
+    </SkyTimeContext.Provider>
   );
 }

@@ -2,7 +2,7 @@ import { motion } from 'motion/react';
 import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
-import { WidgetBody } from '../../components/WidgetCard';
+import { isWidgetDisabled, WidgetBody } from '../../components/WidgetCard';
 import { WEEKLY_MS } from './UsageMeter';
 import { UsageSparkline } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
@@ -38,6 +38,8 @@ function ToolRow({
   icon: Icon,
 }: Readonly<{ id: string; label: string; color: string; iconColor?: string; icon: React.ComponentType<ToolIconProps> }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
+
+  if (isWidgetDisabled(envelope)) return null;
 
   return (
     <div>

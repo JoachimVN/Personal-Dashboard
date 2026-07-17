@@ -56,6 +56,7 @@ export const githubSchema = z.object({
       ciUrl: z.string().optional(),
       latestRelease: z.string().optional(),
       url: z.string(),
+      lastPushedAt: z.string(),
     }),
   ),
 });

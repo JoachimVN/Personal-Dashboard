@@ -16,6 +16,9 @@ import type { Candidate } from './types.js';
 
 const allShapes = ['hero', 'secondary', 'tile'] as const;
 
+// forecast.dayLabel is abbreviated for the widget's narrow column; card copy reads better with the full name.
+const weekdayFullFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long' });
+
 function hasActivityData(day: HealthData['history'][number]): boolean {
   return [day.steps, day.activeEnergyKcal, day.exerciseMinutes, day.standHours]
     .some((value) => value !== undefined && value > 0);
@@ -485,24 +488,27 @@ export function weatherCandidates(
     return [{
       id: 'weather:hot', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
       kicker: 'Heat today', title: `${Math.round(today.maxTemperature)}° expected`,
-      detail: `Above your configured comfortable range`, href: '#/personal', render: { type: 'weather-hours' },
+      detail: `Above your configured comfortable range`, href: '#/weather', render: { type: 'weather-hours' },
     }];
   }
   if (today.minTemperature <= coldThresholdC) {
     return [{
       id: 'weather:cold', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
       kicker: 'Cold today', title: `${Math.round(today.minTemperature)}° expected`,
-      detail: `Below your configured comfortable range`, href: '#/personal', render: { type: 'weather-hours' },
+      detail: `Below your configured comfortable range`, href: '#/weather', render: { type: 'weather-hours' },
     }];
   }
   const overnight = new Date(now).getHours() < 6;
   const forecast = overnight ? today : data.days[1];
   if (forecast) {
+    const forecastDate = new Date(`${forecast.date}T12:00:00Z`);
+    const precipitationDetail = `${forecast.precipitationMm.toFixed(1)} mm precipitation expected`;
+    const dryDetail = `${weekdayFullFmt.format(forecastDate)} looks dry`;
     return [{
       id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['tile'],
       kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
-      detail: forecast.precipitationMm > 0 ? `${forecast.precipitationMm.toFixed(1)} mm precipitation expected` : `${forecast.dayLabel} looks dry`,
-      href: '#/personal', render: { type: 'text' },
+      detail: forecast.precipitationMm > 0 ? precipitationDetail : dryDetail,
+      href: '#/weather', render: { type: 'text' },
     }];
   }
   return [];

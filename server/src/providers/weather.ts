@@ -6,7 +6,7 @@ import type { Provider } from '../scheduler.js';
 const USER_AGENT = 'personal-dashboard/0.1 github.com/JoachimVN/Personal-Dashboard';
 const GEOCODER_URL = 'https://nominatim.openstreetmap.org/reverse';
 
-// Minimal view of the Locationforecast 2.0 "compact" response.
+// Minimal view of the Locationforecast 2.0 "complete" response.
 const metSchema = z.object({
   properties: z.object({
     timeseries: z.array(
@@ -17,6 +17,9 @@ const metSchema = z.object({
             details: z.object({
               air_temperature: z.number(),
               wind_speed: z.number().optional(),
+              wind_from_direction: z.number().optional(),
+              relative_humidity: z.number().optional(),
+              ultraviolet_index_clear_sky: z.number().optional(),
             }),
           }),
           next_1_hours: z
@@ -46,6 +49,69 @@ const reverseGeocodeSchema = z.object({
   address: z.record(z.string(), z.string()).optional(),
   display_name: z.string().optional(),
 });
+
+// MET sunrise 3.0: sun/moon event times are null on days without one (polar day/night).
+const sunEvent = z.object({ time: z.string().nullable().optional() }).nullable().optional();
+const sunriseSunSchema = z.object({
+  properties: z.object({ sunrise: sunEvent, sunset: sunEvent }),
+});
+const sunriseMoonSchema = z.object({
+  properties: z.object({ moonrise: sunEvent, moonset: sunEvent, moonphase: z.number() }),
+});
+
+type SunData = NonNullable<WeatherData['sun']>;
+type MoonData = NonNullable<WeatherData['moon']>;
+
+/** "+02:00"-style offset the sunrise API expects, derived from the dashboard timezone. */
+function utcOffsetLabel(timezone: string, at: Date): string {
+  const name = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, timeZoneName: 'longOffset' })
+    .formatToParts(at)
+    .find((part) => part.type === 'timeZoneName')?.value;
+  const match = name?.match(/GMT([+-]\d{2}:\d{2})/);
+  return match ? match[1] : '+00:00';
+}
+
+async function fetchAstro(
+  coords: { lat: number; lon: number },
+  date: string,
+  offset: string,
+  signal: AbortSignal,
+): Promise<{ sun?: SunData; moon?: MoonData }> {
+  const query =
+    `?lat=${coords.lat.toFixed(4)}&lon=${coords.lon.toFixed(4)}` +
+    `&date=${date}&offset=${encodeURIComponent(offset)}`;
+  const request = (body: 'sun' | 'moon') =>
+    fetch(`https://api.met.no/weatherapi/sunrise/3.0/${body}${query}`, {
+      signal,
+      headers: { 'User-Agent': USER_AGENT },
+    });
+
+  // Astro data is decoration on the forecast; either body failing just omits that block.
+  const [sun, moon] = await Promise.all([
+    request('sun')
+      .then(async (res): Promise<SunData | undefined> => {
+        if (!res.ok) return undefined;
+        const { properties } = sunriseSunSchema.parse(await res.json());
+        return {
+          sunrise: properties.sunrise?.time ?? null,
+          sunset: properties.sunset?.time ?? null,
+        };
+      })
+      .catch(() => undefined),
+    request('moon')
+      .then(async (res): Promise<MoonData | undefined> => {
+        if (!res.ok) return undefined;
+        const { properties } = sunriseMoonSchema.parse(await res.json());
+        return {
+          phaseDeg: properties.moonphase,
+          moonrise: properties.moonrise?.time ?? null,
+          moonset: properties.moonset?.time ?? null,
+        };
+      })
+      .catch(() => undefined),
+  ]);
+  return { sun, moon };
+}
 
 function coordinateLabel(coords: { lat: number; lon: number }): string {
   const latitude = `${Math.abs(coords.lat).toFixed(2)}° ${coords.lat >= 0 ? 'N' : 'S'}`;
@@ -106,6 +172,8 @@ export function createWeatherProvider(
 ): WeatherProvider {
   let coords = fallbackCoords;
   let locationCache: { key: string; name: string } | undefined;
+  /** Sun/moon events only change with the date and location, so refetch only when either does. */
+  let astroCache: { key: string; sun?: SunData; moon?: MoonData } | undefined;
   const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }); // YYYY-MM-DD
   const hourFmt = new Intl.DateTimeFormat('en-GB', {
     timeZone: timezone,
@@ -126,7 +194,7 @@ export function createWeatherProvider(
     async fetch(signal) {
       if (!coords) throw new Error('weather is not configured');
       const url =
-        `https://api.met.no/weatherapi/locationforecast/2.0/compact` +
+        `https://api.met.no/weatherapi/locationforecast/2.0/complete` +
         `?lat=${coords.lat.toFixed(4)}&lon=${coords.lon.toFixed(4)}`;
       const res = await fetch(url, { signal, headers: { 'User-Agent': USER_AGENT } });
       if (!res.ok) throw new Error(`met.no responded ${res.status}`);
@@ -138,17 +206,24 @@ export function createWeatherProvider(
       const current = {
         temperature: now.data.instant.details.air_temperature,
         windSpeed: now.data.instant.details.wind_speed ?? 0,
+        windDirectionDeg: now.data.instant.details.wind_from_direction,
+        humidity: now.data.instant.details.relative_humidity,
+        uvIndex: now.data.instant.details.ultraviolet_index_clear_sky,
+        precipitationMm: now.data.next_1_hours?.details?.precipitation_amount,
         symbol: symbolOf(now),
       };
 
       const hours = series
         .filter((entry) => entry.data.next_1_hours)
-        .slice(0, 12)
+        .slice(0, 24)
         .map((entry) => ({
           time: entry.time,
           hourLabel: hourFmt.format(new Date(entry.time)),
           temperature: entry.data.instant.details.air_temperature,
           precipitationMm: entry.data.next_1_hours?.details?.precipitation_amount ?? 0,
+          uvIndex: entry.data.instant.details.ultraviolet_index_clear_sky,
+          windSpeed: entry.data.instant.details.wind_speed,
+          humidity: entry.data.instant.details.relative_humidity,
           symbol: symbolOf(entry),
         }));
 
@@ -175,12 +250,21 @@ export function createWeatherProvider(
         );
         // Represent the day by the entry nearest 12:00 local.
         const midday = closestToMidday(entries, hourFmt);
+        const uvValues = entries
+          .map((entry) => entry.data.instant.details.ultraviolet_index_clear_sky)
+          .filter((value): value is number => value != null);
+        const windValues = entries
+          .map((entry) => entry.data.instant.details.wind_speed)
+          .filter((value): value is number => value != null);
         return {
           date,
           dayLabel: weekdayFmt.format(new Date(`${date}T12:00:00Z`)),
           minTemperature: Math.min(...temps),
           maxTemperature: Math.max(...temps),
           precipitationMm: Math.round(precipitationMm * 10) / 10,
+          maxUvIndex: uvValues.length > 0 ? Math.max(...uvValues) : undefined,
+          maxWindSpeed: windValues.length > 0 ? Math.max(...windValues) : undefined,
+          humidity: midday.data.instant.details.relative_humidity,
           symbol: symbolOf(midday),
         };
       });
@@ -189,7 +273,22 @@ export function createWeatherProvider(
       if (locationCache?.key !== locationKey) {
         locationCache = { key: locationKey, name: await reverseGeocode(coords, signal) };
       }
-      return { location: { ...coords, name: locationCache.name }, current, hours, days };
+
+      const today = dateFmt.format(new Date());
+      const astroKey = `${today}@${locationKey}`;
+      if (astroCache?.key !== astroKey || (astroCache.sun === undefined && astroCache.moon === undefined)) {
+        const astro = await fetchAstro(coords, today, utcOffsetLabel(timezone, new Date()), signal);
+        astroCache = { key: astroKey, ...astro };
+      }
+
+      return {
+        location: { ...coords, name: locationCache.name },
+        current,
+        hours,
+        days,
+        sun: astroCache.sun,
+        moon: astroCache.moon,
+      };
     },
   };
 }

@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { relativeTime } from '../../lib/time';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
-import { StaleBadge, WidgetBody, WidgetShell } from '../../components/WidgetCard';
+import { isWidgetDisabled, StaleBadge, WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { FIVE_HOUR_MS, UsageMeter, WEEKLY_MS, ZeroUsageMeter } from './UsageMeter';
 import { UsageHistoryChart } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
@@ -55,6 +55,8 @@ function ToolCard({
   icon: Icon,
 }: Readonly<{ id: string; label: string; color: string; iconColor?: string; icon: React.ComponentType<ToolIconProps> }>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
+
+  if (isWidgetDisabled(envelope)) return null;
 
   return (
     <motion.div

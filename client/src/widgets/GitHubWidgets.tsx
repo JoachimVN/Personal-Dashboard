@@ -265,6 +265,9 @@ export function RepoHealthWidget() {
                   {repo.latestRelease}
                 </span>
               )}
+              <span className="text-xs text-ink-faint">
+                updated {relativeTime(repo.lastPushedAt)}
+              </span>
               <span className="ml-auto flex shrink-0 items-center gap-3 text-xs">
                 <span className="text-ink-muted">★ {repo.stars}</span>
                 <CiBadge status={repo.ciStatus} url={repo.ciUrl} />

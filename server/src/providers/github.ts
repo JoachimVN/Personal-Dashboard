@@ -1,5 +1,6 @@
 import { Octokit } from 'octokit';
 import { githubSchema, type GitHubData } from '@personal-dashboard/shared';
+import type { GitHubSnapshotStore } from '../githubSnapshot.js';
 import type { Provider } from '../scheduler.js';
 
 export interface RawEvent {
@@ -91,8 +92,10 @@ interface SearchItem {
 
 const repoFromApiUrl = (url: string) => url.replace('https://api.github.com/repos/', '');
 
+export type GitHubAuth = { token: string; username: string };
+
 /** Owned, non-fork, non-archived repos — the live replacement for a hand-maintained pinned-repo allowlist. */
-export async function listOwnedRepos(auth: { token: string; username: string }): Promise<string[]> {
+export async function listOwnedRepos(auth: GitHubAuth): Promise<string[]> {
   const octokit = new Octokit({ auth: auth.token });
   const repos = await octokit.paginate('GET /user/repos', {
     affiliation: 'owner',
@@ -100,6 +103,27 @@ export async function listOwnedRepos(auth: { token: string; username: string }):
     per_page: 100,
   });
   return repos.filter((repo) => !repo.fork && !repo.archived).map((repo) => repo.full_name);
+}
+
+/**
+ * Keeps Issue Capture usable through a short-lived GitHub API outage without
+ * treating the cached result as an authorization source for issue creation.
+ */
+export function createOwnedReposCache(
+  fetchOwnedRepos: (auth: GitHubAuth) => Promise<string[]> = listOwnedRepos,
+): (auth: GitHubAuth) => Promise<{ repos: string[]; stale: boolean }> {
+  let lastGoodRepos: string[] | undefined;
+
+  return async (auth) => {
+    try {
+      const repos = await fetchOwnedRepos(auth);
+      lastGoodRepos = repos;
+      return { repos, stale: false };
+    } catch (error) {
+      if (lastGoodRepos) return { repos: lastGoodRepos, stale: true };
+      throw error;
+    }
+  };
 }
 
 const CONTRIBUTIONS_QUERY = `
@@ -145,6 +169,7 @@ function activitySummary(commits: ActivityCommit[] | undefined, fallback: string
 
 export function createGitHubProvider(
   auth: { token: string; username: string } | undefined,
+  snapshotStore?: GitHubSnapshotStore,
 ): Provider<GitHubData> {
   return {
     id: 'github',
@@ -152,6 +177,7 @@ export function createGitHubProvider(
     refreshMs: 10 * 60_000,
     timeoutMs: 20_000,
     isConfigured: () => auth !== undefined,
+    loadCached: () => snapshotStore?.getSnapshot() ?? Promise.resolve(undefined),
     async fetch(signal) {
       if (!auth) throw new Error('github is not configured');
       const octokit = new Octokit({ auth: auth.token });
@@ -207,6 +233,7 @@ export function createGitHubProvider(
             ciUrl: run?.html_url,
             latestRelease: release?.data.tag_name,
             url: repoInfo.data.html_url,
+            lastPushedAt: repoInfo.data.pushed_at ?? repoInfo.data.created_at,
           };
         }),
       );
@@ -270,7 +297,7 @@ export function createGitHubProvider(
 
       const calendar = contributions.user.contributionsCollection.contributionCalendar;
 
-      return {
+      const data: GitHubData = {
         activity,
         pullRequests: [
           ...(authored.data.items as SearchItem[]).map((item) => toPr(item, 'author')),
@@ -296,6 +323,8 @@ export function createGitHubProvider(
         },
         repoHealth: health,
       };
+      await snapshotStore?.setSnapshot(data);
+      return data;
     },
   };
 }

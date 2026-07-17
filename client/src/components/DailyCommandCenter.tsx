@@ -64,12 +64,13 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'claude' | 'codex' {
+function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
   if (slot.source === 'health') return 'health';
   if (slot.source === 'spotify') return 'spotify';
+  if (slot.source === 'weather') return 'weather';
   return 'personal';
 }
 
@@ -348,7 +349,9 @@ const DAY_MS = 24 * 60 * 60_000;
 
 /** `"Jane Doe" <jane@example.com>` → `Jane Doe`, falling back to the bare address. */
 function senderName(from: string): string {
-  const name = from.replace(/<[^>]*>/g, '').replaceAll('"', '').trim();
+  const addressStart = from.indexOf('<');
+  const visibleName = addressStart === -1 ? from : from.slice(0, addressStart);
+  const name = visibleName.replaceAll('"', '').trim();
   return name || from.replace(/[<>]/g, '').trim();
 }
 
@@ -496,7 +499,7 @@ function CommandCenterSkeleton() {
     <section className="command-center glass" aria-labelledby="command-center-title">
       <div className="command-center-head">
         <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
-        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
+        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a></nav>
       </div>
       <div className="command-layout animate-pulse">
         <div className="command-primary space-y-3">
@@ -517,6 +520,109 @@ function CommandCenterSkeleton() {
       </div>
     </section>
   );
+}
+
+function heroExtraFor(render: CommandCenterData['hero']['render'], github: GitHubData | undefined, gmail: GmailData | undefined, aiUsage: AiUsageByTool): ReactNode {
+  if (render.type === 'github-reviews') return GithubReviewList({ github, skip: 1 });
+  if (render.type === 'gmail-threads') return GmailThreadList({ threadIds: render.threadIds, gmail });
+  if (render.type !== 'ai-usage-tool') return null;
+
+  const trend = AiUsageTrend({ render, aiUsage });
+  return trend ? <div className="mt-4 max-w-sm">{trend}</div> : null;
+}
+
+function HeroDescription({
+  detail,
+  event,
+  render,
+  extra,
+  track,
+}: Readonly<{
+  detail: string;
+  event: CalendarData['events'][number] | undefined;
+  render: CommandCenterData['hero']['render'];
+  extra: ReactNode;
+  track: { artist: string } | undefined;
+}>): ReactNode {
+  if (event) {
+    return <div className="mt-2 space-y-1.5 text-sm text-ink-muted">
+      {event.location && (
+        <p className="flex items-center gap-1.5">
+          <a href={mapsSearchHref(event.location)} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1.5 transition hover:text-ink">
+            <span aria-hidden>📍</span>
+            <span className="truncate">{event.location}</span>
+          </a>
+        </p>
+      )}
+      {event.description && (
+        <p className="line-clamp-2 border-l border-card-border pl-2.5 text-ink-faint">{event.description}</p>
+      )}
+      {!event.location && !event.description && <p>{detail}</p>}
+    </div>;
+  }
+
+  if (render.type === 'gmail-threads' && extra) return null;
+  return <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{track?.artist ?? detail}</p>;
+}
+
+function HeroWeather({ weather }: Readonly<{ weather: WeatherData | undefined }>): ReactNode {
+  const today = weather?.days[0];
+  return <div className="command-weather-row">
+    <div className="command-weather-target">
+      <a href={sectionHref('weather')} className="command-weather-summary" aria-label="Open weather">
+        <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
+        <div className="min-w-0"><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="truncate text-[11px] text-ink-muted">{today ? `${deg(today.minTemperature)}–${deg(today.maxTemperature)} · ${today.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p></div>
+        {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
+      </a>
+      {weather && <a href={mapsCoordinatesHref(weather.location)} target="_blank" rel="noreferrer" className="command-weather-location"><span aria-hidden>📍</span>{weatherLocation(weather.location)}</a>}
+    </div>
+  </div>;
+}
+
+function HeroPanel({
+  hero,
+  event,
+  track,
+  kicker,
+  extra,
+  activity,
+  weather,
+}: Readonly<{
+  hero: CommandCenterData['hero'];
+  event: CalendarData['events'][number] | undefined;
+  track: { imageUrl?: string; track: string; artist: string } | undefined;
+  kicker: string;
+  extra: ReactNode;
+  activity: HealthData | undefined;
+  weather: WeatherData | undefined;
+}>) {
+  return <CommandPanel
+    href={hero.href}
+    label={`Open ${hero.kicker}: ${event?.title ?? track?.track ?? hero.title}`}
+    className={`command-primary command-panel--${toneFor(hero)}`}
+  >
+    <p className="command-label">{hero.kicker}</p>
+    <div className="mt-5 flex items-start gap-4">
+      {track && <Thumb url={track.imageUrl} size="h-16 w-16" />}
+      <div className="min-w-0">
+        {kicker !== hero.kicker && <p className="command-event-time">{kicker}</p>}
+        <p className="command-event-title">{event?.title ?? track?.track ?? hero.title}</p>
+        <HeroDescription detail={hero.detail} event={event} render={hero.render} extra={extra} track={track} />
+      </div>
+    </div>
+    {extra}
+    {activity?.today && (
+      <div className="mt-4">
+        <ActivityRings
+          activeEnergyKcal={activity.today.activeEnergyKcal ?? 0}
+          exerciseMinutes={activity.today.exerciseMinutes ?? 0}
+          standHours={activity.today.standHours ?? 0}
+          goals={activity.goals}
+        />
+      </div>
+    )}
+    <HeroWeather weather={weather} />
+  </CommandPanel>;
 }
 
 export function DailyCommandCenter() {
@@ -554,76 +660,17 @@ export function DailyCommandCenter() {
     : undefined;
   const heroActivity = heroRender.type === 'health-rings' && health?.today ? health : undefined;
   const heroKicker = heroEvent ? eventTiming(heroEvent, Date.now()) : ranked.hero.kicker;
-  const todayWeather = weather?.days[0];
   // Richer hero bodies for signals whose title/detail alone undersell them. The GitHub list skips
   // the first PR because the hero title already names it.
-  let heroExtra: ReactNode = null;
-  if (heroRender.type === 'github-reviews') heroExtra = GithubReviewList({ github, skip: 1 });
-  else if (heroRender.type === 'gmail-threads') heroExtra = GmailThreadList({ threadIds: heroRender.threadIds, gmail });
-  else if (heroRender.type === 'ai-usage-tool') {
-    const trend = AiUsageTrend({ render: heroRender, aiUsage });
-    if (trend) heroExtra = <div className="mt-4 max-w-sm">{trend}</div>;
-  }
+  const heroExtra = heroExtraFor(heroRender, github, gmail, aiUsage);
 
   return <section className="command-center glass" aria-labelledby="command-center-title">
     <div className="command-center-head">
       <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
-      <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
+      <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a></nav>
     </div>
     <div className="command-layout">
-      <CommandPanel
-        href={ranked.hero.href}
-        label={`Open ${ranked.hero.kicker}: ${heroEvent?.title ?? heroTrack?.track ?? ranked.hero.title}`}
-        className={`command-primary command-panel--${toneFor(ranked.hero)}`}
-      >
-        <p className="command-label">{ranked.hero.kicker}</p>
-        <div className="mt-5 flex items-start gap-4">
-          {heroTrack && <Thumb url={heroTrack.imageUrl} size="h-16 w-16" />}
-          <div className="min-w-0">
-            {heroKicker !== ranked.hero.kicker && <p className="command-event-time">{heroKicker}</p>}
-            <p className="command-event-title">{heroEvent?.title ?? heroTrack?.track ?? ranked.hero.title}</p>
-            {heroEvent ? (
-              <div className="mt-2 space-y-1.5 text-sm text-ink-muted">
-                {heroEvent.location && (
-                  <p className="flex items-center gap-1.5">
-                    <a href={mapsSearchHref(heroEvent.location)} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1.5 transition hover:text-ink">
-                      <span aria-hidden>📍</span>
-                      <span className="truncate">{heroEvent.location}</span>
-                    </a>
-                  </p>
-                )}
-                {heroEvent.description && (
-                  <p className="line-clamp-2 border-l border-card-border pl-2.5 text-ink-faint">{heroEvent.description}</p>
-                )}
-                {!heroEvent.location && !heroEvent.description && <p>{ranked.hero.detail}</p>}
-              </div>
-            ) : heroRender.type !== 'gmail-threads' || !heroExtra ? (
-              <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{heroTrack ? heroTrack.artist : ranked.hero.detail}</p>
-            ) : null}
-          </div>
-        </div>
-        {heroExtra}
-        {heroActivity?.today && (
-          <div className="mt-4">
-            <ActivityRings
-              activeEnergyKcal={heroActivity.today.activeEnergyKcal ?? 0}
-              exerciseMinutes={heroActivity.today.exerciseMinutes ?? 0}
-              standHours={heroActivity.today.standHours ?? 0}
-              goals={heroActivity.goals}
-            />
-          </div>
-        )}
-        <div className="command-weather-row">
-          <div className="command-weather-target">
-            <a href={sectionHref('personal')} className="command-weather-summary" aria-label="Open weather in Personal">
-              <span className="text-2xl" aria-hidden>{weather ? glyph(weather.current.symbol) : '·'}</span>
-              <div className="min-w-0"><p className="text-lg font-semibold tabular-nums">{weather ? deg(weather.current.temperature) : 'Syncing'}</p><p className="truncate text-[11px] text-ink-muted">{todayWeather ? `${deg(todayWeather.minTemperature)}–${deg(todayWeather.maxTemperature)} · ${todayWeather.precipitationMm.toFixed(1)} mm rain` : 'Weather details are loading'}</p></div>
-              {weather?.hours.slice(0, 4).map((hour) => <div key={hour.time} className="command-forecast"><span>{hour.hourLabel}</span><strong>{deg(hour.temperature)}</strong></div>)}
-            </a>
-            {weather && <a href={mapsCoordinatesHref(weather.location)} target="_blank" rel="noreferrer" className="command-weather-location"><span aria-hidden>📍</span>{weatherLocation(weather.location)}</a>}
-          </div>
-        </div>
-      </CommandPanel>
+      <HeroPanel hero={ranked.hero} event={heroEvent} track={heroTrack} kicker={heroKicker} extra={heroExtra} activity={heroActivity} weather={weather} />
       <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} />)}</div>
     </div>
     {activeSecondary && <CommandPanel

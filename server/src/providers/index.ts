@@ -3,6 +3,7 @@ import type { Database } from '../db/client.js';
 import type { ServerEnv } from '../env.js';
 import type { Provider } from '../scheduler.js';
 import { HealthStore } from '../healthStore.js';
+import { GitHubSnapshotStore } from '../githubSnapshot.js';
 import { UsageHistoryStore } from '../usageHistory.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
@@ -25,6 +26,15 @@ export interface Providers {
   health: HealthStore;
 }
 
+/** Layers the user's config.json on/off switch over a provider's own credential check —
+ * distinct reasons ("you turned it off" vs "you haven't set it up"), same 'disabled' status. */
+function withEnabledToggle(provider: Provider, config: AppConfig): Provider {
+  return {
+    ...provider,
+    isConfigured: () => config.widgets[provider.id]?.enabled !== false && provider.isConfigured(),
+  };
+}
+
 export function createProviders(env: ServerEnv, config: AppConfig, database: Database): Providers {
   const weather = createWeatherProvider(env.weather, env.timezone);
   const hue = createHueProvider(env.hue);
@@ -38,32 +48,35 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
     config.aiUsage.historyRetentionDays * 24 * 60 * 60_000,
   );
   const spotifySnapshot = new SpotifySnapshotStore(database);
+  const githubSnapshot = new GitHubSnapshotStore(database);
   const spotifyHistory = new SpotifyHistoryStore(database);
   return {
     weather,
     hue,
     health,
-    all: [
-      weather,
-      createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
-      createGmailProvider(env.google),
-      createGitHubProvider(env.github),
-      createClaudeUsageProvider(config.aiUsage.claudeRefreshMs, usageHistory),
-      createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
-      createNewsProvider(config.news.feeds),
-      createSpotifyProvider(env.spotify, spotifySnapshot, spotifyHistory),
-      createHealthProvider(health, env.timezone, {
-        steps: config.health.stepGoal,
-        activeEnergyKcal: config.health.moveGoalKcal,
-        exerciseMinutes: config.health.exerciseGoalMinutes,
-        standHours: config.health.standGoalHours,
-      }, {
-        windowDays: config.health.baselineWindowDays,
-        deviationPercent: config.health.baselineDeviationPercent,
-      }),
-      createSystemProvider(env.timezone),
-      hue,
-      createIMessageProvider(),
-    ],
+    all: (
+      [
+        weather,
+        createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
+        createGmailProvider(env.google),
+        createGitHubProvider(env.github, githubSnapshot),
+        createClaudeUsageProvider(config.aiUsage.claudeRefreshMs, usageHistory),
+        createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
+        createNewsProvider(config.news.feeds),
+        createSpotifyProvider(env.spotify, spotifySnapshot, spotifyHistory),
+        createHealthProvider(health, env.timezone, {
+          steps: config.health.stepGoal,
+          activeEnergyKcal: config.health.moveGoalKcal,
+          exerciseMinutes: config.health.exerciseGoalMinutes,
+          standHours: config.health.standGoalHours,
+        }, {
+          windowDays: config.health.baselineWindowDays,
+          deviationPercent: config.health.baselineDeviationPercent,
+        }),
+        createSystemProvider(env.timezone),
+        hue,
+        createIMessageProvider(),
+      ] satisfies Provider[]
+    ).map((provider) => withEnabledToggle(provider, config)),
   };
 }

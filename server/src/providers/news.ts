@@ -23,10 +23,16 @@ export function selectNewsItems(feedItems: NewsItem[][]): NewsItem[] {
   const leading = groups.map(([item]) => item);
   const remaining = groups.flatMap(([, ...items]) => items);
 
-  return [
+  const combined = [
     ...leading.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
     ...remaining.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
-  ].slice(0, MAX_ITEMS);
+  ];
+  // The same story can appear in more than one feed (e.g. a regional and a national
+  // NRK feed); keep only its first, highest-priority occurrence.
+  const seenUrls = new Set<string>();
+  const deduped = combined.filter((item) => (seenUrls.has(item.url) ? false : (seenUrls.add(item.url), true)));
+
+  return deduped.slice(0, MAX_ITEMS);
 }
 
 export function createNewsProvider(feeds: NewsFeed[]): Provider<NewsData> {

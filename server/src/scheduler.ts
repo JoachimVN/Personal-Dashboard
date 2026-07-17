@@ -11,6 +11,8 @@ export interface Provider<T = unknown> {
   isConfigured(): boolean;
   /** `force` is true for a user-initiated refresh — providers may use it to bypass self-imposed (but not externally-imposed) pacing. */
   fetch(signal: AbortSignal, force: boolean): Promise<T>;
+  /** Last-good data shared between dashboard server instances, if this provider supports it. */
+  loadCached?(): Promise<{ data: T; fetchedAt: Date } | undefined>;
   /** Optional adaptive schedule, selected after each completed refresh. `refreshMs` remains the
    * fallback delay and the client-visible cache polling cadence. */
   nextRefreshMs?(data: T | undefined): number;
@@ -56,7 +58,7 @@ export class ProviderScheduler {
     this.running = true;
     for (const entry of this.entries.values()) {
       if (entry.status === 'disabled') continue;
-      void this.refresh(entry.provider.id);
+      void this.hydrateAndRefresh(entry);
       if (entry.provider.nextRefreshMs) continue;
       entry.timer = setInterval(
         () => void this.refresh(entry.provider.id),
@@ -64,6 +66,20 @@ export class ProviderScheduler {
       );
       entry.timer.unref?.();
     }
+  }
+
+  private async hydrateAndRefresh(entry: Entry): Promise<void> {
+    try {
+      const cached = await entry.provider.loadCached?.();
+      if (cached) {
+        entry.data = entry.provider.schema.parse(cached.data);
+        entry.fetchedAt = cached.fetchedAt;
+        entry.status = 'stale';
+      }
+    } catch (err) {
+      console.error(`[${entry.provider.id}] cached data unavailable:`, err);
+    }
+    await this.refresh(entry.provider.id);
   }
 
   stop(): void {

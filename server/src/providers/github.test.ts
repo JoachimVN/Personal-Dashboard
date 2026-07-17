@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeEvent, type RawEvent } from './github.js';
+import { createOwnedReposCache, describeEvent, type RawEvent } from './github.js';
 
 function pushEvent(commits: RawEvent['payload']['commits']): RawEvent {
   return {
@@ -32,5 +32,29 @@ describe('describeEvent', () => {
         { sha: 'def456', title: 'fix: retain full commit message' },
       ],
     });
+  });
+});
+
+describe('owned repository cache', () => {
+  const auth = { token: 'test-token', username: 'octo' };
+
+  it('serves the last successful list when GitHub is temporarily unavailable', async () => {
+    let available = true;
+    const getRepos = createOwnedReposCache(async () => {
+      if (!available) throw new Error('GitHub unavailable');
+      return ['octo/dashboard'];
+    });
+
+    await expect(getRepos(auth)).resolves.toEqual({ repos: ['octo/dashboard'], stale: false });
+    available = false;
+    await expect(getRepos(auth)).resolves.toEqual({ repos: ['octo/dashboard'], stale: true });
+  });
+
+  it('keeps an initial failure visible when there is no cached list', async () => {
+    const getRepos = createOwnedReposCache(async () => {
+      throw new Error('GitHub unavailable');
+    });
+
+    await expect(getRepos(auth)).rejects.toThrow('GitHub unavailable');
   });
 });
