@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SteamAchievement, SteamData, SteamGame } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
@@ -24,9 +24,15 @@ type ShelfEntry = { game: SteamGame; source: 'recent' | 'all-time' };
 
 function ShelfGame({ entry }: Readonly<{ entry: ShelfEntry }>) {
   const playtime = entry.source === 'recent' ? entry.game.playtimeRecentMinutes : entry.game.playtimeForeverMinutes;
+  const [headerFailed, setHeaderFailed] = useState(false);
+  const hasHeader = Boolean(entry.game.headerUrl) && !headerFailed;
   return (
     <article className="steam-shelf-game">
-      {entry.game.headerUrl ? <img aria-hidden src={entry.game.headerUrl} alt="" loading="lazy" /> : <div className="steam-shelf-game-fallback" />}
+      {hasHeader ? (
+        <img aria-hidden src={entry.game.headerUrl} alt="" loading="lazy" onError={() => setHeaderFailed(true)} />
+      ) : (
+        <div className="steam-shelf-game-fallback" />
+      )}
       <div className="steam-shelf-game-scrim" />
       <div className="steam-shelf-game-copy">
         <p className="truncate text-sm font-semibold text-white">{entry.game.name}</p>
@@ -127,9 +133,18 @@ function SteamOverviewContent({ data }: Readonly<{ data: SteamData }>) {
   useEffect(() => {
     const card = overviewRef.current?.closest<HTMLElement>('.dashboard-section-card--steam');
     if (!card) return undefined;
-    if (featured?.headerUrl) card.style.setProperty('--steam-card-art', `url("${featured.headerUrl}")`);
-    else card.style.removeProperty('--steam-card-art');
+    const headerUrl = featured?.headerUrl;
+    if (!headerUrl) {
+      card.style.removeProperty('--steam-card-art');
+      return undefined;
+    }
+    // Probe the image before wiring it into the background — a bare CSS url() with no onload/onerror
+    // hook would otherwise leave a 404'd header silently unset, hard to distinguish from "no art yet".
+    const probe = new Image();
+    probe.onload = () => card.style.setProperty('--steam-card-art', `url("${headerUrl}")`);
+    probe.src = headerUrl;
     return () => {
+      probe.onload = null;
       card.style.removeProperty('--steam-card-art');
     };
   }, [featured?.headerUrl]);
