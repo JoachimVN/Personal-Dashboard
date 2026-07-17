@@ -217,9 +217,11 @@ export function ContributionGrid({
     if (el) el.scrollLeft = el.scrollWidth;
   }, [weeks.length]);
 
-  const contributionSummary = hovered
-    ? `${hovered.date} · ${hovered.count} contribution${hovered.count === 1 ? '' : 's'}`
-    : `${data.contributions.total} contributions in the last year`;
+  const contributionSummary = (() => {
+    if (!hovered) return `${data.contributions.total} contributions in the last year`;
+    const plural = hovered.count === 1 ? '' : 's';
+    return `${hovered.date} · ${hovered.count} contribution${plural}`;
+  })();
 
   return (
     <div>
