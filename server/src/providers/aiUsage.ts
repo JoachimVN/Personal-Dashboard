@@ -223,7 +223,16 @@ async function claudeTokenTotals(): Promise<{ fiveHour: number; weekly: number }
   return { fiveHour, weekly };
 }
 
-type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'modelWeekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>;
+export type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'modelWeekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>;
+
+/**
+ * Recent Claude Code versions can return only run statistics from `claude -p "/usage"` when
+ * an account is at its cap. That is not an authoritative zero-quota report, so retain the last
+ * report that did include quota data. An explicit no-limits report has `asOf` and still replaces it.
+ */
+export function retainKnownClaudeQuota(live: ClaudeQuota, previous?: ClaudeQuota): ClaudeQuota {
+  return live.asOf ? live : previous ?? live;
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -333,6 +342,30 @@ async function claudeCliUsageSnapshot(): Promise<ClaudeQuota> {
 }
 
 export function createClaudeUsageProvider(refreshMs: number, history: UsageHistoryStore): Provider<AiUsageToolData> {
+  let rememberedQuota: ClaudeQuota | undefined;
+  let loadedRememberedQuota = false;
+
+  const loadRememberedQuota = async (): Promise<ClaudeQuota | undefined> => {
+    if (loadedRememberedQuota) return rememberedQuota;
+    loadedRememberedQuota = true;
+    try {
+      const snapshot = await history.getSnapshot('ai-usage-claude');
+      if (snapshot?.asOf && (snapshot.fiveHour || snapshot.weekly || snapshot.modelWeekly)) {
+        rememberedQuota = {
+          fiveHour: snapshot.fiveHour,
+          weekly: snapshot.weekly,
+          modelWeekly: snapshot.modelWeekly,
+          fiveHourStatus: snapshot.fiveHourStatus ?? (snapshot.fiveHour ? 'limited' : 'unknown'),
+          weeklyStatus: snapshot.weeklyStatus ?? (snapshot.weekly ? 'limited' : 'unknown'),
+          asOf: snapshot.asOf,
+        };
+      }
+    } catch {
+      // A history lookup must not turn a usable token-total snapshot into a provider failure.
+    }
+    return rememberedQuota;
+  };
+
   return {
     id: 'ai-usage-claude',
     schema: aiUsageToolSchema,
@@ -340,7 +373,10 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
     timeoutMs: 25_000,
     isConfigured: () => true,
     fetch: async () => {
-      const [tokenTotals, quota] = await Promise.all([claudeTokenTotals(), claudeCliUsageSnapshot()]);
+      const [tokenTotals, liveQuota] = await Promise.all([claudeTokenTotals(), claudeCliUsageSnapshot()]);
+      const previousQuota = liveQuota.asOf ? rememberedQuota : rememberedQuota ?? await loadRememberedQuota();
+      const quota = retainKnownClaudeQuota(liveQuota, previousQuota);
+      if (liveQuota.asOf) rememberedQuota = liveQuota;
       const snapshot: UsageSnapshot = {
         available: Boolean(quota.asOf || tokenTotals.fiveHour || tokenTotals.weekly),
         fiveHour: quota.fiveHour,
