@@ -38,17 +38,23 @@ function SteamGameArtwork({ game }: Readonly<{ game: SteamGame }>) {
       {hasHeader && (
         <img
           aria-hidden
-          src={game.headerUrl}
+          data-steam-header={game.headerUrl}
           alt=""
           className="steam-game-row-backdrop"
-          loading="lazy"
+          decoding="async"
           onError={() => setHeaderFailed(true)}
         />
       )}
       {hasHeader ? (
-        <img src={game.headerUrl} alt="" className="steam-game-cover" loading="lazy" onError={() => setHeaderFailed(true)} />
+        <img
+          data-steam-header={game.headerUrl}
+          alt=""
+          className="steam-game-cover"
+          decoding="async"
+          onError={() => setHeaderFailed(true)}
+        />
       ) : game.iconUrl ? (
-        <img src={game.iconUrl} alt="" className="steam-game-cover steam-game-cover--icon" loading="lazy" />
+        <img src={game.iconUrl} alt="" className="steam-game-cover steam-game-cover--icon" loading="lazy" decoding="async" />
       ) : (
         <div aria-hidden className="steam-game-cover steam-game-cover--fallback">{fallbackInitial}</div>
       )}
@@ -126,6 +132,38 @@ export function SteamGameList({ data }: Readonly<{ data: SteamData }>) {
   useEffect(() => {
     listRef.current?.scrollTo({ top: 0 });
   }, [query, sort]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return undefined;
+
+    const loadArtwork = (row: Element) => {
+      row.querySelectorAll<HTMLImageElement>('img[data-steam-header]').forEach((image) => {
+        const src = image.dataset.steamHeader;
+        if (!src || image.hasAttribute('src')) return;
+        image.fetchPriority = 'high';
+        image.src = src;
+      });
+    };
+    const rows = Array.from(list.children);
+    if (!('IntersectionObserver' in window)) {
+      rows.forEach(loadArtwork);
+      return undefined;
+    }
+
+    // Keep several screens of the scroll container warm in both directions so decoded Steam
+    // headers are ready before a fast wheel or trackpad scroll brings their rows into view.
+    const observer = new IntersectionObserver(
+      (entries) => entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        loadArtwork(entry.target);
+        observer.unobserve(entry.target);
+      }),
+      { root: list, rootMargin: '1200px 0px' },
+    );
+    rows.forEach((row) => observer.observe(row));
+    return () => observer.disconnect();
+  }, [data.library, query, sort]);
 
   if (data.availability.library !== 'available' || !data.library) {
     return (
@@ -392,13 +430,16 @@ export function SteamAchievementShowcase({ data }: Readonly<{ data: SteamData }>
   if (data.availability.achievements !== 'available' || !data.achievements) {
     return <p className="text-sm text-ink-faint">No achievement highlights for the tracked game right now.</p>;
   }
-  const { rarest, nextEasiest } = data.achievements;
+  const { gameName, rarest, nextEasiest } = data.achievements;
   if (rarest.length === 0 && nextEasiest.length === 0) {
     return <p className="text-sm text-ink-faint">No global rarity data for this game's achievements yet.</p>;
   }
 
   return (
     <div className="space-y-5">
+      <p className="text-xs text-ink-faint">
+        Tracking <span className="font-medium text-ink-muted">{gameName}</span>
+      </p>
       {rarest.length > 0 && (
         <div>
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">Rarest unlocks</p>
@@ -451,9 +492,12 @@ export function SteamAchievementShowcase({ data }: Readonly<{ data: SteamData }>
   );
 }
 
-/** Ranked by all-time playtime; friends with a private library still appear (name only) at the
- * bottom rather than being silently dropped from the list. */
+type SteamLeaderboardPeriod = 'total' | 'recent';
+
+/** Ranked by all-time or trailing-two-week playtime; friends with private libraries remain
+ * visible (name only) rather than being silently dropped from the list. */
 export function SteamFriendsLeaderboard({ data }: Readonly<{ data: SteamData }>) {
+  const [period, setPeriod] = useState<SteamLeaderboardPeriod>('total');
   const { status, entries } = data.friendsLeaderboard;
   if (status !== 'available') {
     return <p className="text-sm text-ink-faint">Friends leaderboard isn&apos;t available right now.</p>;
@@ -461,19 +505,26 @@ export function SteamFriendsLeaderboard({ data }: Readonly<{ data: SteamData }>)
   if (entries.length <= 1) {
     return <p className="text-sm text-ink-faint">Add Steam friends to see a playtime leaderboard.</p>;
   }
-  const ranked = entries.filter((e) => e.totalPlaytimeMinutes !== undefined);
-  const unranked = entries.filter((e) => e.totalPlaytimeMinutes === undefined);
-  const max = Math.max(...ranked.map((e) => e.totalPlaytimeMinutes ?? 0), 1);
+  const metric = period === 'total' ? 'totalPlaytimeMinutes' : 'recentPlaytimeMinutes';
+  const ranked = entries
+    .filter((entry) => entry[metric] !== undefined)
+    .sort((a, b) => (b[metric] ?? 0) - (a[metric] ?? 0));
+  const unranked = entries.filter((entry) => entry[metric] === undefined);
+  const max = Math.max(...ranked.map((entry) => entry[metric] ?? 0), 1);
 
   return (
     <div>
+      <fieldset className="steam-sort-toggle mb-3" aria-label="Playtime period">
+        <button type="button" data-active={period === 'total'} onClick={() => setPeriod('total')}>All time</button>
+        <button type="button" data-active={period === 'recent'} onClick={() => setPeriod('recent')}>Last 2 weeks</button>
+      </fieldset>
       <ol className="space-y-1.5">
         {ranked.map((entry, i) => (
           <li
             key={entry.steamId}
             className="steam-leaderboard-row"
             data-you={entry.isYou}
-            style={{ '--fill': `${((entry.totalPlaytimeMinutes ?? 0) / max) * 100}%` } as CSSProperties}
+            style={{ '--fill': `${((entry[metric] ?? 0) / max) * 100}%` } as CSSProperties}
           >
             <span className="w-4 shrink-0 text-right text-xs tabular-nums text-ink-faint">{i + 1}</span>
             {entry.avatarUrl ? (
@@ -487,7 +538,7 @@ export function SteamFriendsLeaderboard({ data }: Readonly<{ data: SteamData }>)
             {entry.sharedGames > 0 && (
               <span className="shrink-0 text-[10px] text-ink-faint">{entry.sharedGames} shared</span>
             )}
-            <span className="shrink-0 text-xs tabular-nums text-ink-muted">{formatHours(entry.totalPlaytimeMinutes ?? 0)}</span>
+            <span className="shrink-0 text-xs tabular-nums text-ink-muted">{formatHours(entry[metric] ?? 0)}</span>
           </li>
         ))}
       </ol>

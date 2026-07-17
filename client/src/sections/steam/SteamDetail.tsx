@@ -107,8 +107,8 @@ export function SteamDetail() {
 
       <DetailSectionHeading
         label="Achievements"
-        title="Highlights"
-        detail="Rarest unlocks and the achievements you're closest to, both ranked by Steam's global unlock rate."
+        title="Tracked game highlights"
+        detail="Rarest unlocks and the achievements you're closest to in your current or most recently played game, ranked by Steam's global unlock rate."
       />
       <WidgetShell title="Achievement highlights">
         <WidgetBody envelope={envelope} offline={offline}>

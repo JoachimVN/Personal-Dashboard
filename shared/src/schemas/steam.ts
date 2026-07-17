@@ -44,6 +44,8 @@ export const steamLeaderboardEntrySchema = z.object({
   avatarUrl: z.string().optional(),
   /** undefined means this friend's library is private — still shown, just unranked. */
   totalPlaytimeMinutes: z.number().optional(),
+  /** Steam's trailing recent-play window (currently ~2 weeks). Undefined for private libraries. */
+  recentPlaytimeMinutes: z.number().optional(),
   /** Count of appIds this friend's library shares with your own. */
   sharedGames: z.number(),
   isYou: z.boolean(),

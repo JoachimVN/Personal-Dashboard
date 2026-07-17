@@ -347,7 +347,7 @@ async function fetchFriendLibraryTotal(
   signal: AbortSignal,
   apiKey: string,
   steamId: string,
-): Promise<{ totalPlaytimeMinutes: number; appIds: Set<number> } | undefined> {
+): Promise<{ totalPlaytimeMinutes: number; recentPlaytimeMinutes: number; appIds: Set<number> } | undefined> {
   try {
     const data = await steamRequest<{ response?: { games?: RawGame[] } }>(
       signal,
@@ -360,6 +360,7 @@ async function fetchFriendLibraryTotal(
     if (!games) return undefined; // private "Game details" setting
     return {
       totalPlaytimeMinutes: games.reduce((sum, g) => sum + (g.playtime_forever ?? 0), 0),
+      recentPlaytimeMinutes: games.reduce((sum, g) => sum + (g.playtime_2weeks ?? 0), 0),
       appIds: new Set(games.map((g) => g.appid)),
     };
   } catch {
@@ -383,7 +384,12 @@ async function getOrFetchFriendsLeaderboard(
   snapshotStore: SteamSnapshotStore | undefined,
 ): Promise<{ status: 'available' | 'unavailable'; entries: SteamLeaderboardEntry[] }> {
   const cached = await snapshotStore?.getFriendsLeaderboard();
-  if (cached && !isExpired(cached.fetchedAt, ttlMs)) return { status: 'available', entries: cached.data };
+  const cacheIncludesRecentPlaytime = cached?.data.every(
+    (entry) => entry.totalPlaytimeMinutes === undefined || entry.recentPlaytimeMinutes !== undefined,
+  );
+  if (cached && cacheIncludesRecentPlaytime && !isExpired(cached.fetchedAt, ttlMs)) {
+    return { status: 'available', entries: cached.data };
+  }
 
   try {
     const ownAppIds = new Set((ownLibrary?.allGames ?? []).map((g) => g.appId));
@@ -398,6 +404,7 @@ async function getOrFetchFriendsLeaderboard(
           personaName: summary?.personaname ?? friendId,
           avatarUrl: summary?.avatarfull,
           totalPlaytimeMinutes: lib?.totalPlaytimeMinutes,
+          recentPlaytimeMinutes: lib?.recentPlaytimeMinutes,
           sharedGames: lib ? [...lib.appIds].filter((appId) => ownAppIds.has(appId)).length : 0,
           isYou: false,
         };
@@ -411,6 +418,7 @@ async function getOrFetchFriendsLeaderboard(
         personaName: ownProfile.personaName,
         avatarUrl: ownProfile.avatarUrl,
         totalPlaytimeMinutes: ownLibrary?.totalPlaytimeMinutes,
+        recentPlaytimeMinutes: ownLibrary?.recentPlaytimeMinutes,
         sharedGames: ownAppIds.size,
         isYou: true,
       },

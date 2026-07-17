@@ -364,7 +364,7 @@ describe('createSteamProvider fetch', () => {
       .mockResolvedValueOnce(jsonResponse({ response: { games: [] } }))
       // GetOwnedGames (own) — appids 10 and 20
       .mockResolvedValueOnce(jsonResponse({
-        response: { game_count: 2, games: [{ appid: 10, name: 'A', playtime_forever: 100 }, { appid: 20, name: 'B', playtime_forever: 50 }] },
+        response: { game_count: 2, games: [{ appid: 10, name: 'A', playtime_forever: 100, playtime_2weeks: 20 }, { appid: 20, name: 'B', playtime_forever: 50, playtime_2weeks: 10 }] },
       }))
       // GetPlayerAchievements — tracked game (A) has no stats
       .mockResolvedValueOnce(jsonResponse({ playerstats: { success: false, error: 'no stats' } }))
@@ -376,7 +376,7 @@ describe('createSteamProvider fetch', () => {
       }))
       // GetOwnedGames (friend1) — shares appid 10 with the user
       .mockResolvedValueOnce(jsonResponse({
-        response: { games: [{ appid: 10, playtime_forever: 80 }, { appid: 99, playtime_forever: 20 }] },
+        response: { games: [{ appid: 10, playtime_forever: 80, playtime_2weeks: 7 }, { appid: 99, playtime_forever: 20, playtime_2weeks: 1 }] },
       }))
       // GetOwnedGames (friend2) — private
       .mockResolvedValueOnce(jsonResponse({ response: {} }));
@@ -387,8 +387,8 @@ describe('createSteamProvider fetch', () => {
 
       expect(data.friendsLeaderboard.status).toBe('available');
       expect(data.friendsLeaderboard.entries).toEqual([
-        { steamId: auth.steamId, personaName: 'Alex', avatarUrl: undefined, totalPlaytimeMinutes: 150, sharedGames: 2, isYou: true },
-        { steamId: 'friend1', personaName: 'Bob', avatarUrl: 'https://avatar/bob.jpg', totalPlaytimeMinutes: 100, sharedGames: 1, isYou: false },
+        { steamId: auth.steamId, personaName: 'Alex', avatarUrl: undefined, totalPlaytimeMinutes: 150, recentPlaytimeMinutes: 30, sharedGames: 2, isYou: true },
+        { steamId: 'friend1', personaName: 'Bob', avatarUrl: 'https://avatar/bob.jpg', totalPlaytimeMinutes: 100, recentPlaytimeMinutes: 8, sharedGames: 1, isYou: false },
         { steamId: 'friend2', personaName: 'Cara', avatarUrl: undefined, totalPlaytimeMinutes: undefined, sharedGames: 0, isYou: false },
       ]);
       expect(snapshotStore.setFriendsLeaderboard).toHaveBeenCalledOnce();
@@ -400,8 +400,8 @@ describe('createSteamProvider fetch', () => {
 
   it('reuses a fresh cached leaderboard without re-fetching every friend\'s library', async () => {
     const cachedLeaderboard = [
-      { steamId: auth.steamId, personaName: 'Alex', totalPlaytimeMinutes: 150, sharedGames: 2, isYou: true },
-      { steamId: 'friend1', personaName: 'Bob', totalPlaytimeMinutes: 100, sharedGames: 1, isYou: false },
+      { steamId: auth.steamId, personaName: 'Alex', totalPlaytimeMinutes: 150, recentPlaytimeMinutes: 0, sharedGames: 2, isYou: true },
+      { steamId: 'friend1', personaName: 'Bob', totalPlaytimeMinutes: 100, recentPlaytimeMinutes: 0, sharedGames: 1, isYou: false },
     ];
     const snapshotStore = emptySnapshotStore();
     snapshotStore.getFriendsLeaderboard.mockResolvedValue({ data: cachedLeaderboard, fetchedAt: new Date() });
