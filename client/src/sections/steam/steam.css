@@ -69,6 +69,7 @@
   color: var(--color-ink);
   background: color-mix(in oklab, var(--color-accent-steam) 22%, var(--color-card));
 }
+.steam-leaderboard-period { margin-bottom: 1rem; }
 
 /* Now-playing hero: the game's header art, blurred and dimmed, behind the existing content. A
    negative margin here would expand the box (including its bottom edge) past what space-y-*

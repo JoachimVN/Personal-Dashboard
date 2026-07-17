@@ -514,7 +514,7 @@ export function SteamFriendsLeaderboard({ data }: Readonly<{ data: SteamData }>)
 
   return (
     <div>
-      <fieldset className="steam-sort-toggle mb-3" aria-label="Playtime period">
+      <fieldset className="steam-leaderboard-period steam-sort-toggle" aria-label="Playtime period">
         <button type="button" data-active={period === 'total'} onClick={() => setPeriod('total')}>All time</button>
         <button type="button" data-active={period === 'recent'} onClick={() => setPeriod('recent')}>Last 2 weeks</button>
       </fieldset>
