@@ -65,6 +65,47 @@ describe('parseClaudeUsageScreen', () => {
     expect(quota.weekly?.usedPercent).toBe(33);
   });
 
+  it('reads the final redraw instead of an earlier approximate one still sitting in the captured stream', () => {
+    // The interactive screen redraws in place — an approximate render first, then a corrected one
+    // once local sessions finish scanning for the per-model breakdown. The PTY capture is
+    // append-only, so both renders are present in the buffer; the earlier one must be ignored.
+    const now = new Date(2026, 6, 17, 13, 0);
+    const quota = parseClaudeUsageScreen(
+      `
+      Current session
+      5% used
+      Resets 5:59am (Europe/Oslo)
+
+      Current week (all models)
+      40% used
+      Resets Jul 18 at 11:59pm (Europe/Oslo)
+
+      Current week (Fable)
+      12% used
+      Resets Jul 18 at 11:59pm (Europe/Oslo)
+
+      Refreshing…
+
+      Current session
+      7% used
+      Resets 5:59am (Europe/Oslo)
+
+      Current week (all models)
+      41% used
+      Resets Jul 18 at 11:59pm (Europe/Oslo)
+
+      Current week (Fable)
+      12% used
+      Resets Jul 18 at 11:59pm (Europe/Oslo)
+    `,
+      now,
+    );
+
+    expect(quota.fiveHour?.usedPercent).toBe(7);
+    expect(quota.weekly?.usedPercent).toBe(41);
+    expect(quota.modelWeekly).toMatchObject({ model: 'Fable', usedPercent: 12 });
+  });
+
   it('continues to read older transcript reports with dated session resets', () => {
     const quota = parseClaudeUsageScreen(
       'Current session: 80% used · resets Jul 13 at 2am (Europe/Oslo)\nCurrent week (all models): 13% used · resets Jul 19 at 12am (Europe/Oslo)\nCurrent week (Fable): 9% used · resets Jul 19 at 12am (Europe/Oslo)',
