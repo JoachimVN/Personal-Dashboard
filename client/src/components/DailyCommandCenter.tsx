@@ -15,7 +15,7 @@ import type {
 import { useWidget } from '../useWidget';
 import { UsageSparkline } from '../sections/ai/UsageHistoryChart';
 import { WEEKLY_MS } from '../sections/ai/UsageMeter';
-import { deg, glyph, moonPhaseName, weatherLocation } from '../lib/weather';
+import { deg, glyph, weatherLocation } from '../lib/weather';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
 import { NowPlaying, Thumb } from '../widgets/SpotifyWidget';
@@ -25,7 +25,6 @@ import { rampColor } from '../lib/contributions';
 import { ClaudeIcon, OpenAiIcon } from '../sections/ai/ToolIcons';
 import { sectionHref } from '../router';
 import { UvGauge, WindGauge } from '../sections/weather/WeatherOverview';
-import { MoonDisc, SunArc } from '../sections/weather/astro';
 import '../sections/spotify/spotify.css';
 
 const SECONDARY_CAROUSEL_INTERVAL_MS = 7_000;
@@ -515,18 +514,6 @@ function WeatherSignalSecondary({ slot, weather }: Readonly<{ slot: CommandCente
     return <div className="command-secondary-ai mt-4">
       <UvGauge uvIndex={weather.current.uvIndex} />
       <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
-    </div>;
-  }
-  if (kind === 'sunset' && weather.sun) {
-    return <div className="mt-4"><SunArc sunrise={weather.sun.sunrise} sunset={weather.sun.sunset} /></div>;
-  }
-  if (kind === 'moon' && weather.moon) {
-    return <div className="mt-4 flex items-center gap-4">
-      <MoonDisc phaseDeg={weather.moon.phaseDeg} size={72} />
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-ink">{moonPhaseName(weather.moon.phaseDeg)}</p>
-        <p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p>
-      </div>
     </div>;
   }
   return <WeatherHourlyStrip title={slot.title} detail={slot.detail} weather={weather} />;
