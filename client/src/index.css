@@ -112,19 +112,19 @@ a {
    same clock-driven colors, but stays broad and low enough to remain background. */
 .ambient-horizon {
   position: absolute;
-  bottom: -12rem;
+  bottom: -4rem;
   left: 50%;
-  width: min(132rem, 220vw);
-  height: 30rem;
+  width: min(136rem, 230vw);
+  height: 34rem;
   translate: -50% 0;
   background: radial-gradient(
-    ellipse at 50% 100%,
-    color-mix(in oklab, var(--sky-b) 34%, transparent),
-    color-mix(in oklab, var(--sky-a) 14%, transparent) 42%,
+    ellipse at 50% 82%,
+    color-mix(in oklab, var(--sky-b) 40%, transparent),
+    color-mix(in oklab, var(--sky-a) 18%, transparent) 42%,
     transparent 76%
   );
-  filter: blur(88px);
-  opacity: 0.48;
+  filter: blur(76px);
+  opacity: 0.54;
   transition: background 1.2s ease;
 }
 
@@ -153,14 +153,14 @@ a {
 
 .section-page-horizon {
   position: absolute;
-  bottom: -14rem;
+  bottom: -5rem;
   left: 50%;
-  width: min(100rem, 210vw);
-  height: 28rem;
+  width: min(104rem, 220vw);
+  height: 32rem;
   translate: -50% 0;
-  background: radial-gradient(ellipse at 50% 100%, color-mix(in oklab, var(--section-accent) 16%, transparent), transparent 72%);
-  filter: blur(84px);
-  opacity: 0.54;
+  background: radial-gradient(ellipse at 50% 85%, color-mix(in oklab, var(--section-accent) 20%, transparent), transparent 72%);
+  filter: blur(72px);
+  opacity: 0.6;
 }
 
 /* The hero text sits directly on the sky wash with no card behind it — unlike everywhere
