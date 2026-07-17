@@ -89,6 +89,8 @@ describeDatabase('Postgres stores', () => {
       recentlyPlayed: [],
       achievements: null,
       friendsInGame: [],
+      playtimeHistory: [],
+      friendsLeaderboard: { status: 'unavailable', entries: [] },
       availability: { library: 'unavailable', achievements: 'unavailable', friends: 'unavailable' },
     };
     await store.setSnapshot(snapshot as never);
