@@ -2,11 +2,14 @@ import type { SteamData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import {
+  SteamAchievementShowcase,
   SteamAchievementsWidget,
+  SteamFriendsLeaderboard,
   SteamFriendsWidget,
   SteamGameList,
   SteamLibraryStats,
   SteamNowPlaying,
+  SteamPlaytimeTrend,
   SteamRecentGames,
 } from '../../widgets/SteamWidgets';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
@@ -66,9 +69,21 @@ export function SteamDetail() {
       </DetailIntro>
 
       <DetailSectionHeading label="Now" title="Current game" />
-      <WidgetShell title="Now playing">
+      {/* Neutral title — SteamNowPlaying's own kicker ("Playing now"/"Last played"/"Most played") states the actual status. */}
+      <WidgetShell title="Game">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <SteamNowPlaying data={data} />}
+        </WidgetBody>
+      </WidgetShell>
+
+      <DetailSectionHeading
+        label="Trends"
+        title="Playtime over time"
+        detail="Daily deltas between library snapshots — Steam only reports a cumulative all-time total, not a native day-by-day breakdown."
+      />
+      <WidgetShell title="Playtime">
+        <WidgetBody envelope={envelope} offline={offline}>
+          {(data) => <SteamPlaytimeTrend data={data} />}
         </WidgetBody>
       </WidgetShell>
 
@@ -91,6 +106,35 @@ export function SteamDetail() {
       </div>
 
       <DetailSectionHeading
+        label="Achievements"
+        title="Highlights"
+        detail="Rarest unlocks and the achievements you're closest to, both ranked by Steam's global unlock rate."
+      />
+      <WidgetShell title="Achievement highlights">
+        <WidgetBody envelope={envelope} offline={offline}>
+          {(data) => <SteamAchievementShowcase data={data} />}
+        </WidgetBody>
+      </WidgetShell>
+
+      <DetailSectionHeading
+        label="Friends"
+        title="Playtime leaderboard"
+        detail="Ranked by all-time playtime across your Steam friends; private libraries stay listed, just unranked."
+      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <WidgetShell title="Leaderboard">
+          <WidgetBody envelope={envelope} offline={offline}>
+            {(data) => <SteamFriendsLeaderboard data={data} />}
+          </WidgetBody>
+        </WidgetShell>
+        <WidgetShell title="Playing now">
+          <WidgetBody envelope={envelope} offline={offline}>
+            {(data) => <SteamFriendsWidget data={data} />}
+          </WidgetBody>
+        </WidgetShell>
+      </div>
+
+      <DetailSectionHeading
         label="Library"
         title="All your games"
         detail="Sorted by all-time or last-2-weeks playtime — the only two windows Steam's API tracks."
@@ -98,13 +142,6 @@ export function SteamDetail() {
       <WidgetShell title="Games">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <SteamGameList data={data} />}
-        </WidgetBody>
-      </WidgetShell>
-
-      <DetailSectionHeading label="Friends" title="Who's online" />
-      <WidgetShell title="Friends playing">
-        <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <SteamFriendsWidget data={data} />}
         </WidgetBody>
       </WidgetShell>
     </div>

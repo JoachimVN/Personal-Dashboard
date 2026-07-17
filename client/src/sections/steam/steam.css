@@ -32,3 +32,57 @@
   color: var(--color-ink);
   background: color-mix(in oklab, var(--color-accent-steam) 22%, var(--color-card));
 }
+
+/* Now-playing hero: the game's header art, blurred and dimmed, behind the existing content. A
+   negative margin here would expand the box (including its bottom edge) past what space-y-*
+   gap utilities account for on the next sibling, bleeding the backdrop into it — so this stays
+   flush with the natural content box instead of the "bleed" trick. */
+.steam-hero {
+  position: relative;
+  isolation: isolate;
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.steam-hero-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(28px) saturate(1.3);
+  transform: scale(1.15);
+  opacity: 0.5;
+}
+.steam-hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--color-accent-steam) 16%, transparent), transparent 70%);
+}
+
+/* Friends leaderboard rows — a proportional playtime bar behind the row content. */
+.steam-leaderboard-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+.steam-leaderboard-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: var(--fill);
+  background: color-mix(in oklab, var(--color-accent-steam) 14%, transparent);
+  border-radius: inherit;
+}
+.steam-leaderboard-row[data-you='true'] {
+  background: color-mix(in oklab, var(--color-accent-steam) 10%, var(--color-card));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent-steam) 35%, transparent);
+}
+.steam-leaderboard-row > * {
+  position: relative;
+}
