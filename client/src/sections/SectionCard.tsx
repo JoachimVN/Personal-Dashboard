@@ -23,10 +23,7 @@ function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
   }
   if (id === 'spotify') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M7.5 9.8c2.9-.8 6-.5 8.6 1M8 13c2.3-.6 4.7-.3 6.8 .9M8.6 16c1.7-.4 3.4-.2 4.9 .7" />
-      </svg>
+      <img src="/spotify.svg" alt="" aria-hidden className="h-5 w-5" />
     );
   }
   if (id === 'weather') {
