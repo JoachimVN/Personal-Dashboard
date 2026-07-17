@@ -120,17 +120,14 @@ export function githubCandidates(
 /**
  * "Stale" here means the unread count hasn't moved in a long time — that's a sign to stop
  * surfacing it, not promote it: most unread mail (receipts, one-time codes) was never going to be
- * replied to, and an inbox count that's been sitting untouched for a day isn't news. Short of that
- * cutoff, a *recently changed* count (new mail actually arriving) raises priority the most, but a
- * large enough backlog is its own kind of urgent even without a fresh arrival — 395 unread sitting
- * there is worth a hero slot on its own merits, not just a same-size pile that just grew by one.
+ * replied to, and an inbox count that's been sitting untouched for a day isn't news. Only a
+ * *recently changed* count (new mail actually arriving) is worth raising priority for.
  */
 export function gmailCandidates(
   data: GmailData | undefined,
   changedForMs: number | undefined,
   staleThresholdMs: number,
   freshThresholdMs: number,
-  backlogThreshold: number,
 ): Candidate[] {
   if (!data) return [];
   const oldestUnread = data.threads.find((thread) => thread.unread);
@@ -138,7 +135,6 @@ export function gmailCandidates(
   const fresh = hasUnread && changedForMs !== undefined && changedForMs < freshThresholdMs;
   const stale = hasUnread && changedForMs !== undefined && changedForMs >= staleThresholdMs;
   if (stale) return [];
-  const backlog = hasUnread && data.unreadThreads >= backlogThreshold;
   let score = hasUnread ? 53 : 20;
   let kicker = 'Inbox';
   const detail = oldestUnread?.subject ?? 'No unread thread needs attention';
@@ -146,10 +142,6 @@ export function gmailCandidates(
   if (fresh) {
     score = 78;
     kicker = 'New mail';
-    shapes = [...allShapes];
-  } else if (backlog) {
-    score = 60;
-    kicker = 'Inbox backlog';
     shapes = [...allShapes];
   }
   const unreadIds = data.threads.filter((thread) => thread.unread).slice(0, 3).map((thread) => thread.id);

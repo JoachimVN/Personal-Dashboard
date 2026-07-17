@@ -50,9 +50,6 @@ const configSchema = z.object({
     gmailStaleMs: z.number().int().min(60_000).default(24 * 60 * 60_000),
     /** How recently the unread count must have changed to count as "new mail just arrived". */
     gmailFreshMs: z.number().int().min(60_000).default(30 * 60_000),
-    /** Unread count at or above this is worth surfacing as a signal even when nothing new just
-     * arrived — a big enough backlog is its own kind of urgent, not just a fresh arrival. */
-    gmailBacklogThreshold: z.number().int().positive().default(50),
     /** Trailing days used for non-health "is this unusual for me" comparisons (GitHub, AI usage). */
     baselineWindowDays: z.number().int().min(3).default(14),
     /** Minimum percentage away from the rolling average before it becomes a signal. */
@@ -80,7 +77,6 @@ const configSchema = z.object({
   }).default({
     gmailStaleMs: 24 * 60 * 60_000,
     gmailFreshMs: 30 * 60_000,
-    gmailBacklogThreshold: 50,
     baselineWindowDays: 14,
     baselineDeviationPercent: 50,
     imessageFreshMs: 30 * 60_000,
