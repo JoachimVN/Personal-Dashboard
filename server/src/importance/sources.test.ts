@@ -333,6 +333,8 @@ describe('steamCandidates', () => {
     recentlyPlayed: [],
     achievements: null,
     friendsInGame: [],
+    playtimeHistory: [],
+    friendsLeaderboard: { status: 'unavailable', entries: [] },
     availability: { library: 'unavailable', achievements: 'unavailable', friends: 'unavailable' },
   };
 
@@ -355,7 +357,7 @@ describe('steamCandidates', () => {
 
     expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
       expect.objectContaining({
-        id: 'steam:achievement:10:ACH_1', score: 80, kicker: 'Achievement unlocked', title: 'Freeman',
+        id: 'steam:achievement:10:ACH_1', score: 85, kicker: 'Rare achievement unlocked', title: 'Freeman',
         detail: 'Half-Life · 2.4% of players', shapes: ['hero', 'secondary', 'tile'],
         render: { type: 'steam-achievement', appId: 10, apiName: 'ACH_1' },
       }),
@@ -413,5 +415,58 @@ describe('steamCandidates', () => {
 
   it('returns nothing when there is no current activity, no fresh achievement, no friends, and no recent playtime', () => {
     expect(steamCandidates(baseline, ACHIEVEMENT_FRESH_MS)).toEqual([]);
+  });
+
+  it('boosts a rare fresh unlock above a routine one', () => {
+    const data: SteamData = {
+      ...baseline,
+      achievements: {
+        appId: 10, gameName: 'Half-Life', unlockedCount: 1, totalCount: 10,
+        recentUnlocks: [{
+          apiName: 'ACH_1', displayName: 'Freeman', unlockedAt: new Date(Date.now() - 60_000).toISOString(), globalUnlockedPercent: 3.2,
+        }],
+      },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: false }, 10)).toEqual([
+      expect.objectContaining({ id: 'steam:achievement:10:ACH_1', score: 85, kicker: 'Rare achievement unlocked' }),
+    ]);
+  });
+
+  it('surfaces a fresh game completion over an achievement unlock', () => {
+    const data: SteamData = {
+      ...baseline,
+      achievements: {
+        appId: 10, gameName: 'Half-Life', unlockedCount: 10, totalCount: 10,
+        recentUnlocks: [{ apiName: 'ACH_LAST', displayName: 'Finale', unlockedAt: new Date(Date.now() - 60_000).toISOString() }],
+      },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: true })).toEqual([
+      expect.objectContaining({
+        id: 'steam:completed:10', score: 92, kicker: 'Game completed', title: 'Half-Life',
+        detail: 'All 10 achievements unlocked', shapes: ['hero', 'secondary', 'tile'],
+      }),
+    ]);
+  });
+
+  it('surfaces a fresh playtime milestone for the tracked game', () => {
+    const data: SteamData = { ...baseline, currentGame: { appId: 10, name: 'Half-Life', playtimeForeverMinutes: 3_000 } };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: false, playtimeMilestoneHours: 50 })).toEqual([
+      expect.objectContaining({
+        id: 'steam:playtime-milestone:10:50', score: 65, kicker: 'Playtime milestone', title: '50h in Half-Life', shapes: ['secondary', 'tile'],
+      }),
+    ]);
+  });
+
+  it('surfaces a friends-leaderboard climb below now-playing but above friends online', () => {
+    const data: SteamData = { ...baseline, friendsInGame: [{ steamId: '2', personaName: 'Sam', gameName: 'Portal 2' }] };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: false, leaderboardClimb: { rank: 1, delta: 2 } })).toEqual([
+      expect.objectContaining({
+        id: 'steam:leaderboard-climb:1', score: 45, kicker: 'Friends leaderboard', title: 'Up to #2', detail: 'Climbed 2 spots', shapes: ['tile'],
+      }),
+    ]);
   });
 });

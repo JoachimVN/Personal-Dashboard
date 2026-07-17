@@ -13,7 +13,7 @@ import type {
   WidgetStatus,
 } from '@personal-dashboard/shared';
 import { computeDeviation } from '../deviation.js';
-import type { Candidate } from './types.js';
+import type { Candidate, SteamMoments } from './types.js';
 
 const allShapes = ['hero', 'secondary', 'tile'] as const;
 
@@ -637,25 +637,52 @@ function formatSteamHours(minutes: number): string {
 }
 
 /**
- * Only the first matching candidate is returned — an achievement unlock, current game, friend
- * activity, and recent playtime would otherwise all compete for slots from the same source. Order
- * here doubles as the priority: a fresh achievement always wins over just "playing now", which
- * beats friend/recent-playtime filler.
+ * Only the first matching candidate is returned — a completion, an achievement unlock, a playtime
+ * milestone, current game, friend activity, a leaderboard climb, and recent playtime would
+ * otherwise all compete for slots from the same source. Order here doubles as the priority: a
+ * fresh game completion beats a rare unlock, which beats a routine unlock, which beats a playtime
+ * milestone, which beats just "playing now", down through the ambient filler signals.
  */
-export function steamCandidates(data: SteamData | undefined, achievementFreshMs: number): Candidate[] {
+export function steamCandidates(
+  data: SteamData | undefined,
+  achievementFreshMs: number,
+  moments: SteamMoments = { completedGame: false },
+  rareAchievementPercent = 10,
+): Candidate[] {
   if (!data) return [];
+
+  if (moments.completedGame && data.achievements) {
+    const { appId, gameName, totalCount } = data.achievements;
+    return [{
+      id: `steam:completed:${appId}`, source: 'steam', kind: 'steam', score: 92, shapes: [...allShapes],
+      kicker: 'Game completed', title: gameName, detail: `All ${totalCount} achievements unlocked`,
+      href: '#/steam', render: { type: 'text' },
+    }];
+  }
 
   const recentUnlock = data.achievements?.recentUnlocks[0];
   if (recentUnlock && Date.now() - Date.parse(recentUnlock.unlockedAt) < achievementFreshMs) {
+    const rare = recentUnlock.globalUnlockedPercent !== undefined && recentUnlock.globalUnlockedPercent <= rareAchievementPercent;
     const rarity = recentUnlock.globalUnlockedPercent !== undefined
       ? `${recentUnlock.globalUnlockedPercent.toFixed(1)}% of players`
       : undefined;
     return [{
       id: `steam:achievement:${data.achievements!.appId}:${recentUnlock.apiName}`, source: 'steam', kind: 'steam',
-      score: 80, shapes: [...allShapes], kicker: 'Achievement unlocked', title: recentUnlock.displayName,
+      score: rare ? 85 : 80, shapes: [...allShapes], kicker: rare ? 'Rare achievement unlocked' : 'Achievement unlocked', title: recentUnlock.displayName,
       detail: [data.achievements!.gameName, rarity].filter((value): value is string => Boolean(value)).join(' · '),
       href: '#/steam', render: { type: 'steam-achievement', appId: data.achievements!.appId, apiName: recentUnlock.apiName },
     }];
+  }
+
+  if (moments.playtimeMilestoneHours !== undefined) {
+    const trackedGame = data.currentGame ?? data.recentlyPlayed[0] ?? data.library?.mostPlayed[0];
+    if (trackedGame) {
+      return [{
+        id: `steam:playtime-milestone:${trackedGame.appId}:${moments.playtimeMilestoneHours}`, source: 'steam', kind: 'steam',
+        score: 65, shapes: ['secondary', 'tile'], kicker: 'Playtime milestone', title: `${moments.playtimeMilestoneHours}h in ${trackedGame.name}`,
+        detail: 'Open Steam for the full breakdown', href: '#/steam', render: { type: 'text' },
+      }];
+    }
   }
 
   if (data.currentGame) {
@@ -665,6 +692,15 @@ export function steamCandidates(data: SteamData | undefined, achievementFreshMs:
       shapes: ['secondary', 'tile'], kicker: 'Playing now', title: data.currentGame.name,
       detail: minutes !== undefined ? `${formatSteamHours(minutes)} played` : 'Open Steam',
       href: '#/steam', render: { type: 'steam-now-playing', appId: data.currentGame.appId },
+    }];
+  }
+
+  if (moments.leaderboardClimb) {
+    const { rank, delta } = moments.leaderboardClimb;
+    return [{
+      id: `steam:leaderboard-climb:${rank}`, source: 'steam', kind: 'steam', score: 45, shapes: ['tile'],
+      kicker: 'Friends leaderboard', title: `Up to #${rank + 1}`, detail: `Climbed ${delta} spot${delta === 1 ? '' : 's'}`,
+      href: '#/steam', render: { type: 'text' },
     }];
   }
 

@@ -68,6 +68,12 @@ const configSchema = z.object({
     imessageFreshMs: z.number().int().min(60_000).default(30 * 60_000),
     /** How recently a Steam achievement must have unlocked to surface as a signal. Advanced tuning — leave at the default. */
     steamAchievementFreshMs: z.number().int().min(60_000).default(7 * 24 * 60 * 60_000),
+    /** An unlocked achievement's global unlock % at or below this counts as "rare" and outranks a routine unlock. */
+    steamRareAchievementPercent: z.number().positive().max(100).default(10),
+    /** Total-hours-played thresholds for the tracked game that count as a milestone worth surfacing. */
+    steamPlaytimeMilestoneHours: z.array(z.number().positive()).default([10, 25, 50, 100, 250, 500, 1000]),
+    /** How recently a game-completion, playtime milestone, or friends-leaderboard rank change must have happened to still count as "just happened". */
+    steamMomentFreshMs: z.number().int().min(60_000).default(3 * 24 * 60 * 60_000),
   }).default({
     gmailStaleMs: 24 * 60 * 60_000,
     gmailFreshMs: 30 * 60_000,
@@ -80,6 +86,9 @@ const configSchema = z.object({
     weatherWindMs: 12,
     weatherUvHigh: 8,
     steamAchievementFreshMs: 7 * 24 * 60 * 60_000,
+    steamRareAchievementPercent: 10,
+    steamPlaytimeMilestoneHours: [10, 25, 50, 100, 250, 500, 1000],
+    steamMomentFreshMs: 3 * 24 * 60 * 60_000,
   }),
   steam: z
     .object({

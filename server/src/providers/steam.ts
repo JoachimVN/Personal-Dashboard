@@ -65,7 +65,8 @@ interface RawSchemaAchievement {
 
 interface RawGlobalPercentage {
   name: string;
-  percent: number;
+  // Steam's API documents this as a number but serializes it as a string for some games.
+  percent: number | string;
 }
 
 /** Thrown by steamRequest so callers can distinguish a privacy-driven HTTP 401 (e.g. a private
@@ -472,7 +473,7 @@ async function getOrFetchAchievementPercentages(
     );
     const mapped: SteamAchievementPercentageEntry[] = (data.achievementpercentages?.achievements ?? []).map((a) => ({
       apiName: a.name,
-      percent: a.percent,
+      percent: Number(a.percent),
     }));
     await snapshotStore?.setAchievementPercentages(appId, mapped);
     return mapped;

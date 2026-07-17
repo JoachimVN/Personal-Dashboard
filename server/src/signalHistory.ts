@@ -33,6 +33,14 @@ export class SignalHistoryStore {
     return row ? new Date(row.changed_at) : undefined;
   }
 
+  /** The value stored before the next `record()` call overwrites it — read this first to compute a delta. */
+  async getValue(source: string, metric: string): Promise<JSONValue | undefined> {
+    const [row] = await this.database.client<{ value: JSONValue }[]>`
+      select value from signal_current where source = ${source} and metric = ${metric}
+    `;
+    return row?.value;
+  }
+
   /** The first observation is a baseline, not a meaningful change. */
   async hasChangedSinceBaseline(source: string, metric: string): Promise<boolean> {
     const [row] = await this.database.client<{ count: number }[]>`
