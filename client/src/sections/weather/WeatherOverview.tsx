@@ -1,16 +1,85 @@
 import { useId } from 'react';
+import type { ReactNode } from 'react';
 import type { WeatherData } from '@personal-dashboard/shared';
 import { motion } from 'motion/react';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
-import { deg, glyph, symbolLabel, uvLevel, weatherLocation, windCompass } from '../../lib/weather';
+import { deg, glyph, HUMIDITY_COLOR, symbolLabel, uvLevel, weatherLocation, WIND_COLOR, windCompass } from '../../lib/weather';
 import './weather.css';
 
-function Chip({ label, value }: Readonly<{ label: string; value: string }>) {
+function MiniStat({ label, value, children }: Readonly<{ label: string; value: string; children: ReactNode }>) {
   return (
-    <span className="rounded-full bg-track/40 px-2.5 py-1 text-[11px] text-ink-muted">
-      <span className="font-semibold text-ink">{value}</span> {label}
-    </span>
+    <div className="flex flex-col items-center gap-1">
+      <span className="text-[9px] uppercase tracking-[0.1em] text-ink-faint">{label}</span>
+      {children}
+      <span className="text-[11px] font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+/** Same needle-on-a-compass language as the detail page's wind tile, just small enough to sit
+ * in a row of three — a glyph alone can't say "which way", the needle can. */
+function WindGauge({ speed, directionDeg }: Readonly<{ speed: number; directionDeg?: number }>) {
+  const toward = directionDeg == null ? null : (directionDeg + 180) % 360;
+  return (
+    <MiniStat label="Wind" value={`${Math.round(speed)} m/s${directionDeg != null ? ` ${windCompass(directionDeg)}` : ''}`}>
+      <svg viewBox="0 0 32 32" className="h-8 w-8" aria-hidden>
+        <circle cx="16" cy="16" r="13" fill="none" stroke="var(--color-track)" strokeWidth="2" />
+        {toward != null && (
+          <g style={{ transform: `rotate(${toward}deg)`, transformOrigin: '16px 16px' }}>
+            <path d="M16 5 l2.2 5.4h-4.4Z" fill={WIND_COLOR} />
+            <line x1="16" y1="10" x2="16" y2="23" stroke={WIND_COLOR} strokeWidth="1.6" strokeLinecap="round" opacity="0.5" />
+          </g>
+        )}
+        <circle cx="16" cy="16" r="1.6" fill="var(--color-ink-faint)" />
+      </svg>
+    </MiniStat>
+  );
+}
+
+/** Circular counterpart to the detail page's humidity bar — a ring reads faster at this size than a bar. */
+function HumidityGauge({ humidity }: Readonly<{ humidity: number }>) {
+  const r = 12;
+  const circumference = 2 * Math.PI * r;
+  return (
+    <MiniStat label="Humidity" value={`${Math.round(humidity)}%`}>
+      <svg viewBox="0 0 32 32" className="h-8 w-8 -rotate-90" aria-hidden>
+        <circle cx="16" cy="16" r={r} fill="none" stroke="var(--color-track)" strokeWidth="3" />
+        <circle
+          cx="16" cy="16" r={r} fill="none" stroke={HUMIDITY_COLOR} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={circumference * (1 - humidity / 100)}
+        />
+      </svg>
+    </MiniStat>
+  );
+}
+
+/** Small version of the detail page's UV arc, colored from the same WHO band as its `uvLevel()` label. */
+function UvGauge({ uvIndex }: Readonly<{ uvIndex: number }>) {
+  const level = uvLevel(uvIndex);
+  const fraction = Math.min(uvIndex / 11, 1);
+  const r = 12;
+  const arc = Math.PI * r;
+  return (
+    <MiniStat label="UV" value={`${uvIndex.toFixed(1)} ${level.label}`}>
+      <svg viewBox="0 0 32 20" className="h-6 w-8" aria-hidden>
+        <path d={`M 3 18 A ${r} ${r} 0 0 1 29 18`} fill="none" stroke="var(--color-track)" strokeWidth="3" strokeLinecap="round" />
+        <path
+          d={`M 3 18 A ${r} ${r} 0 0 1 29 18`} fill="none" stroke={level.color} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={arc} strokeDashoffset={arc * (1 - fraction)}
+        />
+      </svg>
+    </MiniStat>
+  );
+}
+
+function MiniConditions({ data }: Readonly<{ data: WeatherData }>) {
+  return (
+    <div className="mt-4 flex items-start gap-5">
+      <WindGauge speed={data.current.windSpeed} directionDeg={data.current.windDirectionDeg} />
+      {data.current.humidity != null && <HumidityGauge humidity={data.current.humidity} />}
+      {data.current.uvIndex != null && <UvGauge uvIndex={data.current.uvIndex} />}
+    </div>
   );
 }
 
@@ -19,23 +88,23 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
   const gradientId = `${useId().replaceAll(':', '')}-spark`;
   if (hours.length < 2) return null;
   const W = 100;
-  const H = 30;
+  const H = 46;
   const temps = hours.map((h) => h.temperature);
   const min = Math.min(...temps);
   const max = Math.max(...temps);
   const span = Math.max(max - min, 2);
   const xAt = (i: number) => (i / (hours.length - 1)) * W;
-  const yAt = (t: number) => 4 + (H - 8) * (1 - (t - min) / span);
+  const yAt = (t: number) => 5 + (H - 10) * (1 - (t - min) / span);
   const line = temps.map((t, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(t)}`).join(' ');
   const peakIndex = temps.indexOf(max);
 
   return (
-    <div className="min-w-0">
-      <div className="mb-1 flex items-baseline justify-between text-[10px] text-ink-faint">
+    <div className="flex h-full min-w-0 flex-col justify-center">
+      <div className="mb-2 flex items-baseline justify-between text-xs text-ink-faint">
         <span className="uppercase tracking-[0.12em]">Next {hours.length} hours</span>
         <span className="tabular-nums">peak {deg(max)} · {hours[peakIndex].hourLabel}:00</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-16 w-full" aria-label="Temperature over the next hours">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-28 w-full" aria-label="Temperature over the next hours">
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="var(--color-accent-weather)" stopOpacity="0.22" />
@@ -87,7 +156,7 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
           />
         </g>
       </svg>
-      <div className="flex justify-between text-[10px] tabular-nums text-ink-faint">
+      <div className="mt-1 flex justify-between text-[11px] tabular-nums text-ink-faint">
         <span>{hours[0].hourLabel}:00</span>
         <span>{hours[Math.floor((hours.length - 1) / 2)].hourLabel}:00</span>
         <span>{hours.at(-1)!.hourLabel}:00</span>
@@ -102,12 +171,12 @@ function WeekAheadMini({ days }: Readonly<{ days: WeatherData['days'] }>) {
   const upcoming = days.slice(1, 5);
   if (upcoming.length === 0) return null;
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex h-full items-center justify-between gap-2">
       {upcoming.map((day) => (
-        <div key={day.date} className="flex min-w-0 flex-col items-center gap-1">
+        <div key={day.date} className="flex min-w-0 flex-col items-center gap-2.5">
           <span className="text-[10px] uppercase tracking-[0.1em] text-ink-faint">{day.dayLabel}</span>
-          <span className="text-xl" aria-hidden>{glyph(day.symbol)}</span>
-          <span className="text-xs tabular-nums">
+          <span className="text-3xl" aria-hidden>{glyph(day.symbol)}</span>
+          <span className="text-sm tabular-nums">
             <strong>{deg(day.maxTemperature)}</strong> <span className="text-ink-faint">{deg(day.minTemperature)}</span>
           </span>
         </div>
@@ -122,24 +191,21 @@ export function WeatherOverview() {
     <WidgetBody envelope={envelope} offline={offline}>
       {(data) => {
         const today = data.days[0];
-        const rain12h = Math.round(data.hours.slice(0, 12).reduce((sum, hour) => sum + hour.precipitationMm, 0) * 10) / 10;
         return (
-          <div className="grid items-center gap-x-6 gap-y-4 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.2fr)_minmax(13rem,0.9fr)]">
+          <div className="grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.2fr)_minmax(13rem,0.9fr)]">
             <div>
               <div className="flex items-center gap-3">
                 <span className="text-4xl" aria-hidden>{glyph(data.current.symbol)}</span>
                 <div>
                   <p className="text-4xl font-semibold tracking-[-0.05em]">{deg(data.current.temperature)}</p>
-                  <p className="text-xs text-ink-muted">{symbolLabel(data.current.symbol)} · {weatherLocation(data.location)}</p>
+                  <p className="text-xs text-ink-muted">
+                    {symbolLabel(data.current.symbol)}
+                    {today && <span className="text-ink-faint"> · {deg(today.minTemperature)}–{deg(today.maxTemperature)}</span>}
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-ink-faint">{weatherLocation(data.location)}</p>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {today && <Chip value={`${deg(today.minTemperature)} / ${deg(today.maxTemperature)}`} label="today" />}
-                <Chip value={`${Math.round(data.current.windSpeed)} m/s`} label={data.current.windDirectionDeg != null ? windCompass(data.current.windDirectionDeg) : 'wind'} />
-                {data.current.humidity != null && <Chip value={`${Math.round(data.current.humidity)}%`} label="humidity" />}
-                {data.current.uvIndex != null && <Chip value={data.current.uvIndex.toFixed(1)} label={`UV · ${uvLevel(data.current.uvIndex).label.toLowerCase()}`} />}
-                {rain12h > 0 && <Chip value={`${rain12h} mm`} label="rain next 12 h" />}
-              </div>
+              <MiniConditions data={data} />
             </div>
             <HourSparkline hours={data.hours.slice(0, 12)} />
             <WeekAheadMini days={data.days} />

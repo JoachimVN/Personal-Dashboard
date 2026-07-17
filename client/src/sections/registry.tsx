@@ -70,7 +70,7 @@ export const SECTIONS: SectionDef[] = [
     id: 'weather',
     title: 'Weather',
     label: 'Sky',
-    description: 'Conditions, sun and moon',
+    description: 'Now, next 12 hours and the week ahead',
     accentVar: '--color-accent-weather',
     Overview: WeatherOverview,
     Detail: WeatherDetail,

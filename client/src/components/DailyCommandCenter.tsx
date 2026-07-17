@@ -64,12 +64,13 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'claude' | 'codex' {
+function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
   if (slot.source === 'health') return 'health';
   if (slot.source === 'spotify') return 'spotify';
+  if (slot.source === 'weather') return 'weather';
   return 'personal';
 }
 
@@ -496,7 +497,7 @@ function CommandCenterSkeleton() {
     <section className="command-center glass" aria-labelledby="command-center-title">
       <div className="command-center-head">
         <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
-        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
+        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a></nav>
       </div>
       <div className="command-layout animate-pulse">
         <div className="command-primary space-y-3">
@@ -568,7 +569,7 @@ export function DailyCommandCenter() {
   return <section className="command-center glass" aria-labelledby="command-center-title">
     <div className="command-center-head">
       <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
-      <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a></nav>
+      <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a></nav>
     </div>
     <div className="command-layout">
       <CommandPanel

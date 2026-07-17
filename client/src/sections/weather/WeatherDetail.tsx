@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { SystemFooter } from '../../components/SystemFooter';
 import { useWidget } from '../../useWidget';
-import { deg, feelsLike, glyph, moonIllumination, moonPhaseName, symbolLabel, uvLevel, weatherLocation, windCompass } from '../../lib/weather';
+import { deg, feelsLike, glyph, HUMIDITY_COLOR, moonIllumination, moonPhaseName, symbolLabel, uvLevel, weatherLocation, WIND_COLOR, windCompass } from '../../lib/weather';
 import { mapsCoordinatesHref } from '../../lib/maps';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 import { MoonDisc, SunArc, timeLabel } from './astro';
@@ -13,8 +13,6 @@ import './weather.css';
 const PRECIP_COLOR = 'light-dark(#0d7fc4, #5ec2ff)';
 const TEMP_COLOR = 'var(--color-accent-weather)';
 const UV_COLOR = 'light-dark(#c99a06, #ffd666)';
-const WIND_COLOR = 'light-dark(#0f8a7f, #4dd9c4)';
-const HUMIDITY_COLOR = 'light-dark(#6d5fd6, #b8a6ff)';
 /** Apple-Weather-style UV ramp: a fixed vertical gradient over the WHO 0–11 scale (top =
  * extreme, bottom = low), sourced from `uvLevel()` so the colors never drift from the gauge. */
 const UV_GRADIENT_STOPS = [11, 8, 6, 3, 0].map((v) => ({ offset: (11 - v) / 11, color: uvLevel(v).color }));

@@ -53,6 +53,9 @@ export function windCompass(directionDeg: number): string {
   return COMPASS[Math.round(((directionDeg % 360) + 360) % 360 / 45) % 8];
 }
 
+export const WIND_COLOR = 'light-dark(#0f8a7f, #4dd9c4)';
+export const HUMIDITY_COLOR = 'light-dark(#6d5fd6, #b8a6ff)';
+
 export interface UvLevel {
   label: string;
   /** WHO UV-scale color for the gauge mark; always paired with the label, never color alone. */

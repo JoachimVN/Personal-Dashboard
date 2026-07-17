@@ -263,6 +263,7 @@ a {
 .command-panel--codex { --panel-accent: var(--color-codex); }
 .command-panel--health { --panel-accent: var(--color-accent-health); }
 .command-panel--spotify { --panel-accent: var(--color-accent-spotify); }
+.command-panel--weather { --panel-accent: var(--color-accent-weather); }
 
 .command-agenda {
   position: relative;
@@ -501,6 +502,7 @@ a {
 .command-signal--codex { --signal-color: var(--color-codex); }
 .command-signal--health { --signal-color: var(--color-accent-health); }
 .command-signal--spotify { --signal-color: var(--color-accent-spotify); }
+.command-signal--weather { --signal-color: var(--color-accent-weather); }
 
 .command-signal-arrow {
   font-size: 0.85rem;
@@ -849,7 +851,11 @@ a {
 }
 
 .dashboard-section-card--personal {
-  min-height: auto;
+  min-height: 27rem;
+}
+
+.dashboard-section-card--weather {
+  min-height: 19rem;
 }
 
 .section-card-aura {
@@ -918,8 +924,257 @@ a {
   }
 }
 
-.dashboard-section-card--personal .section-card-content > div {
+.personal-overview {
   display: grid;
+  gap: 1.15rem;
+}
+
+.personal-overview-panel {
+  min-width: 0;
+  padding: 0.1rem;
+}
+
+.personal-overview-panel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.personal-overview-panel-heading > span,
+.personal-overview-channel-heading > span {
+  color: var(--color-ink-faint);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.personal-overview-panel-heading h3 {
+  color: var(--color-ink-muted);
+  font-size: 0.72rem;
+  font-weight: 570;
+  letter-spacing: -0.005em;
+}
+
+.personal-overview-agenda-body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.personal-overview-featured-event {
+  min-width: 0;
+}
+
+.personal-overview-event-time {
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.personal-overview-event-title {
+  overflow: hidden;
+  margin-top: 0.2rem;
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personal-overview-event-location {
+  overflow: hidden;
+  margin-top: 0.3rem;
+  color: var(--color-ink-muted);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personal-overview-following-events {
+  display: grid;
+  gap: 0.38rem;
+  border-top: 1px solid color-mix(in oklab, var(--accent) 12%, var(--color-card-border));
+  padding-top: 0.72rem;
+}
+
+.personal-overview-following-events li {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.5rem;
+  color: var(--color-ink-muted);
+  font-size: 0.7rem;
+}
+
+.personal-overview-following-events span {
+  flex: 0 0 auto;
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.personal-overview-following-events strong {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-weight: 520;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personal-overview-empty-state {
+  display: flex;
+  min-height: 7.9rem;
+  align-items: center;
+  gap: 0.7rem;
+  color: var(--color-ink-faint);
+  font-size: 0.79rem;
+  line-height: 1.45;
+}
+
+.personal-overview-empty-state span {
+  color: var(--accent);
+  font-size: 1.25rem;
+}
+
+.personal-overview-communication-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.personal-overview-channel + .personal-overview-channel {
+  border-top: 1px solid color-mix(in oklab, var(--accent) 12%, var(--color-card-border));
+  padding-top: 0.75rem;
+}
+
+.personal-overview-channel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.personal-overview-channel-heading strong {
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.personal-overview-channel ul {
+  display: grid;
+  gap: 0.38rem;
+}
+
+.personal-overview-channel a,
+.personal-overview-message {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+}
+
+.personal-overview-channel a:hover span,
+.personal-overview-headline:hover strong {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  text-underline-offset: 0.2em;
+}
+
+.personal-overview-channel a span,
+.personal-overview-message > span {
+  overflow: hidden;
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personal-overview-channel small,
+.personal-overview-message small {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 0.67rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.personal-overview-quiet {
+  color: var(--color-ink-faint);
+  font-size: 0.72rem;
+}
+
+.personal-overview-home-body {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.personal-overview-home-body p {
+  color: var(--color-ink-muted);
+  font-size: 0.78rem;
+}
+
+.personal-overview-home-body strong {
+  color: var(--color-ink);
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: -0.04em;
+}
+
+.personal-overview-room-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.personal-overview-room-pills span {
+  color: var(--color-ink-muted);
+  font-size: 0.63rem;
+}
+
+.personal-overview-room-pills span + span::before {
+  content: '·';
+  margin-right: 0.35rem;
+  color: var(--color-ink-faint);
+}
+
+.personal-overview-headline {
+  position: relative;
+  display: block;
+  min-height: 4.65rem;
+  padding-right: 1.5rem;
+}
+
+.personal-overview-headline > span {
+  display: block;
+  margin-bottom: 0.34rem;
+  color: var(--color-ink-faint);
+  font-size: 0.65rem;
+}
+
+.personal-overview-headline strong {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 0.86rem;
+  font-weight: 570;
+  letter-spacing: -0.015em;
+  line-height: 1.32;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.personal-overview-headline i {
+  position: absolute;
+  right: 0;
+  top: 0;
+  color: var(--accent);
+  font-size: 1rem;
+  font-style: normal;
+  transition: transform 240ms cubic-bezier(.2,.8,.2,1);
+}
+
+@media (hover: hover) {
+  .personal-overview-headline:hover i {
+    transform: translate(0.14rem, -0.14rem);
+  }
 }
 
 .detail-header {
@@ -1154,14 +1409,44 @@ a {
     grid-column: span 12;
   }
 
-  .dashboard-section-card--personal .section-card-content > div {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    column-gap: 2.25rem;
+  .personal-overview {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 2rem;
+    row-gap: 1.15rem;
   }
 
-  .dashboard-section-card--personal .section-card-content > div > :first-child,
-  .dashboard-section-card--personal .section-card-content > div > :last-child {
-    grid-column: span 2;
+  .personal-overview-agenda {
+    grid-column: span 7;
+    border-right: 1px solid color-mix(in oklab, var(--accent) 13%, var(--color-card-border));
+    padding-right: 2rem;
+  }
+
+  .personal-overview-communications {
+    grid-column: span 5;
+  }
+
+  .personal-overview-home {
+    grid-column: span 4;
+    border-top: 1px solid color-mix(in oklab, var(--accent) 13%, var(--color-card-border));
+    padding-top: 1.15rem;
+  }
+
+  .personal-overview-news {
+    grid-column: span 8;
+    border-top: 1px solid color-mix(in oklab, var(--accent) 13%, var(--color-card-border));
+    padding-top: 1.15rem;
+  }
+
+  .personal-overview-agenda-body {
+    grid-template-columns: minmax(0, 1.15fr) minmax(11rem, 0.85fr);
+    align-items: end;
+  }
+
+  .personal-overview-following-events {
+    border-top: 0;
+    border-left: 1px solid color-mix(in oklab, var(--accent) 12%, var(--color-card-border));
+    padding-top: 0;
+    padding-left: 0.85rem;
   }
 
   /* Five cards: whatever sits first goes full-width, the rest pair up 2×2. */
