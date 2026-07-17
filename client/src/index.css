@@ -108,6 +108,26 @@ a {
   transition: background 1.2s ease;
 }
 
+/* A lower horizon balances the sky wash at the top of longer pages. It reuses the
+   same clock-driven colors, but stays broad and low enough to remain background. */
+.ambient-horizon {
+  position: absolute;
+  bottom: -12rem;
+  left: 50%;
+  width: min(110rem, 190vw);
+  height: 30rem;
+  translate: -50% 0;
+  background: radial-gradient(
+    ellipse at 50% 100%,
+    color-mix(in oklab, var(--sky-b) 42%, transparent),
+    color-mix(in oklab, var(--sky-a) 18%, transparent) 42%,
+    transparent 76%
+  );
+  filter: blur(76px);
+  opacity: 0.62;
+  transition: background 1.2s ease;
+}
+
 /* Section-accent wash layered on top of the sky wash while a section page is
    open (App.tsx SectionGlow) — --section-accent is set inline per section from
    its registry.tsx accentVar, so this one rule covers every section. */
@@ -129,6 +149,18 @@ a {
   background: radial-gradient(ellipse at 50% 30%, color-mix(in oklab, var(--section-accent) 30%, transparent), transparent 72%);
   filter: blur(70px);
   opacity: 0.6;
+}
+
+.section-page-horizon {
+  position: absolute;
+  bottom: -14rem;
+  left: 50%;
+  width: min(82rem, 170vw);
+  height: 28rem;
+  translate: -50% 0;
+  background: radial-gradient(ellipse at 50% 100%, color-mix(in oklab, var(--section-accent) 22%, transparent), transparent 72%);
+  filter: blur(72px);
+  opacity: 0.72;
 }
 
 /* The hero text sits directly on the sky wash with no card behind it — unlike everywhere
