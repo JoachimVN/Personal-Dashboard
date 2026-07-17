@@ -306,7 +306,7 @@ function parseUsageWindow(section: string, now: Date) {
  * the last occurrence onward so a non-global `.exec` can't latch onto superseded numbers.
  */
 function latestScreen(text: string): string {
-  const headerRegex = new RegExp(String.raw`Current${WS}session`, 'gi');
+  const headerRegex = new RegExp(`Current${WS}session`, 'gi');
   let lastIndex: number | undefined;
   let match: RegExpExecArray | null;
   while ((match = headerRegex.exec(text))) {
