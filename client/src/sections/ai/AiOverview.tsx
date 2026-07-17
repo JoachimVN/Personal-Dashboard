@@ -2,13 +2,10 @@ import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { isWidgetDisabled, WidgetBody } from '../../components/WidgetCard';
-import { FIVE_HOUR_MS, LayeredUsageBar, WEEKLY_MS } from './UsageMeter';
-import { UsageSparkline } from './UsageHistoryChart';
+import { UsageLane } from './UsageMeter';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
 import type { ToolIconProps } from './ToolIcons';
-
-const DAY_MS = 24 * 60 * 60_000;
 
 function limitLabel(
   limit: AiUsageToolData['fiveHour'],
@@ -19,12 +16,6 @@ function limitLabel(
   if (tokens === 0) return '0%';
   if (tokens !== undefined) return `${formatCompactNumber(tokens)} tokens`;
   return status === 'unlimited' ? 'No limit' : '—';
-}
-
-/** The weekly layer tracks the tighter of the weekly caps (all-models vs model-specific). */
-function weeklyBarPercent(data: AiUsageToolData) {
-  if (!data.weekly && !data.modelWeekly) return undefined;
-  return Math.max(data.weekly?.usedPercent ?? 0, data.modelWeekly?.usedPercent ?? 0);
 }
 
 function ToolRow({
@@ -60,68 +51,26 @@ function ToolRow({
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) =>
           data.available ? (
-            <div className="space-y-1">
-              <div className="flex items-baseline justify-between text-xs text-ink-muted">
-                <span>
-                  5h{' '}
-                  <span className="font-semibold tabular-nums" style={{ color: fastColor }}>
-                    {limitLabel(data.fiveHour, data.fiveHourStatus, data.tokens?.fiveHour)}
-                  </span>
-                </span>
-                <span>
-                  week{' '}
-                  <span className="font-semibold tabular-nums" style={{ color }}>
-                    {limitLabel(data.weekly, data.weeklyStatus, data.tokens?.weekly)}
-                  </span>
-                </span>
-                {data.modelWeekly && (
-                  <span>
-                    {data.modelWeekly.model.toLowerCase()}{' '}
-                    <span className="font-semibold tabular-nums" style={{ color: modelColor }}>
-                      {Math.round(data.modelWeekly.usedPercent)}%
-                    </span>
-                  </span>
-                )}
-              </div>
-              <LayeredUsageBar
-                fiveHour={data.fiveHour?.usedPercent}
-                weekly={weeklyBarPercent(data)}
-                color={color}
-                fastColor={fastColor}
+            <div className="space-y-2">
+              <UsageLane
+                label="5h"
+                value={limitLabel(data.fiveHour, data.fiveHourStatus, data.tokens?.fiveHour)}
+                percent={data.fiveHour?.usedPercent}
+                color={fastColor}
               />
-              {(data.fiveHour || data.weekly) && (
-                <div className="relative h-6">
-                  {data.weekly && (
-                    <div className="absolute inset-0">
-                      <UsageSparkline
-                        points={data.history}
-                        metric="weeklyUsedPercent"
-                        windowMs={data.fiveHour ? DAY_MS : WEEKLY_MS}
-                        color={color}
-                      />
-                    </div>
-                  )}
-                  {data.fiveHour && (
-                    <div className="absolute inset-0">
-                      <UsageSparkline
-                        points={data.history}
-                        metric="fiveHourUsedPercent"
-                        windowMs={DAY_MS}
-                        color={fastColor}
-                        sessionResetsAt={data.fiveHour.resetsAt}
-                        sessionWindowMs={FIVE_HOUR_MS}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-              {data.tokens && (
-                <div className="flex items-baseline justify-between pt-0.5 text-[11px] text-ink-faint">
-                  <span>tokens used</span>
-                  <span className="font-medium tabular-nums text-ink-muted">
-                    5h {formatCompactNumber(data.tokens.fiveHour)} · week {formatCompactNumber(data.tokens.weekly)}
-                  </span>
-                </div>
+              <UsageLane
+                label="week"
+                value={limitLabel(data.weekly, data.weeklyStatus, data.tokens?.weekly)}
+                percent={data.weekly?.usedPercent}
+                color={color}
+              />
+              {data.modelWeekly && (
+                <UsageLane
+                  label={data.modelWeekly.model.toLowerCase()}
+                  value={`${Math.round(data.modelWeekly.usedPercent)}%`}
+                  percent={data.modelWeekly.usedPercent}
+                  color={modelColor}
+                />
               )}
             </div>
           ) : (

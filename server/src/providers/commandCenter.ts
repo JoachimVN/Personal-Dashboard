@@ -168,9 +168,6 @@ export function createCommandCenterProvider(
     async fetch() {
       const envelopes = scheduler.getAllEnvelopes();
       const gmail = widgetData<GmailData>(envelopes, 'gmail');
-      if (gmail) await signalHistory.record('gmail', 'unreadThreads', gmail.unreadThreads);
-      const gmailChangedAt = await signalHistory.lastChangedAt('gmail', 'unreadThreads');
-      const staleForMs = gmailChangedAt ? Date.now() - gmailChangedAt.getTime() : undefined;
       const github = widgetData<GitHubData>(envelopes, 'github');
       const calendar = widgetData<CalendarData>(envelopes, 'calendar');
       const spotify = widgetData<SpotifyData>(envelopes, 'spotify');
@@ -181,7 +178,7 @@ export function createCommandCenterProvider(
       );
       return rankCandidates([
         ...calendarCandidates(calendar, Date.now()),
-        ...gmailCandidates(gmail, staleForMs, config.commandCenter.gmailStaleMs, config.commandCenter.gmailFreshMs),
+        ...gmailCandidates(gmail, config.commandCenter.gmailFreshMs, config.commandCenter.gmailStaleMs),
         ...githubCandidates(github, config.commandCenter.baselineWindowDays, config.commandCenter.baselineDeviationPercent),
         ...healthCandidates(widgetData<HealthData>(envelopes, 'health')),
         ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),

@@ -75,18 +75,27 @@ export function SteamNowPlaying({ data }: Readonly<{ data: SteamData }>) {
   // Steam's "recently played" is a strict last-2-weeks window — someone with a big library but no
   // play in that window would otherwise see a blank card despite having plenty of history to show.
   const game = data.currentGame ?? recent ?? data.library?.mostPlayed[0];
+  const [headerFailed, setHeaderFailed] = useState(false);
   if (!game) return <p className="text-sm text-ink-faint">No recent Steam activity.</p>;
+  const hasHeader = Boolean(game.headerUrl) && !headerFailed;
   let label: string;
   if (data.currentGame) label = 'Playing now';
   else if (recent) label = 'Top played recently';
   else label = 'All-time favourite';
   return (
     <div className="steam-hero p-4 sm:p-5">
-      {game.headerUrl && <img aria-hidden src={game.headerUrl} alt="" className="steam-hero-backdrop" />}
+      {hasHeader && (
+        <img aria-hidden src={game.headerUrl} alt="" className="steam-hero-backdrop" onError={() => setHeaderFailed(true)} />
+      )}
       <div className="steam-hero-scrim" />
       <div className="relative flex items-center gap-4">
-        {game.headerUrl ? (
-          <img src={game.headerUrl} alt="" className="h-20 w-32 shrink-0 rounded-xl object-cover shadow-lg sm:h-24 sm:w-40" />
+        {hasHeader ? (
+          <img
+            src={game.headerUrl}
+            alt=""
+            className="h-20 w-32 shrink-0 rounded-xl object-cover shadow-lg sm:h-24 sm:w-40"
+            onError={() => setHeaderFailed(true)}
+          />
         ) : (
           <div className="h-20 w-32 shrink-0 rounded-xl bg-track sm:h-24 sm:w-40" />
         )}

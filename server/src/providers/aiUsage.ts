@@ -299,13 +299,30 @@ function parseUsageWindow(section: string, now: Date) {
 }
 
 /**
+ * The interactive Usage screen renders in place, redrawing the same header lines with updated
+ * numbers as data comes in (e.g. an approximate figure first, then a corrected one once local
+ * sessions finish scanning). The captured PTY stream is append-only, so an earlier, stale render
+ * of "Current session" is still sitting in the buffer alongside the final one — parse only from
+ * the last occurrence onward so a non-global `.exec` can't latch onto superseded numbers.
+ */
+function latestScreen(text: string): string {
+  const headerRegex = new RegExp(`Current${WS}session`, 'gi');
+  let lastIndex: number | undefined;
+  let match: RegExpExecArray | null;
+  while ((match = headerRegex.exec(text))) {
+    lastIndex = match.index;
+  }
+  return lastIndex === undefined ? text : text.slice(lastIndex);
+}
+
+/**
  * `/usage` is an interactive Claude Code command. Print mode (`claude -p '/usage'`) treats it as
  * prompt text and returns run statistics rather than quota data, so launch a short, isolated
  * pseudo-terminal session. It sends only `/usage`, never a model prompt.
  */
 /** Parse Claude Code's current multiline interactive Usage screen. */
 export function parseClaudeUsageScreen(screen: string, now = new Date()): ClaudeQuota {
-  const text = stripTerminalControls(screen);
+  const text = latestScreen(stripTerminalControls(screen));
   // Terminal cursor updates can erase visual spaces from the captured stream, so accept both
   // the readable UI labels and their compact `Currentsession` / `Currentweek(allmodels)` form.
   const session = new RegExp(String.raw`Current${WS}session([\s\S]*?)(?=${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}|$)`, 'i').exec(text)?.[1] ?? '';
