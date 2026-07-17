@@ -320,9 +320,8 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
   const modelWeekly = modelLimit && modelMatch ? { ...modelLimit, model: modelMatch[1].trim() } : undefined;
   const hasQuotaReport = Boolean(fiveHour || week || modelWeekly);
   const staleBanner = STALE_USAGE_BANNER.exec(text);
-  const asOf = hasQuotaReport
-    ? new Date(now.getTime() - (staleBanner ? staleBannerAgeMs(staleBanner[1], staleBanner[2]) : 0)).toISOString()
-    : undefined;
+  const staleAgeMs = staleBanner ? staleBannerAgeMs(staleBanner[1], staleBanner[2]) : 0;
+  const asOf = hasQuotaReport ? new Date(now.getTime() - staleAgeMs).toISOString() : undefined;
   return {
     fiveHour,
     weekly: week,
