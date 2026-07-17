@@ -46,9 +46,9 @@ const configSchema = z.object({
     })
     .default({ stepGoal: 10_000, moveGoalKcal: 290, exerciseGoalMinutes: 30, standGoalHours: 12, historyRetentionDays: 30, baselineWindowDays: 7, baselineDeviationPercent: 15 }),
   commandCenter: z.object({
-    /** How long an unchanged inbox count must persist before it's deprioritized as ignored, not urgent. */
+    /** How old the newest unread thread's message must be before the inbox is deprioritized as ignored, not urgent. */
     gmailStaleMs: z.number().int().min(60_000).default(24 * 60 * 60_000),
-    /** How recently the unread count must have changed to count as "new mail just arrived". */
+    /** How recently the newest unread thread's message must have arrived to count as "new mail just arrived". */
     gmailFreshMs: z.number().int().min(60_000).default(30 * 60_000),
     /** Trailing days used for non-health "is this unusual for me" comparisons (GitHub, AI usage). */
     baselineWindowDays: z.number().int().min(3).default(14),
