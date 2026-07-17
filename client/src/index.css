@@ -114,17 +114,17 @@ a {
   position: absolute;
   bottom: -12rem;
   left: 50%;
-  width: min(110rem, 190vw);
+  width: min(132rem, 220vw);
   height: 30rem;
   translate: -50% 0;
   background: radial-gradient(
     ellipse at 50% 100%,
-    color-mix(in oklab, var(--sky-b) 42%, transparent),
-    color-mix(in oklab, var(--sky-a) 18%, transparent) 42%,
+    color-mix(in oklab, var(--sky-b) 34%, transparent),
+    color-mix(in oklab, var(--sky-a) 14%, transparent) 42%,
     transparent 76%
   );
-  filter: blur(76px);
-  opacity: 0.62;
+  filter: blur(88px);
+  opacity: 0.48;
   transition: background 1.2s ease;
 }
 
@@ -155,12 +155,12 @@ a {
   position: absolute;
   bottom: -14rem;
   left: 50%;
-  width: min(82rem, 170vw);
+  width: min(100rem, 210vw);
   height: 28rem;
   translate: -50% 0;
-  background: radial-gradient(ellipse at 50% 100%, color-mix(in oklab, var(--section-accent) 22%, transparent), transparent 72%);
-  filter: blur(72px);
-  opacity: 0.72;
+  background: radial-gradient(ellipse at 50% 100%, color-mix(in oklab, var(--section-accent) 16%, transparent), transparent 72%);
+  filter: blur(84px);
+  opacity: 0.54;
 }
 
 /* The hero text sits directly on the sky wash with no card behind it — unlike everywhere
