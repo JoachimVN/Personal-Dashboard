@@ -40,15 +40,13 @@ function daylightLabel(sunrise: string, sunset: string): string {
 interface SunArcProps {
   sunrise: string | null;
   sunset: string | null;
-  /** Skips the caption line for tight slots (the overview card). */
-  compact?: boolean;
 }
 
 /**
  * The sun's day drawn as an arc: the track is the whole daylight window, the lit
  * sweep is how much of it has passed, and the dot is where the sun is right now.
  */
-export function SunArc({ sunrise, sunset, compact }: Readonly<SunArcProps>) {
+export function SunArc({ sunrise, sunset }: Readonly<SunArcProps>) {
   const gradientId = `${useId().replaceAll(':', '')}-sun`;
   // Follows the sky-preview slider when it's on, so the arc scrubs with the sky.
   const now = useSkyNow().getTime();
@@ -181,7 +179,7 @@ export function SunArc({ sunrise, sunset, compact }: Readonly<SunArcProps>) {
           ↓ {timeLabel(sunset)}
         </text>
       </svg>
-      {!compact && <p className="mt-2 text-center text-[11px] text-ink-faint">{caption}</p>}
+      <p className="mt-2 text-center text-[11px] text-ink-faint">{caption}</p>
     </div>
   );
 }

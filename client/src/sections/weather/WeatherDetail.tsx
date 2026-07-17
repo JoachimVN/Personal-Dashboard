@@ -21,26 +21,6 @@ const UV_GRADIENT_STOPS = [11, 8, 6, 3, 0].map((v) => ({ offset: (11 - v) / 11, 
 
 /* ── Intro signals ─────────────────────────────────────────────────────────── */
 
-/** Sun and moon, folded into the hero itself rather than a separate section — they're part of
- * "right now" just as much as temperature is. */
-function HeroSky({ data }: Readonly<{ data: WeatherData }>) {
-  if (!data.sun && !data.moon) return null;
-  return (
-    <div className="mt-4 border-t border-card-border pt-4">
-      {data.sun ? (
-        <SunArc sunrise={data.sun.sunrise} sunset={data.sun.sunset} compact />
-      ) : (
-        <p className="text-xs text-ink-faint">Sun times are syncing.</p>
-      )}
-      {data.moon && (
-        <div className="mt-3">
-          <MoonPanel moon={data.moon} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 function WeatherSignals({ data }: Readonly<{ data: WeatherData }>) {
   const today = data.days[0];
   const feels = feelsLike(data.current.temperature, data.current.humidity, data.current.windSpeed);
@@ -67,7 +47,6 @@ function WeatherSignals({ data }: Readonly<{ data: WeatherData }>) {
         <span aria-hidden>📍</span>
         {weatherLocation(data.location)}
       </a>
-      <HeroSky data={data} />
     </div>
   );
 }
@@ -226,11 +205,11 @@ function nextMoonEventLabel(phaseDeg: number): string {
   return `${name} in ${rounded} ${rounded === 1 ? 'day' : 'days'}`;
 }
 
-/** A small widget, not a full card: the disc sits beside its one caption line. */
+/** Disc sized to stand on its own next to the full-width sun arc, not shrunk down as an aside. */
 function MoonPanel({ moon }: Readonly<{ moon: NonNullable<WeatherData['moon']> }>) {
   const illumination = Math.round(moonIllumination(moon.phaseDeg) * 100);
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.88 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -240,15 +219,15 @@ function MoonPanel({ moon }: Readonly<{ moon: NonNullable<WeatherData['moon']> }
           filter: `drop-shadow(0 0 ${5 + illumination * 0.14}px light-dark(rgb(118 136 163 / ${0.12 + illumination * 0.003}), rgb(231 237 248 / ${0.1 + illumination * 0.004})))`,
         }}
       >
-        <MoonDisc phaseDeg={moon.phaseDeg} size={52} />
+        <MoonDisc phaseDeg={moon.phaseDeg} size={92} />
       </motion.div>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold tracking-[-0.01em]">{moonPhaseName(moon.phaseDeg)}</p>
-        <p className="mt-0.5 truncate text-xs text-ink-muted">
+        <p className="truncate text-base font-semibold tracking-[-0.01em]">{moonPhaseName(moon.phaseDeg)}</p>
+        <p className="mt-1 truncate text-xs text-ink-muted">
           {illumination}% lit · {nextMoonEventLabel(moon.phaseDeg)}
         </p>
         {(moon.moonrise || moon.moonset) && (
-          <p className="mt-0.5 truncate text-xs tabular-nums text-ink-faint">
+          <p className="mt-1 truncate text-xs tabular-nums text-ink-faint">
             {moon.moonrise ? `↑ ${timeLabel(moon.moonrise)}` : 'no moonrise today'}
             {moon.moonrise && moon.moonset && '   '}
             {moon.moonset && `↓ ${timeLabel(moon.moonset)}`}
@@ -733,6 +712,30 @@ function WeekAheadSection({ data }: Readonly<{ data: WeatherData }>) {
   );
 }
 
+/* ── Sky: sun arc + moon phase ────────────────────────────────────────────── */
+
+/** Sun and moon, given a section of their own with room to breathe — the hero card is for
+ * "what's the weather right now", not a squeezed-in arc diagram. */
+function SkySection({ data }: Readonly<{ data: WeatherData }>) {
+  if (!data.sun && !data.moon) return null;
+  return (
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-center lg:gap-8">
+      <div className="min-w-0">
+        {data.sun ? (
+          <SunArc sunrise={data.sun.sunrise} sunset={data.sun.sunset} />
+        ) : (
+          <p className="text-sm text-ink-faint">Sun times are syncing.</p>
+        )}
+      </div>
+      {data.moon && (
+        <div className="border-t border-card-border pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+          <MoonPanel moon={data.moon} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Page ──────────────────────────────────────────────────────────────────── */
 
 export function WeatherDetail() {
@@ -771,6 +774,15 @@ export function WeatherDetail() {
         <WidgetShell title="Conditions">
           <WidgetBody envelope={envelope} offline={offline}>
             {(data) => <ConditionTiles data={data} />}
+          </WidgetBody>
+        </WidgetShell>
+      </div>
+
+      <div className="mt-6">
+        <DetailSectionHeading label="Sky" title="Sun and moon" detail="Where the sun sits in today's arc, and tonight's moon phase." />
+        <WidgetShell title="Sun & moon">
+          <WidgetBody envelope={envelope} offline={offline}>
+            {(data) => <SkySection data={data} />}
           </WidgetBody>
         </WidgetShell>
       </div>

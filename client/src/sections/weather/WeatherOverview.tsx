@@ -3,8 +3,7 @@ import type { WeatherData } from '@personal-dashboard/shared';
 import { motion } from 'motion/react';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
-import { deg, glyph, moonPhaseName, symbolLabel, uvLevel, weatherLocation, windCompass } from '../../lib/weather';
-import { MoonDisc, SunArc } from './astro';
+import { deg, glyph, symbolLabel, uvLevel, weatherLocation, windCompass } from '../../lib/weather';
 import './weather.css';
 
 function Chip({ label, value }: Readonly<{ label: string; value: string }>) {
@@ -97,6 +96,26 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
   );
 }
 
+/** Next few days at a glance — forward-looking counterpart to the hourly sparkline, which
+ * only covers today. Sun/moon detail lives on the full weather page, not repeated here. */
+function WeekAheadMini({ days }: Readonly<{ days: WeatherData['days'] }>) {
+  const upcoming = days.slice(1, 5);
+  if (upcoming.length === 0) return null;
+  return (
+    <div className="flex items-center justify-between gap-2">
+      {upcoming.map((day) => (
+        <div key={day.date} className="flex min-w-0 flex-col items-center gap-1">
+          <span className="text-[10px] uppercase tracking-[0.1em] text-ink-faint">{day.dayLabel}</span>
+          <span className="text-xl" aria-hidden>{glyph(day.symbol)}</span>
+          <span className="text-xs tabular-nums">
+            <strong>{deg(day.maxTemperature)}</strong> <span className="text-ink-faint">{deg(day.minTemperature)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function WeatherOverview() {
   const { envelope, offline } = useWidget<WeatherData>('weather');
   return (
@@ -123,19 +142,7 @@ export function WeatherOverview() {
               </div>
             </div>
             <HourSparkline hours={data.hours.slice(0, 12)} />
-            <div className="flex items-center gap-4">
-              {data.sun && (
-                <div className="min-w-0 flex-1">
-                  <SunArc sunrise={data.sun.sunrise} sunset={data.sun.sunset} compact />
-                </div>
-              )}
-              {data.moon && (
-                <div className="flex shrink-0 flex-col items-center gap-1">
-                  <MoonDisc phaseDeg={data.moon.phaseDeg} size={44} />
-                  <p className="text-[10px] text-ink-faint">{moonPhaseName(data.moon.phaseDeg)}</p>
-                </div>
-              )}
-            </div>
+            <WeekAheadMini days={data.days} />
           </div>
         );
       }}
