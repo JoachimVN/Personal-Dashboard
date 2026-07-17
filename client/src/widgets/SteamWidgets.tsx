@@ -60,12 +60,12 @@ function SteamGameArtwork({ game }: Readonly<{ game: SteamGame }>) {
    display-only — no nested anchors. */
 
 export function SteamNowPlaying({ data }: Readonly<{ data: SteamData }>) {
-  const recent = data.recentlyPlayed[0];
+  const recent = [...data.recentlyPlayed].sort((a, b) => (b.playtimeRecentMinutes ?? 0) - (a.playtimeRecentMinutes ?? 0))[0];
   // Steam's "recently played" is a strict last-2-weeks window — someone with a big library but no
   // play in that window would otherwise see a blank card despite having plenty of history to show.
   const game = data.currentGame ?? recent ?? data.library?.mostPlayed[0];
   if (!game) return <p className="text-sm text-ink-faint">No recent Steam activity.</p>;
-  const label = data.currentGame ? 'Playing now' : recent ? 'Last played' : 'Most played';
+  const label = data.currentGame ? 'Playing now' : recent ? 'Top played recently' : 'All-time favourite';
   return (
     <div className="steam-hero p-4 sm:p-5">
       {game.headerUrl && <img aria-hidden src={game.headerUrl} alt="" className="steam-hero-backdrop" />}

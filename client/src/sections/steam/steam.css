@@ -10,6 +10,43 @@
   }
 }
 
+/* The overview supplies its live featured header as --steam-card-art. This is applied to the
+   actual section card, not only the hero, so the artwork establishes the full card's atmosphere. */
+.dashboard-section-card--steam:has(.steam-overview) {
+  isolation: isolate;
+  background:
+    linear-gradient(115deg, color-mix(in oklab, var(--color-card) 88%, transparent), color-mix(in oklab, var(--color-card) 67%, transparent)),
+    linear-gradient(135deg, color-mix(in oklab, var(--color-accent-steam) 16%, transparent), transparent 58%),
+    var(--color-card);
+}
+.dashboard-section-card--steam:has(.steam-overview)::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -9%;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--steam-card-art) center / cover no-repeat;
+  filter: blur(30px) saturate(1.35);
+  opacity: 0.38;
+  transform: scale(1.08);
+}
+.dashboard-section-card--steam:has(.steam-overview)::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(120deg, color-mix(in oklab, var(--color-card) 88%, transparent), color-mix(in oklab, var(--color-card) 58%, transparent)),
+    color-mix(in oklab, var(--color-card) 38%, transparent);
+}
+.dashboard-section-card--steam:has(.steam-overview) > header,
+.dashboard-section-card--steam:has(.steam-overview) > .section-card-content,
+.dashboard-section-card--steam:has(.steam-overview) > p { z-index: 1; }
+.dashboard-section-card--steam:has(.steam-overview) > .section-card-aura { z-index: 0; }
+
 /* Sort toggle above the full games list. */
 .steam-sort-toggle {
   display: inline-flex;
@@ -75,6 +112,190 @@
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent-steam) 18%, transparent);
 }
 
+/* Overview card: a library pulse plus a small, image-led shelf gives the homepage more useful
+   context than repeating a zero-value trend before the history store has enough samples. */
+.steam-home-dashboard {
+  display: grid;
+  gap: 0.85rem;
+}
+.steam-home-pulse,
+.steam-home-shelf {
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--color-card-border);
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--color-track) 20%, transparent);
+}
+.steam-home-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.7rem;
+}
+.steam-home-section-heading p,
+.steam-home-section-heading span {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.steam-home-section-heading p {
+  color: var(--color-ink);
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.steam-home-section-heading span {
+  color: var(--color-ink-faint);
+  font-size: 0.65rem;
+}
+.steam-home-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid color-mix(in oklab, var(--color-card-border) 85%, transparent);
+  border-radius: 0.8rem;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--color-card) 68%, transparent);
+}
+.steam-home-metric {
+  min-width: 0;
+  padding: 0.65rem 0.55rem;
+}
+.steam-home-metric + .steam-home-metric { border-left: 1px solid var(--color-card-border); }
+.steam-home-metric-value {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.steam-home-metric-label {
+  margin: 0.32rem 0 0;
+  color: var(--color-ink-faint);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+.steam-home-metric-detail {
+  margin: 0.3rem 0 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 0.62rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.steam-home-achievement {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.3rem 0.65rem;
+  align-items: end;
+  margin-top: 0.75rem;
+}
+.steam-home-achievement-panel { margin-top: 0.75rem; }
+.steam-home-achievement-panel .steam-home-achievement { margin-top: 0; }
+.steam-home-achievement-track {
+  grid-column: 1 / -1;
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-track);
+}
+.steam-home-achievement-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent-steam);
+}
+.steam-home-unlocks {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0 0;
+  border-top: 1px solid color-mix(in oklab, var(--color-card-border) 76%, transparent);
+  list-style: none;
+}
+.steam-home-unlock {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  color: var(--color-ink-muted);
+  font-size: 0.68rem;
+}
+.steam-home-unlock img,
+.steam-home-unlock-fallback {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  border-radius: 0.25rem;
+  object-fit: cover;
+}
+.steam-home-unlock-fallback {
+  display: grid;
+  place-items: center;
+  color: var(--color-accent-steam);
+  font-size: 0.62rem;
+  background: color-mix(in oklab, var(--color-accent-steam) 16%, var(--color-track));
+}
+.steam-home-unlock time {
+  flex: 0 0 auto;
+  color: var(--color-ink-faint);
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+}
+.steam-shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+.steam-shelf-game {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 460 / 215;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--color-card-border) 76%, transparent);
+  border-radius: 0.75rem;
+  background: var(--color-track);
+}
+.steam-shelf-game > img {
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms ease;
+}
+.steam-shelf-game:hover > img { transform: scale(1.05); }
+.steam-shelf-game-scrim {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(5 8 14 / 0.82), rgb(5 8 14 / 0.22));
+}
+.steam-shelf-game-copy {
+  position: absolute;
+  inset: auto 0.7rem 0.55rem;
+  min-width: 0;
+}
+.steam-shelf-game-fallback {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--color-accent-steam) 50%, var(--color-track)), var(--color-card));
+}
+@media (max-width: 640px) {
+  .steam-shelf-grid { grid-template-columns: 1fr; }
+}
+
 /* Library browse controls and entries. The background artwork remains deliberately quiet so
    every title and playtime readout keeps enough contrast in both color schemes. */
 .steam-library-toolbar {
@@ -135,7 +356,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(90deg, var(--color-card) 28%, color-mix(in oklab, var(--color-card) 88%, transparent) 62%, color-mix(in oklab, var(--color-card) 60%, transparent));
+  background: linear-gradient(90deg, var(--color-card) 36%, color-mix(in oklab, var(--color-card) 93%, transparent) 64%, color-mix(in oklab, var(--color-card) 72%, transparent));
 }
 .steam-game-row:hover {
   transform: translateX(2px);
