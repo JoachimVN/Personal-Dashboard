@@ -181,7 +181,10 @@ export function createCommandCenterProvider(
       );
       return rankCandidates([
         ...calendarCandidates(calendar, Date.now()),
-        ...gmailCandidates(gmail, staleForMs, config.commandCenter.gmailStaleMs, config.commandCenter.gmailFreshMs),
+        ...gmailCandidates(
+          gmail, staleForMs, config.commandCenter.gmailStaleMs, config.commandCenter.gmailFreshMs,
+          config.commandCenter.gmailBacklogThreshold,
+        ),
         ...githubCandidates(github, config.commandCenter.baselineWindowDays, config.commandCenter.baselineDeviationPercent),
         ...healthCandidates(widgetData<HealthData>(envelopes, 'health')),
         ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),

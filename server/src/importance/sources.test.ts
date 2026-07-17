@@ -44,9 +44,29 @@ describe('gmailCandidates', () => {
     const candidates = gmailCandidates({
       unreadThreads: 1,
       threads: [{ id: 'thread', subject: 'Old message', sender: 'Sender', date: '2026-07-15', unread: true }],
-    }, 25 * 3_600_000, 24 * 3_600_000, 30 * 60_000);
+    }, 25 * 3_600_000, 24 * 3_600_000, 30 * 60_000, 50);
 
     expect(candidates).toEqual([]);
+  });
+
+  it('caps a small, non-fresh unread count to a tile', () => {
+    const candidates = gmailCandidates({
+      unreadThreads: 3,
+      threads: [{ id: 'thread', subject: 'Newsletter', sender: 'Sender', date: '2026-07-15', unread: true }],
+    }, 2 * 3_600_000, 24 * 3_600_000, 30 * 60_000, 50);
+
+    expect(candidates).toContainEqual(expect.objectContaining({ id: 'gmail:inbox', score: 53, shapes: ['tile'] }));
+  });
+
+  it('promotes a large unread backlog to a hero-eligible signal even without a fresh arrival', () => {
+    const candidates = gmailCandidates({
+      unreadThreads: 395,
+      threads: [{ id: 'thread', subject: 'Old message', sender: 'Sender', date: '2026-07-15', unread: true }],
+    }, 2 * 3_600_000, 24 * 3_600_000, 30 * 60_000, 50);
+
+    expect(candidates).toContainEqual(expect.objectContaining({
+      id: 'gmail:inbox', kicker: 'Inbox backlog', shapes: ['hero', 'secondary', 'tile'],
+    }));
   });
 });
 
