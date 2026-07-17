@@ -3,7 +3,7 @@ import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { isWidgetDisabled, WidgetBody } from '../../components/WidgetCard';
-import { WEEKLY_MS } from './UsageMeter';
+import { FIVE_HOUR_MS, WEEKLY_MS } from './UsageMeter';
 import { UsageSparkline } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
@@ -90,6 +90,8 @@ function ToolRow({
                   metric={data.fiveHour ? 'fiveHourUsedPercent' : 'weeklyUsedPercent'}
                   windowMs={data.fiveHour ? DAY_MS : WEEKLY_MS}
                   color={color}
+                  sessionResetsAt={data.fiveHour?.resetsAt}
+                  sessionWindowMs={data.fiveHour ? FIVE_HOUR_MS : undefined}
                 />
               )}
               {data.tokens && (

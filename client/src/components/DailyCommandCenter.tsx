@@ -14,7 +14,7 @@ import type {
 } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { UsageSparkline } from '../sections/ai/UsageHistoryChart';
-import { WEEKLY_MS } from '../sections/ai/UsageMeter';
+import { FIVE_HOUR_MS, WEEKLY_MS } from '../sections/ai/UsageMeter';
 import { deg, glyph, weatherLocation } from '../lib/weather';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { ContributionGrid } from '../widgets/GitHubWidgets';
@@ -448,8 +448,8 @@ function AiUsageTrend({ render, aiUsage }: Readonly<{
   aiUsage: AiUsageByTool;
 }>): ReactNode {
   const lines = render.toolIds
-    .map((toolId) => ({ toolId, history: aiUsage[toolId]?.history }))
-    .filter((line): line is { toolId: AiUsageRender['toolIds'][number]; history: NonNullable<AiUsageToolData['history']> } =>
+    .map((toolId) => ({ toolId, data: aiUsage[toolId], history: aiUsage[toolId]?.history }))
+    .filter((line): line is { toolId: AiUsageRender['toolIds'][number]; data: AiUsageToolData; history: NonNullable<AiUsageToolData['history']> } =>
       Boolean(line.history?.length));
   if (!lines.length) return null;
   return <div className="relative">
@@ -459,6 +459,8 @@ function AiUsageTrend({ render, aiUsage }: Readonly<{
         metric={render.metric === 'fiveHour' ? 'fiveHourUsedPercent' : 'weeklyUsedPercent'}
         windowMs={render.metric === 'fiveHour' ? DAY_MS : WEEKLY_MS}
         color={aiToolColor(line.toolId)}
+        sessionResetsAt={render.metric === 'fiveHour' ? line.data.fiveHour?.resetsAt : undefined}
+        sessionWindowMs={render.metric === 'fiveHour' ? FIVE_HOUR_MS : undefined}
       />
     </div>)}
   </div>;

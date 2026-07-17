@@ -118,6 +118,8 @@ function ToolCard({
                   windowMs={DAY_MS}
                   color={color}
                   caption="5-hour window · last 24 h"
+                  sessionResetsAt={data.fiveHour.resetsAt}
+                  sessionWindowMs={FIVE_HOUR_MS}
                 />
               )}
               {data.weekly && (

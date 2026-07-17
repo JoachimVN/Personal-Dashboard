@@ -1,12 +1,14 @@
-import { execFile } from 'node:child_process';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { chmod, readdir, readFile, stat } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
-import { promisify } from 'node:util';
 import { z } from 'zod';
+import { spawn as spawnPty } from 'node-pty';
 import { aiUsageToolSchema, type AiUsageToolData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 import type { UsageHistoryStore } from '../usageHistory.js';
+
+const require = createRequire(import.meta.url);
 
 /** What the snapshot readers produce; the provider fetch adds the store-managed `history`. */
 type UsageSnapshot = Omit<AiUsageToolData, 'history'>;
@@ -234,111 +236,180 @@ export function retainKnownClaudeQuota(live: ClaudeQuota, previous?: ClaudeQuota
   return live.asOf ? live : previous ?? live;
 }
 
-const execFileAsync = promisify(execFile);
-
 const MONTH_ABBREVIATIONS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
-/** `claude -p "/usage"` prints e.g. "Current session: 41% used · resets Jul 13 at 1:59am (Europe/Oslo)". */
-const QUOTA_TAIL = String.raw`(\d+)%\s*used.*?resets\s+([a-z]{3})\s+(\d{1,2})\s+at\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)`;
-const SESSION_LINE = new RegExp(String.raw`Current session:\s*${QUOTA_TAIL}`, 'i');
-const WEEKLY_LINE = new RegExp(String.raw`Current week \(all models\):\s*${QUOTA_TAIL}`, 'i');
-/** Model-specific weekly cap, e.g. "Current week (Fable): 49% used · …" — the model name varies by plan/era. */
-const MODEL_WEEK_LINE = new RegExp(String.raw`Current week \((?!all models)([^)]+)\):\s*${QUOTA_TAIL}`, 'i');
-const NO_LIMITS_PATTERNS = [
-  /no\s+(?:active\s+)?(?:usage\s+)?limits?/i,
-  /unlimited/i,
-  /limits?\s+(?:are\s+)?not\s+(?:currently\s+)?enforced/i,
-  /limits?\s+(?:are\s+)?temporarily\s+(?:disabled|removed|lifted)/i,
-];
-
-const cliResultSchema = z.object({
-  is_error: z.boolean(),
-  result: z.string().optional(),
-});
-
 /**
- * The CLI reports reset times in the machine's own local time with no year, e.g. "Jul 13 at
- * 1:59am" — both windows reset within days, so resolving against the current year and rolling
- * forward if that lands in the past handles the one edge case (a Dec→Jan reset) correctly.
+ * The interactive Usage screen reports reset times in the machine's own local time with no year,
+ * e.g. "Jul 13 at 1:59am". Both windows reset within days, so resolving against the current year
+ * and rolling forward if that lands in the past handles the Dec→Jan edge case correctly.
  */
-function parseResetsAt(monthAbbr: string, day: string, hour: string, minute: string | undefined, meridiem: string): string | undefined {
+function parseDatedResetAt(monthAbbr: string, day: string, hour: string, minute: string | undefined, meridiem: string, now = new Date()): string | undefined {
   const monthIndex = MONTH_ABBREVIATIONS.indexOf(monthAbbr.toLowerCase());
   if (monthIndex === -1) return undefined;
   let hour24 = Number(hour) % 12;
   if (meridiem.toLowerCase() === 'pm') hour24 += 12;
-  const now = new Date();
   const candidate = new Date(now.getFullYear(), monthIndex, Number(day), hour24, minute ? Number(minute) : 0);
   if (candidate.getTime() < now.getTime() - 24 * 60 * 60_000) candidate.setFullYear(candidate.getFullYear() + 1);
   return Number.isNaN(candidate.getTime()) ? undefined : candidate.toISOString();
 }
 
-/** `groups` is the QUOTA_TAIL captures: percent, month, day, hour, minute?, am/pm. */
-function parseQuota(groups: string[]) {
-  const [percent, monthAbbr, day, hour, minute, meridiem] = groups;
-  const resetsAt = parseResetsAt(monthAbbr, day, hour, minute, meridiem);
-  return resetsAt ? limit(Number(percent), resetsAt) : undefined;
+/** The five-hour screen says only "Resets 5:20pm", so infer today or tomorrow locally. */
+function parseTimeOnlyResetAt(hour: string, minute: string | undefined, meridiem: string, now = new Date()): string | undefined {
+  let hour24 = Number(hour) % 12;
+  if (meridiem.toLowerCase() === 'pm') hour24 += 12;
+  const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour24, minute ? Number(minute) : 0);
+  if (candidate.getTime() < now.getTime()) candidate.setDate(candidate.getDate() + 1);
+  return Number.isNaN(candidate.getTime()) ? undefined : candidate.toISOString();
 }
 
-function parseLine(result: string, pattern: RegExp) {
-  const match = pattern.exec(result);
-  return match ? parseQuota(match.slice(1)) : undefined;
+function stripTerminalControls(value: string): string {
+  return value
+    .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, '') // OSC title/hyperlink sequences.
+    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '') // CSI cursor/style sequences.
+    .replace(/\r/g, '');
 }
 
-function parseModelWeekLine(result: string) {
-  const match = MODEL_WEEK_LINE.exec(result);
-  if (!match) return undefined;
-  const quota = parseQuota(match.slice(2));
-  return quota && { ...quota, model: match[1].trim() };
+function parseUsageWindow(section: string, now: Date) {
+  const used = /(\d+(?:\.\d+)?)%\s*used/i.exec(section);
+  const datedReset = /Resets\s*([a-z]{3})\s*(\d{1,2})\s*at\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
+  const timeOnlyReset = /Resets\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
+  if (!used || (!datedReset && !timeOnlyReset)) return undefined;
+  const resetsAt = datedReset
+    ? parseDatedResetAt(datedReset[1], datedReset[2], datedReset[3], datedReset[4], datedReset[5], now)
+    : parseTimeOnlyResetAt(timeOnlyReset![1], timeOnlyReset![2], timeOnlyReset![3], now);
+  return resetsAt ? limit(Number(used[1]), resetsAt) : undefined;
 }
 
 /**
- * `claude -p "/usage"` is a local command the CLI short-circuits before it ever reaches the
- * model — zero token cost, and it doesn't touch the `/api/oauth/usage` endpoint this used to call
- * directly, which turned out to be rate-limited to the point of never returning a good reading on
- * this machine (see git history). It does write a small local session transcript per invocation,
- * which is why this provider's refresh cadence stays coarse (see `aiUsage.claudeRefreshMs`).
+ * `/usage` is an interactive Claude Code command. Print mode (`claude -p '/usage'`) treats it as
+ * prompt text and returns run statistics rather than quota data, so launch a short, isolated
+ * pseudo-terminal session. It sends only `/usage`, never a model prompt.
  */
-async function claudeCliUsageSnapshot(): Promise<ClaudeQuota> {
+/** Parse Claude Code's current multiline interactive Usage screen. */
+export function parseClaudeUsageScreen(screen: string, now = new Date()): ClaudeQuota {
+  const text = stripTerminalControls(screen);
+  // Terminal cursor updates can erase visual spaces from the captured stream, so accept both
+  // the readable UI labels and their compact `Currentsession` / `Currentweek(allmodels)` form.
+  const session = /Current\s*session([\s\S]*?)(?=Current\s*week\s*\(\s*all\s*models\s*\)|$)/i.exec(text)?.[1] ?? '';
+  const weekly = /Current\s*week\s*\(\s*all\s*models\s*\)([\s\S]*)/i.exec(text)?.[1] ?? '';
+  const fiveHour = parseUsageWindow(session, now);
+  const week = parseUsageWindow(weekly, now);
+  const modelMatch = /Current\s*week\s*\(\s*(?!all\s*models\s*\))([^)]+)\)([\s\S]*?)(?=Current\s*week\s*\(|What's\s*contributing|$)/i.exec(text);
+  const modelLimit = modelMatch ? parseUsageWindow(modelMatch[2], now) : undefined;
+  const modelWeekly = modelLimit && modelMatch ? { ...modelLimit, model: modelMatch[1].trim() } : undefined;
+  const hasQuotaReport = Boolean(fiveHour || week || modelWeekly);
+  return {
+    fiveHour,
+    weekly: week,
+    modelWeekly,
+    fiveHourStatus: limitStatus(Boolean(fiveHour), hasQuotaReport),
+    weeklyStatus: limitStatus(Boolean(week), hasQuotaReport),
+    asOf: hasQuotaReport ? now.toISOString() : undefined,
+  };
+}
+
+export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
   try {
-    // The native installer puts `claude` in ~/.local/bin, which interactive-shell-only PATH
-    // customizations (.zshrc etc.) may add but a non-interactive launchd process won't inherit.
     const localBin = path.join(os.homedir(), '.local/bin');
-    // Strip any Anthropic auth env vars this server process happens to carry (e.g. a leftover
-    // CLAUDE_CODE_OAUTH_TOKEN in server/.env): inheriting one makes the child authenticate
-    // differently than an interactive `claude` session and switches /usage to a different,
-    // non-percentage report.
     const { CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, ...cleanEnv } = process.env;
-    const { stdout } = await execFileAsync('claude', ['-p', '/usage', '--output-format', 'json'], {
-      timeout: 20_000,
-      killSignal: 'SIGKILL',
-      env: { ...cleanEnv, PATH: `${localBin}:${cleanEnv.PATH ?? ''}` },
-    });
-    const parsed = cliResultSchema.parse(JSON.parse(stdout));
-    if (parsed.is_error || !parsed.result) {
-      return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+    // node-pty's macOS prebuilt helper can lose its executable bit in npm installations that
+    // suppress lifecycle scripts. Restoring it is local, idempotent, and required to open a PTY.
+    if (process.platform === 'darwin') {
+      const packageRoot = path.resolve(path.dirname(require.resolve('node-pty')), '..');
+      await chmod(path.join(packageRoot, 'prebuilds', `darwin-${process.arch}`, 'spawn-helper'), 0o755).catch(() => undefined);
     }
-    const result = parsed.result;
-    const fiveHour = parseLine(result, SESSION_LINE);
-    const weekly = parseLine(result, WEEKLY_LINE);
-    const modelWeekly = parseModelWeekLine(result);
-    // Unlike Codex (where the latest rate-limit event is authoritative about which windows
-    // exist), Claude's /usage simply omits "Current session" when no 5-hour session is active —
-    // so only an explicit no-limits line justifies reporting a window as unlimited.
-    const noLimits = NO_LIMITS_PATTERNS.some((pattern) => pattern.test(result));
-    const hasQuotaReport = Boolean(fiveHour || weekly || modelWeekly || noLimits);
-    return {
-      fiveHour,
-      weekly,
-      modelWeekly,
-      fiveHourStatus: limitStatus(Boolean(fiveHour), noLimits),
-      weeklyStatus: limitStatus(Boolean(weekly), noLimits),
-      asOf: hasQuotaReport ? new Date().toISOString() : undefined,
-    };
+    const output = await new Promise<string>((resolve, reject) => {
+      const pty = spawnPty(path.join(localBin, 'claude'), [], {
+        name: 'xterm-256color',
+        cols: 160,
+        rows: 48,
+        cwd: process.cwd(),
+        env: { ...cleanEnv, TERM: 'xterm-256color', PATH: `${localBin}:${cleanEnv.PATH ?? ''}` },
+      });
+      let terminal = '';
+      let settled = false;
+      const finish = (result?: string, error?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(sendUsage);
+        clearTimeout(timeout);
+        try {
+          pty.kill();
+        } catch {
+          // The process may already have exited after rendering the Usage screen.
+        }
+        if (error) reject(error);
+        else resolve(result ?? terminal);
+      };
+      const sendUsage = setTimeout(() => pty.write('/usage\r'), 2_000);
+      const timeout = setTimeout(() => finish(undefined, new Error('Claude Usage screen timed out')), 35_000);
+      pty.onData((chunk) => {
+        terminal += chunk;
+        const quota = parseClaudeUsageScreen(terminal);
+        if (quota.fiveHour && quota.weekly) finish(terminal);
+      });
+      pty.onExit(({ exitCode }) => {
+        if (!settled) finish(undefined, new Error(`Claude exited before Usage rendered (${exitCode})`));
+      });
+    });
+    return parseClaudeUsageScreen(output);
   } catch {
-    // Do not log stdout: the usage report includes account-specific numbers.
-    console.warn('[ai-usage] Claude CLI usage snapshot unavailable');
     return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
   }
+}
+
+function usageReportsIn(value: unknown, reports: string[]): void {
+  if (typeof value === 'string') {
+    if (/Current\s*session/i.test(value) && /Current\s*week\s*\(\s*all\s*models\s*\)/i.test(value)) reports.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry) => usageReportsIn(entry, reports));
+    return;
+  }
+  if (value && typeof value === 'object') {
+    Object.values(value).forEach((entry) => usageReportsIn(entry, reports));
+  }
+}
+
+/** The interactive CLI persists its rendered Usage report in session transcripts. This is a
+ * fallback for a transient PTY failure, not a substitute for the live interactive probe. */
+async function claudeTranscriptUsageSnapshot(): Promise<ClaudeQuota> {
+  try {
+    const projectsDir = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
+    const files = await jsonlFiles(projectsDir);
+    let latest: { at: Date; report: string } | undefined;
+    await Promise.all(files.map(async (file) => {
+      const fileInfo = await stat(file);
+      if (Date.now() - fileInfo.mtimeMs > WEEKLY_MS) return;
+      for (const line of (await readFile(file, 'utf8')).split('\n')) {
+        try {
+          const entry = JSON.parse(line) as { timestamp?: string };
+          if (!entry.timestamp) continue;
+          const at = new Date(entry.timestamp);
+          if (Number.isNaN(at.getTime())) continue;
+          const reports: string[] = [];
+          usageReportsIn(entry, reports);
+          for (const report of reports) {
+            if (!latest || at > latest.at) latest = { at, report };
+          }
+        } catch {
+          // A concurrently-written transcript can have one incomplete final line.
+        }
+      }
+    }));
+    return latest ? parseClaudeUsageScreen(latest.report, latest.at) : { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+  } catch {
+    return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+  }
+}
+
+export function claudeNextRefreshMs(data: UsageSnapshot | undefined, refreshMs: number, now = Date.now()): number {
+  const cappedResets = [data?.fiveHour, data?.weekly]
+    .filter((window): window is NonNullable<typeof window> => Boolean(window && window.usedPercent >= 100))
+    .map((window) => Date.parse(window.resetsAt) - now)
+    .filter((delay) => Number.isFinite(delay) && delay > 0);
+  return cappedResets.length > 0 ? Math.max(...cappedResets) + 5_000 : refreshMs;
 }
 
 export function createClaudeUsageProvider(refreshMs: number, history: UsageHistoryStore): Provider<AiUsageToolData> {
@@ -370,13 +441,16 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
     id: 'ai-usage-claude',
     schema: aiUsageToolSchema,
     refreshMs,
-    timeoutMs: 25_000,
+    timeoutMs: 40_000,
     isConfigured: () => true,
     fetch: async () => {
-      const [tokenTotals, liveQuota] = await Promise.all([claudeTokenTotals(), claudeCliUsageSnapshot()]);
-      const previousQuota = liveQuota.asOf ? rememberedQuota : rememberedQuota ?? await loadRememberedQuota();
-      const quota = retainKnownClaudeQuota(liveQuota, previousQuota);
-      if (liveQuota.asOf) rememberedQuota = liveQuota;
+      const [tokenTotals, liveQuota, transcriptQuota] = await Promise.all([
+        claudeTokenTotals(), claudeInteractiveUsageSnapshot(), claudeTranscriptUsageSnapshot(),
+      ]);
+      const observedQuota = liveQuota.asOf ? liveQuota : transcriptQuota;
+      const previousQuota = observedQuota.asOf ? rememberedQuota : rememberedQuota ?? await loadRememberedQuota();
+      const quota = retainKnownClaudeQuota(observedQuota, previousQuota);
+      if (observedQuota.asOf) rememberedQuota = observedQuota;
       const snapshot: UsageSnapshot = {
         available: Boolean(quota.asOf || tokenTotals.fiveHour || tokenTotals.weekly),
         fiveHour: quota.fiveHour,
@@ -389,6 +463,7 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
       };
       return { ...snapshot, history: await history.record('ai-usage-claude', snapshot) };
     },
+    nextRefreshMs: (data) => claudeNextRefreshMs(data, refreshMs),
   };
 }
 

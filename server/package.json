@@ -30,6 +30,7 @@
     "express": "^5.1.0",
     "googleapis": "^173.0.0",
     "node-ical": "^0.26.1",
+    "node-pty": "^1.1.0",
     "octokit": "^5.0.5",
     "postgres": "^3.4.7",
     "rss-parser": "^3.13.0",
