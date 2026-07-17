@@ -264,6 +264,7 @@ a {
 .command-panel--health { --panel-accent: var(--color-accent-health); }
 .command-panel--spotify { --panel-accent: var(--color-accent-spotify); }
 .command-panel--weather { --panel-accent: var(--color-accent-weather); }
+.command-panel--steam { --panel-accent: var(--color-accent-steam); }
 
 .command-agenda {
   position: relative;
@@ -503,6 +504,7 @@ a {
 .command-signal--health { --signal-color: var(--color-accent-health); }
 .command-signal--spotify { --signal-color: var(--color-accent-spotify); }
 .command-signal--weather { --signal-color: var(--color-accent-weather); }
+.command-signal--steam { --signal-color: var(--color-accent-steam); }
 
 .command-signal-arrow {
   font-size: 0.85rem;

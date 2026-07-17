@@ -20,12 +20,14 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
     /** Which quota window the card is about — drives the trend line and leading summary stat. */
     metric: z.enum(['fiveHour', 'weekly']),
   }),
+  z.object({ type: z.literal('steam-now-playing'), appId: z.number() }),
+  z.object({ type: z.literal('steam-achievement'), appId: z.number(), apiName: z.string() }),
 ]);
 
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AiUsageToolData, GitHubData, HealthData, NewsData, SpotifyData, WeatherData } from '@personal-dashboard/shared';
-import { aiCandidates, githubCandidates, gmailCandidates, healthCandidates, newsCandidates, spotifyCandidates, weatherCandidates } from './sources.js';
+import type { AiUsageToolData, GitHubData, HealthData, NewsData, SpotifyData, SteamData, WeatherData } from '@personal-dashboard/shared';
+import { aiCandidates, githubCandidates, gmailCandidates, healthCandidates, newsCandidates, spotifyCandidates, steamCandidates, weatherCandidates } from './sources.js';
 
 describe('githubCandidates', () => {
   const quietDay: GitHubData = {
@@ -264,5 +264,98 @@ describe('spotifyCandidates', () => {
       kicker: 'New #1 artist · of all time',
       score: 90,
     });
+  });
+});
+
+describe('steamCandidates', () => {
+  const ACHIEVEMENT_FRESH_MS = 7 * 24 * 60 * 60_000;
+
+  const baseline: SteamData = {
+    profile: { steamId: '76561198000000000', personaName: 'Alex', profileUrl: 'https://steamcommunity.com/id/alex' },
+    currentGame: null,
+    library: null,
+    recentlyPlayed: [],
+    achievements: null,
+    friendsInGame: [],
+    availability: { library: 'unavailable', achievements: 'unavailable', friends: 'unavailable' },
+  };
+
+  it('returns nothing when there is no data', () => {
+    expect(steamCandidates(undefined, ACHIEVEMENT_FRESH_MS)).toEqual([]);
+  });
+
+  it('prioritizes a fresh achievement unlock over everything else', () => {
+    const data: SteamData = {
+      ...baseline,
+      currentGame: { appId: 10, name: 'Half-Life' },
+      friendsInGame: [{ steamId: '2', personaName: 'Sam', gameName: 'Half-Life' }],
+      achievements: {
+        appId: 10, gameName: 'Half-Life', unlockedCount: 1, totalCount: 10,
+        recentUnlocks: [{
+          apiName: 'ACH_1', displayName: 'Freeman', unlockedAt: new Date(Date.now() - 60_000).toISOString(), globalUnlockedPercent: 2.4,
+        }],
+      },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
+      expect.objectContaining({
+        id: 'steam:achievement:10:ACH_1', score: 80, kicker: 'Achievement unlocked', title: 'Freeman',
+        detail: 'Half-Life · 2.4% of players', shapes: ['hero', 'secondary', 'tile'],
+        render: { type: 'steam-achievement', appId: 10, apiName: 'ACH_1' },
+      }),
+    ]);
+  });
+
+  it('falls back to current game once the achievement unlock ages past the freshness threshold', () => {
+    const data: SteamData = {
+      ...baseline,
+      currentGame: { appId: 10, name: 'Half-Life', playtimeForeverMinutes: 600 },
+      achievements: {
+        appId: 10, gameName: 'Half-Life', unlockedCount: 1, totalCount: 10,
+        recentUnlocks: [{
+          apiName: 'ACH_1', displayName: 'Freeman', unlockedAt: new Date(Date.now() - ACHIEVEMENT_FRESH_MS - 60_000).toISOString(),
+        }],
+      },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
+      expect.objectContaining({
+        id: 'steam:now-playing:10', score: 58, kicker: 'Playing now', title: 'Half-Life', detail: '10h played',
+        shapes: ['secondary', 'tile'], render: { type: 'steam-now-playing', appId: 10 },
+      }),
+    ]);
+  });
+
+  it('falls back to friends playing when nothing is currently running', () => {
+    const data: SteamData = {
+      ...baseline,
+      friendsInGame: [
+        { steamId: '2', personaName: 'Sam', gameName: 'Portal 2' },
+        { steamId: '3', personaName: 'Jo', gameName: 'Portal 2' },
+      ],
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
+      expect.objectContaining({
+        id: 'steam:friends', score: 25, kicker: 'Friends online', title: '2 friends playing', detail: 'Portal 2', shapes: ['tile'],
+      }),
+    ]);
+  });
+
+  it('falls back to recent playtime as the lowest-priority signal', () => {
+    const data: SteamData = {
+      ...baseline,
+      library: { totalGames: 12, totalPlaytimeMinutes: 6_000, recentPlaytimeMinutes: 300, mostPlayed: [{ appId: 20, name: 'Portal' }], allGames: [{ appId: 20, name: 'Portal' }] },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
+      expect.objectContaining({
+        id: 'steam:recent-playtime', score: 22, kicker: 'This week on Steam', title: '5.0h this week', detail: 'Portal', shapes: ['tile'],
+      }),
+    ]);
+  });
+
+  it('returns nothing when there is no current activity, no fresh achievement, no friends, and no recent playtime', () => {
+    expect(steamCandidates(baseline, ACHIEVEMENT_FRESH_MS)).toEqual([]);
   });
 });

@@ -1,0 +1,34 @@
+/* Steam section design tokens, kept out of index.css so the section is
+   self-contained (same pattern as spotify.css / weather.css). */
+:root {
+  --color-accent-steam: light-dark(#0b65c2, #66c0f4);
+}
+
+@media (min-width: 1024px) {
+  .dashboard-section-card--steam {
+    grid-column: span 12;
+  }
+}
+
+/* Sort toggle above the full games list. */
+.steam-sort-toggle {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border: none;
+  border-radius: 999px;
+  background: var(--color-track);
+}
+.steam-sort-toggle button {
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-ink-faint);
+  transition: color 180ms ease, background 180ms ease;
+}
+.steam-sort-toggle button[data-active='true'] {
+  color: var(--color-ink);
+  background: color-mix(in oklab, var(--color-accent-steam) 22%, var(--color-card));
+}

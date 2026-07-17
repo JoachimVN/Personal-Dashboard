@@ -6,6 +6,7 @@ import { UsageHistoryStore } from './usageHistory.js';
 import { SpotifySnapshotStore } from './spotifyCache.js';
 import { SpotifyHistoryStore } from './spotifyHistory.js';
 import { SignalHistoryStore } from './signalHistory.js';
+import { SteamSnapshotStore } from './steamSnapshot.js';
 
 const databaseUrl = process.env.DATABASE_URL_TEST;
 // These tests truncate their database between cases. Refuse to run if a shell has pointed the
@@ -77,5 +78,33 @@ describeDatabase('Postgres stores', () => {
     await signals.record('gmail', 'unreadThreads', 2);
     expect(await database.client`select * from signal_history`).toHaveLength(1);
     expect(await signals.lastChangedAt('gmail', 'unreadThreads')).toEqual(first);
+  });
+
+  it('round-trips Steam snapshot, library, and per-game achievement caches', async () => {
+    const store = new SteamSnapshotStore(database);
+    const snapshot = {
+      profile: { steamId: '76561198000000000', personaName: 'Alex', profileUrl: 'https://steamcommunity.com/id/alex' },
+      currentGame: null,
+      library: null,
+      recentlyPlayed: [],
+      achievements: null,
+      friendsInGame: [],
+      availability: { library: 'unavailable', achievements: 'unavailable', friends: 'unavailable' },
+    };
+    await store.setSnapshot(snapshot as never);
+    expect((await store.getSnapshot())?.data).toEqual(snapshot);
+
+    const library = { totalGames: 3, totalPlaytimeMinutes: 900, recentPlaytimeMinutes: 60, mostPlayed: [], allGames: [] };
+    await store.setLibraryCache(library);
+    expect((await store.getLibraryCache())?.data).toEqual(library);
+
+    const schema = [{ apiName: 'ACH_1', displayName: 'Freeman' }];
+    await store.setAchievementSchema(10, schema);
+    expect((await store.getAchievementSchema(10))?.data).toEqual(schema);
+    expect(await store.getAchievementSchema(20)).toBeUndefined();
+
+    const percentages = [{ apiName: 'ACH_1', percent: 4.2 }];
+    await store.setAchievementPercentages(10, percentages);
+    expect((await store.getAchievementPercentages(10))?.data).toEqual(percentages);
   });
 });

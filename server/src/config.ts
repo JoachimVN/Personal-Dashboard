@@ -62,6 +62,8 @@ const configSchema = z.object({
     weatherColdC: z.number().default(-10),
     /** How recently an unread iMessage must have arrived to count as "new", vs. just sitting unread. */
     imessageFreshMs: z.number().int().min(60_000).default(30 * 60_000),
+    /** How recently a Steam achievement must have unlocked to surface as a signal. Advanced tuning — leave at the default. */
+    steamAchievementFreshMs: z.number().int().min(60_000).default(7 * 24 * 60 * 60_000),
   }).default({
     gmailStaleMs: 24 * 60 * 60_000,
     gmailFreshMs: 30 * 60_000,
@@ -71,6 +73,7 @@ const configSchema = z.object({
     spotifyFreshMs: 48 * 60 * 60_000,
     weatherHotC: 25,
     weatherColdC: -10,
+    steamAchievementFreshMs: 7 * 24 * 60 * 60_000,
   }),
   code: z
     .object({

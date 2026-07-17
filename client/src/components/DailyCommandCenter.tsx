@@ -9,6 +9,7 @@ import type {
   GmailData,
   HealthData,
   SpotifyData,
+  SteamData,
   WeatherData,
 } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
@@ -64,14 +65,20 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'claude' | 'codex' {
+function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
   if (slot.source === 'health') return 'health';
   if (slot.source === 'spotify') return 'spotify';
   if (slot.source === 'weather') return 'weather';
+  if (slot.source === 'steam') return 'steam';
   return 'personal';
+}
+
+function formatSteamHours(minutes: number): string {
+  const hours = minutes / 60;
+  return hours < 10 ? `${hours.toFixed(1)}h` : `${Math.round(hours)}h`;
 }
 
 function AiToolMark({ accent, className }: Readonly<{ accent: CommandCenterSlot['accent']; className: string }>) {
@@ -317,6 +324,44 @@ function SpotifyAlbumSecondary({ slot, spotify }: Readonly<{ slot: CommandCenter
   </div>;
 }
 
+function SteamNowPlayingSecondary({ slot, steam }: Readonly<{ slot: CommandCenterSlot; steam: SteamData | undefined }>): ReactNode {
+  if (slot.render.type !== 'steam-now-playing') return null;
+  const appId = slot.render.appId;
+  const game = steam?.currentGame?.appId === appId
+    ? steam.currentGame
+    : steam?.recentlyPlayed.find((g) => g.appId === appId);
+  if (!game) return null;
+  return <div className="mt-4">
+    {game.headerUrl && <img src={game.headerUrl} alt="" className="w-full max-w-xs rounded-xl object-cover shadow-lg" />}
+    <p className="mt-3 text-sm font-semibold text-ink">{game.name}</p>
+    {game.playtimeForeverMinutes !== undefined && (
+      <p className="mt-0.5 text-sm text-ink-muted">{formatSteamHours(game.playtimeForeverMinutes)} total playtime</p>
+    )}
+  </div>;
+}
+
+function SteamAchievementSecondary({ slot, steam }: Readonly<{ slot: CommandCenterSlot; steam: SteamData | undefined }>): ReactNode {
+  if (slot.render.type !== 'steam-achievement') return null;
+  const { appId, apiName } = slot.render;
+  const achievements = steam?.achievements?.appId === appId ? steam.achievements : undefined;
+  const achievement = achievements?.recentUnlocks.find((a) => a.apiName === apiName);
+  if (!achievement || !achievements) return null;
+  return <div className="mt-4 flex items-center gap-3">
+    {achievement.iconUrl ? (
+      <img src={achievement.iconUrl} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+    ) : (
+      <div className="h-12 w-12 shrink-0 rounded-lg bg-track" />
+    )}
+    <div className="min-w-0">
+      <p className="text-sm font-semibold text-ink">{achievement.displayName}</p>
+      <p className="mt-0.5 text-sm text-ink-muted">
+        {achievements.unlockedCount}/{achievements.totalCount} unlocked
+        {achievement.globalUnlockedPercent !== undefined ? ` · ${achievement.globalUnlockedPercent.toFixed(1)}% of players` : ''}
+      </p>
+    </div>
+  </div>;
+}
+
 function HealthRingsSecondary({ slot, health }: Readonly<{ slot: CommandCenterSlot; health: HealthData | undefined }>): ReactNode {
   const activityDay = health ? latestActivityDay(health) : undefined;
   if (slot.render.type !== 'health-rings' || !health || !activityDay) return null;
@@ -473,11 +518,12 @@ function SecondaryContent(props: Readonly<{
   github: GitHubData | undefined;
   gmail: GmailData | undefined;
   weather: WeatherData | undefined;
+  steam: SteamData | undefined;
   aiUsage: AiUsageByTool;
   hoveredDay: { date: string; count: number } | null;
   onHover: (day: { date: string; count: number } | null) => void;
 }>): ReactNode {
-  const { slot, calendar, spotify, spotifyFetchedAt, health, github, gmail, weather, aiUsage, hoveredDay, onHover } = props;
+  const { slot, calendar, spotify, spotifyFetchedAt, health, github, gmail, weather, steam, aiUsage, hoveredDay, onHover } = props;
   switch (slot.render.type) {
     case 'calendar-agenda': return CalendarAgendaSecondary({ slot, calendar }) ?? <FallbackSecondary slot={slot} />;
     case 'spotify-now-playing': return SpotifyNowPlayingSecondary({ spotify, spotifyFetchedAt }) ?? <FallbackSecondary slot={slot} />;
@@ -490,6 +536,8 @@ function SecondaryContent(props: Readonly<{
     case 'gmail-threads': return GmailThreadsSecondary({ slot, gmail }) ?? <FallbackSecondary slot={slot} />;
     case 'weather-hours': return WeatherHoursSecondary({ slot, weather }) ?? <FallbackSecondary slot={slot} />;
     case 'ai-usage-tool': return AiUsageSecondary({ slot, aiUsage }) ?? <FallbackSecondary slot={slot} />;
+    case 'steam-now-playing': return SteamNowPlayingSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
+    case 'steam-achievement': return SteamAchievementSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     default: return <FallbackSecondary slot={slot} />;
   }
 }
@@ -499,7 +547,7 @@ function CommandCenterSkeleton() {
     <section className="command-center glass" aria-labelledby="command-center-title">
       <div className="command-center-head">
         <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
-        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a></nav>
+        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a><a href="#/steam">Games</a></nav>
       </div>
       <div className="command-layout animate-pulse">
         <div className="command-primary space-y-3">
@@ -638,6 +686,7 @@ export function DailyCommandCenter() {
   };
   const spotifyEnvelope = useWidget<SpotifyData>('spotify').envelope;
   const spotify = spotifyEnvelope?.data;
+  const steam = useWidget<SteamData>('steam').envelope?.data;
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
   const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
 
@@ -667,7 +716,7 @@ export function DailyCommandCenter() {
   return <section className="command-center glass" aria-labelledby="command-center-title">
     <div className="command-center-head">
       <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
-      <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a></nav>
+      <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a><a href="#/steam">Games</a></nav>
     </div>
     <div className="command-layout">
       <HeroPanel hero={ranked.hero} event={heroEvent} track={heroTrack} kicker={heroKicker} extra={heroExtra} activity={heroActivity} weather={weather} />
@@ -685,7 +734,7 @@ export function DailyCommandCenter() {
         onActiveChange={setActiveSecondaryIndex}
         renderItem={(slot) => <>
           <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>
-          <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} gmail={gmail} weather={weather} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
+          <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyEnvelope?.fetchedAt} health={health} github={github} gmail={gmail} weather={weather} steam={steam} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
         </>}
       />
     </CommandPanel>}

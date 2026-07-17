@@ -205,6 +205,14 @@ One-time setup:
 
 Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `user-top-read`) power the Spotify section: now playing, recently played, and top artists/tracks over the last 4 weeks / 6 months / all time. Spotify's API has no all-time or top-albums endpoint, so those are seeded once from Spotify's long_term (multi-year) top lists and then grown from observed plays in the shared Postgres history.
 
+### Steam
+
+1. Create a Steam Web API key at [steamcommunity.com/dev/apikey](https://steamcommunity.com/dev/apikey) (any domain name works — the key is only ever used server-side).
+2. Find your SteamID64: open your Steam profile in a browser and use a lookup tool such as [steamid.io](https://steamid.io) rather than pasting the API key into any third-party site.
+3. Set `STEAM_API_KEY` and `STEAM_ID` in `server/.env`, then restart the server.
+
+Steam's own privacy settings gate what the widget can show: **Game details** must be public for library totals and achievement progress, and **Friends list** visibility determines whether the friends-playing signal works — with either set to private, that part of the widget degrades to a quiet empty state rather than failing. The integration is read-only (it never writes to your Steam account) and the API key is only ever used server-side, never sent to the browser.
+
 ### Philips Hue
 
 Lights go through Philips' cloud (the official [Remote API](https://developers.meethue.com)), the same path the Hue phone app uses, so the widget works no matter what network the Mac is on. The bridge's LAN IP is not involved.

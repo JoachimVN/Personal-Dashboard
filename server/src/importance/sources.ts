@@ -8,6 +8,7 @@ import type {
   IMessageData,
   NewsData,
   SpotifyData,
+  SteamData,
   WeatherData,
   WidgetStatus,
 } from '@personal-dashboard/shared';
@@ -511,6 +512,66 @@ export function weatherCandidates(
       href: '#/weather', render: { type: 'text' },
     }];
   }
+  return [];
+}
+
+function formatSteamHours(minutes: number): string {
+  const hours = minutes / 60;
+  return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)}h`;
+}
+
+/**
+ * Only the first matching candidate is returned — an achievement unlock, current game, friend
+ * activity, and recent playtime would otherwise all compete for slots from the same source. Order
+ * here doubles as the priority: a fresh achievement always wins over just "playing now", which
+ * beats friend/recent-playtime filler.
+ */
+export function steamCandidates(data: SteamData | undefined, achievementFreshMs: number): Candidate[] {
+  if (!data) return [];
+
+  const recentUnlock = data.achievements?.recentUnlocks[0];
+  if (recentUnlock && Date.now() - Date.parse(recentUnlock.unlockedAt) < achievementFreshMs) {
+    const rarity = recentUnlock.globalUnlockedPercent !== undefined
+      ? `${recentUnlock.globalUnlockedPercent.toFixed(1)}% of players`
+      : undefined;
+    return [{
+      id: `steam:achievement:${data.achievements!.appId}:${recentUnlock.apiName}`, source: 'steam', kind: 'steam',
+      score: 80, shapes: [...allShapes], kicker: 'Achievement unlocked', title: recentUnlock.displayName,
+      detail: [data.achievements!.gameName, rarity].filter((value): value is string => Boolean(value)).join(' · '),
+      href: '#/steam', render: { type: 'steam-achievement', appId: data.achievements!.appId, apiName: recentUnlock.apiName },
+    }];
+  }
+
+  if (data.currentGame) {
+    const minutes = data.currentGame.playtimeForeverMinutes;
+    return [{
+      id: `steam:now-playing:${data.currentGame.appId}`, source: 'steam', kind: 'steam', score: 58,
+      shapes: ['secondary', 'tile'], kicker: 'Playing now', title: data.currentGame.name,
+      detail: minutes !== undefined ? `${formatSteamHours(minutes)} played` : 'Open Steam',
+      href: '#/steam', render: { type: 'steam-now-playing', appId: data.currentGame.appId },
+    }];
+  }
+
+  if (data.friendsInGame.length) {
+    const first = data.friendsInGame[0]!;
+    return [{
+      id: 'steam:friends', source: 'steam', kind: 'steam', score: 25, shapes: ['tile'],
+      kicker: 'Friends online',
+      title: `${data.friendsInGame.length} friend${data.friendsInGame.length === 1 ? '' : 's'} playing`,
+      detail: first.gameName, href: '#/steam', render: { type: 'text' },
+    }];
+  }
+
+  const recentMinutes = data.library?.recentPlaytimeMinutes;
+  const recentGameName = data.library?.mostPlayed[0]?.name ?? data.recentlyPlayed[0]?.name;
+  if (recentMinutes && recentGameName) {
+    return [{
+      id: 'steam:recent-playtime', source: 'steam', kind: 'steam', score: 22, shapes: ['tile'],
+      kicker: 'This week on Steam', title: `${formatSteamHours(recentMinutes)} this week`, detail: recentGameName,
+      href: '#/steam', render: { type: 'text' },
+    }];
+  }
+
   return [];
 }
 

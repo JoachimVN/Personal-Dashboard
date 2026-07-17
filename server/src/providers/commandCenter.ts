@@ -9,6 +9,7 @@ import {
   type IMessageData,
   type NewsData,
   type SpotifyData,
+  type SteamData,
   type WeatherData,
   type WidgetEnvelope,
 } from '@personal-dashboard/shared';
@@ -25,6 +26,7 @@ import {
   imessageCandidates,
   newsCandidates,
   spotifyCandidates,
+  steamCandidates,
   weatherCandidates,
   type SpotifyFreshness,
 } from '../importance/sources.js';
@@ -104,6 +106,7 @@ export function createCommandCenterProvider(
         ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),
         ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
         ...spotifyCandidates(spotify, spotifyFresh),
+        ...steamCandidates(widgetData<SteamData>(envelopes, 'steam'), config.commandCenter.steamAchievementFreshMs),
         ...weatherCandidates(widgetData<WeatherData>(envelopes, 'weather'), config.commandCenter.weatherHotC, config.commandCenter.weatherColdC),
         ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
         ...aiCandidates(

@@ -7,6 +7,7 @@ import { GitHubSnapshotStore } from '../githubSnapshot.js';
 import { UsageHistoryStore } from '../usageHistory.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
+import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
@@ -16,6 +17,7 @@ import { createHueProvider, type HueProvider } from './hue.js';
 import { createIMessageProvider } from './imessage.js';
 import { createNewsProvider } from './news.js';
 import { createSpotifyProvider } from './spotify.js';
+import { createSteamProvider } from './steam.js';
 import { createSystemProvider } from './system.js';
 import { createWeatherProvider, type WeatherProvider } from './weather.js';
 
@@ -50,6 +52,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
   const spotifySnapshot = new SpotifySnapshotStore(database);
   const githubSnapshot = new GitHubSnapshotStore(database);
   const spotifyHistory = new SpotifyHistoryStore(database);
+  const steamSnapshot = new SteamSnapshotStore(database);
   return {
     weather,
     hue,
@@ -76,6 +79,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
         createSystemProvider(env.timezone),
         hue,
         createIMessageProvider(),
+        createSteamProvider(env.steam, steamSnapshot),
       ] satisfies Provider[]
     ).map((provider) => withEnabledToggle(provider, config)),
   };
