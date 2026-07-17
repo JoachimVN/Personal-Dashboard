@@ -6,33 +6,15 @@ describe('parseSteam', () => {
     vi.unstubAllEnvs();
   });
 
-  it('is undefined when neither credential is set', () => {
-    vi.stubEnv('STEAM_API_KEY', '');
-    vi.stubEnv('STEAM_ID', '');
-    expect(parseSteam()).toBeUndefined();
-  });
-
-  it('is undefined when only the API key is set', () => {
-    vi.stubEnv('STEAM_API_KEY', 'test-key');
-    vi.stubEnv('STEAM_ID', '');
-    expect(parseSteam()).toBeUndefined();
-  });
-
-  it('is undefined when only the SteamID is set', () => {
-    vi.stubEnv('STEAM_API_KEY', '');
-    vi.stubEnv('STEAM_ID', '76561198000000000');
-    expect(parseSteam()).toBeUndefined();
-  });
-
-  it('is undefined when STEAM_ID is not a 17-digit numeric SteamID64', () => {
-    vi.stubEnv('STEAM_API_KEY', 'test-key');
-    vi.stubEnv('STEAM_ID', 'not-a-steam-id');
-    expect(parseSteam()).toBeUndefined();
-  });
-
-  it('is undefined when STEAM_ID has the wrong digit count', () => {
-    vi.stubEnv('STEAM_API_KEY', 'test-key');
-    vi.stubEnv('STEAM_ID', '123456789');
+  it.each([
+    ['neither credential is set', '', ''],
+    ['only the API key is set', 'test-key', ''],
+    ['only the SteamID is set', '', '76561198000000000'],
+    ['STEAM_ID is not a 17-digit numeric SteamID64', 'test-key', 'not-a-steam-id'],
+    ['STEAM_ID has the wrong digit count', 'test-key', '123456789'],
+  ])('is undefined when %s', (_description, apiKey, steamId) => {
+    vi.stubEnv('STEAM_API_KEY', apiKey);
+    vi.stubEnv('STEAM_ID', steamId);
     expect(parseSteam()).toBeUndefined();
   });
 

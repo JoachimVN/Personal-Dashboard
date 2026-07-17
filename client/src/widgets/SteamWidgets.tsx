@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { SteamData, SteamGame } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
@@ -33,6 +33,23 @@ function SteamGameArtwork({ game }: Readonly<{ game: SteamGame }>) {
   const hasHeader = Boolean(game.headerUrl) && !headerFailed;
   const fallbackInitial = game.name.trim().charAt(0).toUpperCase() || '?';
 
+  let cover: ReactNode;
+  if (hasHeader) {
+    cover = (
+      <img
+        data-steam-header={game.headerUrl}
+        alt=""
+        className="steam-game-cover"
+        decoding="async"
+        onError={() => setHeaderFailed(true)}
+      />
+    );
+  } else if (game.iconUrl) {
+    cover = <img src={game.iconUrl} alt="" className="steam-game-cover steam-game-cover--icon" loading="lazy" decoding="async" />;
+  } else {
+    cover = <div aria-hidden className="steam-game-cover steam-game-cover--fallback">{fallbackInitial}</div>;
+  }
+
   return (
     <>
       {hasHeader && (
@@ -45,19 +62,7 @@ function SteamGameArtwork({ game }: Readonly<{ game: SteamGame }>) {
           onError={() => setHeaderFailed(true)}
         />
       )}
-      {hasHeader ? (
-        <img
-          data-steam-header={game.headerUrl}
-          alt=""
-          className="steam-game-cover"
-          decoding="async"
-          onError={() => setHeaderFailed(true)}
-        />
-      ) : game.iconUrl ? (
-        <img src={game.iconUrl} alt="" className="steam-game-cover steam-game-cover--icon" loading="lazy" decoding="async" />
-      ) : (
-        <div aria-hidden className="steam-game-cover steam-game-cover--fallback">{fallbackInitial}</div>
-      )}
+      {cover}
     </>
   );
 }
@@ -71,7 +76,10 @@ export function SteamNowPlaying({ data }: Readonly<{ data: SteamData }>) {
   // play in that window would otherwise see a blank card despite having plenty of history to show.
   const game = data.currentGame ?? recent ?? data.library?.mostPlayed[0];
   if (!game) return <p className="text-sm text-ink-faint">No recent Steam activity.</p>;
-  const label = data.currentGame ? 'Playing now' : recent ? 'Top played recently' : 'All-time favourite';
+  let label: string;
+  if (data.currentGame) label = 'Playing now';
+  else if (recent) label = 'Top played recently';
+  else label = 'All-time favourite';
   return (
     <div className="steam-hero p-4 sm:p-5">
       {game.headerUrl && <img aria-hidden src={game.headerUrl} alt="" className="steam-hero-backdrop" />}
@@ -214,17 +222,21 @@ export function SteamGameList({ data }: Readonly<{ data: SteamData }>) {
           {games.map((game, index) => {
             const primaryMinutes = sort === 'total' ? game.playtimeForeverMinutes : game.playtimeRecentMinutes;
             const secondaryMinutes = sort === 'total' ? game.playtimeRecentMinutes : game.playtimeForeverMinutes;
+            let secondaryLabel: string;
+            if (secondaryMinutes && secondaryMinutes > 0) {
+              secondaryLabel = `${formatHours(secondaryMinutes)} ${sort === 'total' ? 'in the last 2 weeks' : 'in library'}`;
+            } else if (sort === 'recent') {
+              secondaryLabel = 'No activity in the last 2 weeks';
+            } else {
+              secondaryLabel = 'No recent activity';
+            }
             return (
               <li key={game.appId} className="steam-game-row" data-recent={(game.playtimeRecentMinutes ?? 0) > 0}>
                 <span className="steam-game-rank">{index + 1}</span>
                 <SteamGameArtwork game={game} />
                 <div className="relative min-w-0 flex-1">
                   <p className="truncate font-semibold text-ink">{game.name}</p>
-                  <p className="mt-0.5 text-xs tabular-nums text-ink-muted">
-                    {secondaryMinutes && secondaryMinutes > 0
-                      ? `${formatHours(secondaryMinutes)} ${sort === 'total' ? 'in the last 2 weeks' : 'in library'}`
-                      : sort === 'recent' ? 'No activity in the last 2 weeks' : 'No recent activity'}
-                  </p>
+                  <p className="mt-0.5 text-xs tabular-nums text-ink-muted">{secondaryLabel}</p>
                 </div>
                 <div className="relative shrink-0 text-right">
                   <p className="text-sm font-semibold tabular-nums text-ink">{formatHours(primaryMinutes ?? 0)}</p>

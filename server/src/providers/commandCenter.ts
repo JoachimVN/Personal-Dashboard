@@ -10,6 +10,7 @@ import {
   type NewsData,
   type SpotifyData,
   type SteamData,
+  type SteamGame,
   type WeatherData,
   type WidgetEnvelope,
 } from '@personal-dashboard/shared';
@@ -78,6 +79,58 @@ export async function computeSpotifyFreshness(
   return fresh;
 }
 
+async function detectSteamCompletedGame(
+  signalHistory: SignalHistoryStore,
+  achievements: SteamData['achievements'],
+  freshMs: number,
+): Promise<boolean> {
+  if (!achievements) return false;
+  const { appId, unlockedCount, totalCount } = achievements;
+  const metric = `completed:${appId}`;
+  const completed = totalCount > 0 && unlockedCount === totalCount;
+  await signalHistory.record('steam', metric, completed);
+  if (!completed) return false;
+  const changedAt = await signalHistory.lastChangedAt('steam', metric);
+  return (await signalHistory.hasChangedSinceBaseline('steam', metric))
+    && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+}
+
+async function detectSteamPlaytimeMilestone(
+  signalHistory: SignalHistoryStore,
+  trackedGame: SteamGame | undefined,
+  playtimeMilestoneHours: number[],
+  freshMs: number,
+): Promise<number | undefined> {
+  if (trackedGame?.playtimeForeverMinutes === undefined) return undefined;
+  const hours = trackedGame.playtimeForeverMinutes / 60;
+  const tier = [...playtimeMilestoneHours].sort((a, b) => b - a).find((milestone) => hours >= milestone);
+  // Record the below-threshold state too. Otherwise a first observation at (say) 8h followed
+  // by 10h treats the actual first milestone as its baseline and silently misses the moment.
+  const metric = `playtime-milestone:${trackedGame.appId}`;
+  await signalHistory.record('steam', metric, tier ?? 0);
+  if (tier === undefined) return undefined;
+  const changedAt = await signalHistory.lastChangedAt('steam', metric);
+  const isFresh = (await signalHistory.hasChangedSinceBaseline('steam', metric))
+    && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+  return isFresh ? tier : undefined;
+}
+
+async function detectSteamLeaderboardClimb(
+  signalHistory: SignalHistoryStore,
+  friendsLeaderboard: SteamData['friendsLeaderboard'],
+  freshMs: number,
+): Promise<{ rank: number; delta: number } | undefined> {
+  if (friendsLeaderboard.status !== 'available') return undefined;
+  const rank = friendsLeaderboard.entries.findIndex((entry) => entry.isYou);
+  if (rank < 0) return undefined;
+  const previous = await signalHistory.getValue('steam', 'leaderboard-rank');
+  await signalHistory.record('steam', 'leaderboard-rank', rank);
+  if (typeof previous !== 'number' || previous <= rank) return undefined;
+  const changedAt = await signalHistory.lastChangedAt('steam', 'leaderboard-rank');
+  if (changedAt === undefined || Date.now() - changedAt.getTime() >= freshMs) return undefined;
+  return { rank, delta: previous - rank };
+}
+
 /**
  * Detects Steam "moments" that need history across polls, not just the latest snapshot: a game
  * reaching 100% achievements, the tracked game crossing a round-number playtime milestone, and a
@@ -91,49 +144,14 @@ export async function computeSteamMoments(
   playtimeMilestoneHours: number[],
   freshMs: number,
 ): Promise<SteamMoments> {
-  const moments: SteamMoments = { completedGame: false };
-  if (!steam) return moments;
-
-  if (steam.achievements) {
-    const { appId, unlockedCount, totalCount } = steam.achievements;
-    const metric = `completed:${appId}`;
-    const completed = totalCount > 0 && unlockedCount === totalCount;
-    await signalHistory.record('steam', metric, completed);
-    const changedAt = await signalHistory.lastChangedAt('steam', metric);
-    moments.completedGame = completed
-      && (await signalHistory.hasChangedSinceBaseline('steam', metric))
-      && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
-  }
+  if (!steam) return { completedGame: false };
 
   const trackedGame = steam.currentGame ?? steam.recentlyPlayed[0] ?? steam.library?.mostPlayed[0];
-  if (trackedGame?.playtimeForeverMinutes !== undefined) {
-    const hours = trackedGame.playtimeForeverMinutes / 60;
-    const tier = [...playtimeMilestoneHours].sort((a, b) => b - a).find((milestone) => hours >= milestone);
-    // Record the below-threshold state too. Otherwise a first observation at (say) 8h followed
-    // by 10h treats the actual first milestone as its baseline and silently misses the moment.
-    const metric = `playtime-milestone:${trackedGame.appId}`;
-    await signalHistory.record('steam', metric, tier ?? 0);
-    const changedAt = await signalHistory.lastChangedAt('steam', metric);
-    const isFresh = (await signalHistory.hasChangedSinceBaseline('steam', metric))
-      && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
-    if (tier !== undefined && isFresh) moments.playtimeMilestoneHours = tier;
-  }
+  const completedGame = await detectSteamCompletedGame(signalHistory, steam.achievements, freshMs);
+  const playtimeMilestoneHoursMoment = await detectSteamPlaytimeMilestone(signalHistory, trackedGame, playtimeMilestoneHours, freshMs);
+  const leaderboardClimb = await detectSteamLeaderboardClimb(signalHistory, steam.friendsLeaderboard, freshMs);
 
-  if (steam.friendsLeaderboard.status === 'available') {
-    const rank = steam.friendsLeaderboard.entries.findIndex((entry) => entry.isYou);
-    if (rank >= 0) {
-      const previous = await signalHistory.getValue('steam', 'leaderboard-rank');
-      await signalHistory.record('steam', 'leaderboard-rank', rank);
-      if (typeof previous === 'number' && previous > rank) {
-        const changedAt = await signalHistory.lastChangedAt('steam', 'leaderboard-rank');
-        if (changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs) {
-          moments.leaderboardClimb = { rank, delta: previous - rank };
-        }
-      }
-    }
-  }
-
-  return moments;
+  return { completedGame, playtimeMilestoneHours: playtimeMilestoneHoursMoment, leaderboardClimb };
 }
 
 export function createCommandCenterProvider(

@@ -114,6 +114,58 @@ function buildGeometry(chartPoints: ChartPoint[]): ChartGeometry {
   };
 }
 
+/** Splices the synthetic reset/session-start markers (see ChartPoint) into chartPoints in place,
+ * one set per known reset timestamp within the visible window. */
+function addSessionResetPoints(
+  chartPoints: ChartPoint[],
+  points: UsageHistoryPoint[],
+  sessionResetsAt: string | undefined,
+  sessionWindowMs: number,
+  start: number,
+  end: number,
+  windowMs: number,
+): void {
+  const resets = new Set([
+    ...points.map((point) => point.fiveHourResetsAt).filter((reset): reset is string => Boolean(reset)),
+    sessionResetsAt,
+  ].filter((reset): reset is string => Boolean(reset)));
+  for (const resetAt of resets) {
+    const reset = Date.parse(resetAt);
+    if (!Number.isFinite(reset)) continue;
+    const sessionStart = reset - sessionWindowMs;
+    if (reset > start && reset <= end) {
+      const prior = chartPoints.findLast((point) => Date.parse(point.at) < reset);
+      if (prior?.percent === 100) {
+        chartPoints.push({
+          x: ((reset - start) / windowMs) * W,
+          y: 0,
+          at: new Date(reset).toISOString(),
+          percent: 100,
+          order: 1,
+          sessionCapEnd: true,
+        });
+      }
+      chartPoints.push({
+        x: ((reset - start) / windowMs) * W,
+        y: H,
+        at: new Date(reset).toISOString(),
+        percent: 0,
+        order: 2,
+        resetAnchor: true,
+      });
+    }
+    if (sessionStart <= start || sessionStart > end) continue;
+    chartPoints.push({
+      x: ((sessionStart - start) / windowMs) * W,
+      y: H,
+      at: new Date(sessionStart).toISOString(),
+      percent: 0,
+      order: 2,
+      sessionStart: true,
+    });
+  }
+}
+
 function useChartGeometry(
   points: UsageHistoryPoint[],
   metric: Metric,
@@ -136,45 +188,7 @@ function useChartGeometry(
         };
       });
     if (sessionWindowMs) {
-      const resets = new Set([
-        ...points.map((point) => point.fiveHourResetsAt).filter((reset): reset is string => Boolean(reset)),
-        sessionResetsAt,
-      ].filter((reset): reset is string => Boolean(reset)));
-      for (const resetAt of resets) {
-        const reset = Date.parse(resetAt);
-        if (!Number.isFinite(reset)) continue;
-        const sessionStart = reset - sessionWindowMs;
-        if (reset > start && reset <= end) {
-          const prior = chartPoints.filter((point) => Date.parse(point.at) < reset).at(-1);
-          if (prior?.percent === 100) {
-            chartPoints.push({
-              x: ((reset - start) / windowMs) * W,
-              y: 0,
-              at: new Date(reset).toISOString(),
-              percent: 100,
-              order: 1,
-              sessionCapEnd: true,
-            });
-          }
-          chartPoints.push({
-            x: ((reset - start) / windowMs) * W,
-            y: H,
-            at: new Date(reset).toISOString(),
-            percent: 0,
-            order: 2,
-            resetAnchor: true,
-          });
-        }
-        if (sessionStart <= start || sessionStart > end) continue;
-        chartPoints.push({
-          x: ((sessionStart - start) / windowMs) * W,
-          y: H,
-          at: new Date(sessionStart).toISOString(),
-          percent: 0,
-          order: 2,
-          sessionStart: true,
-        });
-      }
+      addSessionResetPoints(chartPoints, points, sessionResetsAt, sessionWindowMs, start, end, windowMs);
     }
     chartPoints.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || (a.order ?? 0) - (b.order ?? 0));
     return chartPoints.length < 2 ? null : buildGeometry(chartPoints);
@@ -210,6 +224,12 @@ export function UsageHistoryChart({
     return <p className="text-[11px] text-ink-faint">{caption} — collecting history…</p>;
   }
   const chartPoints = geometry.points;
+
+  let captionText = caption;
+  if (hovered) {
+    const resetSuffix = hovered.sessionStart ? ' · session reset' : '';
+    captionText = `${Math.round(hovered.percent)}% · ${timeLabel(hovered.at, windowMs)}${resetSuffix}`;
+  }
 
   const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -302,11 +322,7 @@ export function UsageHistoryChart({
           />
         )}
       </div>
-      <p className="mt-1 text-[11px] tabular-nums text-ink-faint">
-        {hovered
-          ? `${Math.round(hovered.percent)}% · ${timeLabel(hovered.at, windowMs)}${hovered.sessionStart ? ' · session reset' : ''}`
-          : caption}
-      </p>
+      <p className="mt-1 text-[11px] tabular-nums text-ink-faint">{captionText}</p>
     </div>
   );
 }

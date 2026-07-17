@@ -368,6 +368,16 @@ async function fetchFriendLibraryTotal(
   }
 }
 
+interface FriendsLeaderboardRequest {
+  ownProfile: SteamData['profile'];
+  ownLibrary: SteamLibrarySnapshot | null;
+  friendIds: string[];
+  friendSummaries: RawPlayerSummary[];
+  maxFriends: number;
+  ttlMs: number;
+  snapshotStore: SteamSnapshotStore | undefined;
+}
+
 /** Computes (or serves a cached copy of) a playtime leaderboard across your friends — each entry
  * costs an extra GetOwnedGames call, so this is capped to `maxFriends` and cached for `ttlMs`
  * rather than recomputed on every 5-minute poll. Friends with a private library still appear
@@ -375,14 +385,9 @@ async function fetchFriendLibraryTotal(
 async function getOrFetchFriendsLeaderboard(
   signal: AbortSignal,
   apiKey: string,
-  ownProfile: SteamData['profile'],
-  ownLibrary: SteamLibrarySnapshot | null,
-  friendIds: string[],
-  friendSummaries: RawPlayerSummary[],
-  maxFriends: number,
-  ttlMs: number,
-  snapshotStore: SteamSnapshotStore | undefined,
+  request: FriendsLeaderboardRequest,
 ): Promise<{ status: 'available' | 'unavailable'; entries: SteamLeaderboardEntry[] }> {
+  const { ownProfile, ownLibrary, friendIds, friendSummaries, maxFriends, ttlMs, snapshotStore } = request;
   const cached = await snapshotStore?.getFriendsLeaderboard();
   const requestedFriendIds = friendIds.slice(0, maxFriends);
   const cacheIncludesRecentPlaytime = cached?.data.every(
@@ -534,6 +539,29 @@ async function fetchAchievements(
   return { appId, gameName, unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest };
 }
 
+async function resolveSteamLibrary(
+  signal: AbortSignal,
+  apiKey: string,
+  steamId: string,
+  snapshotStore: SteamSnapshotStore | undefined,
+): Promise<{ library: SteamLibrarySnapshot | null; libraryAvailability: SteamData['availability']['library'] }> {
+  const cachedLibrary = await snapshotStore?.getLibraryCache();
+  if (cachedLibrary && !isExpired(cachedLibrary.fetchedAt, LIBRARY_CACHE_TTL_MS)) {
+    return { library: cachedLibrary.data, libraryAvailability: 'available' };
+  }
+
+  const result = await fetchOwnedGames(signal, apiKey, steamId);
+  if (result.status === 'available') {
+    await snapshotStore?.setLibraryCache(result.data);
+    return { library: result.data, libraryAvailability: 'available' };
+  }
+  if (cachedLibrary) {
+    // Prefer a stale-but-real cache over marking the whole library unavailable.
+    return { library: cachedLibrary.data, libraryAvailability: 'available' };
+  }
+  return { library: null, libraryAvailability: result.status };
+}
+
 export interface SteamLeaderboardOptions {
   maxFriends: number;
   ttlMs: number;
@@ -562,27 +590,7 @@ export function createSteamProvider(
       const { profile, currentGame } = await fetchProfile(signal, apiKey, steamId);
       const recentlyPlayed = await fetchRecentlyPlayed(signal, apiKey, steamId);
 
-      const cachedLibrary = await snapshotStore?.getLibraryCache();
-      let library: SteamLibrarySnapshot | null = null;
-      let libraryAvailability: SteamData['availability']['library'] = 'unavailable';
-
-      if (cachedLibrary && !isExpired(cachedLibrary.fetchedAt, LIBRARY_CACHE_TTL_MS)) {
-        library = cachedLibrary.data;
-        libraryAvailability = 'available';
-      } else {
-        const result = await fetchOwnedGames(signal, apiKey, steamId);
-        if (result.status === 'available') {
-          library = result.data;
-          libraryAvailability = 'available';
-          await snapshotStore?.setLibraryCache(result.data);
-        } else if (cachedLibrary) {
-          // Prefer a stale-but-real cache over marking the whole library unavailable.
-          library = cachedLibrary.data;
-          libraryAvailability = 'available';
-        } else {
-          libraryAvailability = result.status;
-        }
-      }
+      const { library, libraryAvailability } = await resolveSteamLibrary(signal, apiKey, steamId, snapshotStore);
 
       if (library) await historyStore?.record(library.totalPlaytimeMinutes);
 
@@ -605,17 +613,15 @@ export function createSteamProvider(
 
       const leaderboard =
         friendIdsResult.status === 'available'
-          ? await getOrFetchFriendsLeaderboard(
-              signal,
-              apiKey,
-              profile,
-              library,
-              friendIdsResult.friendIds,
+          ? await getOrFetchFriendsLeaderboard(signal, apiKey, {
+              ownProfile: profile,
+              ownLibrary: library,
+              friendIds: friendIdsResult.friendIds,
               friendSummaries,
-              leaderboardOptions.maxFriends,
-              leaderboardOptions.ttlMs,
+              maxFriends: leaderboardOptions.maxFriends,
+              ttlMs: leaderboardOptions.ttlMs,
               snapshotStore,
-            )
+            })
           : { status: 'unavailable' as const, entries: [] };
 
       const data: SteamData = {

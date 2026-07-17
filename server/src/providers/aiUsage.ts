@@ -262,15 +262,20 @@ function parseTimeOnlyResetAt(hour: string, minute: string | undefined, meridiem
   return Number.isNaN(candidate.getTime()) ? undefined : candidate.toISOString();
 }
 
+const WS = '\\s*';
+const CURRENT_WEEK = `Current${WS}week${WS}\\(`;
+const ALL_MODELS_CLOSE = `all${WS}models${WS}\\)`;
+const ESC = '\u001B';
+const BEL = '\u0007';
+const OSC_SEQUENCE = new RegExp(`${ESC}\\][^${BEL}]*(?:${BEL}|${ESC}\\\\)`, 'g'); // OSC title/hyperlink sequences.
+const CSI_SEQUENCE = new RegExp(`${ESC}\\[[0-?]*[ -/]*[@-~]`, 'g'); // CSI cursor/style sequences.
+
 function stripTerminalControls(value: string): string {
-  return value
-    .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, '') // OSC title/hyperlink sequences.
-    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, '') // CSI cursor/style sequences.
-    .replace(/\r/g, '');
+  return value.replace(OSC_SEQUENCE, '').replace(CSI_SEQUENCE, '').replaceAll('\r', '');
 }
 
 function parseUsageWindow(section: string, now: Date) {
-  const used = /(\d+(?:\.\d+)?)%\s*used/i.exec(section);
+  const used = /(\d{1,3}(?:\.\d{1,2})?)%\s*used/i.exec(section);
   const datedReset = /Resets\s*([a-z]{3})\s*(\d{1,2})\s*at\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
   const timeOnlyReset = /Resets\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
   if (!used || (!datedReset && !timeOnlyReset)) return undefined;
@@ -290,11 +295,14 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
   const text = stripTerminalControls(screen);
   // Terminal cursor updates can erase visual spaces from the captured stream, so accept both
   // the readable UI labels and their compact `Currentsession` / `Currentweek(allmodels)` form.
-  const session = /Current\s*session([\s\S]*?)(?=Current\s*week\s*\(\s*all\s*models\s*\)|$)/i.exec(text)?.[1] ?? '';
-  const weekly = /Current\s*week\s*\(\s*all\s*models\s*\)([\s\S]*)/i.exec(text)?.[1] ?? '';
+  const session = new RegExp(`Current${WS}session([\\s\\S]*?)(?=${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}|$)`, 'i').exec(text)?.[1] ?? '';
+  const weekly = new RegExp(`${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}([\\s\\S]*)`, 'i').exec(text)?.[1] ?? '';
   const fiveHour = parseUsageWindow(session, now);
   const week = parseUsageWindow(weekly, now);
-  const modelMatch = /Current\s*week\s*\(\s*(?!all\s*models\s*\))([^)]+)\)([\s\S]*?)(?=Current\s*week\s*\(|What's\s*contributing|$)/i.exec(text);
+  const modelMatch = new RegExp(
+    `${CURRENT_WEEK}${WS}(?!${ALL_MODELS_CLOSE})([^)]+)\\)([\\s\\S]*?)(?=${CURRENT_WEEK}|What's${WS}contributing|$)`,
+    'i',
+  ).exec(text);
   const modelLimit = modelMatch ? parseUsageWindow(modelMatch[2], now) : undefined;
   const modelWeekly = modelLimit && modelMatch ? { ...modelLimit, model: modelMatch[1].trim() } : undefined;
   const hasQuotaReport = Boolean(fiveHour || week || modelWeekly);
