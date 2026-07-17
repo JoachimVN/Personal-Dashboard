@@ -116,33 +116,15 @@ export function SteamLibraryStats({ data }: Readonly<{ data: SteamData }>) {
 
 type SteamGameSort = 'total' | 'recent';
 
-/* Rows have a fixed 4.75rem height and a 0.55rem gap (see steam.css). Keeping only the visible
- * window mounted prevents a large library from decoding hundreds of Steam headers during a fast scroll. */
-const STEAM_LIBRARY_ROW_HEIGHT = 85;
-const STEAM_LIBRARY_OVERSCAN = 5;
-
 /** Full owned-games list, sortable by the only two windows Steam's API actually tracks —
  * all-time playtime and the trailing ~2-week window — rather than invented intermediate ranges. */
 export function SteamGameList({ data }: Readonly<{ data: SteamData }>) {
   const [sort, setSort] = useState<SteamGameSort>('total');
   const [query, setQuery] = useState('');
   const listRef = useRef<HTMLOListElement>(null);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [viewportHeight, setViewportHeight] = useState(672);
-
-  useEffect(() => {
-    const list = listRef.current;
-    if (!list) return undefined;
-    const updateViewportHeight = () => setViewportHeight(list.clientHeight);
-    updateViewportHeight();
-    const observer = new ResizeObserver(updateViewportHeight);
-    observer.observe(list);
-    return () => observer.disconnect();
-  }, []);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: 0 });
-    setScrollTop(0);
   }, [query, sort]);
 
   if (data.availability.library !== 'available' || !data.library) {
@@ -162,12 +144,6 @@ export function SteamGameList({ data }: Readonly<{ data: SteamData }>) {
   const games = [...data.library.allGames]
     .filter((game) => game.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     .sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0));
-  const visibleStart = Math.max(0, Math.floor(scrollTop / STEAM_LIBRARY_ROW_HEIGHT) - STEAM_LIBRARY_OVERSCAN);
-  const visibleEnd = Math.min(
-    games.length,
-    Math.ceil((scrollTop + viewportHeight) / STEAM_LIBRARY_ROW_HEIGHT) + STEAM_LIBRARY_OVERSCAN,
-  );
-  const visibleGames = games.slice(visibleStart, visibleEnd);
 
   return (
     <div>
@@ -196,11 +172,8 @@ export function SteamGameList({ data }: Readonly<{ data: SteamData }>) {
         <ol
           ref={listRef}
           className="steam-game-list max-h-[42rem] overflow-y-auto pr-1"
-          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
-          style={{ paddingTop: visibleStart * STEAM_LIBRARY_ROW_HEIGHT, paddingBottom: (games.length - visibleEnd) * STEAM_LIBRARY_ROW_HEIGHT }}
         >
-          {visibleGames.map((game, visibleIndex) => {
-            const index = visibleStart + visibleIndex;
+          {games.map((game, index) => {
             const primaryMinutes = sort === 'total' ? game.playtimeForeverMinutes : game.playtimeRecentMinutes;
             const secondaryMinutes = sort === 'total' ? game.playtimeRecentMinutes : game.playtimeForeverMinutes;
             return (
