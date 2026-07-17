@@ -51,9 +51,19 @@ function ToolCard({
   id,
   label,
   color,
+  fastColor,
+  modelColor,
   iconColor = color,
   icon: Icon,
-}: Readonly<{ id: string; label: string; color: string; iconColor?: string; icon: React.ComponentType<ToolIconProps> }>) {
+}: Readonly<{
+  id: string;
+  label: string;
+  color: string;
+  fastColor: string;
+  modelColor: string;
+  iconColor?: string;
+  icon: React.ComponentType<ToolIconProps>;
+}>) {
   const { envelope, offline, refresh, refreshing } = useWidget<AiUsageToolData>(id);
 
   if (isWidgetDisabled(envelope)) return null;
@@ -84,11 +94,11 @@ function ToolCard({
                   label="5 hours"
                   limit={data.fiveHour}
                   tokens={data.tokens?.fiveHour}
-                  color={color}
+                  color={fastColor}
                   windowMs={FIVE_HOUR_MS}
                 />
               ) : (
-                <WindowUnavailable label="5 hours" status={data.fiveHourStatus} tokens={data.tokens?.fiveHour} color={color} />
+                <WindowUnavailable label="5 hours" status={data.fiveHourStatus} tokens={data.tokens?.fiveHour} color={fastColor} />
               )}
               {data.weekly ? (
                 <UsageMeter
@@ -105,7 +115,7 @@ function ToolCard({
                 <UsageMeter
                   label={`Weekly (${data.modelWeekly.model})`}
                   limit={data.modelWeekly}
-                  color={color}
+                  color={modelColor}
                   windowMs={WEEKLY_MS}
                 />
               )}
@@ -116,7 +126,7 @@ function ToolCard({
                   points={data.history}
                   metric="fiveHourUsedPercent"
                   windowMs={DAY_MS}
-                  color={color}
+                  color={fastColor}
                   caption="5-hour window · last 24 h"
                   sessionResetsAt={data.fiveHour.resetsAt}
                   sessionWindowMs={FIVE_HOUR_MS}
@@ -136,7 +146,7 @@ function ToolCard({
                   points={data.history}
                   metric="modelWeeklyUsedPercent"
                   windowMs={WEEKLY_MS}
-                  color={color}
+                  color={modelColor}
                   caption={`${data.modelWeekly.model} weekly · last 7 d`}
                 />
               )}

@@ -71,6 +71,48 @@ export function UsageMeter({
   );
 }
 
+/**
+ * Both windows stacked as two thin full-strength bars rather than overlaid with transparency —
+ * blended opacity read as a single washed-out blob, especially when the two percentages are
+ * close. Two solid-color lanes stay legible at any combination of values.
+ */
+export function LayeredUsageBar({
+  fiveHour,
+  weekly,
+  color,
+  fastColor,
+}: Readonly<{
+  fiveHour?: number;
+  weekly?: number;
+  color: string;
+  fastColor: string;
+}>) {
+  return (
+    <div className="space-y-1">
+      {fiveHour !== undefined && (
+        <div className="h-1.5 overflow-hidden rounded-full bg-track">
+          <motion.div
+            className="h-full rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${fiveHour}%` }}
+            style={{ backgroundColor: fastColor }}
+          />
+        </div>
+      )}
+      {weekly !== undefined && (
+        <div className="h-1.5 overflow-hidden rounded-full bg-track">
+          <motion.div
+            className="h-full rounded-full"
+            initial={{ width: 0 }}
+            animate={{ width: `${weekly}%` }}
+            style={{ backgroundColor: color }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Claude omits the 5-hour quota entirely when no session is active. Treat a confirmed zero
  * local total as an empty window, rather than making token count look like the quota state. */
 export function ZeroUsageMeter({

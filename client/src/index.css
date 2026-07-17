@@ -29,6 +29,14 @@
   --color-codex: light-dark(#5b6ee1, #9895ff);
   --color-codex-blue: light-dark(#4b84e8, #7eafff);
   --color-codex-purple: light-dark(#7863df, #b49dff);
+
+  /* Lighter tints of the brand accents, used for the 5-hour usage window stacked with the weekly one. */
+  --color-claude-fast: color-mix(in oklab, var(--color-claude) 72%, white 28%);
+  --color-codex-fast: color-mix(in oklab, var(--color-codex) 72%, white 28%);
+
+  /* Darker tints, used for a model-specific weekly cap (e.g. Claude's "Fable" limit). */
+  --color-claude-model: color-mix(in oklab, var(--color-claude) 72%, black 28%);
+  --color-codex-model: color-mix(in oklab, var(--color-codex) 72%, black 28%);
 }
 
 /* Glass card recipe — apply only to card-level surfaces; stacked backdrop-filters are expensive on mobile Safari. */
