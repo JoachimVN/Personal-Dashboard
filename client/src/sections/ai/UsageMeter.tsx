@@ -71,40 +71,32 @@ export function UsageMeter({
   );
 }
 
-/**
- * Both windows stacked as two thin full-strength bars rather than overlaid with transparency —
- * blended opacity read as a single washed-out blob, especially when the two percentages are
- * close. Two solid-color lanes stay legible at any combination of values.
- */
-export function LayeredUsageBar({
-  fiveHour,
-  weekly,
+/** One overview-card row: a label/value line with that window's own bar directly beneath it. */
+export function UsageLane({
+  label,
+  value,
+  percent,
   color,
-  fastColor,
 }: Readonly<{
-  fiveHour?: number;
-  weekly?: number;
+  label: string;
+  value: string;
+  percent?: number;
   color: string;
-  fastColor: string;
 }>) {
   return (
-    <div className="space-y-1">
-      {fiveHour !== undefined && (
+    <div>
+      <div className="mb-1 flex items-baseline justify-between text-xs text-ink-muted">
+        <span>{label}</span>
+        <span className="font-semibold tabular-nums" style={{ color }}>
+          {value}
+        </span>
+      </div>
+      {percent !== undefined && (
         <div className="h-1.5 overflow-hidden rounded-full bg-track">
           <motion.div
             className="h-full rounded-full"
             initial={{ width: 0 }}
-            animate={{ width: `${fiveHour}%` }}
-            style={{ backgroundColor: fastColor }}
-          />
-        </div>
-      )}
-      {weekly !== undefined && (
-        <div className="h-1.5 overflow-hidden rounded-full bg-track">
-          <motion.div
-            className="h-full rounded-full"
-            initial={{ width: 0 }}
-            animate={{ width: `${weekly}%` }}
+            animate={{ width: `${percent}%` }}
             style={{ backgroundColor: color }}
           />
         </div>
