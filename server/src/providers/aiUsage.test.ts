@@ -75,6 +75,25 @@ describe('parseClaudeUsageScreen', () => {
     expect(quota.weekly?.usedPercent).toBe(13);
     expect(quota.modelWeekly).toMatchObject({ model: 'Fable', usedPercent: 9 });
   });
+
+  it('backdates asOf when the screen reports rate-limited last-known usage instead of a live read', () => {
+    const now = new Date(2026, 6, 17, 18, 0);
+    const quota = parseClaudeUsageScreen(
+      `Current session
+      0% used
+      Resets 11:59pm (Europe/Oslo)
+
+      Current week (all models)
+      35% used
+      Resets Jul 18 at 11:59pm (Europe/Oslo)
+
+      Showing last-known usage as of 50m ago (rate limited — try again in a moment)`,
+      now,
+    );
+
+    expect(quota.fiveHour?.usedPercent).toBe(0);
+    expect(quota.asOf).toBe(new Date(2026, 6, 17, 17, 10).toISOString());
+  });
 });
 
 describe('claudeNextRefreshMs', () => {

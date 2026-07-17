@@ -274,6 +274,19 @@ function stripTerminalControls(value: string): string {
   return value.replace(OSC_SEQUENCE, '').replace(CSI_SEQUENCE, '').replaceAll('\r', '');
 }
 
+/**
+ * When Anthropic's usage endpoint itself is rate-limited, the Usage screen still renders the last
+ * numbers it had under a "Showing last-known usage as of 50m ago (rate limited — try again in a
+ * moment)" banner. Those numbers are real but old; without this, `asOf` would be stamped "now" on
+ * every poll and the widget would look perfectly fresh while quietly serving an hours-stale reading.
+ */
+const STALE_USAGE_BANNER = new RegExp(String.raw`last-known${WS}usage${WS}as${WS}of${WS}(\d+)${WS}(m|h|d)${WS}ago`, 'i');
+
+function staleBannerAgeMs(amount: string, unit: string): number {
+  const msPerUnit: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000 };
+  return Number(amount) * (msPerUnit[unit.toLowerCase()] ?? 60_000);
+}
+
 function parseUsageWindow(section: string, now: Date) {
   const used = /(\d{1,3}(?:\.\d{1,2})?)%\s*used/i.exec(section);
   const datedReset = /Resets\s*([a-z]{3})\s*(\d{1,2})\s*at\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
@@ -306,13 +319,17 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
   const modelLimit = modelMatch ? parseUsageWindow(modelMatch[2], now) : undefined;
   const modelWeekly = modelLimit && modelMatch ? { ...modelLimit, model: modelMatch[1].trim() } : undefined;
   const hasQuotaReport = Boolean(fiveHour || week || modelWeekly);
+  const staleBanner = STALE_USAGE_BANNER.exec(text);
+  const asOf = hasQuotaReport
+    ? new Date(now.getTime() - (staleBanner ? staleBannerAgeMs(staleBanner[1], staleBanner[2]) : 0)).toISOString()
+    : undefined;
   return {
     fiveHour,
     weekly: week,
     modelWeekly,
     fiveHourStatus: limitStatus(Boolean(fiveHour), hasQuotaReport),
     weeklyStatus: limitStatus(Boolean(week), hasQuotaReport),
-    asOf: hasQuotaReport ? now.toISOString() : undefined,
+    asOf,
   };
 }
 
@@ -336,11 +353,13 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
       });
       let terminal = '';
       let settled = false;
+      let settleTimer: NodeJS.Timeout | undefined;
       const finish = (result?: string, error?: Error) => {
         if (settled) return;
         settled = true;
         clearTimeout(sendUsage);
         clearTimeout(timeout);
+        clearTimeout(settleTimer);
         try {
           pty.kill();
         } catch {
@@ -354,7 +373,13 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
       pty.onData((chunk) => {
         terminal += chunk;
         const quota = parseClaudeUsageScreen(terminal);
-        if (quota.fiveHour && quota.weekly) finish(terminal);
+        // Both windows parsing is necessary but not sufficient: a trailing "rate limited, showing
+        // last-known usage" banner can still stream in afterward, so wait for the screen to go
+        // quiet before treating this render as the final one (see parseClaudeUsageScreen).
+        if (quota.fiveHour && quota.weekly) {
+          clearTimeout(settleTimer);
+          settleTimer = setTimeout(() => finish(terminal), 750);
+        }
       });
       pty.onExit(({ exitCode }) => {
         if (!settled) finish(undefined, new Error(`Claude exited before Usage rendered (${exitCode})`));
