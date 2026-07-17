@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { steamGameSchema, steamSchema, type SteamData } from '@personal-dashboard/shared';
+import { steamGameSchema, steamLeaderboardEntrySchema, steamSchema, type SteamData, type SteamLeaderboardEntry } from '@personal-dashboard/shared';
 import type { Database } from './db/client.js';
 
 const steamLibrarySnapshotSchema = z.object({
@@ -92,5 +92,13 @@ export class SteamSnapshotStore {
 
   setAchievementPercentages(appId: number, data: SteamAchievementPercentageEntry[]): Promise<void> {
     return setCached(this.database, `achievement-percentages:${appId}`, data);
+  }
+
+  getFriendsLeaderboard(): Promise<{ data: SteamLeaderboardEntry[]; fetchedAt: Date } | undefined> {
+    return getCached(this.database, 'friends-leaderboard', z.array(steamLeaderboardEntrySchema));
+  }
+
+  setFriendsLeaderboard(data: SteamLeaderboardEntry[]): Promise<void> {
+    return setCached(this.database, 'friends-leaderboard', data);
   }
 }

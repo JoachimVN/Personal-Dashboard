@@ -106,6 +106,12 @@ export const spotifyObservedPlays = pgTable(
   (table) => [primaryKey({ columns: [table.playedAt, table.trackId] })],
 );
 
+export const steamPlaytimeHistory = pgTable('steam_playtime_history', {
+  date: text('date').primaryKey(),
+  totalPlaytimeMinutes: doublePrecision('total_playtime_minutes').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const signalCurrent = pgTable(
   'signal_current',
   {

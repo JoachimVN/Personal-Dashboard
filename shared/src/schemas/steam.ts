@@ -27,6 +27,37 @@ export const steamAchievementSchema = z.object({
 
 export type SteamAchievement = z.infer<typeof steamAchievementSchema>;
 
+/** A not-yet-unlocked achievement — no `unlockedAt`, used for the "closest to unlocking" showcase. */
+export const steamLockedAchievementSchema = z.object({
+  apiName: z.string(),
+  displayName: z.string(),
+  description: z.string().optional(),
+  iconUrl: z.string().optional(),
+  globalUnlockedPercent: z.number().optional(),
+});
+
+export type SteamLockedAchievement = z.infer<typeof steamLockedAchievementSchema>;
+
+export const steamLeaderboardEntrySchema = z.object({
+  steamId: z.string(),
+  personaName: z.string(),
+  avatarUrl: z.string().optional(),
+  /** undefined means this friend's library is private — still shown, just unranked. */
+  totalPlaytimeMinutes: z.number().optional(),
+  /** Count of appIds this friend's library shares with your own. */
+  sharedGames: z.number(),
+  isYou: z.boolean(),
+});
+
+export type SteamLeaderboardEntry = z.infer<typeof steamLeaderboardEntrySchema>;
+
+export const steamPlaytimeHistoryPointSchema = z.object({
+  date: z.string(),
+  totalPlaytimeMinutes: z.number(),
+});
+
+export type SteamPlaytimeHistoryPoint = z.infer<typeof steamPlaytimeHistoryPointSchema>;
+
 export const steamFriendSchema = z.object({
   steamId: z.string(),
   personaName: z.string(),
@@ -68,9 +99,21 @@ export const steamSchema = z.object({
       unlockedCount: z.number(),
       totalCount: z.number(),
       recentUnlocks: z.array(steamAchievementSchema),
+      /** Up to 5 unlocked achievements with the lowest global unlock percent. */
+      rarest: z.array(steamAchievementSchema),
+      /** Up to 5 locked achievements with the highest global unlock percent — "most players have
+       * this, you don't yet". */
+      nextEasiest: z.array(steamLockedAchievementSchema),
     })
     .nullable(),
   friendsInGame: z.array(steamFriendSchema),
+  /** One row per calendar day of cumulative all-time playtime, oldest first. Client derives
+   * day-over-day deltas for the trend chart. */
+  playtimeHistory: z.array(steamPlaytimeHistoryPointSchema),
+  friendsLeaderboard: z.object({
+    status: z.enum(['available', 'unavailable']),
+    entries: z.array(steamLeaderboardEntrySchema),
+  }),
   availability: z.object({
     library: z.enum(['available', 'private', 'unavailable']),
     achievements: z.enum(['available', 'unavailable']),

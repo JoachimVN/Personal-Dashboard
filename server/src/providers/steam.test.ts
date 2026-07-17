@@ -24,6 +24,8 @@ function emptySnapshotStore() {
     setAchievementSchema: vi.fn().mockResolvedValue(undefined),
     getAchievementPercentages: vi.fn().mockResolvedValue(undefined),
     setAchievementPercentages: vi.fn().mockResolvedValue(undefined),
+    getFriendsLeaderboard: vi.fn().mockResolvedValue(undefined),
+    setFriendsLeaderboard: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -111,6 +113,45 @@ describe('mergeAchievements', () => {
   it('falls back to the raw API name when no schema entry matches', () => {
     const result = mergeAchievements([{ apiname: 'ACH_MYSTERY', achieved: 1, unlocktime: 1_752_600_000 }], [], []);
     expect(result.recentUnlocks[0]).toMatchObject({ apiName: 'ACH_MYSTERY', displayName: 'ACH_MYSTERY', globalUnlockedPercent: undefined });
+  });
+
+  it('ranks unlocked achievements by ascending global rarity, dropping ones with no rarity data', () => {
+    const result = mergeAchievements(
+      [
+        { apiname: 'ACH_COMMON', achieved: 1, unlocktime: 1 },
+        { apiname: 'ACH_RARE', achieved: 1, unlocktime: 2 },
+        { apiname: 'ACH_UNKNOWN', achieved: 1, unlocktime: 3 },
+      ],
+      [],
+      [
+        { apiName: 'ACH_COMMON', percent: 80 },
+        { apiName: 'ACH_RARE', percent: 1.5 },
+      ],
+    );
+    expect(result.rarest.map((a) => a.apiName)).toEqual(['ACH_RARE', 'ACH_COMMON']);
+  });
+
+  it('surfaces locked achievements with the highest global unlock rate as "next easiest"', () => {
+    const result = mergeAchievements(
+      [
+        { apiname: 'ACH_DONE', achieved: 1, unlocktime: 1 },
+        { apiname: 'ACH_HARD', achieved: 0, unlocktime: 0 },
+        { apiname: 'ACH_EASY', achieved: 0, unlocktime: 0 },
+        { apiname: 'ACH_UNKNOWN', achieved: 0, unlocktime: 0 },
+      ],
+      [
+        { apiName: 'ACH_DONE', displayName: 'Done' },
+        { apiName: 'ACH_HARD', displayName: 'Hard' },
+        { apiName: 'ACH_EASY', displayName: 'Easy' },
+        { apiName: 'ACH_UNKNOWN', displayName: 'Unknown' },
+      ],
+      [
+        { apiName: 'ACH_HARD', percent: 2 },
+        { apiName: 'ACH_EASY', percent: 95 },
+      ],
+    );
+    // Already-unlocked (ACH_DONE) and rarity-less (ACH_UNKNOWN) achievements never appear here.
+    expect(result.nextEasiest.map((a) => a.apiName)).toEqual(['ACH_EASY', 'ACH_HARD']);
   });
 });
 
@@ -310,6 +351,74 @@ describe('createSteamProvider fetch', () => {
       const data = await provider.fetch(new AbortController().signal, false);
 
       expect(data.achievements?.recentUnlocks[0]).toMatchObject({ displayName: 'Freeman', globalUnlockedPercent: 12.5 });
+      expect(fetchMock).toHaveBeenCalledTimes(5);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('computes a friends playtime leaderboard, keeping private-library friends unranked rather than dropping them', async () => {
+    const snapshotStore = emptySnapshotStore();
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ response: { players: [{ steamid: auth.steamId, personaname: 'Alex', profileurl: 'https://steamcommunity.com/id/alex' }] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { games: [] } }))
+      // GetOwnedGames (own) — appids 10 and 20
+      .mockResolvedValueOnce(jsonResponse({
+        response: { game_count: 2, games: [{ appid: 10, name: 'A', playtime_forever: 100 }, { appid: 20, name: 'B', playtime_forever: 50 }] },
+      }))
+      // GetPlayerAchievements — tracked game (A) has no stats
+      .mockResolvedValueOnce(jsonResponse({ playerstats: { success: false, error: 'no stats' } }))
+      // GetFriendList
+      .mockResolvedValueOnce(jsonResponse({ friendslist: { friends: [{ steamid: 'friend1' }, { steamid: 'friend2' }] } }))
+      // GetPlayerSummaries (friends)
+      .mockResolvedValueOnce(jsonResponse({
+        response: { players: [{ steamid: 'friend1', personaname: 'Bob', avatarfull: 'https://avatar/bob.jpg' }, { steamid: 'friend2', personaname: 'Cara' }] },
+      }))
+      // GetOwnedGames (friend1) — shares appid 10 with the user
+      .mockResolvedValueOnce(jsonResponse({
+        response: { games: [{ appid: 10, playtime_forever: 80 }, { appid: 99, playtime_forever: 20 }] },
+      }))
+      // GetOwnedGames (friend2) — private
+      .mockResolvedValueOnce(jsonResponse({ response: {} }));
+
+    try {
+      const provider = createSteamProvider(auth, snapshotStore as never);
+      const data = await provider.fetch(new AbortController().signal, false);
+
+      expect(data.friendsLeaderboard.status).toBe('available');
+      expect(data.friendsLeaderboard.entries).toEqual([
+        { steamId: auth.steamId, personaName: 'Alex', avatarUrl: undefined, totalPlaytimeMinutes: 150, sharedGames: 2, isYou: true },
+        { steamId: 'friend1', personaName: 'Bob', avatarUrl: 'https://avatar/bob.jpg', totalPlaytimeMinutes: 100, sharedGames: 1, isYou: false },
+        { steamId: 'friend2', personaName: 'Cara', avatarUrl: undefined, totalPlaytimeMinutes: undefined, sharedGames: 0, isYou: false },
+      ]);
+      expect(snapshotStore.setFriendsLeaderboard).toHaveBeenCalledOnce();
+      expect(fetchMock).toHaveBeenCalledTimes(8);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('reuses a fresh cached leaderboard without re-fetching every friend\'s library', async () => {
+    const cachedLeaderboard = [
+      { steamId: auth.steamId, personaName: 'Alex', totalPlaytimeMinutes: 150, sharedGames: 2, isYou: true },
+      { steamId: 'friend1', personaName: 'Bob', totalPlaytimeMinutes: 100, sharedGames: 1, isYou: false },
+    ];
+    const snapshotStore = emptySnapshotStore();
+    snapshotStore.getFriendsLeaderboard.mockResolvedValue({ data: cachedLeaderboard, fetchedAt: new Date() });
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ response: { players: [{ steamid: auth.steamId, personaname: 'Alex', profileurl: 'https://steamcommunity.com/id/alex' }] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { games: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { game_count: 0, games: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ friendslist: { friends: [{ steamid: 'friend1' }] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { players: [{ steamid: 'friend1', personaname: 'Bob' }] } }));
+
+    try {
+      const provider = createSteamProvider(auth, snapshotStore as never);
+      const data = await provider.fetch(new AbortController().signal, false);
+
+      expect(data.friendsLeaderboard).toEqual({ status: 'available', entries: cachedLeaderboard });
+      expect(snapshotStore.setFriendsLeaderboard).not.toHaveBeenCalled();
+      // No per-friend GetOwnedGames calls beyond the 5 already queued above.
       expect(fetchMock).toHaveBeenCalledTimes(5);
     } finally {
       fetchMock.mockRestore();

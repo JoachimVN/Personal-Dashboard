@@ -8,6 +8,7 @@ import { UsageHistoryStore } from '../usageHistory.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
+import { SteamHistoryStore } from '../steamHistory.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
@@ -53,6 +54,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
   const githubSnapshot = new GitHubSnapshotStore(database);
   const spotifyHistory = new SpotifyHistoryStore(database);
   const steamSnapshot = new SteamSnapshotStore(database);
+  const steamHistory = new SteamHistoryStore(database, config.steam.historyRetentionDays);
   return {
     weather,
     hue,
@@ -79,7 +81,10 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
         createSystemProvider(env.timezone),
         hue,
         createIMessageProvider(),
-        createSteamProvider(env.steam, steamSnapshot),
+        createSteamProvider(env.steam, steamSnapshot, steamHistory, {
+          maxFriends: config.steam.leaderboardMaxFriends,
+          ttlMs: config.steam.leaderboardTtlHours * 60 * 60_000,
+        }),
       ] satisfies Provider[]
     ).map((provider) => withEnabledToggle(provider, config)),
   };

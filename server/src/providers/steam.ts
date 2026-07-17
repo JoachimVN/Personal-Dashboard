@@ -1,5 +1,14 @@
-import { steamSchema, type SteamData, type SteamFriend, type SteamGame } from '@personal-dashboard/shared';
+import {
+  steamSchema,
+  type SteamAchievement,
+  type SteamData,
+  type SteamFriend,
+  type SteamGame,
+  type SteamLeaderboardEntry,
+  type SteamLockedAchievement,
+} from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
+import type { SteamHistoryStore } from '../steamHistory.js';
 import type {
   SteamAchievementPercentageEntry,
   SteamAchievementSchemaEntry,
@@ -15,6 +24,7 @@ const MAX_FRIENDS_IN_GAME = 8;
 const LIBRARY_CACHE_TTL_MS = 6 * 60 * 60_000;
 const ACHIEVEMENT_SCHEMA_TTL_MS = 30 * 24 * 60 * 60_000;
 const ACHIEVEMENT_PERCENTAGES_TTL_MS = 24 * 60 * 60_000;
+const RARITY_SHOWCASE_COUNT = 5;
 
 export interface SteamAuth {
   apiKey: string;
@@ -141,26 +151,53 @@ export function mergeAchievements(
   playerAchievements: RawPlayerAchievement[],
   schema: SteamAchievementSchemaEntry[],
   percentages: SteamAchievementPercentageEntry[],
-): { unlockedCount: number; totalCount: number; recentUnlocks: NonNullable<SteamData['achievements']>['recentUnlocks'] } {
+): {
+  unlockedCount: number;
+  totalCount: number;
+  recentUnlocks: SteamAchievement[];
+  rarest: SteamAchievement[];
+  nextEasiest: SteamLockedAchievement[];
+} {
   const schemaByName = new Map(schema.map((entry) => [entry.apiName, entry]));
   const percentByName = new Map(percentages.map((entry) => [entry.apiName, entry.percent]));
   const unlocked = playerAchievements.filter((a) => a.achieved === 1);
+  const unlockedNames = new Set(unlocked.map((a) => a.apiname));
 
-  const recentUnlocks = unlocked
-    .map((a) => {
-      const def = schemaByName.get(a.apiname);
-      return {
-        apiName: a.apiname,
-        displayName: def?.displayName ?? a.apiname,
-        description: def?.description,
-        iconUrl: def?.icon,
-        unlockedAt: unixSecondsToIso(a.unlocktime),
-        globalUnlockedPercent: percentByName.get(a.apiname),
-      };
-    })
-    .sort((a, b) => (a.unlockedAt < b.unlockedAt ? 1 : -1));
+  const toAchievement = (a: RawPlayerAchievement): SteamAchievement => {
+    const def = schemaByName.get(a.apiname);
+    return {
+      apiName: a.apiname,
+      displayName: def?.displayName ?? a.apiname,
+      description: def?.description,
+      iconUrl: def?.icon,
+      unlockedAt: unixSecondsToIso(a.unlocktime),
+      globalUnlockedPercent: percentByName.get(a.apiname),
+    };
+  };
 
-  return { unlockedCount: unlocked.length, totalCount: playerAchievements.length, recentUnlocks };
+  const recentUnlocks = unlocked.map(toAchievement).sort((a, b) => (a.unlockedAt < b.unlockedAt ? 1 : -1));
+
+  const rarest = [...recentUnlocks]
+    .filter((a) => a.globalUnlockedPercent !== undefined)
+    .sort((a, b) => a.globalUnlockedPercent! - b.globalUnlockedPercent!)
+    .slice(0, RARITY_SHOWCASE_COUNT);
+
+  // "Most other players already have this, you don't yet" — locked achievements sorted by
+  // descending global unlock rate.
+  const nextEasiest: SteamLockedAchievement[] = schema
+    .filter((entry) => !unlockedNames.has(entry.apiName))
+    .map((entry) => ({
+      apiName: entry.apiName,
+      displayName: entry.displayName,
+      description: entry.description,
+      iconUrl: entry.icon,
+      globalUnlockedPercent: percentByName.get(entry.apiName),
+    }))
+    .filter((entry) => entry.globalUnlockedPercent !== undefined)
+    .sort((a, b) => b.globalUnlockedPercent! - a.globalUnlockedPercent!)
+    .slice(0, RARITY_SHOWCASE_COUNT);
+
+  return { unlockedCount: unlocked.length, totalCount: playerAchievements.length, recentUnlocks, rarest, nextEasiest };
 }
 
 function isExpired(fetchedAt: Date, ttlMs: number): boolean {
@@ -251,13 +288,9 @@ async function fetchOwnedGames(signal: AbortSignal, apiKey: string, steamId: str
   }
 }
 
-type FriendsResult =
-  | { status: 'available'; friends: SteamFriend[] }
-  | { status: 'private' }
-  | { status: 'unavailable' };
+type FriendIdsResult = { status: 'available'; friendIds: string[] } | { status: 'private' } | { status: 'unavailable' };
 
-async function fetchFriendsInGame(signal: AbortSignal, apiKey: string, steamId: string): Promise<FriendsResult> {
-  let friendIds: string[];
+async function fetchFriendIds(signal: AbortSignal, apiKey: string, steamId: string): Promise<FriendIdsResult> {
   try {
     const data = await steamRequest<{ friendslist?: { friends?: { steamid: string }[] } }>(
       signal,
@@ -270,40 +303,123 @@ async function fetchFriendsInGame(signal: AbortSignal, apiKey: string, steamId: 
     // An accessible-but-empty friends list is real; a missing friendslist despite a 200 covers any
     // other shape Steam might send for "nothing to show here".
     if (!friends) return { status: 'private' };
-    friendIds = friends.map((f) => f.steamid);
+    return { status: 'available', friendIds: friends.map((f) => f.steamid) };
   } catch (err) {
     // A private friends list returns HTTP 401 — distinct from a genuine fetch/server failure.
     return { status: err instanceof SteamHttpError && err.status === 401 ? 'private' : 'unavailable' };
   }
+}
 
-  if (friendIds.length === 0) return { status: 'available', friends: [] };
+/** Shared by "friends in game" and the leaderboard's name/avatar lookup, so a large friends list
+ * only costs one chunked round of GetPlayerSummaries calls, not two. */
+async function fetchPlayerSummaries(signal: AbortSignal, apiKey: string, steamIds: string[]): Promise<RawPlayerSummary[]> {
+  const summaries: RawPlayerSummary[] = [];
+  for (const chunk of chunkFriendIds(steamIds)) {
+    const data = await steamRequest<{ response?: { players?: RawPlayerSummary[] } }>(
+      signal,
+      apiKey,
+      '/ISteamUser/GetPlayerSummaries/v2/',
+      { steamids: chunk.join(',') },
+      'GetPlayerSummaries (friends)',
+    );
+    summaries.push(...(data.response?.players ?? []));
+  }
+  return summaries;
+}
+
+function deriveFriendsInGame(summaries: RawPlayerSummary[]): SteamFriend[] {
+  return summaries
+    .filter((p) => p.gameid)
+    .slice(0, MAX_FRIENDS_IN_GAME)
+    .map((p) => ({
+      steamId: p.steamid,
+      personaName: p.personaname,
+      avatarUrl: p.avatarfull,
+      appId: p.gameid ? Number(p.gameid) : undefined,
+      gameName: p.gameextrainfo ?? 'Playing a Steam game',
+    }));
+}
+
+/** Only appid + playtime is needed for the leaderboard, so `include_appinfo` stays off to keep
+ * the payload small — unlike the user's own library fetch, which needs names/icons to display. */
+async function fetchFriendLibraryTotal(
+  signal: AbortSignal,
+  apiKey: string,
+  steamId: string,
+): Promise<{ totalPlaytimeMinutes: number; appIds: Set<number> } | undefined> {
+  try {
+    const data = await steamRequest<{ response?: { games?: RawGame[] } }>(
+      signal,
+      apiKey,
+      '/IPlayerService/GetOwnedGames/v1/',
+      { steamid: steamId, include_appinfo: 'false', include_played_free_games: 'true' },
+      'GetOwnedGames (friend)',
+    );
+    const games = data.response?.games;
+    if (!games) return undefined; // private "Game details" setting
+    return {
+      totalPlaytimeMinutes: games.reduce((sum, g) => sum + (g.playtime_forever ?? 0), 0),
+      appIds: new Set(games.map((g) => g.appid)),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Computes (or serves a cached copy of) a playtime leaderboard across your friends — each entry
+ * costs an extra GetOwnedGames call, so this is capped to `maxFriends` and cached for `ttlMs`
+ * rather than recomputed on every 5-minute poll. Friends with a private library still appear
+ * (name only, unranked) rather than being dropped. */
+async function getOrFetchFriendsLeaderboard(
+  signal: AbortSignal,
+  apiKey: string,
+  ownProfile: SteamData['profile'],
+  ownLibrary: SteamLibrarySnapshot | null,
+  friendIds: string[],
+  friendSummaries: RawPlayerSummary[],
+  maxFriends: number,
+  ttlMs: number,
+  snapshotStore: SteamSnapshotStore | undefined,
+): Promise<{ status: 'available' | 'unavailable'; entries: SteamLeaderboardEntry[] }> {
+  const cached = await snapshotStore?.getFriendsLeaderboard();
+  if (cached && !isExpired(cached.fetchedAt, ttlMs)) return { status: 'available', entries: cached.data };
 
   try {
-    const summaries: RawPlayerSummary[] = [];
-    for (const chunk of chunkFriendIds(friendIds)) {
-      const data = await steamRequest<{ response?: { players?: RawPlayerSummary[] } }>(
-        signal,
-        apiKey,
-        '/ISteamUser/GetPlayerSummaries/v2/',
-        { steamids: chunk.join(',') },
-        'GetPlayerSummaries (friends)',
-      );
-      summaries.push(...(data.response?.players ?? []));
-    }
+    const ownAppIds = new Set((ownLibrary?.allGames ?? []).map((g) => g.appId));
+    const summaryBySteamId = new Map(friendSummaries.map((s) => [s.steamid, s]));
 
-    const inGame: SteamFriend[] = summaries
-      .filter((p) => p.gameid)
-      .slice(0, MAX_FRIENDS_IN_GAME)
-      .map((p) => ({
-        steamId: p.steamid,
-        personaName: p.personaname,
-        avatarUrl: p.avatarfull,
-        appId: p.gameid ? Number(p.gameid) : undefined,
-        gameName: p.gameextrainfo ?? 'Playing a Steam game',
-      }));
-    return { status: 'available', friends: inGame };
+    const friendEntries = await Promise.all(
+      friendIds.slice(0, maxFriends).map(async (friendId): Promise<SteamLeaderboardEntry> => {
+        const summary = summaryBySteamId.get(friendId);
+        const lib = await fetchFriendLibraryTotal(signal, apiKey, friendId);
+        return {
+          steamId: friendId,
+          personaName: summary?.personaname ?? friendId,
+          avatarUrl: summary?.avatarfull,
+          totalPlaytimeMinutes: lib?.totalPlaytimeMinutes,
+          sharedGames: lib ? [...lib.appIds].filter((appId) => ownAppIds.has(appId)).length : 0,
+          isYou: false,
+        };
+      }),
+    );
+
+    const entries = [
+      ...friendEntries,
+      {
+        steamId: ownProfile.steamId,
+        personaName: ownProfile.personaName,
+        avatarUrl: ownProfile.avatarUrl,
+        totalPlaytimeMinutes: ownLibrary?.totalPlaytimeMinutes,
+        sharedGames: ownAppIds.size,
+        isYou: true,
+      },
+    ].sort((a, b) => (b.totalPlaytimeMinutes ?? -1) - (a.totalPlaytimeMinutes ?? -1));
+
+    await snapshotStore?.setFriendsLeaderboard(entries);
+    return { status: 'available', entries };
   } catch {
-    return { status: 'unavailable' };
+    if (cached) return { status: 'available', entries: cached.data };
+    return { status: 'unavailable', entries: [] };
   }
 }
 
@@ -395,11 +511,27 @@ async function fetchAchievements(
 
   const schema = await getOrFetchAchievementSchema(signal, apiKey, appId, snapshotStore);
   const percentages = await getOrFetchAchievementPercentages(signal, apiKey, appId, snapshotStore);
-  const { unlockedCount, totalCount, recentUnlocks } = mergeAchievements(playerAchievements, schema, percentages);
-  return { appId, gameName, unlockedCount, totalCount, recentUnlocks };
+  const { unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest } = mergeAchievements(
+    playerAchievements,
+    schema,
+    percentages,
+  );
+  return { appId, gameName, unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest };
 }
 
-export function createSteamProvider(auth: SteamAuth | undefined, snapshotStore?: SteamSnapshotStore): Provider<SteamData> {
+export interface SteamLeaderboardOptions {
+  maxFriends: number;
+  ttlMs: number;
+}
+
+const DEFAULT_LEADERBOARD_OPTIONS: SteamLeaderboardOptions = { maxFriends: 30, ttlMs: 12 * 60 * 60_000 };
+
+export function createSteamProvider(
+  auth: SteamAuth | undefined,
+  snapshotStore?: SteamSnapshotStore,
+  historyStore?: SteamHistoryStore,
+  leaderboardOptions: SteamLeaderboardOptions = DEFAULT_LEADERBOARD_OPTIONS,
+): Provider<SteamData> {
   return {
     id: 'steam',
     schema: steamSchema,
@@ -437,12 +569,39 @@ export function createSteamProvider(auth: SteamAuth | undefined, snapshotStore?:
         }
       }
 
+      if (library) await historyStore?.record(library.totalPlaytimeMinutes);
+
       const tracked = pickTrackedGame(currentGame, recentlyPlayed, library?.mostPlayed);
       const achievements = tracked
         ? await fetchAchievements(signal, apiKey, steamId, tracked.appId, tracked.name, snapshotStore)
         : null;
 
-      const friendsResult = await fetchFriendsInGame(signal, apiKey, steamId);
+      const friendIdsResult = await fetchFriendIds(signal, apiKey, steamId);
+      let friendSummaries: RawPlayerSummary[] = [];
+      let friendsAvailability: SteamData['availability']['friends'] = friendIdsResult.status;
+      if (friendIdsResult.status === 'available') {
+        try {
+          friendSummaries = await fetchPlayerSummaries(signal, apiKey, friendIdsResult.friendIds);
+          friendsAvailability = 'available';
+        } catch {
+          friendsAvailability = 'unavailable';
+        }
+      }
+
+      const leaderboard =
+        friendIdsResult.status === 'available'
+          ? await getOrFetchFriendsLeaderboard(
+              signal,
+              apiKey,
+              profile,
+              library,
+              friendIdsResult.friendIds,
+              friendSummaries,
+              leaderboardOptions.maxFriends,
+              leaderboardOptions.ttlMs,
+              snapshotStore,
+            )
+          : { status: 'unavailable' as const, entries: [] };
 
       const data: SteamData = {
         profile,
@@ -450,11 +609,13 @@ export function createSteamProvider(auth: SteamAuth | undefined, snapshotStore?:
         library,
         recentlyPlayed,
         achievements,
-        friendsInGame: friendsResult.status === 'available' ? friendsResult.friends : [],
+        friendsInGame: friendsAvailability === 'available' ? deriveFriendsInGame(friendSummaries) : [],
+        playtimeHistory: (await historyStore?.get()) ?? [],
+        friendsLeaderboard: leaderboard,
         availability: {
           library: libraryAvailability,
           achievements: achievements ? 'available' : 'unavailable',
-          friends: friendsResult.status,
+          friends: friendsAvailability,
         },
       };
 
