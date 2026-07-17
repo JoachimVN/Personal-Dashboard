@@ -1,5 +1,6 @@
 import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react';
 import { motion } from 'motion/react';
+import { GitHubMark } from '../components/GitHubMark';
 import type { SectionDef } from './registry';
 import { sectionHref } from '../router';
 
@@ -18,7 +19,7 @@ function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
   }
   if (id === 'github') {
     return (
-      <img src="/github-invertocat-black.svg" alt="" aria-hidden className="section-icon-github h-5 w-5" />
+      <GitHubMark className="h-5 w-5 text-(--color-github-mark)" />
     );
   }
   if (id === 'spotify') {
