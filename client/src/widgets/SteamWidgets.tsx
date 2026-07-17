@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from 'react';
-import type { SteamData } from '@personal-dashboard/shared';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import type { SteamData, SteamGame } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
 const accent = 'var(--color-accent-steam)';
@@ -26,6 +26,36 @@ function Stat({ value, label }: Readonly<{ value: string | number; label: string
   );
 }
 
+/** Steam's owned-games endpoint gives every game a derived header URL, but older/delisted apps
+ * can still return 404. Fall back to the square Steam icon, then a stable initial tile. */
+function SteamGameArtwork({ game }: Readonly<{ game: SteamGame }>) {
+  const [headerFailed, setHeaderFailed] = useState(false);
+  const hasHeader = Boolean(game.headerUrl) && !headerFailed;
+  const fallbackInitial = game.name.trim().charAt(0).toUpperCase() || '?';
+
+  return (
+    <>
+      {hasHeader && (
+        <img
+          aria-hidden
+          src={game.headerUrl}
+          alt=""
+          className="steam-game-row-backdrop"
+          loading="lazy"
+          onError={() => setHeaderFailed(true)}
+        />
+      )}
+      {hasHeader ? (
+        <img src={game.headerUrl} alt="" className="steam-game-cover" loading="lazy" onError={() => setHeaderFailed(true)} />
+      ) : game.iconUrl ? (
+        <img src={game.iconUrl} alt="" className="steam-game-cover steam-game-cover--icon" loading="lazy" />
+      ) : (
+        <div aria-hidden className="steam-game-cover steam-game-cover--fallback">{fallbackInitial}</div>
+      )}
+    </>
+  );
+}
+
 /* The whole overview card is one link (see SectionCard), so these components are
    display-only — no nested anchors. */
 
@@ -37,23 +67,27 @@ export function SteamNowPlaying({ data }: Readonly<{ data: SteamData }>) {
   if (!game) return <p className="text-sm text-ink-faint">No recent Steam activity.</p>;
   const label = data.currentGame ? 'Playing now' : recent ? 'Last played' : 'Most played';
   return (
-    <div className="steam-hero">
+    <div className="steam-hero p-4 sm:p-5">
       {game.headerUrl && <img aria-hidden src={game.headerUrl} alt="" className="steam-hero-backdrop" />}
       <div className="steam-hero-scrim" />
-      <div className="relative flex gap-4">
+      <div className="relative flex items-center gap-4">
         {game.headerUrl ? (
-          <img src={game.headerUrl} alt="" className="h-20 w-36 shrink-0 rounded-xl object-cover shadow-lg" />
+          <img src={game.headerUrl} alt="" className="h-20 w-32 shrink-0 rounded-xl object-cover shadow-lg sm:h-24 sm:w-40" />
         ) : (
-          <div className="h-20 w-36 shrink-0 rounded-xl bg-track" />
+          <div className="h-20 w-32 shrink-0 rounded-xl bg-track sm:h-24 sm:w-40" />
         )}
         <div className="flex min-w-0 flex-1 flex-col justify-center">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
-            {label}
-          </p>
-          <p className="mt-1 truncate text-lg font-semibold text-ink">{game.name}</p>
-          {game.playtimeForeverMinutes !== undefined && (
-            <p className="truncate text-sm text-ink-muted">{formatHours(game.playtimeForeverMinutes)} total playtime</p>
-          )}
+          <div className="flex items-center gap-2">
+            {data.currentGame && <span aria-hidden className="steam-live-dot" />}
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>{label}</p>
+          </div>
+          <p className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-ink sm:text-xl">{game.name}</p>
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs tabular-nums text-ink-muted">
+            {game.playtimeForeverMinutes !== undefined && <span>{formatHours(game.playtimeForeverMinutes)} in library</span>}
+            {game.playtimeRecentMinutes !== undefined && game.playtimeRecentMinutes > 0 && (
+              <span className="text-ink">{formatHours(game.playtimeRecentMinutes)} this fortnight</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -82,10 +116,34 @@ export function SteamLibraryStats({ data }: Readonly<{ data: SteamData }>) {
 
 type SteamGameSort = 'total' | 'recent';
 
+/* Rows have a fixed 4.75rem height and a 0.55rem gap (see steam.css). Keeping only the visible
+ * window mounted prevents a large library from decoding hundreds of Steam headers during a fast scroll. */
+const STEAM_LIBRARY_ROW_HEIGHT = 85;
+const STEAM_LIBRARY_OVERSCAN = 5;
+
 /** Full owned-games list, sortable by the only two windows Steam's API actually tracks —
  * all-time playtime and the trailing ~2-week window — rather than invented intermediate ranges. */
 export function SteamGameList({ data }: Readonly<{ data: SteamData }>) {
   const [sort, setSort] = useState<SteamGameSort>('total');
+  const [query, setQuery] = useState('');
+  const listRef = useRef<HTMLOListElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState(672);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return undefined;
+    const updateViewportHeight = () => setViewportHeight(list.clientHeight);
+    updateViewportHeight();
+    const observer = new ResizeObserver(updateViewportHeight);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0 });
+    setScrollTop(0);
+  }, [query, sort]);
 
   if (data.availability.library !== 'available' || !data.library) {
     return (
@@ -101,39 +159,73 @@ export function SteamGameList({ data }: Readonly<{ data: SteamData }>) {
   }
 
   const key = sort === 'total' ? 'playtimeForeverMinutes' : 'playtimeRecentMinutes';
-  const games = [...data.library.allGames].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0));
+  const games = [...data.library.allGames]
+    .filter((game) => game.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    .sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0));
+  const visibleStart = Math.max(0, Math.floor(scrollTop / STEAM_LIBRARY_ROW_HEIGHT) - STEAM_LIBRARY_OVERSCAN);
+  const visibleEnd = Math.min(
+    games.length,
+    Math.ceil((scrollTop + viewportHeight) / STEAM_LIBRARY_ROW_HEIGHT) + STEAM_LIBRARY_OVERSCAN,
+  );
+  const visibleGames = games.slice(visibleStart, visibleEnd);
 
   return (
     <div>
-      <fieldset className="steam-sort-toggle mb-3" aria-label="Sort by">
-        <button type="button" data-active={sort === 'total'} onClick={() => setSort('total')}>
-          All time
-        </button>
-        <button type="button" data-active={sort === 'recent'} onClick={() => setSort('recent')}>
-          Last 2 weeks
-        </button>
-      </fieldset>
-      <ol className="max-h-[34rem] space-y-2 overflow-y-auto pr-1 text-sm">
-        {games.map((game) => (
-          <li
-            key={game.appId}
-            className="flex items-center gap-3 rounded-xl bg-track/25 px-3 py-2 transition hover:bg-track/45"
-          >
-            {game.iconUrl ? (
-              <img src={game.iconUrl} alt="" className="h-8 w-8 shrink-0 rounded-md object-cover" />
-            ) : (
-              <div className="h-8 w-8 shrink-0 rounded-md bg-track" />
-            )}
-            <p className="min-w-0 flex-1 truncate font-medium text-ink">{game.name}</p>
-            <span className="shrink-0 text-xs tabular-nums text-ink-faint">
-              {formatHours(game.playtimeForeverMinutes ?? 0)} total
-            </span>
-            <span className="shrink-0 text-xs tabular-nums text-ink-faint">
-              {formatHours(game.playtimeRecentMinutes ?? 0)} recent
-            </span>
-          </li>
-        ))}
-      </ol>
+      <div className="steam-library-toolbar">
+        <label className="steam-game-search">
+          <span className="sr-only">Search your games</span>
+          <svg viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="10.8" cy="10.8" r="6.3" /><path d="m16 16 4 4" />
+          </svg>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your library" />
+        </label>
+        <fieldset className="steam-sort-toggle" aria-label="Sort by">
+          <button type="button" data-active={sort === 'total'} onClick={() => setSort('total')}>All time</button>
+          <button type="button" data-active={sort === 'recent'} onClick={() => setSort('recent')}>Last 2 weeks</button>
+        </fieldset>
+      </div>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <p className="text-xs text-ink-faint">{games.length === data.library.allGames.length ? `${games.length} games` : `${games.length} matching games`}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+          {sort === 'total' ? 'Hours in library' : 'Recent activity'}
+        </p>
+      </div>
+      {games.length === 0 ? (
+        <p className="rounded-2xl bg-track/25 px-4 py-5 text-sm text-ink-faint">No games match that search.</p>
+      ) : (
+        <ol
+          ref={listRef}
+          className="steam-game-list max-h-[42rem] overflow-y-auto pr-1"
+          onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+          style={{ paddingTop: visibleStart * STEAM_LIBRARY_ROW_HEIGHT, paddingBottom: (games.length - visibleEnd) * STEAM_LIBRARY_ROW_HEIGHT }}
+        >
+          {visibleGames.map((game, visibleIndex) => {
+            const index = visibleStart + visibleIndex;
+            const primaryMinutes = sort === 'total' ? game.playtimeForeverMinutes : game.playtimeRecentMinutes;
+            const secondaryMinutes = sort === 'total' ? game.playtimeRecentMinutes : game.playtimeForeverMinutes;
+            return (
+              <li key={game.appId} className="steam-game-row" data-recent={(game.playtimeRecentMinutes ?? 0) > 0}>
+                <span className="steam-game-rank">{index + 1}</span>
+                <SteamGameArtwork game={game} />
+                <div className="relative min-w-0 flex-1">
+                  <p className="truncate font-semibold text-ink">{game.name}</p>
+                  <p className="mt-0.5 text-xs tabular-nums text-ink-muted">
+                    {secondaryMinutes && secondaryMinutes > 0
+                      ? `${formatHours(secondaryMinutes)} ${sort === 'total' ? 'in the last 2 weeks' : 'in library'}`
+                      : sort === 'recent' ? 'No activity in the last 2 weeks' : 'No recent activity'}
+                  </p>
+                </div>
+                <div className="relative shrink-0 text-right">
+                  <p className="text-sm font-semibold tabular-nums text-ink">{formatHours(primaryMinutes ?? 0)}</p>
+                  <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-ink-faint">
+                    {sort === 'total' ? 'total' : 'recent'}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </div>
   );
 }
