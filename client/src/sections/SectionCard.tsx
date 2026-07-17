@@ -7,16 +7,6 @@ export function accentStyle(section: SectionDef): CSSProperties {
   return { '--accent': `var(${section.accentVar})` } as CSSProperties;
 }
 
-export function AccentDot() {
-  return (
-    <span
-      aria-hidden
-      className="h-2 w-2 shrink-0 rounded-full bg-(--accent)"
-      style={{ boxShadow: '0 0 12px 2px color-mix(in oklab, var(--accent) 45%, transparent)' }}
-    />
-  );
-}
-
 function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
   if (id === 'ai') {
     return (
@@ -28,10 +18,7 @@ function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
   }
   if (id === 'github') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="6" cy="5" r="2" /><circle cx="18" cy="7" r="2" /><circle cx="8" cy="19" r="2" />
-        <path d="M6 7v4a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V9M8 17v-2" />
-      </svg>
+      <img src="/github-invertocat-black.svg" alt="" aria-hidden className="section-icon-github h-5 w-5" />
     );
   }
   if (id === 'spotify') {

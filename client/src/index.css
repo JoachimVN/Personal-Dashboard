@@ -894,6 +894,7 @@ a {
   background: color-mix(in oklab, var(--accent) 7%, var(--color-card));
   transition: background 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
 }
+.section-icon-github { filter: invert(light-dark(0%, 100%)); }
 
 .section-arrow {
   transition: color 220ms ease, background 220ms ease, transform 350ms cubic-bezier(.2,.8,.2,1);

@@ -156,8 +156,7 @@ export function AiDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Usage"
-        title={<>Context and<br /><span className="text-ink-faint">usage limits.</span></>}
+        title="AI usage"
         description="How much of your AI usage allowance is left, and how fast you're using it."
         accent="var(--color-accent-ai)"
       />

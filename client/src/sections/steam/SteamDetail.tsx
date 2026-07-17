@@ -54,14 +54,7 @@ export function SteamDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Games"
-        title={
-          <>
-            What you&apos;re
-            <br />
-            <span className="text-ink-faint">playing on Steam.</span>
-          </>
-        }
+        title="Steam activity"
         description="Your current game, library totals, and achievement progress for whichever game is tracked right now."
         accent="var(--color-accent-steam)"
       >

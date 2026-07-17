@@ -739,8 +739,7 @@ export function WeatherDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Weather"
-        title={<>Today&rsquo;s sky,<br /><span className="text-ink-faint">read closely.</span></>}
+        title="Weather forecast"
         description="Current conditions, the sun and moon, and the week ahead, straight from MET Norway."
         accent="var(--color-accent-weather)"
       >
