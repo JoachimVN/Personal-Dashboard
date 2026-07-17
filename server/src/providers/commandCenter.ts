@@ -9,6 +9,8 @@ import {
   type IMessageData,
   type NewsData,
   type SpotifyData,
+  type SteamData,
+  type SteamGame,
   type WeatherData,
   type WidgetEnvelope,
 } from '@personal-dashboard/shared';
@@ -25,11 +27,13 @@ import {
   imessageCandidates,
   newsCandidates,
   spotifyCandidates,
+  steamCandidates,
   weatherCandidates,
   type SpotifyFreshness,
 } from '../importance/sources.js';
 import type { ProviderScheduler, Provider } from '../scheduler.js';
 import { SignalHistoryStore } from '../signalHistory.js';
+import type { SteamMoments } from '../importance/types.js';
 
 function widgetData<T>(envelopes: Record<string, WidgetEnvelope>, id: string): T | undefined {
   const envelope = envelopes[id];
@@ -75,6 +79,81 @@ export async function computeSpotifyFreshness(
   return fresh;
 }
 
+async function detectSteamCompletedGame(
+  signalHistory: SignalHistoryStore,
+  achievements: SteamData['achievements'],
+  freshMs: number,
+): Promise<boolean> {
+  if (!achievements) return false;
+  const { appId, unlockedCount, totalCount } = achievements;
+  const metric = `completed:${appId}`;
+  const completed = totalCount > 0 && unlockedCount === totalCount;
+  await signalHistory.record('steam', metric, completed);
+  if (!completed) return false;
+  const changedAt = await signalHistory.lastChangedAt('steam', metric);
+  return (await signalHistory.hasChangedSinceBaseline('steam', metric))
+    && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+}
+
+async function detectSteamPlaytimeMilestone(
+  signalHistory: SignalHistoryStore,
+  trackedGame: SteamGame | undefined,
+  playtimeMilestoneHours: number[],
+  freshMs: number,
+): Promise<number | undefined> {
+  if (trackedGame?.playtimeForeverMinutes === undefined) return undefined;
+  const hours = trackedGame.playtimeForeverMinutes / 60;
+  const tier = [...playtimeMilestoneHours].sort((a, b) => b - a).find((milestone) => hours >= milestone);
+  // Record the below-threshold state too. Otherwise a first observation at (say) 8h followed
+  // by 10h treats the actual first milestone as its baseline and silently misses the moment.
+  const metric = `playtime-milestone:${trackedGame.appId}`;
+  await signalHistory.record('steam', metric, tier ?? 0);
+  if (tier === undefined) return undefined;
+  const changedAt = await signalHistory.lastChangedAt('steam', metric);
+  const isFresh = (await signalHistory.hasChangedSinceBaseline('steam', metric))
+    && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+  return isFresh ? tier : undefined;
+}
+
+async function detectSteamLeaderboardClimb(
+  signalHistory: SignalHistoryStore,
+  friendsLeaderboard: SteamData['friendsLeaderboard'],
+  freshMs: number,
+): Promise<{ rank: number; delta: number } | undefined> {
+  if (friendsLeaderboard.status !== 'available') return undefined;
+  const rank = friendsLeaderboard.entries.findIndex((entry) => entry.isYou);
+  if (rank < 0) return undefined;
+  const previous = await signalHistory.getValue('steam', 'leaderboard-rank');
+  await signalHistory.record('steam', 'leaderboard-rank', rank);
+  if (typeof previous !== 'number' || previous <= rank) return undefined;
+  const changedAt = await signalHistory.lastChangedAt('steam', 'leaderboard-rank');
+  if (changedAt === undefined || Date.now() - changedAt.getTime() >= freshMs) return undefined;
+  return { rank, delta: previous - rank };
+}
+
+/**
+ * Detects Steam "moments" that need history across polls, not just the latest snapshot: a game
+ * reaching 100% achievements, the tracked game crossing a round-number playtime milestone, and a
+ * climb on the friends leaderboard. Each uses the same "first observation is a baseline, not a
+ * change" guard as computeSpotifyFreshness, so an already-completed game or an already-high
+ * leaderboard rank doesn't fire the moment the dashboard starts tracking it.
+ */
+export async function computeSteamMoments(
+  signalHistory: SignalHistoryStore,
+  steam: SteamData | undefined,
+  playtimeMilestoneHours: number[],
+  freshMs: number,
+): Promise<SteamMoments> {
+  if (!steam) return { completedGame: false };
+
+  const trackedGame = steam.currentGame ?? steam.recentlyPlayed[0] ?? steam.library?.mostPlayed[0];
+  const completedGame = await detectSteamCompletedGame(signalHistory, steam.achievements, freshMs);
+  const playtimeMilestoneHoursMoment = await detectSteamPlaytimeMilestone(signalHistory, trackedGame, playtimeMilestoneHours, freshMs);
+  const leaderboardClimb = await detectSteamLeaderboardClimb(signalHistory, steam.friendsLeaderboard, freshMs);
+
+  return { completedGame, playtimeMilestoneHours: playtimeMilestoneHoursMoment, leaderboardClimb };
+}
+
 export function createCommandCenterProvider(
   scheduler: ProviderScheduler,
   signalHistory: SignalHistoryStore,
@@ -96,6 +175,10 @@ export function createCommandCenterProvider(
       const calendar = widgetData<CalendarData>(envelopes, 'calendar');
       const spotify = widgetData<SpotifyData>(envelopes, 'spotify');
       const spotifyFresh = await computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs);
+      const steam = widgetData<SteamData>(envelopes, 'steam');
+      const steamMoments = await computeSteamMoments(
+        signalHistory, steam, config.commandCenter.steamPlaytimeMilestoneHours, config.commandCenter.steamMomentFreshMs,
+      );
       return rankCandidates([
         ...calendarCandidates(calendar, Date.now()),
         ...gmailCandidates(gmail, staleForMs, config.commandCenter.gmailStaleMs, config.commandCenter.gmailFreshMs),
@@ -104,7 +187,14 @@ export function createCommandCenterProvider(
         ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),
         ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
         ...spotifyCandidates(spotify, spotifyFresh),
-        ...weatherCandidates(widgetData<WeatherData>(envelopes, 'weather'), config.commandCenter.weatherHotC, config.commandCenter.weatherColdC),
+        ...steamCandidates(steam, config.commandCenter.steamAchievementFreshMs, steamMoments, config.commandCenter.steamRareAchievementPercent),
+        ...weatherCandidates(
+          widgetData<WeatherData>(envelopes, 'weather'),
+          config.commandCenter.weatherHotC,
+          config.commandCenter.weatherColdC,
+          config.commandCenter.weatherWindMs,
+          config.commandCenter.weatherUvHigh,
+        ),
         ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
         ...aiCandidates(
           [

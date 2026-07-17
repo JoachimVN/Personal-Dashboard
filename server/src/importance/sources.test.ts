@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AiUsageToolData, GitHubData, HealthData, NewsData, SpotifyData, WeatherData } from '@personal-dashboard/shared';
-import { aiCandidates, githubCandidates, gmailCandidates, healthCandidates, newsCandidates, spotifyCandidates, weatherCandidates } from './sources.js';
+import type { AiUsageToolData, GitHubData, HealthData, NewsData, SpotifyData, SteamData, WeatherData } from '@personal-dashboard/shared';
+import { aiCandidates, githubCandidates, gmailCandidates, healthCandidates, newsCandidates, spotifyCandidates, steamCandidates, weatherCandidates } from './sources.js';
 
 describe('githubCandidates', () => {
   const quietDay: GitHubData = {
@@ -124,9 +124,65 @@ describe('weatherCandidates', () => {
   };
 
   it('uses today rather than the following date for an overnight fallback forecast', () => {
-    const [candidate] = weatherCandidates(weather, 25, -10, new Date('2026-07-16T01:00:00').getTime());
+    const [candidate] = weatherCandidates(weather, 25, -10, 12, 8, new Date('2026-07-16T01:00:00').getTime());
 
     expect(candidate).toMatchObject({ id: 'weather:later-today:2026-07-16', kicker: 'Later today', title: '10° to 18°' });
+  });
+
+  it('surfaces a hero-eligible severe candidate when thunder is in the next 3 hours', () => {
+    const now = new Date('2026-07-16T12:00:00Z').getTime();
+    const data: WeatherData = {
+      ...weather,
+      hours: [{ time: '2026-07-16T13:00:00Z', hourLabel: '13', temperature: 16, precipitationMm: 3, symbol: 'thunder' }],
+    };
+
+    const candidates = weatherCandidates(data, 25, -10, 12, 8, now);
+
+    expect(candidates).toContainEqual(expect.objectContaining({ id: 'weather:severe', shapes: ['hero', 'secondary', 'tile'] }));
+  });
+
+  it('does not surface rain-soon when it is already wet right now', () => {
+    const data: WeatherData = {
+      ...weather,
+      current: { ...weather.current, precipitationMm: 2 },
+      hours: [{ time: '2026-07-16T13:00:00Z', hourLabel: '13', temperature: 16, precipitationMm: 2, symbol: 'rain' }],
+    };
+
+    expect(weatherCandidates(data, 25, -10, 12, 8).map((c) => c.id)).not.toContain('weather:rain-soon');
+  });
+
+  it('surfaces rain-soon when currently dry but rain is expected within 6 hours', () => {
+    const data: WeatherData = {
+      ...weather,
+      hours: [{ time: '2026-07-16T13:00:00Z', hourLabel: '13', temperature: 16, precipitationMm: 0.5, symbol: 'rain' }],
+    };
+
+    expect(weatherCandidates(data, 25, -10, 12, 8)).toContainEqual(expect.objectContaining({ id: 'weather:rain-soon', title: 'Rain by 13:00' }));
+  });
+
+  it('surfaces a windy-today candidate once the peak crosses the configured threshold', () => {
+    const data: WeatherData = { ...weather, days: [{ ...weather.days[0]!, maxWindSpeed: 14 }, weather.days[1]!] };
+
+    expect(weatherCandidates(data, 25, -10, 12, 8)).toContainEqual(expect.objectContaining({ id: 'weather:wind', title: '14 m/s peak' }));
+  });
+
+  it('surfaces a high-UV candidate once the peak crosses the configured threshold', () => {
+    const data: WeatherData = { ...weather, days: [{ ...weather.days[0]!, maxUvIndex: 9 }, weather.days[1]!] };
+
+    expect(weatherCandidates(data, 25, -10, 12, 8)).toContainEqual(expect.objectContaining({ id: 'weather:uv', title: 'UV 9.0 today' }));
+  });
+
+  it('surfaces a full-moon candidate when the phase is within tolerance of 180°', () => {
+    const data: WeatherData = { ...weather, moon: { phaseDeg: 178, moonrise: null, moonset: null } };
+
+    expect(weatherCandidates(data, 25, -10, 12, 8)).toContainEqual(expect.objectContaining({ id: 'weather:moon', title: 'Full moon tonight' }));
+  });
+
+  it('surfaces a sunset-soon candidate within 45 minutes of sunset', () => {
+    const now = new Date('2026-07-16T20:00:00Z').getTime();
+    const data: WeatherData = { ...weather, sun: { sunrise: null, sunset: '2026-07-16T20:30:00Z' } };
+
+    expect(weatherCandidates(data, 25, -10, 12, 8, now)).toContainEqual(expect.objectContaining({ id: 'weather:sunset', detail: 'Sets in 30 min' }));
   });
 });
 
@@ -264,5 +320,153 @@ describe('spotifyCandidates', () => {
       kicker: 'New #1 artist · of all time',
       score: 90,
     });
+  });
+});
+
+describe('steamCandidates', () => {
+  const ACHIEVEMENT_FRESH_MS = 7 * 24 * 60 * 60_000;
+
+  const baseline: SteamData = {
+    profile: { steamId: '76561198000000000', personaName: 'Alex', profileUrl: 'https://steamcommunity.com/id/alex' },
+    currentGame: null,
+    library: null,
+    recentlyPlayed: [],
+    achievements: null,
+    friendsInGame: [],
+    playtimeHistory: [],
+    friendsLeaderboard: { status: 'unavailable', entries: [] },
+    availability: { library: 'unavailable', achievements: 'unavailable', friends: 'unavailable' },
+  };
+
+  it('returns nothing when there is no data', () => {
+    expect(steamCandidates(undefined, ACHIEVEMENT_FRESH_MS)).toEqual([]);
+  });
+
+  it('prioritizes a fresh achievement unlock over everything else', () => {
+    const data: SteamData = {
+      ...baseline,
+      currentGame: { appId: 10, name: 'Half-Life' },
+      friendsInGame: [{ steamId: '2', personaName: 'Sam', gameName: 'Half-Life' }],
+      achievements: {
+        appId: 10, gameName: 'Half-Life', unlockedCount: 1, totalCount: 10,
+        recentUnlocks: [{
+          apiName: 'ACH_1', displayName: 'Freeman', unlockedAt: new Date(Date.now() - 60_000).toISOString(), globalUnlockedPercent: 2.4,
+        }],
+      },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
+      expect.objectContaining({
+        id: 'steam:achievement:10:ACH_1', score: 85, kicker: 'Rare achievement unlocked', title: 'Freeman',
+        detail: 'Half-Life · 2.4% of players', shapes: ['hero', 'secondary', 'tile'],
+        render: { type: 'steam-achievement', appId: 10, apiName: 'ACH_1' },
+      }),
+    ]);
+  });
+
+  it('falls back to current game once the achievement unlock ages past the freshness threshold', () => {
+    const data: SteamData = {
+      ...baseline,
+      currentGame: { appId: 10, name: 'Half-Life', playtimeForeverMinutes: 600 },
+      achievements: {
+        appId: 10, gameName: 'Half-Life', unlockedCount: 1, totalCount: 10,
+        recentUnlocks: [{
+          apiName: 'ACH_1', displayName: 'Freeman', unlockedAt: new Date(Date.now() - ACHIEVEMENT_FRESH_MS - 60_000).toISOString(),
+        }],
+      },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
+      expect.objectContaining({
+        id: 'steam:now-playing:10', score: 58, kicker: 'Playing now', title: 'Half-Life', detail: '10h played',
+        shapes: ['secondary', 'tile'], render: { type: 'steam-now-playing', appId: 10 },
+      }),
+    ]);
+  });
+
+  it('falls back to friends playing when nothing is currently running', () => {
+    const data: SteamData = {
+      ...baseline,
+      friendsInGame: [
+        { steamId: '2', personaName: 'Sam', gameName: 'Portal 2' },
+        { steamId: '3', personaName: 'Jo', gameName: 'Portal 2' },
+      ],
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
+      expect.objectContaining({
+        id: 'steam:friends', score: 25, kicker: 'Friends online', title: '2 friends playing', detail: 'Portal 2', shapes: ['tile'],
+      }),
+    ]);
+  });
+
+  it('falls back to recent playtime as the lowest-priority signal', () => {
+    const data: SteamData = {
+      ...baseline,
+      library: { totalGames: 12, totalPlaytimeMinutes: 6_000, recentPlaytimeMinutes: 300, mostPlayed: [{ appId: 20, name: 'Portal' }], allGames: [{ appId: 20, name: 'Portal' }] },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS)).toEqual([
+      expect.objectContaining({
+        id: 'steam:recent-playtime', score: 22, kicker: 'This week on Steam', title: '5.0h this week', detail: 'Portal', shapes: ['tile'],
+      }),
+    ]);
+  });
+
+  it('returns nothing when there is no current activity, no fresh achievement, no friends, and no recent playtime', () => {
+    expect(steamCandidates(baseline, ACHIEVEMENT_FRESH_MS)).toEqual([]);
+  });
+
+  it('boosts a rare fresh unlock above a routine one', () => {
+    const data: SteamData = {
+      ...baseline,
+      achievements: {
+        appId: 10, gameName: 'Half-Life', unlockedCount: 1, totalCount: 10,
+        recentUnlocks: [{
+          apiName: 'ACH_1', displayName: 'Freeman', unlockedAt: new Date(Date.now() - 60_000).toISOString(), globalUnlockedPercent: 3.2,
+        }],
+      },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: false }, 10)).toEqual([
+      expect.objectContaining({ id: 'steam:achievement:10:ACH_1', score: 85, kicker: 'Rare achievement unlocked' }),
+    ]);
+  });
+
+  it('surfaces a fresh game completion over an achievement unlock', () => {
+    const data: SteamData = {
+      ...baseline,
+      achievements: {
+        appId: 10, gameName: 'Half-Life', unlockedCount: 10, totalCount: 10,
+        recentUnlocks: [{ apiName: 'ACH_LAST', displayName: 'Finale', unlockedAt: new Date(Date.now() - 60_000).toISOString() }],
+      },
+    };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: true })).toEqual([
+      expect.objectContaining({
+        id: 'steam:completed:10', score: 92, kicker: 'Game completed', title: 'Half-Life',
+        detail: 'All 10 achievements unlocked', shapes: ['hero', 'secondary', 'tile'],
+      }),
+    ]);
+  });
+
+  it('surfaces a fresh playtime milestone for the tracked game', () => {
+    const data: SteamData = { ...baseline, currentGame: { appId: 10, name: 'Half-Life', playtimeForeverMinutes: 3_000 } };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: false, playtimeMilestoneHours: 50 })).toEqual([
+      expect.objectContaining({
+        id: 'steam:playtime-milestone:10:50', score: 65, kicker: 'Playtime milestone', title: '50h in Half-Life', shapes: ['secondary', 'tile'],
+      }),
+    ]);
+  });
+
+  it('surfaces a friends-leaderboard climb below now-playing but above friends online', () => {
+    const data: SteamData = { ...baseline, friendsInGame: [{ steamId: '2', personaName: 'Sam', gameName: 'Portal 2' }] };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: false, leaderboardClimb: { rank: 1, delta: 2 } })).toEqual([
+      expect.objectContaining({
+        id: 'steam:leaderboard-climb:1', score: 45, kicker: 'Friends leaderboard', title: 'Up to #2', detail: 'Climbed 2 spots', shapes: ['tile'],
+      }),
+    ]);
   });
 });

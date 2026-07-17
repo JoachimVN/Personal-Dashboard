@@ -114,6 +114,7 @@ function BackgroundGlow() {
   return (
     <div aria-hidden className="ambient-canvas pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-canvas">
       <div className="ambient-aurora" />
+      <div className="ambient-horizon" />
     </div>
   );
 }
@@ -125,6 +126,7 @@ function SectionGlow({ accentVar }: Readonly<{ accentVar: string }>) {
   return (
     <div aria-hidden className="section-page-glow" style={{ '--section-accent': `var(${accentVar})` } as CSSProperties}>
       <div className="section-page-aurora" />
+      <div className="section-page-horizon" />
     </div>
   );
 }

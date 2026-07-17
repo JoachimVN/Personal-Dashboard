@@ -19,6 +19,8 @@ export const usageHistoryPointSchema = z.object({
   /** The `asOf` moment of the snapshot this point was sampled from. */
   at: z.string().datetime(),
   fiveHourUsedPercent: z.number().min(0).max(100).optional(),
+  /** Reset deadline observed alongside the five-hour percentage at this sample. */
+  fiveHourResetsAt: z.string().datetime().optional(),
   weeklyUsedPercent: z.number().min(0).max(100).optional(),
   modelWeeklyUsedPercent: z.number().min(0).max(100).optional(),
 });

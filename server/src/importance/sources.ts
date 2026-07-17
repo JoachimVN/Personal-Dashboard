@@ -8,11 +8,12 @@ import type {
   IMessageData,
   NewsData,
   SpotifyData,
+  SteamData,
   WeatherData,
   WidgetStatus,
 } from '@personal-dashboard/shared';
 import { computeDeviation } from '../deviation.js';
-import type { Candidate } from './types.js';
+import type { Candidate, SteamMoments } from './types.js';
 
 const allShapes = ['hero', 'secondary', 'tile'] as const;
 
@@ -476,42 +477,271 @@ export function aiCandidates(
  * a forecast, no history to compare against, so "extreme" here just means "past a configured
  * line" rather than "unusual for you".
  */
+const SEVERE_HORIZON_MS = 3 * 60 * 60_000;
+const SEVERE_SYMBOLS: readonly [prefix: string, label: string][] = [
+  ['thunder', 'Thunderstorms expected'],
+  ['heavyrain', 'Heavy rain expected'],
+  ['heavysnow', 'Heavy snow expected'],
+  ['heavysleet', 'Heavy sleet expected'],
+];
+
+/** Same "strip the day/night/twilight suffix" convention as the client's `glyph()`. */
+function baseSymbol(symbol: string): string {
+  return symbol.replace(/_(day|night|polartwilight)$/, '');
+}
+
+function severeLabel(symbol: string): string | undefined {
+  return SEVERE_SYMBOLS.find(([prefix]) => baseSymbol(symbol).startsWith(prefix))?.[1];
+}
+
+function severeCandidate(data: WeatherData, now: number): Candidate | undefined {
+  const upcoming = data.hours.filter((hour) => {
+    const delta = Date.parse(hour.time) - now;
+    return delta >= -60_000 && delta <= SEVERE_HORIZON_MS;
+  });
+  const hit = upcoming
+    .map((hour) => ({ hour, label: severeLabel(hour.symbol) }))
+    .find((entry): entry is { hour: WeatherData['hours'][number]; label: string } => entry.label !== undefined);
+  if (!hit) return undefined;
+  const isNow = Date.parse(hit.hour.time) - now < 60 * 60_000;
+  return {
+    id: 'weather:severe', source: 'weather', kind: 'weather', score: 90, shapes: [...allShapes],
+    kicker: 'Severe weather', title: hit.label,
+    detail: isNow ? 'Happening now — check before heading out' : `Arriving around ${hit.hour.hourLabel}:00`,
+    href: '#/weather', render: { type: 'weather-signal', kind: 'severe' },
+  };
+}
+
+function hotCandidate(today: WeatherData['days'][number], hotThresholdC: number): Candidate | undefined {
+  if (today.maxTemperature < hotThresholdC) return undefined;
+  return {
+    id: 'weather:hot', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
+    kicker: 'Heat today', title: `${Math.round(today.maxTemperature)}° expected`,
+    detail: 'Above your configured comfortable range', href: '#/weather', render: { type: 'weather-signal', kind: 'hot' },
+  };
+}
+
+function coldCandidate(today: WeatherData['days'][number], coldThresholdC: number): Candidate | undefined {
+  if (today.minTemperature > coldThresholdC) return undefined;
+  return {
+    id: 'weather:cold', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
+    kicker: 'Cold today', title: `${Math.round(today.minTemperature)}° expected`,
+    detail: 'Below your configured comfortable range', href: '#/weather', render: { type: 'weather-signal', kind: 'cold' },
+  };
+}
+
+/** Only fires when it isn't already obviously wet — a genuinely upcoming change, not the current forecast. */
+function rainSoonCandidate(data: WeatherData): Candidate | undefined {
+  if ((data.current.precipitationMm ?? 0) > 0.1) return undefined;
+  const hit = data.hours.slice(0, 6).find((hour) => hour.precipitationMm >= 0.2);
+  if (!hit) return undefined;
+  return {
+    id: 'weather:rain-soon', source: 'weather', kind: 'weather', score: 58, shapes: ['secondary', 'tile'],
+    kicker: 'Rain ahead', title: `Rain by ${hit.hourLabel}:00`,
+    detail: `${hit.precipitationMm.toFixed(1)} mm expected`, href: '#/weather', render: { type: 'weather-signal', kind: 'rain' },
+  };
+}
+
+function windCandidate(today: WeatherData['days'][number], windThresholdMs: number): Candidate | undefined {
+  if (today.maxWindSpeed === undefined || today.maxWindSpeed < windThresholdMs) return undefined;
+  return {
+    id: 'weather:wind', source: 'weather', kind: 'weather', score: 50, shapes: ['secondary', 'tile'],
+    kicker: 'Windy today', title: `${Math.round(today.maxWindSpeed)} m/s peak`,
+    detail: 'Above your configured wind threshold', href: '#/weather', render: { type: 'weather-signal', kind: 'wind' },
+  };
+}
+
+function uvCandidate(today: WeatherData['days'][number], uvThresholdHigh: number): Candidate | undefined {
+  if (today.maxUvIndex === undefined || today.maxUvIndex < uvThresholdHigh) return undefined;
+  return {
+    id: 'weather:uv', source: 'weather', kind: 'weather', score: 46, shapes: ['secondary', 'tile'],
+    kicker: 'High UV', title: `UV ${today.maxUvIndex.toFixed(1)} today`,
+    detail: 'Sun protection recommended', href: '#/weather', render: { type: 'weather-signal', kind: 'uv' },
+  };
+}
+
+const SUNSET_WINDOW_MS = 45 * 60_000;
+
+function sunsetCandidate(sun: WeatherData['sun'], now: number): Candidate | undefined {
+  if (!sun?.sunset) return undefined;
+  const minsToSunset = (Date.parse(sun.sunset) - now) / 60_000;
+  if (minsToSunset < 0 || minsToSunset > SUNSET_WINDOW_MS / 60_000) return undefined;
+  return {
+    id: 'weather:sunset', source: 'weather', kind: 'weather', score: 30, shapes: ['tile'],
+    kicker: 'Golden hour', title: 'Sunset soon',
+    detail: `Sets in ${Math.round(minsToSunset)} min`, href: '#/weather', render: { type: 'weather-signal', kind: 'sunset' },
+  };
+}
+
+const MOON_PHASE_TOLERANCE_DEG = 5;
+
+function circularDistanceDeg(a: number, b: number): number {
+  const diff = Math.abs(a - b) % 360;
+  return Math.min(diff, 360 - diff);
+}
+
+function moonCandidate(moon: WeatherData['moon']): Candidate | undefined {
+  if (!moon) return undefined;
+  const isNew = circularDistanceDeg(moon.phaseDeg, 0) <= MOON_PHASE_TOLERANCE_DEG;
+  const isFull = circularDistanceDeg(moon.phaseDeg, 180) <= MOON_PHASE_TOLERANCE_DEG;
+  if (!isNew && !isFull) return undefined;
+  const illumination = Math.round(((1 - Math.cos((moon.phaseDeg * Math.PI) / 180)) / 2) * 100);
+  return {
+    id: 'weather:moon', source: 'weather', kind: 'weather', score: 28, shapes: ['tile'],
+    kicker: "Tonight's sky", title: isFull ? 'Full moon tonight' : 'New moon tonight',
+    detail: `${illumination}% lit`, href: '#/weather', render: { type: 'weather-signal', kind: 'moon' },
+  };
+}
+
+function forecastCandidate(data: WeatherData, today: WeatherData['days'][number], now: number): Candidate | undefined {
+  const overnight = new Date(now).getHours() < 6;
+  const forecast = overnight ? today : data.days[1];
+  if (!forecast) return undefined;
+  const forecastDate = new Date(`${forecast.date}T12:00:00Z`);
+  const precipitationDetail = `${forecast.precipitationMm.toFixed(1)} mm precipitation expected`;
+  const dryDetail = `${weekdayFullFmt.format(forecastDate)} looks dry`;
+  return {
+    id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['tile'],
+    kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
+    detail: forecast.precipitationMm > 0 ? precipitationDetail : dryDetail,
+    href: '#/weather', render: { type: 'text' },
+  };
+}
+
 export function weatherCandidates(
   data: WeatherData | undefined,
   hotThresholdC: number,
   coldThresholdC: number,
+  windThresholdMs: number,
+  uvThresholdHigh: number,
   now = Date.now(),
 ): Candidate[] {
   const today = data?.days[0];
-  if (!today) return [];
-  if (today.maxTemperature >= hotThresholdC) {
-    return [{
-      id: 'weather:hot', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
-      kicker: 'Heat today', title: `${Math.round(today.maxTemperature)}° expected`,
-      detail: `Above your configured comfortable range`, href: '#/weather', render: { type: 'weather-hours' },
-    }];
-  }
-  if (today.minTemperature <= coldThresholdC) {
-    return [{
-      id: 'weather:cold', source: 'weather', kind: 'weather', score: 62, shapes: ['secondary', 'tile'],
-      kicker: 'Cold today', title: `${Math.round(today.minTemperature)}° expected`,
-      detail: `Below your configured comfortable range`, href: '#/weather', render: { type: 'weather-hours' },
-    }];
-  }
-  const overnight = new Date(now).getHours() < 6;
-  const forecast = overnight ? today : data.days[1];
-  if (forecast) {
-    const forecastDate = new Date(`${forecast.date}T12:00:00Z`);
-    const precipitationDetail = `${forecast.precipitationMm.toFixed(1)} mm precipitation expected`;
-    const dryDetail = `${weekdayFullFmt.format(forecastDate)} looks dry`;
-    return [{
-      id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['tile'],
-      kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
-      detail: forecast.precipitationMm > 0 ? precipitationDetail : dryDetail,
-      href: '#/weather', render: { type: 'text' },
-    }];
-  }
-  return [];
+  if (!data || !today) return [];
+  return [
+    severeCandidate(data, now),
+    hotCandidate(today, hotThresholdC),
+    coldCandidate(today, coldThresholdC),
+    rainSoonCandidate(data),
+    windCandidate(today, windThresholdMs),
+    uvCandidate(today, uvThresholdHigh),
+    sunsetCandidate(data.sun, now),
+    moonCandidate(data.moon),
+    forecastCandidate(data, today, now),
+  ].filter((candidate): candidate is Candidate => candidate !== undefined);
+}
+
+function formatSteamHours(minutes: number): string {
+  const hours = minutes / 60;
+  return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)}h`;
+}
+
+const DEFAULT_STEAM_MOMENTS: SteamMoments = { completedGame: false };
+
+function steamCompletedGameCandidate(data: SteamData, moments: SteamMoments): Candidate | undefined {
+  if (!moments.completedGame || !data.achievements) return undefined;
+  const { appId, gameName, totalCount } = data.achievements;
+  return {
+    id: `steam:completed:${appId}`, source: 'steam', kind: 'steam', score: 92, shapes: [...allShapes],
+    kicker: 'Game completed', title: gameName, detail: `All ${totalCount} achievements unlocked`,
+    href: '#/steam', render: { type: 'text' },
+  };
+}
+
+function steamAchievementCandidate(data: SteamData, achievementFreshMs: number, rareAchievementPercent: number): Candidate | undefined {
+  const recentUnlock = data.achievements?.recentUnlocks[0];
+  if (!recentUnlock || Date.now() - Date.parse(recentUnlock.unlockedAt) >= achievementFreshMs) return undefined;
+  const rare = recentUnlock.globalUnlockedPercent !== undefined && recentUnlock.globalUnlockedPercent <= rareAchievementPercent;
+  const rarity = recentUnlock.globalUnlockedPercent !== undefined
+    ? `${recentUnlock.globalUnlockedPercent.toFixed(1)}% of players`
+    : undefined;
+  return {
+    id: `steam:achievement:${data.achievements!.appId}:${recentUnlock.apiName}`, source: 'steam', kind: 'steam',
+    score: rare ? 85 : 80, shapes: [...allShapes], kicker: rare ? 'Rare achievement unlocked' : 'Achievement unlocked', title: recentUnlock.displayName,
+    detail: [data.achievements!.gameName, rarity].filter((value): value is string => Boolean(value)).join(' · '),
+    href: '#/steam', render: { type: 'steam-achievement', appId: data.achievements!.appId, apiName: recentUnlock.apiName },
+  };
+}
+
+function steamPlaytimeMilestoneCandidate(data: SteamData, moments: SteamMoments): Candidate | undefined {
+  if (moments.playtimeMilestoneHours === undefined) return undefined;
+  const trackedGame = data.currentGame ?? data.recentlyPlayed[0] ?? data.library?.mostPlayed[0];
+  if (!trackedGame) return undefined;
+  return {
+    id: `steam:playtime-milestone:${trackedGame.appId}:${moments.playtimeMilestoneHours}`, source: 'steam', kind: 'steam',
+    score: 65, shapes: ['secondary', 'tile'], kicker: 'Playtime milestone', title: `${moments.playtimeMilestoneHours}h in ${trackedGame.name}`,
+    detail: 'Open Steam for the full breakdown', href: '#/steam', render: { type: 'text' },
+  };
+}
+
+function steamNowPlayingCandidate(data: SteamData): Candidate | undefined {
+  if (!data.currentGame) return undefined;
+  const minutes = data.currentGame.playtimeForeverMinutes;
+  return {
+    id: `steam:now-playing:${data.currentGame.appId}`, source: 'steam', kind: 'steam', score: 58,
+    shapes: ['secondary', 'tile'], kicker: 'Playing now', title: data.currentGame.name,
+    detail: minutes !== undefined ? `${formatSteamHours(minutes)} played` : 'Open Steam',
+    href: '#/steam', render: { type: 'steam-now-playing', appId: data.currentGame.appId },
+  };
+}
+
+function steamLeaderboardClimbCandidate(moments: SteamMoments): Candidate | undefined {
+  if (!moments.leaderboardClimb) return undefined;
+  const { rank, delta } = moments.leaderboardClimb;
+  return {
+    id: `steam:leaderboard-climb:${rank}`, source: 'steam', kind: 'steam', score: 45, shapes: ['tile'],
+    kicker: 'Friends leaderboard', title: `Up to #${rank + 1}`, detail: `Climbed ${delta} spot${delta === 1 ? '' : 's'}`,
+    href: '#/steam', render: { type: 'text' },
+  };
+}
+
+function steamFriendsOnlineCandidate(data: SteamData): Candidate | undefined {
+  if (!data.friendsInGame.length) return undefined;
+  const first = data.friendsInGame[0]!;
+  return {
+    id: 'steam:friends', source: 'steam', kind: 'steam', score: 25, shapes: ['tile'],
+    kicker: 'Friends online',
+    title: `${data.friendsInGame.length} friend${data.friendsInGame.length === 1 ? '' : 's'} playing`,
+    detail: first.gameName, href: '#/steam', render: { type: 'text' },
+  };
+}
+
+function steamRecentPlaytimeCandidate(data: SteamData): Candidate | undefined {
+  const recentMinutes = data.library?.recentPlaytimeMinutes;
+  const recentGameName = data.library?.mostPlayed[0]?.name ?? data.recentlyPlayed[0]?.name;
+  if (!recentMinutes || !recentGameName) return undefined;
+  return {
+    id: 'steam:recent-playtime', source: 'steam', kind: 'steam', score: 22, shapes: ['tile'],
+    kicker: 'This week on Steam', title: `${formatSteamHours(recentMinutes)} this week`, detail: recentGameName,
+    href: '#/steam', render: { type: 'text' },
+  };
+}
+
+/**
+ * Only the first matching candidate is returned — a completion, an achievement unlock, a playtime
+ * milestone, current game, friend activity, a leaderboard climb, and recent playtime would
+ * otherwise all compete for slots from the same source. Order here doubles as the priority: a
+ * fresh game completion beats a rare unlock, which beats a routine unlock, which beats a playtime
+ * milestone, which beats just "playing now", down through the ambient filler signals.
+ */
+export function steamCandidates(
+  data: SteamData | undefined,
+  achievementFreshMs: number,
+  moments: SteamMoments = DEFAULT_STEAM_MOMENTS,
+  rareAchievementPercent = 10,
+): Candidate[] {
+  if (!data) return [];
+
+  const candidate =
+    steamCompletedGameCandidate(data, moments)
+    ?? steamAchievementCandidate(data, achievementFreshMs, rareAchievementPercent)
+    ?? steamPlaytimeMilestoneCandidate(data, moments)
+    ?? steamNowPlayingCandidate(data)
+    ?? steamLeaderboardClimbCandidate(moments)
+    ?? steamFriendsOnlineCandidate(data)
+    ?? steamRecentPlaytimeCandidate(data);
+
+  return candidate ? [candidate] : [];
 }
 
 export function hueCandidates(data: HueData | undefined): Candidate[] {

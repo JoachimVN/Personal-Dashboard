@@ -5,7 +5,28 @@ import { motion } from 'motion/react';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { deg, glyph, HUMIDITY_COLOR, symbolLabel, uvLevel, weatherLocation, WIND_COLOR, windCompass } from '../../lib/weather';
+import { useSkyNow } from '../../lib/skyTime';
 import './weather.css';
+
+/**
+ * A small, deliberately soft approximation of daylight from the only solar data we
+ * have. It starts and ends with a little warmth, then reaches its clearest point at
+ * solar noon. That makes the overview's ambience feel connected to the real sky
+ * without pretending to know cloud cover or the sun's exact altitude.
+ */
+export function daylightIntensity(sun: WeatherData['sun'], now: Date): number {
+  if (!sun?.sunrise || !sun.sunset) return 0;
+
+  const sunrise = Date.parse(sun.sunrise);
+  const sunset = Date.parse(sun.sunset);
+  const current = now.getTime();
+  if (!Number.isFinite(sunrise) || !Number.isFinite(sunset) || sunset <= sunrise || current < sunrise || current > sunset) {
+    return 0;
+  }
+
+  const progress = (current - sunrise) / (sunset - sunrise);
+  return 0.16 + Math.sin(progress * Math.PI) * 0.84;
+}
 
 function MiniStat({ label, value, children }: Readonly<{ label: string; value: string; children: ReactNode }>) {
   return (
@@ -19,7 +40,7 @@ function MiniStat({ label, value, children }: Readonly<{ label: string; value: s
 
 /** Same needle-on-a-compass language as the detail page's wind tile, just small enough to sit
  * in a row of three — a glyph alone can't say "which way", the needle can. */
-function WindGauge({ speed, directionDeg }: Readonly<{ speed: number; directionDeg?: number }>) {
+export function WindGauge({ speed, directionDeg }: Readonly<{ speed: number; directionDeg?: number }>) {
   const toward = directionDeg == null ? null : (directionDeg + 180) % 360;
   const direction = directionDeg == null ? '' : ` ${windCompass(directionDeg)}`;
   return (
@@ -39,7 +60,7 @@ function WindGauge({ speed, directionDeg }: Readonly<{ speed: number; directionD
 }
 
 /** Circular counterpart to the detail page's humidity bar — a ring reads faster at this size than a bar. */
-function HumidityGauge({ humidity }: Readonly<{ humidity: number }>) {
+export function HumidityGauge({ humidity }: Readonly<{ humidity: number }>) {
   const r = 12;
   const circumference = 2 * Math.PI * r;
   return (
@@ -56,7 +77,7 @@ function HumidityGauge({ humidity }: Readonly<{ humidity: number }>) {
 }
 
 /** Small version of the detail page's UV arc, colored from the same WHO band as its `uvLevel()` label. */
-function UvGauge({ uvIndex }: Readonly<{ uvIndex: number }>) {
+export function UvGauge({ uvIndex }: Readonly<{ uvIndex: number }>) {
   const level = uvLevel(uvIndex);
   const fraction = Math.min(uvIndex / 11, 1);
   const r = 12;
@@ -188,12 +209,16 @@ function WeekAheadMini({ days }: Readonly<{ days: WeatherData['days'] }>) {
 
 export function WeatherOverview() {
   const { envelope, offline } = useWidget<WeatherData>('weather');
+  const now = useSkyNow();
   return (
     <WidgetBody envelope={envelope} offline={offline}>
       {(data) => {
         const today = data.days[0];
+        // Ten brightness steps are enough to keep CSS compact, while still avoiding
+        // a visibly abrupt shift as the shared clock advances through the day.
+        const sunlight = Math.round(daylightIntensity(data.sun, now) * 10);
         return (
-          <div className="grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.2fr)_minmax(13rem,0.9fr)]">
+          <div className="weather-overview grid gap-x-6 gap-y-4 lg:grid-cols-[minmax(12rem,0.9fr)_minmax(0,1.2fr)_minmax(13rem,0.9fr)]" data-sunlight={sunlight}>
             <div>
               <div className="flex items-center gap-3">
                 <span className="text-4xl" aria-hidden>{glyph(data.current.symbol)}</span>

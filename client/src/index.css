@@ -29,6 +29,14 @@
   --color-codex: light-dark(#5b6ee1, #9895ff);
   --color-codex-blue: light-dark(#4b84e8, #7eafff);
   --color-codex-purple: light-dark(#7863df, #b49dff);
+
+  /* Lighter tints of the brand accents, used for the 5-hour usage window stacked with the weekly one. */
+  --color-claude-fast: color-mix(in oklab, var(--color-claude) 72%, white 28%);
+  --color-codex-fast: color-mix(in oklab, var(--color-codex) 72%, white 28%);
+
+  /* Darker tints, used for a model-specific weekly cap (e.g. Claude's "Fable" limit). */
+  --color-claude-model: color-mix(in oklab, var(--color-claude) 72%, black 28%);
+  --color-codex-model: color-mix(in oklab, var(--color-codex) 72%, black 28%);
 }
 
 /* Glass card recipe — apply only to card-level surfaces; stacked backdrop-filters are expensive on mobile Safari. */
@@ -108,6 +116,26 @@ a {
   transition: background 1.2s ease;
 }
 
+/* A lower horizon balances the sky wash at the top of longer pages. It reuses the
+   same clock-driven colors, but stays broad and low enough to remain background. */
+.ambient-horizon {
+  position: absolute;
+  bottom: -4rem;
+  left: 50%;
+  width: min(136rem, 230vw);
+  height: 34rem;
+  translate: -50% 0;
+  background: radial-gradient(
+    ellipse at 50% 82%,
+    color-mix(in oklab, var(--sky-b) 40%, transparent),
+    color-mix(in oklab, var(--sky-a) 18%, transparent) 42%,
+    transparent 76%
+  );
+  filter: blur(76px);
+  opacity: 0.54;
+  transition: background 1.2s ease;
+}
+
 /* Section-accent wash layered on top of the sky wash while a section page is
    open (App.tsx SectionGlow) — --section-accent is set inline per section from
    its registry.tsx accentVar, so this one rule covers every section. */
@@ -128,6 +156,18 @@ a {
   translate: -50% 0;
   background: radial-gradient(ellipse at 50% 30%, color-mix(in oklab, var(--section-accent) 30%, transparent), transparent 72%);
   filter: blur(70px);
+  opacity: 0.6;
+}
+
+.section-page-horizon {
+  position: absolute;
+  bottom: -5rem;
+  left: 50%;
+  width: min(104rem, 220vw);
+  height: 32rem;
+  translate: -50% 0;
+  background: radial-gradient(ellipse at 50% 85%, color-mix(in oklab, var(--section-accent) 20%, transparent), transparent 72%);
+  filter: blur(72px);
   opacity: 0.6;
 }
 
@@ -264,6 +304,7 @@ a {
 .command-panel--health { --panel-accent: var(--color-accent-health); }
 .command-panel--spotify { --panel-accent: var(--color-accent-spotify); }
 .command-panel--weather { --panel-accent: var(--color-accent-weather); }
+.command-panel--steam { --panel-accent: var(--color-accent-steam); }
 
 .command-agenda {
   position: relative;
@@ -503,6 +544,7 @@ a {
 .command-signal--health { --signal-color: var(--color-accent-health); }
 .command-signal--spotify { --signal-color: var(--color-accent-spotify); }
 .command-signal--weather { --signal-color: var(--color-accent-weather); }
+.command-signal--steam { --signal-color: var(--color-accent-steam); }
 
 .command-signal-arrow {
   font-size: 0.85rem;
@@ -854,6 +896,14 @@ a {
   min-height: 27rem;
 }
 
+.dashboard-section-card--health {
+  background:
+    radial-gradient(88% 68% at 8% -22%, color-mix(in oklab, #57c7dc 22%, transparent), transparent 70%),
+    radial-gradient(70% 72% at 88% -28%, color-mix(in oklab, #ff8eaa 20%, transparent), transparent 72%),
+    linear-gradient(180deg, color-mix(in oklab, #f6c5c8 8%, transparent), transparent 44%),
+    var(--color-card);
+}
+
 .dashboard-section-card--weather {
   min-height: 19rem;
 }
@@ -884,7 +934,6 @@ a {
   background: color-mix(in oklab, var(--accent) 7%, var(--color-card));
   transition: background 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
 }
-
 .section-arrow {
   transition: color 220ms ease, background 220ms ease, transform 350ms cubic-bezier(.2,.8,.2,1);
 }
@@ -898,6 +947,14 @@ a {
     box-shadow:
       0 24px 75px light-dark(rgb(46 55 77 / 0.12), rgb(0 0 0 / 0.4)),
       inset 0 1px 0 light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.1));
+  }
+
+  .dashboard-section-card--health:hover {
+    background:
+      radial-gradient(88% 68% at 8% -22%, color-mix(in oklab, #57c7dc 30%, transparent), transparent 70%),
+      radial-gradient(70% 72% at 88% -28%, color-mix(in oklab, #ff8eaa 27%, transparent), transparent 72%),
+      linear-gradient(180deg, color-mix(in oklab, #f6c5c8 12%, transparent), transparent 48%),
+      var(--color-card);
   }
 
   .dashboard-section-card:hover .section-card-aura {

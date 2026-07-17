@@ -11,8 +11,10 @@ import { WeatherOverview } from './weather/WeatherOverview';
 import { WeatherDetail } from './weather/WeatherDetail';
 import { HealthOverview } from './health/HealthOverview';
 import { HealthDetail } from './health/HealthDetail';
+import { SteamOverview } from './steam/SteamOverview';
+import { SteamDetail } from './steam/SteamDetail';
 
-export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health'] as const;
+export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health', 'steam'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 export interface SectionDef {
@@ -83,6 +85,15 @@ export const SECTIONS: SectionDef[] = [
     accentVar: '--color-accent-health',
     Overview: HealthOverview,
     Detail: HealthDetail,
+  },
+  {
+    id: 'steam',
+    title: 'Steam',
+    label: 'Games',
+    description: 'Current game, library and achievements',
+    accentVar: '--color-accent-steam',
+    Overview: SteamOverview,
+    Detail: SteamDetail,
   },
 ];
 

@@ -40,8 +40,7 @@ export function GitHubDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Build"
-        title={<>Issues, PRs<br /><span className="text-ink-faint">and quick actions.</span></>}
+        title="GitHub activity"
         description="Capture an issue, launch a coding session, or check what's moving across your repos."
         accent="var(--color-accent-github)"
       >

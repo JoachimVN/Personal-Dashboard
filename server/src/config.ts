@@ -60,8 +60,20 @@ const configSchema = z.object({
     weatherHotC: z.number().default(25),
     /** Today's forecast min °C at or below this becomes a "cold today" signal. */
     weatherColdC: z.number().default(-10),
+    /** Today's forecast peak wind speed (m/s) at or above this becomes a "windy today" signal. */
+    weatherWindMs: z.number().default(12),
+    /** Today's forecast peak UV index at or above this becomes a "high UV" signal (8 = WHO "very high"). */
+    weatherUvHigh: z.number().default(8),
     /** How recently an unread iMessage must have arrived to count as "new", vs. just sitting unread. */
     imessageFreshMs: z.number().int().min(60_000).default(30 * 60_000),
+    /** How recently a Steam achievement must have unlocked to surface as a signal. Advanced tuning — leave at the default. */
+    steamAchievementFreshMs: z.number().int().min(60_000).default(7 * 24 * 60 * 60_000),
+    /** An unlocked achievement's global unlock % at or below this counts as "rare" and outranks a routine unlock. */
+    steamRareAchievementPercent: z.number().positive().max(100).default(10),
+    /** Total-hours-played thresholds for the tracked game that count as a milestone worth surfacing. */
+    steamPlaytimeMilestoneHours: z.array(z.number().positive()).default([10, 25, 50, 100, 250, 500, 1000]),
+    /** How recently a game-completion, playtime milestone, or friends-leaderboard rank change must have happened to still count as "just happened". */
+    steamMomentFreshMs: z.number().int().min(60_000).default(3 * 24 * 60 * 60_000),
   }).default({
     gmailStaleMs: 24 * 60 * 60_000,
     gmailFreshMs: 30 * 60_000,
@@ -71,7 +83,23 @@ const configSchema = z.object({
     spotifyFreshMs: 48 * 60 * 60_000,
     weatherHotC: 25,
     weatherColdC: -10,
+    weatherWindMs: 12,
+    weatherUvHigh: 8,
+    steamAchievementFreshMs: 7 * 24 * 60 * 60_000,
+    steamRareAchievementPercent: 10,
+    steamPlaytimeMilestoneHours: [10, 25, 50, 100, 250, 500, 1000],
+    steamMomentFreshMs: 3 * 24 * 60 * 60_000,
   }),
+  steam: z
+    .object({
+      /** How many days of daily playtime samples to retain for the trend chart. */
+      historyRetentionDays: z.number().int().min(1).default(90),
+      /** Cap on how many friends' libraries to fetch for the playtime leaderboard — each one is an extra Steam API call. */
+      leaderboardMaxFriends: z.number().int().min(1).default(50),
+      /** How long a computed friends leaderboard is cached before re-fetching every friend's library. */
+      leaderboardTtlHours: z.number().int().min(1).default(12),
+    })
+    .default({ historyRetentionDays: 90, leaderboardMaxFriends: 50, leaderboardTtlHours: 12 }),
   code: z
     .object({
       /** Local parent directory to scan for git repos, per OS. Each immediate subdirectory with a .git and a GitHub-remote origin becomes a launchable project. */

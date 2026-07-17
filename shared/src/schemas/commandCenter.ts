@@ -12,7 +12,10 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('github-contributions') }),
   z.object({ type: z.literal('github-reviews') }),
   z.object({ type: z.literal('gmail-threads'), threadIds: z.array(z.string()) }),
-  z.object({ type: z.literal('weather-hours') }),
+  z.object({
+    type: z.literal('weather-signal'),
+    kind: z.enum(['severe', 'hot', 'cold', 'rain', 'wind', 'uv', 'sunset', 'moon']),
+  }),
   z.object({
     type: z.literal('ai-usage-tool'),
     /** One trend line per tool, overlaid on the same 0–100% scale when there are several. */
@@ -20,12 +23,14 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
     /** Which quota window the card is about — drives the trend line and leading summary stat. */
     metric: z.enum(['fiveHour', 'weekly']),
   }),
+  z.object({ type: z.literal('steam-now-playing'), appId: z.number() }),
+  z.object({ type: z.literal('steam-achievement'), appId: z.number(), apiName: z.string() }),
 ]);
 
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

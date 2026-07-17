@@ -14,6 +14,7 @@ export interface ServerEnv {
   google?: { clientId: string; clientSecret: string };
   spotify?: { clientId: string; clientSecret: string };
   hue?: { clientId: string; clientSecret: string };
+  steam?: { apiKey: string; steamId: string };
 }
 
 function parseWeather(): ServerEnv['weather'] {
@@ -25,6 +26,17 @@ function parseWeather(): ServerEnv['weather'] {
     return undefined;
   }
   return { lat, lon };
+}
+
+export function parseSteam(): ServerEnv['steam'] {
+  const apiKey = process.env.STEAM_API_KEY;
+  const steamId = process.env.STEAM_ID;
+  if (!apiKey || !steamId) return undefined;
+  if (!/^\d{17}$/.test(steamId)) {
+    console.warn('⚠️  STEAM_ID is not a numeric SteamID64 (17 digits) — Steam disabled.');
+    return undefined;
+  }
+  return { apiKey, steamId };
 }
 
 export function loadEnv(): ServerEnv {
@@ -78,5 +90,6 @@ export function loadEnv(): ServerEnv {
       process.env.HUE_CLIENT_ID && process.env.HUE_CLIENT_SECRET
         ? { clientId: process.env.HUE_CLIENT_ID, clientSecret: process.env.HUE_CLIENT_SECRET }
         : undefined,
+    steam: parseSteam(),
   };
 }

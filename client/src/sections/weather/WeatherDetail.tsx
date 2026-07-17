@@ -245,9 +245,12 @@ const CHART_H = 34;
  * switching tabs never changes the card's height and hovering any chart dims the same strip. */
 function HourGlyphStrip({ hours, active }: Readonly<{ hours: WeatherData['hours']; active: number | null }>) {
   return (
-    <div className="mb-2 flex text-base" aria-hidden>
+    <div className="mb-2 flex text-[clamp(0.55rem,3.2vw,1rem)]" aria-hidden>
       {hours.map((hour, i) => (
-        <span key={hour.time} className={`flex-1 text-center transition-opacity ${active != null && active !== i ? 'opacity-35' : ''}`}>
+        <span
+          key={hour.time}
+          className={`min-w-0 flex-1 text-center transition-opacity ${active != null && active !== i ? 'opacity-35' : ''}`}
+        >
           {glyph(hour.symbol)}
         </span>
       ))}
@@ -739,8 +742,7 @@ export function WeatherDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Weather"
-        title={<>Today&rsquo;s sky,<br /><span className="text-ink-faint">read closely.</span></>}
+        title="Weather forecast"
         description="Current conditions, the sun and moon, and the week ahead, straight from MET Norway."
         accent="var(--color-accent-weather)"
       >

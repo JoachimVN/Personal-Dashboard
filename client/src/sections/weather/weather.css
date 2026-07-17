@@ -14,6 +14,53 @@
   }
 }
 
+/* ── Overview daylight wash ─────────────────────────────────────────────── */
+
+/* The overview reports a 0–10 daylight band from today's sunrise and sunset.
+   :has() keeps the atmospheric treatment on the actual card chrome, while the
+   weather component remains responsible only for turning real sun data into a
+   presentation value. (The Steam card already uses :has(), so this is within our
+   supported browser baseline.) */
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='0']) { --weather-daylight-strength: 0; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='1']) { --weather-daylight-strength: 0.035; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='2']) { --weather-daylight-strength: 0.06; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='3']) { --weather-daylight-strength: 0.09; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='4']) { --weather-daylight-strength: 0.12; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='5']) { --weather-daylight-strength: 0.15; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='6']) { --weather-daylight-strength: 0.18; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='7']) { --weather-daylight-strength: 0.21; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='8']) { --weather-daylight-strength: 0.24; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='9']) { --weather-daylight-strength: 0.27; }
+.dashboard-section-card--weather:has(.weather-overview[data-sunlight='10']) { --weather-daylight-strength: 0.3; }
+
+.dashboard-section-card--weather {
+  isolation: isolate;
+  --weather-daylight-strength: 0;
+}
+
+.dashboard-section-card--weather::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -42% -18% 18%;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(62% 72% at 60% 4%, var(--color-accent-weather), transparent 74%);
+  filter: blur(42px);
+  opacity: var(--weather-daylight-strength);
+  transition: opacity 900ms ease;
+}
+
+.dashboard-section-card--weather > header,
+.dashboard-section-card--weather > .section-card-content,
+.dashboard-section-card--weather > p {
+  z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-section-card--weather::before { transition: none; }
+}
+
 /* ── Sun arc ─────────────────────────────────────────────────────────────── */
 
 /* The sun dot travels the arc via stroke-dash tricks on a guide path; the glow

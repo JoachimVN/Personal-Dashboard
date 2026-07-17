@@ -10,4 +10,5 @@ export * from './schemas/hue.js';
 export * from './schemas/imessage.js';
 export * from './schemas/spotify.js';
 export * from './schemas/health.js';
+export * from './schemas/steam.js';
 export * from './schemas/commandCenter.js';

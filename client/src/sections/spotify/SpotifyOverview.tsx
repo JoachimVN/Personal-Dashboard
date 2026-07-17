@@ -47,10 +47,10 @@ function TopSong({ track }: Readonly<{ track: Track }>) {
         <img
           src={track.imageUrl}
           alt=""
-          className="w-28 shrink-0 self-stretch rounded-xl object-cover shadow-lg sm:w-36"
+          className="aspect-square w-28 shrink-0 self-center rounded-xl object-cover shadow-lg sm:w-36"
         />
       ) : (
-        <div className="w-28 shrink-0 self-stretch rounded-xl bg-track sm:w-36" />
+        <div className="aspect-square w-28 shrink-0 self-center rounded-xl bg-track sm:w-36" />
       )}
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>

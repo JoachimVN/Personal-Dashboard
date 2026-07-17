@@ -1,20 +1,11 @@
 import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react';
 import { motion } from 'motion/react';
+import { GitHubMark } from '../components/GitHubMark';
 import type { SectionDef } from './registry';
 import { sectionHref } from '../router';
 
 export function accentStyle(section: SectionDef): CSSProperties {
   return { '--accent': `var(${section.accentVar})` } as CSSProperties;
-}
-
-export function AccentDot() {
-  return (
-    <span
-      aria-hidden
-      className="h-2 w-2 shrink-0 rounded-full bg-(--accent)"
-      style={{ boxShadow: '0 0 12px 2px color-mix(in oklab, var(--accent) 45%, transparent)' }}
-    />
-  );
 }
 
 function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
@@ -28,18 +19,12 @@ function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
   }
   if (id === 'github') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="6" cy="5" r="2" /><circle cx="18" cy="7" r="2" /><circle cx="8" cy="19" r="2" />
-        <path d="M6 7v4a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V9M8 17v-2" />
-      </svg>
+      <GitHubMark className="h-5 w-5 text-(--color-github-mark)" />
     );
   }
   if (id === 'spotify') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M7.5 9.8c2.9-.8 6-.5 8.6 1M8 13c2.3-.6 4.7-.3 6.8 .9M8.6 16c1.7-.4 3.4-.2 4.9 .7" />
-      </svg>
+      <img src="/spotify.svg" alt="" aria-hidden className="h-5 w-5" />
     );
   }
   if (id === 'weather') {
@@ -55,6 +40,13 @@ function SectionIcon({ id }: Readonly<{ id: SectionDef['id'] }>) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
         <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
+      </svg>
+    );
+  }
+  if (id === 'steam') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
+        <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.253 0-2.265-1.014-2.265-2.265z" />
       </svg>
     );
   }

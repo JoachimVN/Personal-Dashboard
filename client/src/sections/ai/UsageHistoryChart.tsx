@@ -12,6 +12,14 @@ interface ChartPoint {
   y: number;
   at: string;
   percent: number;
+  /** Sort same-timestamp synthetic reset points in their visual event order. */
+  order?: number;
+  /** Synthetic 100% endpoint immediately before a known allowance reset. */
+  sessionCapEnd?: boolean;
+  /** Synthetic zero at a reset deadline observed in a historical sample. */
+  resetAnchor?: boolean;
+  /** Synthetic zero at the start of a newly-reset rolling allowance. */
+  sessionStart?: boolean;
 }
 
 function timeLabel(iso: string, windowMs: number): string {
@@ -51,8 +59,42 @@ function buildGeometry(chartPoints: ChartPoint[]): ChartGeometry {
   const gapMs = median(deltas) * 3;
 
   const runs: ChartPoint[][] = [[chartPoints[0]]];
+  const gapJoins: Array<{ from: ChartPoint; to: ChartPoint }> = [];
   deltas.forEach((delta, i) => {
-    if (delta > gapMs) runs.push([]);
+    const next = chartPoints[i + 1];
+    // A confirmed capped session remains at 100% until its reset. Keep that plateau and draw the
+    // reset as a vertical drop; the next observed session can then rise normally from zero.
+    if (next.sessionCapEnd) {
+      runs.at(-1)!.push(next);
+      return;
+    }
+    if (next.resetAnchor) {
+      if (runs.at(-1)!.at(-1)!.sessionCapEnd) {
+        runs.at(-1)!.push(next);
+        return;
+      }
+      gapJoins.push({ from: runs.at(-1)!.at(-1)!, to: next });
+      runs.push([next]);
+      return;
+    }
+    // A rolling allowance reset is an explicitly known endpoint, but the path leading to it was
+    // not sampled. Draw that descent dashed rather than leaving a misleading blank space or a
+    // solid interpolation; the next run rises normally from the known 0% session start.
+    if (next.sessionStart) {
+      if (runs.at(-1)!.at(-1)!.resetAnchor) {
+        runs.at(-1)!.push(next);
+        return;
+      }
+      gapJoins.push({ from: runs.at(-1)!.at(-1)!, to: next });
+      runs.push([next]);
+      return;
+    }
+    // The first observed point after a reset belongs to the zero anchor even if the dashboard
+    // did not sample immediately. That slope represents known within-session accumulation.
+    if (delta > gapMs && !runs.at(-1)![0].sessionStart) {
+      gapJoins.push({ from: runs.at(-1)!.at(-1)!, to: next });
+      runs.push([]);
+    }
     runs.at(-1)!.push(chartPoints[i + 1]);
   });
 
@@ -65,18 +107,72 @@ function buildGeometry(chartPoints: ChartPoint[]): ChartGeometry {
     areaPath: solidRuns
       .map((run) => `${runLine(run)} L${run.at(-1)!.x},${H} L${run[0].x},${H} Z`)
       .join(' '),
-    gapPath: runs
-      .slice(1)
-      .map((run, i) => {
-        const prev = runs[i].at(-1)!;
-        return `M${prev.x},${prev.y} L${run[0].x},${run[0].y}`;
-      })
+    gapPath: gapJoins
+      .map(({ from, to }) => `M${from.x},${from.y} L${to.x},${to.y}`)
       .join(' '),
     dots: runs.filter((run) => run.length === 1).map((run) => run[0]),
   };
 }
 
-function useChartGeometry(points: UsageHistoryPoint[], metric: Metric, windowMs: number) {
+/** Splices the synthetic reset/session-start markers (see ChartPoint) into chartPoints in place,
+ * one set per known reset timestamp within the visible window. */
+function addSessionResetPoints(
+  chartPoints: ChartPoint[],
+  points: UsageHistoryPoint[],
+  sessionResetsAt: string | undefined,
+  sessionWindowMs: number,
+  start: number,
+  end: number,
+  windowMs: number,
+): void {
+  const resets = new Set([
+    ...points.map((point) => point.fiveHourResetsAt).filter((reset): reset is string => Boolean(reset)),
+    sessionResetsAt,
+  ].filter((reset): reset is string => Boolean(reset)));
+  for (const resetAt of resets) {
+    const reset = Date.parse(resetAt);
+    if (!Number.isFinite(reset)) continue;
+    const sessionStart = reset - sessionWindowMs;
+    if (reset > start && reset <= end) {
+      const prior = chartPoints.findLast((point) => Date.parse(point.at) < reset);
+      if (prior?.percent === 100) {
+        chartPoints.push({
+          x: ((reset - start) / windowMs) * W,
+          y: 0,
+          at: new Date(reset).toISOString(),
+          percent: 100,
+          order: 1,
+          sessionCapEnd: true,
+        });
+      }
+      chartPoints.push({
+        x: ((reset - start) / windowMs) * W,
+        y: H,
+        at: new Date(reset).toISOString(),
+        percent: 0,
+        order: 2,
+        resetAnchor: true,
+      });
+    }
+    if (sessionStart <= start || sessionStart > end) continue;
+    chartPoints.push({
+      x: ((sessionStart - start) / windowMs) * W,
+      y: H,
+      at: new Date(sessionStart).toISOString(),
+      percent: 0,
+      order: 2,
+      sessionStart: true,
+    });
+  }
+}
+
+function useChartGeometry(
+  points: UsageHistoryPoint[],
+  metric: Metric,
+  windowMs: number,
+  sessionResetsAt?: string,
+  sessionWindowMs?: number,
+) {
   return useMemo(() => {
     const end = Date.now();
     const start = end - windowMs;
@@ -91,8 +187,12 @@ function useChartGeometry(points: UsageHistoryPoint[], metric: Metric, windowMs:
           percent,
         };
       });
+    if (sessionWindowMs) {
+      addSessionResetPoints(chartPoints, points, sessionResetsAt, sessionWindowMs, start, end, windowMs);
+    }
+    chartPoints.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || (a.order ?? 0) - (b.order ?? 0));
     return chartPoints.length < 2 ? null : buildGeometry(chartPoints);
-  }, [points, metric, windowMs]);
+  }, [points, metric, windowMs, sessionResetsAt, sessionWindowMs]);
 }
 
 /**
@@ -105,20 +205,31 @@ export function UsageHistoryChart({
   windowMs,
   color,
   caption,
+  sessionResetsAt,
+  sessionWindowMs,
 }: Readonly<{
   points: UsageHistoryPoint[];
   metric: Metric;
   windowMs: number;
   color: string;
   caption: string;
+  /** Current rolling-window deadline; used to anchor a known reset at 0%. */
+  sessionResetsAt?: string;
+  sessionWindowMs?: number;
 }>) {
-  const geometry = useChartGeometry(points, metric, windowMs);
+  const geometry = useChartGeometry(points, metric, windowMs, sessionResetsAt, sessionWindowMs);
   const [hovered, setHovered] = useState<ChartPoint | null>(null);
 
   if (!geometry) {
     return <p className="text-[11px] text-ink-faint">{caption} — collecting history…</p>;
   }
   const chartPoints = geometry.points;
+
+  let captionText = caption;
+  if (hovered) {
+    const resetSuffix = hovered.sessionStart ? ' · session reset' : '';
+    captionText = `${Math.round(hovered.percent)}% · ${timeLabel(hovered.at, windowMs)}${resetSuffix}`;
+  }
 
   const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -211,11 +322,7 @@ export function UsageHistoryChart({
           />
         )}
       </div>
-      <p className="mt-1 text-[11px] tabular-nums text-ink-faint">
-        {hovered
-          ? `${Math.round(hovered.percent)}% · ${timeLabel(hovered.at, windowMs)}`
-          : caption}
-      </p>
+      <p className="mt-1 text-[11px] tabular-nums text-ink-faint">{captionText}</p>
     </div>
   );
 }
@@ -226,13 +333,17 @@ export function UsageSparkline({
   metric,
   windowMs,
   color,
+  sessionResetsAt,
+  sessionWindowMs,
 }: Readonly<{
   points: UsageHistoryPoint[];
   metric: Metric;
   windowMs: number;
   color: string;
+  sessionResetsAt?: string;
+  sessionWindowMs?: number;
 }>) {
-  const geometry = useChartGeometry(points, metric, windowMs);
+  const geometry = useChartGeometry(points, metric, windowMs, sessionResetsAt, sessionWindowMs);
   if (!geometry) return null;
 
   return (

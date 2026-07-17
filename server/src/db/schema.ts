@@ -33,6 +33,7 @@ export const aiUsageHistoryPoints = pgTable(
     toolId: text('tool_id').notNull(),
     at: timestamp('at', { withTimezone: true }).notNull(),
     fiveHourUsedPercent: doublePrecision('five_hour_used_percent'),
+    fiveHourResetsAt: timestamp('five_hour_resets_at', { withTimezone: true }),
     weeklyUsedPercent: doublePrecision('weekly_used_percent'),
     modelWeeklyUsedPercent: doublePrecision('model_weekly_used_percent'),
   },
@@ -105,6 +106,12 @@ export const spotifyObservedPlays = pgTable(
   },
   (table) => [primaryKey({ columns: [table.playedAt, table.trackId] })],
 );
+
+export const steamPlaytimeHistory = pgTable('steam_playtime_history', {
+  date: text('date').primaryKey(),
+  totalPlaytimeMinutes: doublePrecision('total_playtime_minutes').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const signalCurrent = pgTable(
   'signal_current',

@@ -78,8 +78,7 @@ export function PersonalDetail() {
   return (
     <div>
       <DetailIntro
-        eyebrow="Today"
-        title={<>Calendar, mail<br /><span className="text-ink-faint">and messages.</span></>}
+        title="Today"
         description="Today's events, your inboxes, and the rest of daily life."
         accent="var(--color-accent-personal)"
       >

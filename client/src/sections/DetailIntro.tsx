@@ -2,7 +2,6 @@ import type { CSSProperties, ReactNode } from 'react';
 import { motion } from 'motion/react';
 
 interface DetailIntroProps {
-  eyebrow: string;
   title: ReactNode;
   description: string;
   accent: string;
@@ -10,7 +9,7 @@ interface DetailIntroProps {
 }
 
 /** Editorial opening block shared by the three section detail pages. */
-export function DetailIntro({ eyebrow, title, description, accent, children }: Readonly<DetailIntroProps>) {
+export function DetailIntro({ title, description, accent, children }: Readonly<DetailIntroProps>) {
   return (
     <motion.section
       className="detail-intro relative mb-5 overflow-hidden rounded-[2rem] p-6 sm:mb-6 sm:p-8 lg:p-10"
@@ -23,10 +22,6 @@ export function DetailIntro({ eyebrow, title, description, accent, children }: R
       <div aria-hidden className="detail-intro-grid" />
       <div className="relative grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
         <div>
-          <div className="mb-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-(--detail-accent)">
-            <span className="h-1.5 w-1.5 rounded-full bg-(--detail-accent) shadow-[0_0_10px_var(--detail-accent)]" />
-            {eyebrow}
-          </div>
           <h1 className="detail-intro-title max-w-3xl text-[clamp(2.4rem,6vw,5rem)] font-semibold leading-[0.94] tracking-[-0.065em]">
             {title}
           </h1>

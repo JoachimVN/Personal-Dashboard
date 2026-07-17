@@ -18,6 +18,7 @@ export type UsageSnapshot = z.infer<typeof persistedSnapshotSchema>;
 interface UsagePointRow {
   at: string;
   five_hour_used_percent: number | null;
+  five_hour_resets_at: string | null;
   weekly_used_percent: number | null;
   model_weekly_used_percent: number | null;
 }
@@ -26,6 +27,7 @@ function toPoint(row: UsagePointRow): UsageHistoryPoint {
   return usageHistoryPointSchema.parse({
     at: new Date(row.at).toISOString(),
     fiveHourUsedPercent: row.five_hour_used_percent ?? undefined,
+    fiveHourResetsAt: row.five_hour_resets_at ? new Date(row.five_hour_resets_at).toISOString() : undefined,
     weeklyUsedPercent: row.weekly_used_percent ?? undefined,
     modelWeeklyUsedPercent: row.model_weekly_used_percent ?? undefined,
   });
@@ -49,15 +51,15 @@ export class UsageHistoryStore {
       const lockKey = ['ai-usage', toolId].join(':');
       await transaction`select pg_advisory_xact_lock(hashtext(${lockKey}))`;
       const [last] = await transaction<UsagePointRow[]>`
-        select at, five_hour_used_percent, weekly_used_percent, model_weekly_used_percent
+        select at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, model_weekly_used_percent
         from ai_usage_history_points where tool_id = ${toolId} order by at desc limit 1
       `;
       if (!last || at.getTime() - Date.parse(last.at) >= this.sampleMs) {
         await transaction`
           insert into ai_usage_history_points (
-            tool_id, at, five_hour_used_percent, weekly_used_percent, model_weekly_used_percent
+            tool_id, at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, model_weekly_used_percent
           ) values (
-            ${toolId}, ${at.toISOString()}, ${snapshot.fiveHour?.usedPercent ?? null},
+            ${toolId}, ${at.toISOString()}, ${snapshot.fiveHour?.usedPercent ?? null}, ${snapshot.fiveHour?.resetsAt ?? null},
             ${snapshot.weekly?.usedPercent ?? null}, ${snapshot.modelWeekly?.usedPercent ?? null}
           ) on conflict (tool_id, at) do nothing
         `;
@@ -70,7 +72,7 @@ export class UsageHistoryStore {
       const cutoff = new Date(Date.now() - this.retentionMs).toISOString();
       await transaction`delete from ai_usage_history_points where tool_id = ${toolId} and at < ${cutoff}`;
       const points = await transaction<UsagePointRow[]>`
-        select at, five_hour_used_percent, weekly_used_percent, model_weekly_used_percent
+        select at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, model_weekly_used_percent
         from ai_usage_history_points where tool_id = ${toolId} order by at asc
       `;
       return points.map(toPoint);
@@ -79,7 +81,7 @@ export class UsageHistoryStore {
 
   async get(toolId: string): Promise<UsageHistoryPoint[]> {
     const rows = await this.database.client<UsagePointRow[]>`
-      select at, five_hour_used_percent, weekly_used_percent, model_weekly_used_percent
+      select at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, model_weekly_used_percent
       from ai_usage_history_points where tool_id = ${toolId} order by at asc
     `;
     return rows.map(toPoint);

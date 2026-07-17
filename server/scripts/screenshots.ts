@@ -131,7 +131,7 @@ async function buildPages(): Promise<Page[]> {
     ...calendarCandidates(overviewCalendarFixture, overviewNow.getTime()),
     ...githubCandidates(overviewGithubFixture, 14, 50),
     ...healthCandidates(overviewHealthFixture),
-    ...weatherCandidates(overviewWeatherFixture, 25, -10),
+    ...weatherCandidates(overviewWeatherFixture, 25, -10, 12, 8),
     ...imessageCandidates(undefined, GMAIL_FRESH_MS),
     ...spotifyCandidates(fixtures.spotifyOverview, {
       trackShort: false, trackMedium: false, trackLong: false,

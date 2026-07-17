@@ -52,8 +52,8 @@ async function importUsageHistory(sql: TransactionSql, usage: z.infer<typeof usa
   for (const [toolId, points] of Object.entries(usage.tools)) {
     for (const point of points) {
       await sql`
-        insert into ai_usage_history_points (tool_id, at, five_hour_used_percent, weekly_used_percent, model_weekly_used_percent)
-        values (${toolId}, ${point.at}, ${point.fiveHourUsedPercent ?? null}, ${point.weeklyUsedPercent ?? null}, ${point.modelWeeklyUsedPercent ?? null})
+        insert into ai_usage_history_points (tool_id, at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, model_weekly_used_percent)
+        values (${toolId}, ${point.at}, ${point.fiveHourUsedPercent ?? null}, ${point.fiveHourResetsAt ?? null}, ${point.weeklyUsedPercent ?? null}, ${point.modelWeeklyUsedPercent ?? null})
         on conflict (tool_id, at) do nothing
       `;
       count += 1;
