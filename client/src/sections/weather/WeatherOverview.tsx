@@ -21,8 +21,9 @@ function MiniStat({ label, value, children }: Readonly<{ label: string; value: s
  * in a row of three — a glyph alone can't say "which way", the needle can. */
 function WindGauge({ speed, directionDeg }: Readonly<{ speed: number; directionDeg?: number }>) {
   const toward = directionDeg == null ? null : (directionDeg + 180) % 360;
+  const direction = directionDeg == null ? '' : ` ${windCompass(directionDeg)}`;
   return (
-    <MiniStat label="Wind" value={`${Math.round(speed)} m/s${directionDeg != null ? ` ${windCompass(directionDeg)}` : ''}`}>
+    <MiniStat label="Wind" value={`${Math.round(speed)} m/s${direction}`}>
       <svg viewBox="0 0 32 32" className="h-8 w-8" aria-hidden>
         <circle cx="16" cy="16" r="13" fill="none" stroke="var(--color-track)" strokeWidth="2" />
         {toward != null && (

@@ -501,10 +501,13 @@ export function weatherCandidates(
   const overnight = new Date(now).getHours() < 6;
   const forecast = overnight ? today : data.days[1];
   if (forecast) {
+    const forecastDate = new Date(`${forecast.date}T12:00:00Z`);
+    const precipitationDetail = `${forecast.precipitationMm.toFixed(1)} mm precipitation expected`;
+    const dryDetail = `${weekdayFullFmt.format(forecastDate)} looks dry`;
     return [{
       id: `weather:${overnight ? 'later-today' : 'tomorrow'}:${forecast.date}`, source: 'weather', kind: 'weather', score: 26, shapes: ['tile'],
       kicker: overnight ? 'Later today' : "Tomorrow's forecast", title: `${Math.round(forecast.minTemperature)}° to ${Math.round(forecast.maxTemperature)}°`,
-      detail: forecast.precipitationMm > 0 ? `${forecast.precipitationMm.toFixed(1)} mm precipitation expected` : `${weekdayFullFmt.format(new Date(`${forecast.date}T12:00:00Z`))} looks dry`,
+      detail: forecast.precipitationMm > 0 ? precipitationDetail : dryDetail,
       href: '#/weather', render: { type: 'text' },
     }];
   }

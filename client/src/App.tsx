@@ -11,7 +11,7 @@ import { DailyCommandCenter } from './components/DailyCommandCenter';
 import { ThemeToggle } from './components/ThemeToggle';
 
 // Set to true locally when tuning the continuous sky colors. Never enable for normal use.
-const SHOW_SKY_TIME_DEBUGGER = true;
+const SHOW_SKY_TIME_DEBUGGER = false;
 
 type SkyStop = {
   minute: number;

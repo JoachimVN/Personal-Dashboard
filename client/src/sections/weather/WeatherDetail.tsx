@@ -283,6 +283,12 @@ interface HourlyChartProps {
   onActiveChange: (index: number | null) => void;
 }
 
+function nearestHourlyIndex(event: React.PointerEvent<SVGSVGElement>, hourCount: number): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const position = (event.clientX - rect.left) / rect.width;
+  return Math.min(hourCount - 1, Math.max(0, Math.floor(position * hourCount)));
+}
+
 function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProps>) {
   const gradientId = `${useId().replaceAll(':', '')}-hourly`;
   if (hours.length < 2) return <p className="text-sm text-ink-faint">Hourly forecast is syncing.</p>;
@@ -297,11 +303,7 @@ function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProp
   const totalRain = Math.round(hours.reduce((sum, h) => sum + h.precipitationMm, 0) * 10) / 10;
   const peak = temps.indexOf(Math.max(...temps));
 
-  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const i = Math.min(hours.length - 1, Math.max(0, Math.floor(((event.clientX - rect.left) / rect.width) * hours.length)));
-    onActiveChange(i);
-  };
+  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => onActiveChange(nearestHourlyIndex(event, hours.length));
 
   let readout = `peak ${deg(temps[peak])} at ${hours[peak].hourLabel}:00`;
   if (totalRain > 0) readout += ` · ${totalRain} mm rain expected`;
@@ -460,11 +462,7 @@ function HourlyLineChart({
     if (point) readout = `${point.hour.hourLabel}:00 · ${format(point.value)}`;
   }
 
-  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const i = Math.min(hours.length - 1, Math.max(0, Math.floor(((event.clientX - rect.left) / rect.width) * hours.length)));
-    onActiveChange(i);
-  };
+  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => onActiveChange(nearestHourlyIndex(event, hours.length));
 
   return (
     <div>

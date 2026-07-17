@@ -187,7 +187,8 @@ app.get('/api/github/repos', async (_req, res) => {
   } catch (error) {
     // Never log the raw error here — it can carry the auth token in its request URL/headers.
     const status = typeof error === 'object' && error !== null && 'status' in error ? (error as { status?: unknown }).status : undefined;
-    console.error(`[github/repos] failed (status ${status ?? 'unknown'})`);
+    const statusLabel = typeof status === 'number' || typeof status === 'string' ? String(status) : 'unknown';
+    console.error(`[github/repos] failed (status ${statusLabel})`);
     res.status(502).json({ error: 'github-repos-failed' });
   }
 });

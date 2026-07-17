@@ -95,7 +95,7 @@ export function SunArc({ sunrise, sunset }: Readonly<SunArcProps>) {
 
   return (
     <div className="min-w-0">
-      <svg viewBox="-16 -26 252 144" className="w-full" role="img" aria-label={`Sunrise ${timeLabel(sunrise)}, sunset ${timeLabel(sunset)}`}>
+      <svg viewBox="-16 -26 252 144" className="w-full" aria-label={`Sunrise ${timeLabel(sunrise)}, sunset ${timeLabel(sunset)}`}>
         <defs>
           <linearGradient id={gradientId} x1="22" y1="104" x2="198" y2="104" gradientUnits="userSpaceOnUse">
             <stop offset="0" stopColor="var(--color-accent-weather)" stopOpacity="0.35" />
@@ -226,16 +226,16 @@ export function MoonDisc({ phaseDeg, size = 72 }: Readonly<MoonDiscProps>) {
   const waxing = phase < 180;
   // Terminator bulges toward +x in quadrants 1 and 3, −x in 2 and 4.
   const termSweep = Math.floor(phase / 90) % 2 === 0 ? 0 : 1;
+  const arcSweep = waxing ? 1 : 0;
   const litPath =
     phase === 0
       ? ''
-      : `M 0 -1 A 1 1 0 0 ${waxing ? 1 : 0} 0 1 A ${rx} 1 0 0 ${termSweep} 0 -1 Z`;
+      : `M 0 -1 A 1 1 0 0 ${arcSweep} 0 1 A ${rx} 1 0 0 ${termSweep} 0 -1 Z`;
 
   return (
     <svg
       viewBox="-1.2 -1.2 2.4 2.4"
       style={{ width: size, height: size }}
-      role="img"
       aria-label={`${moonPhaseName(phase)}, ${Math.round(moonIllumination(phase) * 100)}% illuminated`}
     >
       <defs>

@@ -94,8 +94,12 @@ function WeekOfSteps({ history, goal }: Readonly<{ history: HealthDay[]; goal: n
   const max = Math.max(goal, ...days.map((d) => d.steps ?? 0), 1);
   const activeDay = active == null ? null : days[active];
   const total = days.reduce((sum, d) => sum + (d.steps ?? 0), 0);
+  const activeDate = activeDay ? new Date(`${activeDay.date}T12:00:00`) : null;
+  const activeReadout = activeDay && activeDate
+    ? `${activeDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · ${(activeDay.steps ?? 0).toLocaleString()} steps`
+    : null;
   const readout = activeDay
-    ? `${new Date(`${activeDay.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} · ${(activeDay.steps ?? 0).toLocaleString()} steps`
+    ? activeReadout
     : `${total.toLocaleString()} steps this week`;
 
   return (
