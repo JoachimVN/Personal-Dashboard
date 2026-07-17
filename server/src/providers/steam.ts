@@ -384,10 +384,16 @@ async function getOrFetchFriendsLeaderboard(
   snapshotStore: SteamSnapshotStore | undefined,
 ): Promise<{ status: 'available' | 'unavailable'; entries: SteamLeaderboardEntry[] }> {
   const cached = await snapshotStore?.getFriendsLeaderboard();
+  const requestedFriendIds = friendIds.slice(0, maxFriends);
   const cacheIncludesRecentPlaytime = cached?.data.every(
     (entry) => entry.totalPlaytimeMinutes === undefined || entry.recentPlaytimeMinutes !== undefined,
   );
-  if (cached && cacheIncludesRecentPlaytime && !isExpired(cached.fetchedAt, ttlMs)) {
+  const cachedFriendIds = new Set(cached?.data.filter((entry) => !entry.isYou).map((entry) => entry.steamId));
+  const cacheMatchesFriendList = cached !== undefined
+    && requestedFriendIds.length === cachedFriendIds.size
+    && requestedFriendIds.every((friendId) => cachedFriendIds.has(friendId))
+    && cached.data.some((entry) => entry.isYou && entry.steamId === ownProfile.steamId);
+  if (cached && cacheIncludesRecentPlaytime && cacheMatchesFriendList && !isExpired(cached.fetchedAt, ttlMs)) {
     return { status: 'available', entries: cached.data };
   }
 
@@ -396,7 +402,7 @@ async function getOrFetchFriendsLeaderboard(
     const summaryBySteamId = new Map(friendSummaries.map((s) => [s.steamid, s]));
 
     const friendEntries = await Promise.all(
-      friendIds.slice(0, maxFriends).map(async (friendId): Promise<SteamLeaderboardEntry> => {
+      requestedFriendIds.map(async (friendId): Promise<SteamLeaderboardEntry> => {
         const summary = summaryBySteamId.get(friendId);
         const lib = await fetchFriendLibraryTotal(signal, apiKey, friendId);
         return {
@@ -533,7 +539,7 @@ export interface SteamLeaderboardOptions {
   ttlMs: number;
 }
 
-const DEFAULT_LEADERBOARD_OPTIONS: SteamLeaderboardOptions = { maxFriends: 30, ttlMs: 12 * 60 * 60_000 };
+const DEFAULT_LEADERBOARD_OPTIONS: SteamLeaderboardOptions = { maxFriends: 50, ttlMs: 12 * 60 * 60_000 };
 
 export function createSteamProvider(
   auth: SteamAuth | undefined,

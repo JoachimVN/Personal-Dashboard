@@ -424,4 +424,33 @@ describe('createSteamProvider fetch', () => {
       fetchMock.mockRestore();
     }
   });
+
+  it('refreshes a fresh cached leaderboard when it does not cover every requested friend', async () => {
+    const cachedLeaderboard = [
+      { steamId: auth.steamId, personaName: 'Alex', totalPlaytimeMinutes: 150, recentPlaytimeMinutes: 0, sharedGames: 0, isYou: true },
+      { steamId: 'friend1', personaName: 'Bob', totalPlaytimeMinutes: 100, recentPlaytimeMinutes: 0, sharedGames: 0, isYou: false },
+    ];
+    const snapshotStore = emptySnapshotStore();
+    snapshotStore.getFriendsLeaderboard.mockResolvedValue({ data: cachedLeaderboard, fetchedAt: new Date() });
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ response: { players: [{ steamid: auth.steamId, personaname: 'Alex', profileurl: 'https://steamcommunity.com/id/alex' }] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { games: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { game_count: 0, games: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ friendslist: { friends: [{ steamid: 'friend1' }, { steamid: 'friend2' }] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { players: [{ steamid: 'friend1', personaname: 'Bob' }, { steamid: 'friend2', personaname: 'Cara' }] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { games: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { games: [] } }));
+
+    try {
+      const provider = createSteamProvider(auth, snapshotStore as never);
+      const data = await provider.fetch(new AbortController().signal, false);
+
+      expect(data.friendsLeaderboard.entries.map((entry) => entry.steamId)).toEqual(expect.arrayContaining([auth.steamId, 'friend1', 'friend2']));
+      expect(data.friendsLeaderboard.entries).toHaveLength(3);
+      expect(snapshotStore.setFriendsLeaderboard).toHaveBeenCalledOnce();
+      expect(fetchMock).toHaveBeenCalledTimes(7);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
 });

@@ -95,11 +95,11 @@ const configSchema = z.object({
       /** How many days of daily playtime samples to retain for the trend chart. */
       historyRetentionDays: z.number().int().min(1).default(90),
       /** Cap on how many friends' libraries to fetch for the playtime leaderboard — each one is an extra Steam API call. */
-      leaderboardMaxFriends: z.number().int().min(1).default(30),
+      leaderboardMaxFriends: z.number().int().min(1).default(50),
       /** How long a computed friends leaderboard is cached before re-fetching every friend's library. */
       leaderboardTtlHours: z.number().int().min(1).default(12),
     })
-    .default({ historyRetentionDays: 90, leaderboardMaxFriends: 30, leaderboardTtlHours: 12 }),
+    .default({ historyRetentionDays: 90, leaderboardMaxFriends: 50, leaderboardTtlHours: 12 }),
   code: z
     .object({
       /** Local parent directory to scan for git repos, per OS. Each immediate subdirectory with a .git and a GitHub-remote origin becomes a launchable project. */
