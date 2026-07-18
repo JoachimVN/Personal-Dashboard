@@ -9,6 +9,7 @@ import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { SteamHistoryStore } from '../steamHistory.js';
+import { createAiNewsProvider } from './aiNews.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
@@ -68,6 +69,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
         createClaudeUsageProvider(config.aiUsage.claudeRefreshMs, usageHistory),
         createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
         createNewsProvider(config.news.feeds),
+        createAiNewsProvider(config.aiNews.feeds),
         createSpotifyProvider(env.spotify, spotifySnapshot, spotifyHistory),
         createHealthProvider(health, env.timezone, {
           steps: config.health.stepGoal,

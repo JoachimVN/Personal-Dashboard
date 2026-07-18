@@ -7,6 +7,12 @@
       { "name": "Hacker News", "url": "https://news.ycombinator.com/rss" }
     ]
   },
+  "aiNews": {
+    "feeds": [
+      { "name": "OpenAI", "url": "https://openai.com/news/rss.xml", "provider": "openai" },
+      { "name": "Anthropic", "url": "https://news.google.com/rss/search?q=site:anthropic.com/news&hl=en-US&gl=US&ceid=US:en", "provider": "anthropic" }
+    ]
+  },
   "code": {
     "reposRoot": {
       "darwin": "/Users/you/GitHub",

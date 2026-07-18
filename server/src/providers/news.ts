@@ -11,12 +11,17 @@ export interface NewsFeed {
   url: string;
 }
 
+interface FeedItem {
+  url: string;
+  publishedAt: string;
+}
+
 /**
  * Keep the news card useful when one high-volume feed publishes several newer
  * stories than the others. Each healthy feed gets its newest headline first;
  * the remaining slots are then filled by recency.
  */
-export function selectNewsItems(feedItems: NewsItem[][]): NewsItem[] {
+export function selectNewsItems<T extends FeedItem>(feedItems: T[][], maxItems = MAX_ITEMS): T[] {
   const groups = feedItems
     .map((items) => items.filter((item) => item.url).toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)))
     .filter((items) => items.length > 0);
@@ -32,7 +37,7 @@ export function selectNewsItems(feedItems: NewsItem[][]): NewsItem[] {
   const seenUrls = new Set<string>();
   const deduped = combined.filter((item) => (seenUrls.has(item.url) ? false : (seenUrls.add(item.url), true)));
 
-  return deduped.slice(0, MAX_ITEMS);
+  return deduped.slice(0, maxItems);
 }
 
 export function createNewsProvider(feeds: NewsFeed[]): Provider<NewsData> {

@@ -1,5 +1,6 @@
 import {
   commandCenterSchema,
+  type AiNewsData,
   type AiUsageToolData,
   type CalendarData,
   type GitHubData,
@@ -18,6 +19,7 @@ import type { AppConfig } from '../config.js';
 import { rankCandidates } from '../importance/rank.js';
 import {
   aiCandidates,
+  aiNewsCandidates,
   calendarCandidates,
   fallbackCandidates,
   githubCandidates,
@@ -183,6 +185,7 @@ export function createCommandCenterProvider(
         ...healthCandidates(widgetData<HealthData>(envelopes, 'health')),
         ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),
         ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
+        ...aiNewsCandidates(widgetData<AiNewsData>(envelopes, 'ai-news')),
         ...spotifyCandidates(spotify, spotifyFresh),
         ...steamCandidates(steam, config.commandCenter.steamAchievementFreshMs, steamMoments, config.commandCenter.steamRareAchievementPercent),
         ...weatherCandidates(

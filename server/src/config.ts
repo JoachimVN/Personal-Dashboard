@@ -15,6 +15,13 @@ const configSchema = z.object({
       feeds: z.array(z.object({ name: z.string(), url: z.string() })).default([]),
     })
     .default({ feeds: [] }),
+  aiNews: z
+    .object({
+      feeds: z
+        .array(z.object({ name: z.string(), url: z.string(), provider: z.enum(['openai', 'anthropic']) }))
+        .default([]),
+    })
+    .default({ feeds: [] }),
   aiUsage: z
     .object({
       /** How often to re-read Codex's local session files, in ms. Cheap — no external API call. */
