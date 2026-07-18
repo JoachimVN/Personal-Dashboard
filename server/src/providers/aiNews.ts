@@ -4,10 +4,11 @@ import type { Provider } from '../scheduler.js';
 import { selectNewsItems } from './news.js';
 
 /** Per-provider cap, not a shared pool — otherwise a high-volume feed (e.g. OpenAI's blog) crowds
- * out a lower-volume one (Anthropic's Google News proxy) in the merged list. Each provider only
- * gets a half-width column next to the other, so it wraps to more lines per headline than the
- * full-width News card at the same item count — stays lower than News's own cap for that reason. */
-const MAX_ITEMS_PER_PROVIDER = 6;
+ * out a lower-volume one (Anthropic's Google News proxy) in the merged list. Matches News's own
+ * fetch cap; the client only *renders* the first 6 of these and scrolls for the rest (see
+ * AiNews.tsx) — a fixed rendered count, not a fill-the-space target, since column width (and so
+ * how much each headline wraps) varies by viewport in a way item count alone can't compensate for. */
+const MAX_ITEMS_PER_PROVIDER = 12;
 
 /** Google News search-result titles are suffixed with " - <publisher>"; strip it since the
  * publisher is already shown as the item's source line right below the title. */

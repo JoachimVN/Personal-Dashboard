@@ -19,12 +19,17 @@ import { useWidget } from '../../useWidget';
 import { AiNews } from '../ai/AiNews';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
+// News and AI news sit side by side and need to match length regardless of viewport width — how
+// much a headline wraps at a given column width varies, so item count alone can't guarantee that.
+// Both render a fixed 6 items and scroll internally past that, instead of chasing a "right" count.
+const NEWS_PAIR_ITEMS = 6;
+
 const ITEMS: ArrangeableItem[] = [
   { id: 'calendar', label: 'Calendar', render: () => <CalendarWidget /> },
   { id: 'gmail', label: 'Mail', render: () => <GmailWidget /> },
   { id: 'imessage', label: 'Messages', render: () => <IMessageWidget /> },
-  { id: 'news', label: 'News', render: () => <NewsWidget /> },
-  { id: 'ai-news', label: 'AI news', render: () => <AiNews /> },
+  { id: 'news', label: 'News', render: () => <NewsWidget maxItems={NEWS_PAIR_ITEMS} scrollable /> },
+  { id: 'ai-news', label: 'AI news', render: () => <AiNews maxItems={NEWS_PAIR_ITEMS} scrollable /> },
   { id: 'hue', label: 'Lights', render: () => <HueWidget /> },
 ];
 

@@ -17,18 +17,28 @@ function NewsGroup({
   color,
   icon: Icon,
   items,
-}: Readonly<{ label: string; color: string; icon: React.ComponentType<ToolIconProps>; items: AiNewsData['items'] }>) {
+  maxItems,
+  scrollable,
+}: Readonly<{
+  label: string;
+  color: string;
+  icon: React.ComponentType<ToolIconProps>;
+  items: AiNewsData['items'];
+  maxItems?: number;
+  scrollable?: boolean;
+}>) {
+  const shown = items.slice(0, maxItems ?? items.length);
   return (
     <div>
       <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-ink-muted">
         <Icon className="h-3.5 w-3.5 shrink-0" style={{ color }} />
         {label}
       </div>
-      {items.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="text-xs text-ink-faint">No recent stories.</p>
       ) : (
-        <ul className="space-y-1.5 text-sm">
-          {items.map((item) => (
+        <ul className={`space-y-1.5 text-sm ${scrollable ? 'h-[19rem] overflow-y-auto pr-1' : ''}`}>
+          {shown.map((item) => (
             <li key={item.url} className="leading-tight">
               <a href={item.url} target="_blank" rel="noreferrer" className="font-medium text-ink hover:underline">
                 {item.title}
@@ -44,7 +54,7 @@ function NewsGroup({
   );
 }
 
-export function AiNews() {
+export function AiNews({ maxItems, scrollable }: Readonly<{ maxItems?: number; scrollable?: boolean }> = {}) {
   const { envelope, offline } = useWidget<AiNewsData>('ai-news');
 
   return (
@@ -58,6 +68,8 @@ export function AiNews() {
               color={group.color}
               icon={group.icon}
               items={data.items.filter((item) => item.provider === group.provider)}
+              maxItems={maxItems}
+              scrollable={scrollable}
             />
           ))}
         </div>
