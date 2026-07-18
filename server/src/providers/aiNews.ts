@@ -4,8 +4,9 @@ import type { Provider } from '../scheduler.js';
 import { selectNewsItems } from './news.js';
 
 /** Per-provider cap, not a shared pool — otherwise a high-volume feed (e.g. OpenAI's blog) crowds
- * out a lower-volume one (Anthropic's Google News proxy) in the merged list. */
-const MAX_ITEMS_PER_PROVIDER = 5;
+ * out a lower-volume one (Anthropic's Google News proxy) in the merged list. Matches the plain
+ * News card's item count so the two side-by-side columns fill roughly the same card height. */
+const MAX_ITEMS_PER_PROVIDER = 12;
 
 type AiNewsItem = AiNewsData['items'][number];
 
