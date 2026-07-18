@@ -5,9 +5,9 @@ import { selectNewsItems } from './news.js';
 
 /** Per-provider cap, not a shared pool — otherwise a high-volume feed (e.g. OpenAI's blog) crowds
  * out a lower-volume one (Anthropic's Google News proxy) in the merged list. Matches News's own
- * fetch cap; the client only *renders* the first 6 of these and scrolls for the rest (see
- * AiNews.tsx) — a fixed rendered count, not a fill-the-space target, since column width (and so
- * how much each headline wraps) varies by viewport in a way item count alone can't compensate for. */
+ * fetch cap; on the Personal page the client renders all of these in a fixed-height scrollable
+ * list (see AiNews.tsx) rather than a content-based height, since how much a headline wraps varies
+ * by viewport in a way a fixed item count alone can't compensate for. */
 const MAX_ITEMS_PER_PROVIDER = 12;
 
 /** Google News search-result titles are suffixed with " - <publisher>"; strip it since the

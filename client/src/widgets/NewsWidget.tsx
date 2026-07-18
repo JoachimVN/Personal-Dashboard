@@ -3,14 +3,14 @@ import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
 
-export function NewsWidget({ maxItems, scrollable }: Readonly<{ maxItems?: number; scrollable?: boolean }> = {}) {
+export function NewsWidget({ scrollable }: Readonly<{ scrollable?: boolean }> = {}) {
   const { envelope, offline } = useWidget<NewsData>('news');
 
   return (
     <WidgetCard title="News" envelope={envelope} offline={offline}>
       {(data) => (
         <ul className={`space-y-1.5 text-sm ${scrollable ? 'h-[19rem] overflow-y-auto pr-1' : ''}`}>
-          {data.items.slice(0, maxItems ?? data.items.length).map((item) => (
+          {data.items.map((item) => (
             <li key={item.url} className="leading-tight">
               <a
                 href={item.url}
