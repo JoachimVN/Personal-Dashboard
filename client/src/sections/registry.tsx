@@ -1,4 +1,4 @@
-import type { ComponentType, CSSProperties } from 'react';
+import { useId, type ComponentType, type CSSProperties } from 'react';
 import { GitHubMark } from '../components/GitHubMark';
 import { AiOverview } from './ai/AiOverview';
 import { AiDetail } from './ai/AiDetail';
@@ -133,6 +133,7 @@ export function SteamGradientDefs() {
     command-center nav (`monochrome`, so the pill row reads as one consistent set rather than
     a handful of brand colors next to a handful of plain glyphs). */
 export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId; monochrome?: boolean }>) {
+  const maskId = useId();
   if (id === 'ai') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -160,11 +161,34 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
   }
   if (id === 'weather') {
     const accent = monochrome ? 'currentColor' : 'var(--accent)';
+    const cloudPath = 'M13 20.5h5.2a3.3 3.3 0 0 0 .6-6.55A4.6 4.6 0 0 0 10 12.9a3.6 3.6 0 0 0 .4 7.6H13Z';
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="9" cy="9" r="3.5" stroke={accent} />
-        <path d="M9 2.5v1.4M9 14.1v1.4M2.5 9h1.4M14.1 9h1.4M4.4 4.4l1 1M12.6 12.6l1 1M13.6 4.4l-1 1M5.4 12.6l-1 1" stroke={accent} />
-        <path d="M13 20.5h5.2a3.3 3.3 0 0 0 .6-6.55A4.6 4.6 0 0 0 10 12.9a3.6 3.6 0 0 0 .4 7.6H13Z" fill="var(--color-card)" />
+        {/* The cloud sits in front of the sun, so the part of the sun it covers has to actually
+            disappear rather than get painted over in a background-matching color — a fill hack
+            like that only works where the icon happens to sit on exactly --color-card (the
+            overview card), and shows up as a visibly mismatched patch anywhere else (the nav
+            pill's translucent glass, various hover states). A mask cuts the cloud's silhouette
+            out of the sun instead, so it reads correctly against any background. */}
+        <mask id={maskId} maskUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="24" height="24" fill="#fff" />
+          <path d={cloudPath} fill="#000" />
+        </mask>
+        <g mask={`url(#${maskId})`}>
+          <circle cx="9" cy="9" r="3.5" stroke={accent} />
+          <path d="M9 2.5v1.4M9 14.1v1.4M2.5 9h1.4M14.1 9h1.4M4.4 4.4l1 1M12.6 12.6l1 1M13.6 4.4l-1 1M5.4 12.6l-1 1" stroke={accent} />
+        </g>
+        <path d={cloudPath} />
+      </svg>
+    );
+  }
+  if (id === 'personal') {
+    const accent = monochrome ? 'currentColor' : 'var(--accent)';
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3.25" y="5" width="17.5" height="15.5" rx="3" />
+        <path d="M8 3v3.4M16 3v3.4M3.25 10h17.5" />
+        <rect x="13.5" y="13" width="4" height="4" rx="1" fill={accent} stroke="none" />
       </svg>
     );
   }
