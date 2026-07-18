@@ -9,9 +9,11 @@ import {
   type HueData,
   type IMessageData,
   type NewsData,
+  type PowerData,
   type SpotifyData,
   type SteamData,
   type SteamGame,
+  type TransitData,
   type WeatherData,
   type WidgetEnvelope,
 } from '@personal-dashboard/shared';
@@ -28,8 +30,10 @@ import {
   hueCandidates,
   imessageCandidates,
   newsCandidates,
+  powerCandidates,
   spotifyCandidates,
   steamCandidates,
+  transitCandidates,
   weatherCandidates,
   type SpotifyFreshness,
 } from '../importance/sources.js';
@@ -196,6 +200,12 @@ export function createCommandCenterProvider(
           config.commandCenter.weatherUvHigh,
         ),
         ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
+        ...transitCandidates(widgetData<TransitData>(envelopes, 'transit')),
+        ...powerCandidates(
+          widgetData<PowerData>(envelopes, 'power'),
+          config.commandCenter.powerSpikeRatio,
+          config.commandCenter.powerSpikeMinNok,
+        ),
         ...aiCandidates(
           [
             { id: 'claude', label: 'Claude', data: widgetData<AiUsageToolData>(envelopes, 'ai-usage-claude') },

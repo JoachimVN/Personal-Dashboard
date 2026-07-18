@@ -18,14 +18,17 @@ import { createHealthProvider } from './health.js';
 import { createHueProvider, type HueProvider } from './hue.js';
 import { createIMessageProvider } from './imessage.js';
 import { createNewsProvider } from './news.js';
+import { createPowerProvider } from './power.js';
 import { createSpotifyProvider } from './spotify.js';
 import { createSteamProvider } from './steam.js';
 import { createSystemProvider } from './system.js';
+import { createTransitProvider, type TransitProvider } from './transit.js';
 import { createWeatherProvider, type WeatherProvider } from './weather.js';
 
 export interface Providers {
   all: Provider[];
   weather: WeatherProvider;
+  transit: TransitProvider;
   hue: HueProvider;
   health: HealthStore;
 }
@@ -41,6 +44,8 @@ function withEnabledToggle(provider: Provider, config: AppConfig): Provider {
 
 export function createProviders(env: ServerEnv, config: AppConfig, database: Database): Providers {
   const weather = createWeatherProvider(env.weather, env.timezone);
+  // Transit shares the weather coordinates: "departures near the dashboard's location".
+  const transit = createTransitProvider(env.weather, config.transit);
   const hue = createHueProvider(env.hue);
   const health = new HealthStore(
     database,
@@ -58,11 +63,14 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
   const steamHistory = new SteamHistoryStore(database, config.steam.historyRetentionDays);
   return {
     weather,
+    transit,
     hue,
     health,
     all: (
       [
         weather,
+        transit,
+        createPowerProvider(config.power.area, env.timezone),
         createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
         createGmailProvider(env.google),
         createGitHubProvider(env.github, githubSnapshot),

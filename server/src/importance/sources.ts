@@ -8,8 +8,11 @@ import type {
   HueData,
   IMessageData,
   NewsData,
+  PowerData,
+  PowerHour,
   SpotifyData,
   SteamData,
+  TransitData,
   WeatherData,
   WidgetStatus,
 } from '@personal-dashboard/shared';
@@ -748,6 +751,95 @@ export function steamCandidates(
     ?? steamRecentPlaytimeCandidate(data);
 
   return candidate ? [candidate] : [];
+}
+
+/** Next departure worth walking for: not so soon you'd miss it, not so far out it's noise. */
+const TRANSIT_MIN_LEAD_MS = 2 * 60_000;
+const TRANSIT_MAX_LEAD_MS = 45 * 60_000;
+
+export function transitCandidates(data: TransitData | undefined, now = Date.now()): Candidate[] {
+  for (const stop of data?.stops ?? []) {
+    const departure = stop.departures.find((entry) => {
+      const lead = Date.parse(entry.expectedTime) - now;
+      return lead >= TRANSIT_MIN_LEAD_MS && lead <= TRANSIT_MAX_LEAD_MS;
+    });
+    if (!departure) continue;
+    const minutes = Math.round((Date.parse(departure.expectedTime) - now) / 60_000);
+    return [{
+      id: `transit:${stop.id}:${departure.line}:${departure.expectedTime}`, source: 'transit', kind: 'transit',
+      score: 21, shapes: ['tile'], kicker: `Next ${departure.mode}`,
+      title: `${departure.line} · ${minutes} min`,
+      detail: `${departure.destination} · from ${stop.name}`,
+      href: '#/personal', render: { type: 'text' },
+    }];
+  }
+  return [];
+}
+
+const priceFmt = (price: number) => `${price.toFixed(2)} kr`;
+
+function currentPowerHour(hours: PowerHour[], now: number): PowerHour | undefined {
+  return hours.find((hour) => {
+    const start = Date.parse(hour.time);
+    return now >= start && now < start + 60 * 60_000;
+  });
+}
+
+/**
+ * Spot prices are known a day ahead, so power signals are about *acting* on the curve: a spike
+ * says "put off the laundry", a much-cheaper hour ahead says when to run it. The ambient tile
+ * keeps the current price on the board even when nothing is unusual.
+ */
+export function powerCandidates(
+  data: PowerData | undefined,
+  spikeRatio: number,
+  spikeMinNok: number,
+  now = Date.now(),
+): Candidate[] {
+  if (!data?.today.length) return [];
+  const hours = [...data.today, ...data.tomorrow];
+  const current = currentPowerHour(hours, now);
+  if (!current) return [];
+  const price = current.priceNokPerKwh;
+  const average = data.today.reduce((sum, hour) => sum + hour.priceNokPerKwh, 0) / data.today.length;
+  const upcoming = hours.filter((hour) => Date.parse(hour.time) > Date.parse(current.time)
+    && Date.parse(hour.time) - now <= 12 * 60 * 60_000);
+  const cheapest = upcoming.toSorted((a, b) => a.priceNokPerKwh - b.priceNokPerKwh)[0];
+  const candidates: Candidate[] = [];
+
+  if (price < 0) {
+    candidates.push({
+      id: `power:negative:${current.time}`, source: 'power', kind: 'power', score: 62, shapes: ['secondary', 'tile'],
+      kicker: 'Negative power price', title: 'You get paid to use power',
+      detail: `${priceFmt(price)}/kWh right now in ${data.area}`, href: '#/personal', render: { type: 'text' },
+    });
+  } else if (average > 0 && price >= average * spikeRatio && price >= spikeMinNok) {
+    candidates.push({
+      id: `power:spike:${current.time}`, source: 'power', kind: 'power', score: 60, shapes: ['secondary', 'tile'],
+      kicker: 'Power price spike', title: `${priceFmt(price)}/kWh right now`,
+      detail: cheapest
+        ? `${(price / average).toFixed(1)}× today's average · down to ${priceFmt(cheapest.priceNokPerKwh)} at ${cheapest.hourLabel}:00`
+        : `${(price / average).toFixed(1)}× today's average`,
+      href: '#/personal', render: { type: 'text' },
+    });
+  } else if (cheapest && price >= spikeMinNok / 2 && cheapest.priceNokPerKwh <= price / 2) {
+    // Halving an already-cheap price saves øre, not kroner — only worth a tile when the
+    // current price is at least within sight of the spike floor.
+    candidates.push({
+      id: `power:cheap-ahead:${cheapest.time}`, source: 'power', kind: 'power', score: 30, shapes: ['tile'],
+      kicker: 'Cheaper power ahead', title: `${priceFmt(cheapest.priceNokPerKwh)} at ${cheapest.hourLabel}:00`,
+      detail: `vs ${priceFmt(price)}/kWh right now`, href: '#/personal', render: { type: 'text' },
+    });
+  }
+
+  const range = [...data.today].sort((a, b) => a.priceNokPerKwh - b.priceNokPerKwh);
+  candidates.push({
+    id: `power:now:${current.time}`, source: 'power', kind: 'power', score: 20, shapes: ['tile'],
+    kicker: `Power · ${data.area}`, title: `${priceFmt(price)}/kWh`,
+    detail: `Today ${priceFmt(range[0]!.priceNokPerKwh)}–${priceFmt(range.at(-1)!.priceNokPerKwh)}`,
+    href: '#/personal', render: { type: 'text' },
+  });
+  return candidates;
 }
 
 export function hueCandidates(data: HueData | undefined): Candidate[] {

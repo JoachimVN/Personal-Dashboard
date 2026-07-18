@@ -13,6 +13,14 @@
       { "name": "Anthropic", "url": "https://news.google.com/rss/search?q=site:anthropic.com/news&hl=en-US&gl=US&ceid=US:en", "provider": "anthropic" }
     ]
   },
+  "transit": {
+    "stopIds": [],
+    "maxStops": 2,
+    "departuresPerStop": 5
+  },
+  "power": {
+    "area": "NO3"
+  },
   "code": {
     "reposRoot": {
       "darwin": "/Users/you/GitHub",

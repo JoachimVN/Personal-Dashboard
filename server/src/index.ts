@@ -62,7 +62,9 @@ app.post('/api/weather/location', async (req, res) => {
     return;
   }
   providers.weather.setCoords(parsed.data);
+  providers.transit.setCoords(parsed.data);
   await scheduler.refresh('weather'); // refresh() never throws — it stores the failure on the entry
+  await scheduler.refresh('transit');
   res.json({ ok: true });
 });
 
