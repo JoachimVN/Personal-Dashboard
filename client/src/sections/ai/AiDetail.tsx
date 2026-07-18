@@ -176,7 +176,7 @@ export function AiDetail() {
         {AI_TOOLS.map((tool) => <ToolCard key={tool.id} {...tool} />)}
       </div>
       <DetailSectionHeading label="Headlines" title="AI news" detail="Official OpenAI and Anthropic announcements, polled every 30 minutes." />
-      <AiNews />
+      <AiNews scrollable />
     </div>
   );
 }
