@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { POWER_AREAS } from '@personal-dashboard/shared';
 import { z } from 'zod';
 
 const configSchema = z.object({
@@ -13,6 +14,13 @@ const configSchema = z.object({
   news: z
     .object({
       feeds: z.array(z.object({ name: z.string(), url: z.string() })).default([]),
+    })
+    .default({ feeds: [] }),
+  aiNews: z
+    .object({
+      feeds: z
+        .array(z.object({ name: z.string(), url: z.string(), provider: z.enum(['openai', 'anthropic']) }))
+        .default([]),
     })
     .default({ feeds: [] }),
   aiUsage: z
@@ -74,6 +82,10 @@ const configSchema = z.object({
     steamPlaytimeMilestoneHours: z.array(z.number().positive()).default([10, 25, 50, 100, 250, 500, 1000]),
     /** How recently a game-completion, playtime milestone, or friends-leaderboard rank change must have happened to still count as "just happened". */
     steamMomentFreshMs: z.number().int().min(60_000).default(3 * 24 * 60 * 60_000),
+    /** Current spot price at or above this multiple of today's average becomes a "price spike" signal. */
+    powerSpikeRatio: z.number().positive().default(1.5),
+    /** ...but only when the price is also at least this many NOK/kWh — a spike off a near-zero average isn't worth surfacing. */
+    powerSpikeMinNok: z.number().positive().default(1),
   }).default({
     gmailStaleMs: 24 * 60 * 60_000,
     gmailFreshMs: 30 * 60_000,
@@ -89,6 +101,8 @@ const configSchema = z.object({
     steamRareAchievementPercent: 10,
     steamPlaytimeMilestoneHours: [10, 25, 50, 100, 250, 500, 1000],
     steamMomentFreshMs: 3 * 24 * 60 * 60_000,
+    powerSpikeRatio: 1.5,
+    powerSpikeMinNok: 1,
   }),
   steam: z
     .object({
@@ -100,6 +114,27 @@ const configSchema = z.object({
       leaderboardTtlHours: z.number().int().min(1).default(12),
     })
     .default({ historyRetentionDays: 90, leaderboardMaxFriends: 50, leaderboardTtlHours: 12 }),
+  transit: z
+    .object({
+      /** NSR stop place ids you actually use (find yours at stoppested.entur.org) — shown whenever
+       * you're within `favoriteRadiusMeters` of one, ahead of auto-discovered nearby stops (which
+       * can be merely-closer stops with no useful service). Empty = always auto-discover. */
+      stopIds: z.array(z.string()).default([]),
+      favoriteRadiusMeters: z.number().positive().default(5000),
+      /** How many auto-discovered stops to show, and how far away (in meters) one is still worth
+       * showing, when no favorite is close enough (or none are configured). */
+      maxStops: z.number().int().min(1).max(5).default(2),
+      nearbyRadiusMeters: z.number().positive().default(2000),
+      departuresPerStop: z.number().int().min(1).max(10).default(5),
+    })
+    .default({ stopIds: [], favoriteRadiusMeters: 5000, maxStops: 2, nearbyRadiusMeters: 2000, departuresPerStop: 5 }),
+  power: z
+    .object({
+      /** Norwegian electricity bidding area (NO1 Øst … NO5 Vest); unset = auto-detect from the
+       * dashboard's coordinates (same as transit/weather), off only if neither is available. */
+      area: z.enum(POWER_AREAS).optional(),
+    })
+    .default({}),
   code: z
     .object({
       /** Local parent directory to scan for git repos, per OS. Each immediate subdirectory with a .git and a GitHub-remote origin becomes a launchable project. */

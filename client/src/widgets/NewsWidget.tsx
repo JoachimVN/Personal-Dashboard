@@ -3,13 +3,13 @@ import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
 
-export function NewsWidget() {
+export function NewsWidget({ scrollable }: Readonly<{ scrollable?: boolean }> = {}) {
   const { envelope, offline } = useWidget<NewsData>('news');
 
   return (
     <WidgetCard title="News" envelope={envelope} offline={offline}>
       {(data) => (
-        <ul className="space-y-1.5 text-sm">
+        <ul className={`space-y-1.5 text-sm ${scrollable ? 'h-[19rem] overflow-y-auto pr-1' : ''}`}>
           {data.items.map((item) => (
             <li key={item.url} className="leading-tight">
               <a

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AiUsageToolData, GitHubData, HealthData, NewsData, SpotifyData, SteamData, WeatherData } from '@personal-dashboard/shared';
-import { aiCandidates, githubCandidates, gmailCandidates, healthCandidates, newsCandidates, spotifyCandidates, steamCandidates, weatherCandidates } from './sources.js';
+import type { AiNewsData, AiUsageToolData, GitHubData, HealthData, NewsData, PowerData, SpotifyData, SteamData, TransitData, WeatherData } from '@personal-dashboard/shared';
+import { aiCandidates, aiNewsCandidates, githubCandidates, gmailCandidates, healthCandidates, newsCandidates, powerCandidates, spotifyCandidates, steamCandidates, transitCandidates, weatherCandidates } from './sources.js';
 
 describe('githubCandidates', () => {
   const quietDay: GitHubData = {
@@ -219,6 +219,16 @@ describe('newsCandidates', () => {
 
     expect(newsCandidates(data)).toContainEqual(expect.objectContaining({
       kicker: 'Source', title: 'A useful headline', shapes: ['tile'],
+    }));
+  });
+});
+
+describe('aiNewsCandidates', () => {
+  it('surfaces the latest AI headline under its own source, distinct from general news', () => {
+    const data: AiNewsData = { items: [{ title: 'New model released', source: 'OpenAI', url: 'https://example.com/ai-news', publishedAt: '2026-07-16T00:00:00Z', provider: 'openai' }] };
+
+    expect(aiNewsCandidates(data)).toContainEqual(expect.objectContaining({
+      source: 'ai-news', kicker: 'OpenAI', title: 'New model released', shapes: ['tile'], href: '#/ai',
     }));
   });
 });
@@ -495,5 +505,98 @@ describe('steamCandidates', () => {
         id: 'steam:leaderboard-climb:1', score: 45, kicker: 'Friends leaderboard', title: 'Up to #2', detail: 'Climbed 2 spots', shapes: ['tile'],
       }),
     ]);
+  });
+});
+
+describe('transitCandidates', () => {
+  const now = Date.parse('2026-07-18T12:00:00+02:00');
+  const departure = (expectedTime: string, overrides: Partial<TransitData['stops'][number]['departures'][number]> = {}) => ({
+    line: '2', destination: 'Strindheim via Lade', mode: 'bus',
+    aimedTime: expectedTime, expectedTime, realtime: true, ...overrides,
+  });
+
+  it('surfaces the first departure inside the walkable window as a tile', () => {
+    const data: TransitData = {
+      stops: [{
+        id: 'NSR:StopPlace:41613', name: 'Prinsens gate', distanceMeters: 165,
+        departures: [
+          departure('2026-07-18T12:01:00+02:00'), // too soon to catch
+          departure('2026-07-18T12:07:00+02:00'),
+        ],
+      }],
+    };
+
+    expect(transitCandidates(data, now)).toEqual([expect.objectContaining({
+      kicker: 'Next bus', title: '2 · 7 min', detail: 'Strindheim via Lade · from Prinsens gate', shapes: ['tile'],
+    })]);
+  });
+
+  it('stays quiet when every departure is outside the window', () => {
+    const data: TransitData = {
+      stops: [{
+        id: 'NSR:StopPlace:41613', name: 'Prinsens gate',
+        departures: [departure('2026-07-18T13:30:00+02:00')],
+      }],
+    };
+
+    expect(transitCandidates(data, now)).toEqual([]);
+  });
+});
+
+describe('powerCandidates', () => {
+  const now = Date.parse('2026-07-18T18:30:00+02:00');
+  const hour = (isoHour: string, price: number): PowerData['today'][number] => ({
+    time: `2026-07-18T${isoHour}:00:00+02:00`, hourLabel: isoHour, priceNokPerKwh: price,
+  });
+  const flatDay = (price: number): PowerData => ({
+    area: 'NO3',
+    today: Array.from({ length: 24 }, (_, index) => hour(String(index).padStart(2, '0'), price)),
+    tomorrow: [],
+  });
+
+  it('emits only the ambient tile on an ordinary flat day', () => {
+    const candidates = powerCandidates(flatDay(0.85), 1.5, 1, now);
+
+    expect(candidates).toEqual([expect.objectContaining({
+      id: expect.stringContaining('power:now'), kicker: 'Power · NO3', title: '0.85 kr/kWh', shapes: ['tile'],
+    })]);
+  });
+
+  it('flags a spike above the ratio and the floor, pointing at the cheapest upcoming hour', () => {
+    const data = flatDay(0.8);
+    data.today[18] = hour('18', 2.4);
+    data.today[23] = hour('23', 0.4);
+    const spike = powerCandidates(data, 1.5, 1, now).find((candidate) => candidate.id.startsWith('power:spike'));
+
+    expect(spike).toMatchObject({
+      title: '2.40 kr/kWh right now',
+      detail: expect.stringContaining('down to 0.40 kr at 23:00'),
+      shapes: ['secondary', 'tile'],
+    });
+  });
+
+  it('stays quiet on cheap days below the NOK floor — no spike, no cheap-ahead nudge', () => {
+    const data = flatDay(0.1);
+    data.today[18] = hour('18', 0.4);
+
+    expect(powerCandidates(data, 1.5, 1, now).map((candidate) => candidate.id))
+      .toEqual([expect.stringContaining('power:now')]);
+  });
+
+  it('points at a much cheaper upcoming hour', () => {
+    const data = flatDay(1.2);
+    data.today[22] = hour('22', 0.5);
+    const cheap = powerCandidates(data, 1.5, 1, now).find((candidate) => candidate.id.startsWith('power:cheap-ahead'));
+
+    expect(cheap).toMatchObject({ title: '0.50 kr at 22:00', shapes: ['tile'] });
+  });
+
+  it('celebrates a negative price', () => {
+    const data = flatDay(0.5);
+    data.today[18] = hour('18', -0.12);
+
+    expect(powerCandidates(data, 1.5, 1, now)[0]).toMatchObject({
+      kicker: 'Negative power price', title: 'You get paid to use power',
+    });
   });
 });

@@ -1,9 +1,12 @@
 import type {
+  AiNewsData,
   CalendarData,
   GmailData,
   HueData,
   IMessageData,
   NewsData,
+  PowerData,
+  TransitData,
   WidgetEnvelope,
 } from '@personal-dashboard/shared';
 import { ArrangeableWidgetGrid, type ArrangeableItem } from '../../components/ArrangeableWidgetGrid';
@@ -12,17 +15,26 @@ import { GmailWidget } from '../../widgets/GmailWidget';
 import { HueWidget } from '../../widgets/HueWidget';
 import { IMessageWidget } from '../../widgets/IMessageWidget';
 import { NewsWidget } from '../../widgets/NewsWidget';
+import { PowerWidget } from '../../widgets/PowerWidget';
+import { TransitWidget } from '../../widgets/TransitWidget';
 import { SystemFooter } from '../../components/SystemFooter';
 import { isWidgetDisabled } from '../../components/WidgetCard';
 import { useWidget } from '../../useWidget';
+import { AiNews } from '../ai/AiNews';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
 const ITEMS: ArrangeableItem[] = [
   { id: 'calendar', label: 'Calendar', render: () => <CalendarWidget /> },
   { id: 'gmail', label: 'Mail', render: () => <GmailWidget /> },
   { id: 'imessage', label: 'Messages', render: () => <IMessageWidget /> },
-  { id: 'news', label: 'News', render: () => <NewsWidget /> },
+  // News and AI news sit side by side and need to match length regardless of viewport width — how
+  // much a headline wraps at a given column width varies, so item count alone can't guarantee
+  // that. Both render every fetched item (up to 12) in a fixed-height, scrollable list instead.
+  { id: 'news', label: 'News', render: () => <NewsWidget scrollable /> },
+  { id: 'ai-news', label: 'AI news', render: () => <AiNews scrollable /> },
   { id: 'hue', label: 'Lights', render: () => <HueWidget /> },
+  { id: 'transit', label: 'Departures', render: () => <TransitWidget /> },
+  { id: 'power', label: 'Power', render: () => <PowerWidget /> },
 ];
 
 /** Excludes items the user turned off in config.json, so ArrangeableWidgetGrid never lays out an empty cell for them. */
@@ -31,13 +43,19 @@ function useEnabledItems(): ArrangeableItem[] {
   const gmail = useWidget<GmailData>('gmail');
   const imessage = useWidget<IMessageData>('imessage');
   const news = useWidget<NewsData>('news');
+  const aiNews = useWidget<AiNewsData>('ai-news');
   const hue = useWidget<HueData>('hue');
+  const transit = useWidget<TransitData>('transit');
+  const power = useWidget<PowerData>('power');
   const envelopeById: Record<string, WidgetEnvelope<unknown> | null> = {
     calendar: calendar.envelope,
     gmail: gmail.envelope,
     imessage: imessage.envelope,
     news: news.envelope,
+    'ai-news': aiNews.envelope,
     hue: hue.envelope,
+    transit: transit.envelope,
+    power: power.envelope,
   };
   return ITEMS.filter((item) => !isWidgetDisabled(envelopeById[item.id] ?? null));
 }

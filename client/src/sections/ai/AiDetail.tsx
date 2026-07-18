@@ -9,6 +9,7 @@ import { UsageHistoryChart } from './UsageHistoryChart';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
 import type { ToolIconProps } from './ToolIcons';
+import { AiNews } from './AiNews';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -174,6 +175,8 @@ export function AiDetail() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {AI_TOOLS.map((tool) => <ToolCard key={tool.id} {...tool} />)}
       </div>
+      <DetailSectionHeading label="Headlines" title="AI news" detail="Official OpenAI and Anthropic announcements, polled every 30 minutes." />
+      <AiNews scrollable />
     </div>
   );
 }

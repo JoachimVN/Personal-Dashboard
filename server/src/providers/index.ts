@@ -9,6 +9,7 @@ import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { SteamHistoryStore } from '../steamHistory.js';
+import { createAiNewsProvider } from './aiNews.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
@@ -17,14 +18,18 @@ import { createHealthProvider } from './health.js';
 import { createHueProvider, type HueProvider } from './hue.js';
 import { createIMessageProvider } from './imessage.js';
 import { createNewsProvider } from './news.js';
+import { createPowerProvider, type PowerProvider } from './power.js';
 import { createSpotifyProvider } from './spotify.js';
 import { createSteamProvider } from './steam.js';
 import { createSystemProvider } from './system.js';
+import { createTransitProvider, type TransitProvider } from './transit.js';
 import { createWeatherProvider, type WeatherProvider } from './weather.js';
 
 export interface Providers {
   all: Provider[];
   weather: WeatherProvider;
+  transit: TransitProvider;
+  power: PowerProvider;
   hue: HueProvider;
   health: HealthStore;
 }
@@ -40,6 +45,9 @@ function withEnabledToggle(provider: Provider, config: AppConfig): Provider {
 
 export function createProviders(env: ServerEnv, config: AppConfig, database: Database): Providers {
   const weather = createWeatherProvider(env.weather, env.timezone);
+  // Transit and power share the weather coordinates: "near the dashboard's location".
+  const transit = createTransitProvider(env.weather, config.transit);
+  const power = createPowerProvider(config.power.area, env.weather, env.timezone);
   const hue = createHueProvider(env.hue);
   const health = new HealthStore(
     database,
@@ -57,17 +65,22 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
   const steamHistory = new SteamHistoryStore(database, config.steam.historyRetentionDays);
   return {
     weather,
+    transit,
+    power,
     hue,
     health,
     all: (
       [
         weather,
+        transit,
+        power,
         createCalendarProvider(env.icloud, config.calendar.allowlist, env.timezone),
         createGmailProvider(env.google),
         createGitHubProvider(env.github, githubSnapshot),
         createClaudeUsageProvider(config.aiUsage.claudeRefreshMs, usageHistory),
         createCodexUsageProvider(config.aiUsage.codexRefreshMs, usageHistory),
         createNewsProvider(config.news.feeds),
+        createAiNewsProvider(config.aiNews.feeds),
         createSpotifyProvider(env.spotify, spotifySnapshot, spotifyHistory),
         createHealthProvider(health, env.timezone, {
           steps: config.health.stepGoal,

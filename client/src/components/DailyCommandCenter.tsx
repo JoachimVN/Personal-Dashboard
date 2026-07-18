@@ -23,6 +23,7 @@ import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
 import { ClaudeIcon, OpenAiIcon } from '../sections/ai/ToolIcons';
+import { accentStyle, SECTIONS, SectionIcon } from '../sections/registry';
 import { sectionHref } from '../router';
 import { UvGauge, WindGauge } from '../sections/weather/WeatherOverview';
 import { GitHubMark } from './GitHubMark';
@@ -574,12 +575,26 @@ function SecondaryContent(props: Readonly<{
   }
 }
 
+/** Icon-only so the pill row stays a fixed width as sections are added — labels made it grow
+    unbounded. Generated from SECTIONS so a new section doesn't need a second hand-edit here. */
+function CommandNav() {
+  return (
+    <nav className="command-nav" aria-label="Dashboard sections">
+      {SECTIONS.map((section) => (
+        <a key={section.id} href={sectionHref(section.id)} aria-label={section.title} title={section.title} style={accentStyle(section)}>
+          <SectionIcon id={section.id} monochrome />
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 function CommandCenterSkeleton() {
   return (
     <section className="command-center glass" aria-labelledby="command-center-title">
       <div className="command-center-head">
         <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
-        <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a><a href="#/steam">Games</a></nav>
+        <CommandNav />
       </div>
       <div className="command-layout animate-pulse">
         <div className="command-primary space-y-3">
@@ -752,7 +767,7 @@ export function DailyCommandCenter() {
   return <section className="command-center glass" aria-labelledby="command-center-title">
     <div className="command-center-head">
       <div><p className="command-eyebrow">Overview</p><h2 id="command-center-title" className="command-title">What's next</h2></div>
-      <nav className="command-nav" aria-label="Dashboard sections"><a href="#/personal">Day</a><a href="#/weather">Sky</a><a href="#/health">Health</a><a href="#/github">Code</a><a href="#/ai">AI</a><a href="#/spotify">Music</a><a href="#/steam">Games</a></nav>
+      <CommandNav />
     </div>
     <div className="command-layout">
       <HeroPanel hero={ranked.hero} event={heroEvent} track={heroTrack} kicker={heroKicker} extra={heroExtra} activity={heroActivity} weather={weather} />

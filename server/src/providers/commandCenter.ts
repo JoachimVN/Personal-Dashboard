@@ -1,5 +1,6 @@
 import {
   commandCenterSchema,
+  type AiNewsData,
   type AiUsageToolData,
   type CalendarData,
   type GitHubData,
@@ -8,9 +9,11 @@ import {
   type HueData,
   type IMessageData,
   type NewsData,
+  type PowerData,
   type SpotifyData,
   type SteamData,
   type SteamGame,
+  type TransitData,
   type WeatherData,
   type WidgetEnvelope,
 } from '@personal-dashboard/shared';
@@ -18,6 +21,7 @@ import type { AppConfig } from '../config.js';
 import { rankCandidates } from '../importance/rank.js';
 import {
   aiCandidates,
+  aiNewsCandidates,
   calendarCandidates,
   fallbackCandidates,
   githubCandidates,
@@ -26,8 +30,10 @@ import {
   hueCandidates,
   imessageCandidates,
   newsCandidates,
+  powerCandidates,
   spotifyCandidates,
   steamCandidates,
+  transitCandidates,
   weatherCandidates,
   type SpotifyFreshness,
 } from '../importance/sources.js';
@@ -40,11 +46,29 @@ function widgetData<T>(envelopes: Record<string, WidgetEnvelope>, id: string): T
   return envelope?.status === 'ready' || envelope?.status === 'stale' ? envelope.data as T | undefined : undefined;
 }
 
+/** Whether a metric just recorded via `record()` changed within `freshMs` — one round trip
+ * instead of two by reading `lastChangedAt` and `hasChangedSinceBaseline` concurrently. */
+async function isFreshSinceRecord(
+  signalHistory: SignalHistoryStore,
+  source: string,
+  metric: string,
+  freshMs: number,
+): Promise<boolean> {
+  const [changedAt, hasChanged] = await Promise.all([
+    signalHistory.lastChangedAt(source, metric),
+    signalHistory.hasChangedSinceBaseline(source, metric),
+  ]);
+  return hasChanged && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+}
+
 /**
  * Records each timeframe's #1 track/artist/album, then reports which ones changed within
  * freshMs — "just became your new favorite" rather than "different from a week ago because the
  * API is noisy". Spotify's own top-lists only refresh every ~12h, so freshMs is generous (days,
  * not minutes) to give a genuine change real dwell time on the board.
+ *
+ * Each check hits the (network) signal history store, and every check writes a distinct
+ * source/metric pair, so they're independent — run them concurrently rather than one at a time.
  */
 export async function computeSpotifyFreshness(
   signalHistory: SignalHistoryStore,
@@ -69,13 +93,11 @@ export async function computeSpotifyFreshness(
     ['artistAllTime', 'topArtist:all-time', spotify.allTime.artists[0]?.id ?? spotify.allTime.artists[0]?.name],
     ['albumAllTime', 'topAlbum:all-time', spotify.allTime.albums[0]?.id ?? spotify.allTime.albums[0]?.name],
   ];
-  for (const [key, metric, value] of checks) {
-    if (value === undefined) continue;
+  await Promise.all(checks.map(async ([key, metric, value]) => {
+    if (value === undefined) return;
     await signalHistory.record('spotify', metric, value);
-    const changedAt = await signalHistory.lastChangedAt('spotify', metric);
-    fresh[key] = await signalHistory.hasChangedSinceBaseline('spotify', metric)
-      && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
-  }
+    fresh[key] = await isFreshSinceRecord(signalHistory, 'spotify', metric, freshMs);
+  }));
   return fresh;
 }
 
@@ -90,9 +112,7 @@ async function detectSteamCompletedGame(
   const completed = totalCount > 0 && unlockedCount === totalCount;
   await signalHistory.record('steam', metric, completed);
   if (!completed) return false;
-  const changedAt = await signalHistory.lastChangedAt('steam', metric);
-  return (await signalHistory.hasChangedSinceBaseline('steam', metric))
-    && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+  return isFreshSinceRecord(signalHistory, 'steam', metric, freshMs);
 }
 
 async function detectSteamPlaytimeMilestone(
@@ -109,9 +129,7 @@ async function detectSteamPlaytimeMilestone(
   const metric = `playtime-milestone:${trackedGame.appId}`;
   await signalHistory.record('steam', metric, tier ?? 0);
   if (tier === undefined) return undefined;
-  const changedAt = await signalHistory.lastChangedAt('steam', metric);
-  const isFresh = (await signalHistory.hasChangedSinceBaseline('steam', metric))
-    && changedAt !== undefined && Date.now() - changedAt.getTime() < freshMs;
+  const isFresh = await isFreshSinceRecord(signalHistory, 'steam', metric, freshMs);
   return isFresh ? tier : undefined;
 }
 
@@ -147,9 +165,11 @@ export async function computeSteamMoments(
   if (!steam) return { completedGame: false };
 
   const trackedGame = steam.currentGame ?? steam.recentlyPlayed[0] ?? steam.library?.mostPlayed[0];
-  const completedGame = await detectSteamCompletedGame(signalHistory, steam.achievements, freshMs);
-  const playtimeMilestoneHoursMoment = await detectSteamPlaytimeMilestone(signalHistory, trackedGame, playtimeMilestoneHours, freshMs);
-  const leaderboardClimb = await detectSteamLeaderboardClimb(signalHistory, steam.friendsLeaderboard, freshMs);
+  const [completedGame, playtimeMilestoneHoursMoment, leaderboardClimb] = await Promise.all([
+    detectSteamCompletedGame(signalHistory, steam.achievements, freshMs),
+    detectSteamPlaytimeMilestone(signalHistory, trackedGame, playtimeMilestoneHours, freshMs),
+    detectSteamLeaderboardClimb(signalHistory, steam.friendsLeaderboard, freshMs),
+  ]);
 
   return { completedGame, playtimeMilestoneHours: playtimeMilestoneHoursMoment, leaderboardClimb };
 }
@@ -171,11 +191,13 @@ export function createCommandCenterProvider(
       const github = widgetData<GitHubData>(envelopes, 'github');
       const calendar = widgetData<CalendarData>(envelopes, 'calendar');
       const spotify = widgetData<SpotifyData>(envelopes, 'spotify');
-      const spotifyFresh = await computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs);
       const steam = widgetData<SteamData>(envelopes, 'steam');
-      const steamMoments = await computeSteamMoments(
-        signalHistory, steam, config.commandCenter.steamPlaytimeMilestoneHours, config.commandCenter.steamMomentFreshMs,
-      );
+      const [spotifyFresh, steamMoments] = await Promise.all([
+        computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs),
+        computeSteamMoments(
+          signalHistory, steam, config.commandCenter.steamPlaytimeMilestoneHours, config.commandCenter.steamMomentFreshMs,
+        ),
+      ]);
       return rankCandidates([
         ...calendarCandidates(calendar, Date.now()),
         ...gmailCandidates(gmail, config.commandCenter.gmailFreshMs, config.commandCenter.gmailStaleMs),
@@ -183,6 +205,7 @@ export function createCommandCenterProvider(
         ...healthCandidates(widgetData<HealthData>(envelopes, 'health')),
         ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),
         ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
+        ...aiNewsCandidates(widgetData<AiNewsData>(envelopes, 'ai-news')),
         ...spotifyCandidates(spotify, spotifyFresh),
         ...steamCandidates(steam, config.commandCenter.steamAchievementFreshMs, steamMoments, config.commandCenter.steamRareAchievementPercent),
         ...weatherCandidates(
@@ -193,6 +216,12 @@ export function createCommandCenterProvider(
           config.commandCenter.weatherUvHigh,
         ),
         ...imessageCandidates(widgetData<IMessageData>(envelopes, 'imessage'), config.commandCenter.imessageFreshMs),
+        ...transitCandidates(widgetData<TransitData>(envelopes, 'transit')),
+        ...powerCandidates(
+          widgetData<PowerData>(envelopes, 'power'),
+          config.commandCenter.powerSpikeRatio,
+          config.commandCenter.powerSpikeMinNok,
+        ),
         ...aiCandidates(
           [
             { id: 'claude', label: 'Claude', data: widgetData<AiUsageToolData>(envelopes, 'ai-usage-claude') },
