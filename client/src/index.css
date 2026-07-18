@@ -1506,10 +1506,17 @@ a {
     padding-left: 0.85rem;
   }
 
-  /* Five cards: whatever sits first goes full-width, the rest pair up 2×2. */
+  /* Whatever sits first goes full-width, the rest pair up 2×2 (odd one out sits alone last). */
   .arrangeable-grid--personal > :nth-child(1) {
     grid-column: span 2;
   }
+}
+
+/* Grid rows stretch item boxes by default, but the visible glass card is a nested <section> that
+   only grows to its content — without this, a short card in a row next to a tall one leaves a
+   visible gap instead of matching its neighbor's height. */
+.arrangeable-grid--personal > * > section {
+  height: 100%;
 }
 
 @media (max-width: 639px) {
