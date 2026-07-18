@@ -179,9 +179,9 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
           <path d={cloudPath} fill="#000" transform={cloudTransform} />
         </mask>
         <g mask={`url(#${maskId})`} fill={accent}>
-          <circle cx="11.5" cy="11.5" r="4" />
+          <circle cx="10" cy="10" r="4" />
           {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
-            <rect key={angle} x="10.8" y="4.3" width="1.4" height="2.1" rx="0.7" transform={`rotate(${angle} 11.5 11.5)`} />
+            <rect key={angle} x="9.3" y="2.8" width="1.4" height="2.1" rx="0.7" transform={`rotate(${angle} 10 10)`} />
           ))}
         </g>
         <path d={cloudPath} fill="currentColor" transform={cloudTransform} />
