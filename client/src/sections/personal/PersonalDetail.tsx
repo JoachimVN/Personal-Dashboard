@@ -1,4 +1,5 @@
 import type {
+  AiNewsData,
   CalendarData,
   GmailData,
   HueData,
@@ -15,6 +16,7 @@ import { NewsWidget } from '../../widgets/NewsWidget';
 import { SystemFooter } from '../../components/SystemFooter';
 import { isWidgetDisabled } from '../../components/WidgetCard';
 import { useWidget } from '../../useWidget';
+import { AiNews } from '../ai/AiNews';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
 const ITEMS: ArrangeableItem[] = [
@@ -22,6 +24,7 @@ const ITEMS: ArrangeableItem[] = [
   { id: 'gmail', label: 'Mail', render: () => <GmailWidget /> },
   { id: 'imessage', label: 'Messages', render: () => <IMessageWidget /> },
   { id: 'news', label: 'News', render: () => <NewsWidget /> },
+  { id: 'ai-news', label: 'AI news', render: () => <AiNews /> },
   { id: 'hue', label: 'Lights', render: () => <HueWidget /> },
 ];
 
@@ -31,12 +34,14 @@ function useEnabledItems(): ArrangeableItem[] {
   const gmail = useWidget<GmailData>('gmail');
   const imessage = useWidget<IMessageData>('imessage');
   const news = useWidget<NewsData>('news');
+  const aiNews = useWidget<AiNewsData>('ai-news');
   const hue = useWidget<HueData>('hue');
   const envelopeById: Record<string, WidgetEnvelope<unknown> | null> = {
     calendar: calendar.envelope,
     gmail: gmail.envelope,
     imessage: imessage.envelope,
     news: news.envelope,
+    'ai-news': aiNews.envelope,
     hue: hue.envelope,
   };
   return ITEMS.filter((item) => !isWidgetDisabled(envelopeById[item.id] ?? null));
