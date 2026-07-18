@@ -4,9 +4,17 @@ import type { Provider } from '../scheduler.js';
 import { selectNewsItems } from './news.js';
 
 /** Per-provider cap, not a shared pool — otherwise a high-volume feed (e.g. OpenAI's blog) crowds
- * out a lower-volume one (Anthropic's Google News proxy) in the merged list. Matches the plain
- * News card's item count so the two side-by-side columns fill roughly the same card height. */
-const MAX_ITEMS_PER_PROVIDER = 12;
+ * out a lower-volume one (Anthropic's Google News proxy) in the merged list. Each provider only
+ * gets a half-width column next to the other, so it wraps to more lines per headline than the
+ * full-width News card at the same item count — stays lower than News's own cap for that reason. */
+const MAX_ITEMS_PER_PROVIDER = 6;
+
+/** Google News search-result titles are suffixed with " - <publisher>"; strip it since the
+ * publisher is already shown as the item's source line right below the title. */
+function stripPublisherSuffix(title: string, publisher: string): string {
+  const suffix = ` - ${publisher}`;
+  return title.endsWith(suffix) ? title.slice(0, -suffix.length) : title;
+}
 
 type AiNewsItem = AiNewsData['items'][number];
 
@@ -30,7 +38,7 @@ export function createAiNewsProvider(feeds: AiNewsFeed[]): Provider<AiNewsData> 
         feeds.map(async (feed) => {
           const parsed = await parser.parseURL(feed.url);
           const items: AiNewsItem[] = (parsed.items ?? []).map((item) => ({
-            title: item.title ?? '(untitled)',
+            title: stripPublisherSuffix(item.title ?? '(untitled)', feed.name),
             source: feed.name,
             url: item.link ?? '',
             publishedAt: item.isoDate ?? new Date(0).toISOString(),
