@@ -270,10 +270,12 @@ a {
 }
 
 .command-nav a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
   border-radius: 999px;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.7rem;
-  font-weight: 650;
   color: var(--color-ink-muted);
   transition: background 180ms ease, color 180ms ease;
 }
