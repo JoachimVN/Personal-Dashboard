@@ -162,27 +162,29 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
   if (id === 'weather') {
     const accent = monochrome ? 'currentColor' : 'var(--accent)';
     const cloudPath = 'M13 20.5h5.2a3.3 3.3 0 0 0 .6-6.55A4.6 4.6 0 0 0 10 12.9a3.6 3.6 0 0 0 .4 7.6H13Z';
+    const cloudTransform = 'translate(-4.35 -2.06) scale(1.15)';
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5">
         {/* Filled, like the rest of the set (github/spotify/health/steam are all solid shapes,
             not linework) — the sun is a solid disc plus solid rays, rotated copies of one rounded
-            rect around its center. The cloud sits in front of the sun, so the part of the sun it
-            covers has to actually disappear rather than get painted over in a background-matching
-            color — that fill hack only lines up where the icon happens to sit on exactly
-            --color-card (the overview card), and shows up as a visibly mismatched patch anywhere
-            else (the nav pill's translucent glass, various hover states). A mask cuts the cloud's
-            silhouette out of the sun instead, so it reads correctly against any background. */}
+            rect around its center, nested well into the cloud rather than just grazing its edge.
+            The cloud sits in front of the sun, so the part of the sun it covers has to actually
+            disappear rather than get painted over in a background-matching color — that fill hack
+            only lines up where the icon happens to sit on exactly --color-card (the overview
+            card), and shows up as a visibly mismatched patch anywhere else (the nav pill's
+            translucent glass, various hover states). A mask cuts the cloud's silhouette out of the
+            sun instead, so it reads correctly against any background. */}
         <mask id={maskId} maskUnits="userSpaceOnUse">
           <rect x="0" y="0" width="24" height="24" fill="#fff" />
-          <path d={cloudPath} fill="#000" />
+          <path d={cloudPath} fill="#000" transform={cloudTransform} />
         </mask>
         <g mask={`url(#${maskId})`} fill={accent}>
-          <circle cx="8" cy="7.5" r="3" />
+          <circle cx="11.5" cy="11.5" r="4" />
           {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
-            <rect key={angle} x="7.35" y="1.5" width="1.3" height="1.9" rx="0.65" transform={`rotate(${angle} 8 7.5)`} />
+            <rect key={angle} x="10.8" y="4.3" width="1.4" height="2.1" rx="0.7" transform={`rotate(${angle} 11.5 11.5)`} />
           ))}
         </g>
-        <path d={cloudPath} fill="currentColor" />
+        <path d={cloudPath} fill="currentColor" transform={cloudTransform} />
       </svg>
     );
   }
