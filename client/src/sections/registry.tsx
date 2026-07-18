@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, CSSProperties } from 'react';
 import { GitHubMark } from '../components/GitHubMark';
 import { AiOverview } from './ai/AiOverview';
 import { AiDetail } from './ai/AiDetail';
@@ -104,6 +104,31 @@ export function sectionById(id: SectionId): SectionDef {
   return section;
 }
 
+export function accentStyle(section: SectionDef): CSSProperties {
+  return { '--accent': `var(${section.accentVar})` } as CSSProperties;
+}
+
+/** Mount once (see App.tsx). Every colored steam glyph references this same gradient by id — an
+    SVG def can't live inside SectionIcon itself, since that renders more than once and ids must
+    be unique per document. Stops match Valve's own mark (commons.wikimedia.org/wiki/File:Steam_icon_logo.svg). */
+export function SteamGradientDefs() {
+  return (
+    <svg width="0" height="0" aria-hidden className="absolute">
+      <defs>
+        <linearGradient id="steam-gradient" x1="50%" y1="0%" x2="50%" y2="100%">
+          <stop offset="0%" stopColor="#111d2e" />
+          <stop offset="21.2%" stopColor="#051839" />
+          <stop offset="40.7%" stopColor="#0a1b48" />
+          <stop offset="58.1%" stopColor="#132e62" />
+          <stop offset="73.8%" stopColor="#144b7e" />
+          <stop offset="87.3%" stopColor="#136497" />
+          <stop offset="100%" stopColor="#1387b8" />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
+
 /** Shared per-section glyph — used by both the overview cards (colored) and the compact
     command-center nav (`monochrome`, so the pill row reads as one consistent set rather than
     a handful of brand colors next to a handful of plain glyphs). */
@@ -151,9 +176,17 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
     );
   }
   if (id === 'steam') {
+    /* Valve's own mark: a dark navy→cyan gradient disc behind a white atom/swirl glyph
+       (commons.wikimedia.org/wiki/File:Steam_icon_logo.svg). Both paths always render; CSS
+       decides per context whether the disc is visible and what the swirl is filled with — see
+       .section-icon-steam-* in index.css. That lets the nav go from a plain currentColor swirl
+       (matching its sibling icons) to the full colored badge on hover, not just a flat tint. */
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
-        <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.253 0-2.265-1.014-2.265-2.265z" />
+      <svg viewBox="0 0 65 65" aria-hidden className="h-5 w-5 section-icon-steam">
+        <g transform="translate(0.5 0.5)">
+          <path className="section-icon-steam-disc" d="M1.305 41.202C5.259 54.386 17.488 64 31.959 64c17.673 0 32-14.327 32-32s-14.327-32-32-32C15.001 0 1.124 13.193.028 29.874c2.074 3.477 2.879 5.628 1.275 11.328z" />
+          <path className="section-icon-steam-swirl" d="M30.31 23.985l.003.158-7.83 11.375c-1.268-.058-2.54.165-3.748.662a8.14 8.14 0 0 0-1.498.8L.042 29.893s-.398 6.546 1.26 11.424l12.156 5.016c.6 2.728 2.48 5.12 5.242 6.27a8.88 8.88 0 0 0 11.603-4.782 8.89 8.89 0 0 0 .684-3.656L42.18 36.16l.275.005c6.705 0 12.155-5.466 12.155-12.18s-5.44-12.16-12.155-12.174c-6.702 0-12.155 5.46-12.155 12.174zm-1.88 23.05c-1.454 3.5-5.466 5.147-8.953 3.694a6.84 6.84 0 0 1-3.524-3.362l3.957 1.64a5.04 5.04 0 0 0 6.591-2.719 5.05 5.05 0 0 0-2.715-6.601l-4.1-1.695c1.578-.6 3.372-.62 5.05.077 1.7.703 3 2.027 3.696 3.72s.692 3.56-.01 5.246M42.466 32.1a8.12 8.12 0 0 1-8.098-8.113 8.12 8.12 0 0 1 8.098-8.111 8.12 8.12 0 0 1 8.1 8.111 8.12 8.12 0 0 1-8.1 8.113m-6.068-8.126a6.09 6.09 0 0 1 6.08-6.095c3.355 0 6.084 2.73 6.084 6.095a6.09 6.09 0 0 1-6.084 6.093 6.09 6.09 0 0 1-6.081-6.093z" />
+        </g>
       </svg>
     );
   }

@@ -23,7 +23,7 @@ import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
 import { ClaudeIcon, OpenAiIcon } from '../sections/ai/ToolIcons';
-import { SECTIONS, SectionIcon } from '../sections/registry';
+import { accentStyle, SECTIONS, SectionIcon } from '../sections/registry';
 import { sectionHref } from '../router';
 import { UvGauge, WindGauge } from '../sections/weather/WeatherOverview';
 import { GitHubMark } from './GitHubMark';
@@ -581,7 +581,7 @@ function CommandNav() {
   return (
     <nav className="command-nav" aria-label="Dashboard sections">
       {SECTIONS.map((section) => (
-        <a key={section.id} href={sectionHref(section.id)} aria-label={section.title} title={section.title}>
+        <a key={section.id} href={sectionHref(section.id)} aria-label={section.title} title={section.title} style={accentStyle(section)}>
           <SectionIcon id={section.id} monochrome />
         </a>
       ))}

@@ -1,7 +1,6 @@
 import { motion } from 'motion/react';
-import type { SectionDef } from './registry';
+import { accentStyle, type SectionDef } from './registry';
 import { OVERVIEW_HREF } from '../router';
-import { accentStyle } from './SectionCard';
 import { ThemeToggle } from '../components/ThemeToggle';
 
 /**

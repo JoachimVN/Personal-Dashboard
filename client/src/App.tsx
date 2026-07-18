@@ -3,7 +3,7 @@ import { AnimatePresence, LayoutGroup, MotionConfig, motion } from 'motion/react
 import { useHashRoute } from './router';
 import { useDeviceLocation } from './useDeviceLocation';
 import { SkyTimeContext } from './lib/skyTime';
-import { SECTIONS, sectionById } from './sections/registry';
+import { SECTIONS, sectionById, SteamGradientDefs } from './sections/registry';
 import { SectionCard } from './sections/SectionCard';
 import { SectionView } from './sections/SectionView';
 import { SystemFooter } from './components/SystemFooter';
@@ -229,6 +229,7 @@ export default function App() {
       className="app-shell min-h-screen text-ink selection:bg-(--color-accent-ai)/25"
       style={skyFor(skyNow)}
     >
+      <SteamGradientDefs />
       <BackgroundGlow />
       {SHOW_SKY_TIME_DEBUGGER && <SkyTimeDebugger minute={skyDebugMinute} onMinuteChange={setSkyDebugMinute} />}
       {route.view === 'section' && <SectionGlow accentVar={sectionById(route.sectionId).accentVar} />}

@@ -1,11 +1,7 @@
-import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent } from 'react';
 import { motion } from 'motion/react';
-import { SectionIcon, type SectionDef } from './registry';
+import { accentStyle, SectionIcon, type SectionDef } from './registry';
 import { sectionHref } from '../router';
-
-export function accentStyle(section: SectionDef): CSSProperties {
-  return { '--accent': `var(${section.accentVar})` } as CSSProperties;
-}
 
 export const sectionCardVariants = {
   hidden: { opacity: 0, y: 12 },
