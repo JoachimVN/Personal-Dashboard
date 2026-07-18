@@ -280,15 +280,25 @@ a {
   transition: background 180ms ease, color 180ms ease;
 }
 
-.command-nav a:hover {
-  color: var(--accent);
+@media (hover: hover) {
+  .command-nav a:hover {
+    color: var(--accent);
+  }
 }
 
 /* Steam's mark is two-tone (gradient disc + white swirl), so it can't hover-tint via currentColor
-   like the other glyphs. Default: swirl only, in currentColor, disc hidden. Colored (always in
-   the overview card, on hover in the compact nav): disc gets the brand gradient, swirl goes white.
+   like the other glyphs. Default: swirl only, ink-muted, disc hidden. Colored (always in the
+   overview card, on hover in the compact nav): disc gets the brand gradient, swirl goes white.
    The disc's fill stays a constant gradient reference and fades via opacity — url(#steam-gradient)
-   itself can't be transitioned — while the swirl's solid-to-solid color change transitions normally. */
+   itself can't be transitioned — while the swirl's solid-to-solid color change transitions normally.
+   The swirl's resting fill is the literal ink-muted token, not currentColor: `.command-nav a:hover`
+   also tweens the anchor's `color` to --accent on its own 180ms transition, and if the swirl tracked
+   currentColor it would pick up that live in-flight value on mouse-leave (once :hover stops matching
+   and the swirl falls back to this base rule) — a visible flash of the flat accent blue before it
+   settles to grey, instead of just fading white->grey.
+   Hover-only guarded below so a tap on touch devices (no real :hover) doesn't leave the badge and
+   the flat accent tint stuck on — the same sticky-hover problem .dashboard-section-card:hover
+   already guards against further down this file. */
 .section-icon-steam-disc {
   fill: url(#steam-gradient);
   opacity: 0;
@@ -296,18 +306,26 @@ a {
 }
 
 .section-icon-steam-swirl {
-  fill: currentColor;
+  fill: var(--color-ink-muted);
   transition: fill 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.dashboard-section-card .section-icon-steam-disc,
-.command-nav a:hover .section-icon-steam-disc {
+.dashboard-section-card .section-icon-steam-disc {
   opacity: 1;
 }
 
-.dashboard-section-card .section-icon-steam-swirl,
-.command-nav a:hover .section-icon-steam-swirl {
+.dashboard-section-card .section-icon-steam-swirl {
   fill: #fff;
+}
+
+@media (hover: hover) {
+  .command-nav a:hover .section-icon-steam-disc {
+    opacity: 1;
+  }
+
+  .command-nav a:hover .section-icon-steam-swirl {
+    fill: #fff;
+  }
 }
 
 .command-layout {
