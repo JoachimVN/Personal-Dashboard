@@ -30,11 +30,15 @@ const kr = (price: number) => `${price.toFixed(2)} kr`;
 /**
  * One sequential hue for the whole curve (magnitude, single series); the only color break is
  * the current hour in the section accent. Negative prices (they happen) hang below a zero line.
+ * Bars are hoverable (and tappable) like the health widget's steps trend — the active bar is
+ * reported up so the header above the chart can show its exact price instead of "now"'s.
  */
-function PriceChart({ hours, nowIndex, todayCount }: Readonly<{
+function PriceChart({ hours, nowIndex, todayCount, active, onActiveChange }: Readonly<{
   hours: PowerHour[];
   nowIndex: number;
   todayCount: number;
+  active: number | null;
+  onActiveChange: (index: number | null) => void;
 }>) {
   const prices = hours.map((hour) => hour.priceNokPerKwh);
   const max = Math.max(...prices, 0.01);
@@ -49,6 +53,9 @@ function PriceChart({ hours, nowIndex, todayCount }: Readonly<{
       preserveAspectRatio="none"
       role="img"
       aria-label="Hourly electricity price"
+      onPointerLeave={(e) => {
+        if (e.pointerType === 'mouse') onActiveChange(null);
+      }}
     >
       {hours.map((hour, index) => {
         const x = (index / hours.length) * CHART_W;
@@ -58,16 +65,30 @@ function PriceChart({ hours, nowIndex, todayCount }: Readonly<{
         const height = Math.max(Math.abs(zeroY - priceY), 0.75);
         const isNow = index === nowIndex;
         const isTomorrow = index >= todayCount;
-        let fill = 'var(--color-accent-personal)';
-        let opacity = 1;
-        if (!isNow) {
-          fill = 'var(--color-ink-faint)';
-          opacity = isTomorrow ? 0.28 : 0.5;
+        let fill = 'var(--color-ink-faint)';
+        let opacity = isTomorrow ? 0.28 : 0.5;
+        if (isNow) {
+          fill = 'var(--color-accent-personal)';
+          opacity = 1;
+        } else if (active === index) {
+          fill = 'var(--color-ink)';
+          opacity = 0.9;
         }
         return (
-          <rect key={hour.time} x={x} y={y} width={barW} height={height} rx={0.5} fill={fill} opacity={opacity}>
-            <title>{`${isTomorrow ? 'Tomorrow' : 'Today'} ${hour.hourLabel}:00 · ${kr(hour.priceNokPerKwh)}/kWh`}</title>
-          </rect>
+          <rect
+            key={hour.time}
+            x={x}
+            y={y}
+            width={barW}
+            height={height}
+            rx={0.5}
+            fill={fill}
+            opacity={opacity}
+            className="cursor-pointer"
+            aria-label={`${isTomorrow ? 'Tomorrow' : 'Today'} ${hour.hourLabel}:00 · ${kr(hour.priceNokPerKwh)}/kWh`}
+            onPointerEnter={() => onActiveChange(index)}
+            onPointerDown={() => onActiveChange(index)}
+          />
         );
       })}
       {min < 0 && (
@@ -80,6 +101,7 @@ function PriceChart({ hours, nowIndex, todayCount }: Readonly<{
 export function PowerWidget() {
   const { envelope, offline } = useWidget<PowerData>('power');
   const now = useNow();
+  const [active, setActive] = useState<number | null>(null);
 
   return (
     <WidgetCard title="Power price" envelope={envelope} offline={offline}>
@@ -87,6 +109,8 @@ export function PowerWidget() {
         const hours = [...data.today, ...data.tomorrow];
         const nowIndex = currentHourIndex(hours, now);
         const current = nowIndex >= 0 ? hours[nowIndex] : undefined;
+        const activeHour = active != null ? hours[active] : undefined;
+        const displayed = activeHour ?? current;
         const sortedToday = [...data.today].sort((a, b) => a.priceNokPerKwh - b.priceNokPerKwh);
         const low = sortedToday[0];
         const high = sortedToday.at(-1);
@@ -95,12 +119,16 @@ export function PowerWidget() {
           <div>
             <p className="flex items-baseline gap-2">
               <span className="text-3xl font-semibold tracking-[-0.04em] tabular-nums">
-                {current ? kr(current.priceNokPerKwh) : '–'}
+                {displayed ? kr(displayed.priceNokPerKwh) : '–'}
               </span>
-              <span className="text-xs text-ink-faint">/kWh · {data.area} spot</span>
+              <span className="text-xs text-ink-faint">
+                {activeHour
+                  ? `/kWh · ${active! >= data.today.length ? 'tomorrow' : 'today'} ${activeHour.hourLabel}:00`
+                  : `/kWh · ${data.area} spot`}
+              </span>
             </p>
             <div className="mt-3">
-              <PriceChart hours={hours} nowIndex={nowIndex} todayCount={data.today.length} />
+              <PriceChart hours={hours} nowIndex={nowIndex} todayCount={data.today.length} active={active} onActiveChange={setActive} />
               <div className="mt-1 flex justify-between text-[0.65rem] text-ink-faint">
                 <span>Today</span>
                 {data.tomorrow.length > 0 && <span>Tomorrow</span>}
