@@ -177,17 +177,30 @@ export function isCodexLimitStale(
   return now - Date.parse(asOf) > maxAgeMs;
 }
 
-/** Matches any "<label> limit: [bar] N% left (resets HH:MM on D Mon)" row in the `/status` panel.
- * Codex currently only renders a "Weekly limit" row, but the format is generic enough to also pick
- * up a "5h"/"hour"/"session" row if one is ever added — see classifyCodexLimitLabel. */
-const CODEX_LIMIT_LINE_REGEX =
-  /^[^\w\r\n]*([\w ]+)\s+limit\s*:\s*(?:\[[^\]\r\n]*])?\s*(\d{1,3})%\s*left\s*\(resets\s*(\d{1,2}):(\d{2})\s*on\s*(\d{1,2})\s*([a-z]{3})\)/gim;
+/** Matches the value portion of a "<label> limit: [bar] N% left (resets HH:MM on D Mon)"
+ * `/status` row. The label and optional bar are separated structurally before this bounded parse. */
+const CODEX_LIMIT_VALUE_REGEX =
+  /^(\d{1,3})%\s*left\s*\(resets\s*(\d{1,2}):(\d{2})\s*on\s*(\d{1,2})\s*([a-z]{3})\)/i;
 
 function classifyCodexLimitLabel(label: string): CodexLimitBucket | undefined {
   const normalized = label.toLowerCase();
   if (normalized.includes('week')) return 'weekly';
   if (normalized.includes('5h') || normalized.includes('hour') || normalized.includes('session')) return 'fiveHour';
   return undefined;
+}
+
+function parseCodexLimitLine(line: string): { label: string; match: RegExpExecArray } | undefined {
+  const markerIndex = line.toLowerCase().indexOf('limit:');
+  if (markerIndex === -1) return undefined;
+
+  let value = line.slice(markerIndex + 'limit:'.length).trimStart();
+  if (value.startsWith('[')) {
+    const barEnd = value.indexOf(']');
+    if (barEnd === -1) return undefined;
+    value = value.slice(barEnd + 1).trimStart();
+  }
+  const match = CODEX_LIMIT_VALUE_REGEX.exec(value);
+  return match ? { label: line.slice(0, markerIndex), match } : undefined;
 }
 
 /** `/status` reports resets in 24-hour local time with no year, e.g. "11:49 on 25 Jul". */
@@ -210,12 +223,14 @@ export function parseCodexStatusScreen(
   const text = stripTerminalControls(screen);
   const windows: Partial<Record<CodexLimitBucket, ReturnType<typeof limit>>> = {};
   let sawAnyLimitLine = false;
-  for (const match of text.matchAll(CODEX_LIMIT_LINE_REGEX)) {
-    const bucket = classifyCodexLimitLabel(match[1]);
+  for (const line of text.split('\n')) {
+    const parsed = parseCodexLimitLine(line);
+    if (!parsed) continue;
+    const bucket = classifyCodexLimitLabel(parsed.label);
     if (!bucket) continue;
     sawAnyLimitLine = true;
-    const resetsAt = parseCodexResetAt(match[3], match[4], match[5], match[6], now);
-    if (resetsAt) windows[bucket] = limit(100 - Number(match[2]), resetsAt);
+    const resetsAt = parseCodexResetAt(parsed.match[2], parsed.match[3], parsed.match[4], parsed.match[5], now);
+    if (resetsAt) windows[bucket] = limit(100 - Number(parsed.match[1]), resetsAt);
   }
   const asOf = windows.fiveHour || windows.weekly ? now.toISOString() : undefined;
   return {
