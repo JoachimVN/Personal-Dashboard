@@ -15,6 +15,11 @@ function currentHourIndex(hours: PowerHour[], now: number): number {
   });
 }
 
+function activeHourContext(active: number, todayLength: number, hourLabel: string): string {
+  const day = active >= todayLength ? 'tomorrow' : 'today';
+  return `/kWh · ${day} ${hourLabel}:00`;
+}
+
 /** Re-derive "the current hour" as the clock crosses hour boundaries between polls. */
 function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
@@ -122,8 +127,8 @@ export function PowerWidget() {
                 {displayed ? kr(displayed.priceNokPerKwh) : '–'}
               </span>
               <span className="text-xs text-ink-faint">
-                {activeHour
-                  ? `/kWh · ${active! >= data.today.length ? 'tomorrow' : 'today'} ${activeHour.hourLabel}:00`
+                {activeHour && active !== null
+                  ? activeHourContext(active, data.today.length, activeHour.hourLabel)
                   : `/kWh · ${data.area} spot`}
               </span>
             </p>

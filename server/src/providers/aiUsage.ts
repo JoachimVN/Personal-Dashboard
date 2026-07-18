@@ -66,25 +66,26 @@ function asIso(timestamp: string): string | undefined {
 }
 
 /** 5h = 300 minutes, weekly = 10080 minutes; classify with slack rather than exact-matching. */
-function windowBucket(windowMinutes: number): 'fiveHour' | 'weekly' | undefined {
+function windowBucket(windowMinutes: number): CodexLimitBucket | undefined {
   if (windowMinutes > 0 && windowMinutes <= 600) return 'fiveHour';
   if (windowMinutes >= 5000 && windowMinutes <= 20000) return 'weekly';
   return undefined;
 }
 
+type CodexLimitBucket = 'fiveHour' | 'weekly';
 type TimestampedCodexLimit = { timestamp: string; entry: z.infer<typeof codexLimitSchema> };
 
 interface CodexLimits {
   fiveHour?: TimestampedCodexLimit;
   weekly?: TimestampedCodexLimit;
-  latestReport?: { timestamp: string; buckets: Array<'fiveHour' | 'weekly'> };
+  latestReport?: { timestamp: string; buckets: CodexLimitBucket[] };
 }
 
 function recordLatestLimit(
   limits: CodexLimits,
   timestamp: string,
   entry: z.infer<typeof codexLimitSchema>,
-): 'fiveHour' | 'weekly' | undefined {
+): CodexLimitBucket | undefined {
   const bucket = windowBucket(entry.window_minutes);
   if (bucket === 'fiveHour' && (!limits.fiveHour || timestamp > limits.fiveHour.timestamp)) {
     limits.fiveHour = { timestamp, entry };
@@ -180,9 +181,9 @@ export function isCodexLimitStale(
  * Codex currently only renders a "Weekly limit" row, but the format is generic enough to also pick
  * up a "5h"/"hour"/"session" row if one is ever added — see classifyCodexLimitLabel. */
 const CODEX_LIMIT_LINE_REGEX =
-  /([^\n]*?)limit\s*:[^\n]*?(\d{1,3})%\s*left\s*\(resets\s*(\d{1,2}):(\d{2})\s*on\s*(\d{1,2})\s*([A-Za-z]{3})\)/gi;
+  /^[^\w\r\n]*([\w ]+)\s+limit\s*:\s*(?:\[[^\]\r\n]*])?\s*(\d{1,3})%\s*left\s*\(resets\s*(\d{1,2}):(\d{2})\s*on\s*(\d{1,2})\s*([a-z]{3})\)/gim;
 
-function classifyCodexLimitLabel(label: string): 'fiveHour' | 'weekly' | undefined {
+function classifyCodexLimitLabel(label: string): CodexLimitBucket | undefined {
   const normalized = label.toLowerCase();
   if (normalized.includes('week')) return 'weekly';
   if (normalized.includes('5h') || normalized.includes('hour') || normalized.includes('session')) return 'fiveHour';
@@ -207,7 +208,7 @@ export function parseCodexStatusScreen(
   now = new Date(),
 ): Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'> {
   const text = stripTerminalControls(screen);
-  const windows: Partial<Record<'fiveHour' | 'weekly', ReturnType<typeof limit>>> = {};
+  const windows: Partial<Record<CodexLimitBucket, ReturnType<typeof limit>>> = {};
   let sawAnyLimitLine = false;
   for (const match of text.matchAll(CODEX_LIMIT_LINE_REGEX)) {
     const bucket = classifyCodexLimitLabel(match[1]);

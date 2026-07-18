@@ -207,9 +207,9 @@ export function createTransitProvider(
           ? withDistance.filter(({ distanceMeters }) => distanceMeters !== undefined && distanceMeters <= settings.favoriteRadiusMeters)
           : withDistance;
         if (selected.length > 0) {
+          const sorted = selected.toSorted((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0));
           return {
-            stops: selected
-              .sort((a, b) => (a.distanceMeters ?? 0) - (b.distanceMeters ?? 0))
+            stops: sorted
               .map(({ place, distanceMeters }) => toStopData(place, distanceMeters)),
           };
         }

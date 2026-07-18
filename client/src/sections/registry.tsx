@@ -134,7 +134,8 @@ export function SteamGradientDefs() {
     a handful of brand colors next to a handful of plain glyphs). */
 export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId; monochrome?: boolean }>) {
   const maskId = useId();
-  if (id === 'ai') {
+  switch (id) {
+    case 'ai': {
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6">
         <path d="M12 3.25v17.5M3.25 12h17.5M5.8 5.8l12.4 12.4M18.2 5.8 5.8 18.2" />
@@ -142,12 +143,12 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
       </svg>
     );
   }
-  if (id === 'github') {
+    case 'github': {
     return (
       <GitHubMark className={monochrome ? 'h-5 w-5' : 'h-5 w-5 text-(--color-github-mark)'} />
     );
   }
-  if (id === 'spotify') {
+    case 'spotify': {
     if (monochrome) {
       return (
         <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
@@ -159,7 +160,7 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
       <img src="/spotify.svg" alt="" aria-hidden className="h-5 w-5" />
     );
   }
-  if (id === 'weather') {
+    case 'weather': {
     const accent = monochrome ? 'currentColor' : 'var(--accent)';
     const cloudPath = 'M13 20.5h5.2a3.3 3.3 0 0 0 .6-6.55A4.6 4.6 0 0 0 10 12.9a3.6 3.6 0 0 0 .4 7.6H13Z';
     const cloudTransform = 'translate(-4.35 -2.06) scale(1.15)';
@@ -188,7 +189,7 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
       </svg>
     );
   }
-  if (id === 'personal') {
+    case 'personal': {
     const accent = monochrome ? 'currentColor' : 'var(--accent)';
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -198,14 +199,14 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
       </svg>
     );
   }
-  if (id === 'health') {
+    case 'health': {
     return (
       <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
         <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
       </svg>
     );
   }
-  if (id === 'steam') {
+    case 'steam': {
     /* Valve's own mark: a dark navy→cyan gradient disc behind a white atom/swirl glyph
        (commons.wikimedia.org/wiki/File:Steam_icon_logo.svg). Both paths always render; CSS
        decides per context whether the disc is visible and what the swirl is filled with — see
@@ -220,9 +221,11 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
       </svg>
     );
   }
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12.5 10 17l9-10" /><path d="M19 13v6H5V5h9" />
-    </svg>
-  );
+  default:
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 12.5 10 17l9-10" /><path d="M19 13v6H5V5h9" />
+      </svg>
+    );
+  }
 }
