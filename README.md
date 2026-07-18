@@ -165,15 +165,23 @@ departures from the stops nearest those coordinates, using [Entur](https://devel
 national journey-planner API (covers every Norwegian operator: AtB, Ruter, Skyss, …). When the
 dashboard PWA shares your phone's location, the stops follow you the same way weather does.
 
-To pin specific stops instead (e.g. your home stop in both directions), list their NSR ids in
-`server/config.json` under `transit.stopIds` — find ids at
-[stoppested.entur.org](https://stoppested.entur.org) (they look like `NSR:StopPlace:41613`).
-`transit.maxStops` and `transit.departuresPerStop` tune how much the card shows.
+To make specific stops (e.g. the ones you actually take, which auto-discovery might skip in favor
+of a nearer but less useful stop) take priority, list their NSR ids in `server/config.json` under
+`transit.stopIds` — find ids at [stoppested.entur.org](https://stoppested.entur.org) (they look
+like `NSR:StopPlace:41613`). These are shown whenever you're within `transit.favoriteRadiusMeters`
+(default 5 km) of one of them; if you're not near any of them right now, it falls back to
+auto-discovery, capped at `transit.maxStops` stops within `transit.nearbyRadiusMeters` (default
+2 km). `transit.departuresPerStop` tunes how much the card shows per stop.
 
 ### Electricity spot price (Norway)
 
-No key needed: set your [bidding area](https://www.nordpoolgroup.com/en/maps/) in
-`server/config.json` (`NO1` Øst / `NO2` Sør / `NO3` Midt / `NO4` Nord / `NO5` Vest):
+No key needed. With `WEATHER_LAT` / `WEATHER_LON` set (or the dashboard PWA sharing your phone's
+location), the widget auto-detects your [bidding area](https://www.nordpoolgroup.com/en/maps/)
+(`NO1` Øst … `NO5` Vest) from those coordinates via Entur's reverse geocoder, the same way transit
+follows the dashboard's location.
+
+To pin a specific area instead (e.g. it's wrong near a zone border, or you want a location other
+than your own), set it explicitly in `server/config.json` — this always overrides auto-detection:
 
 ```json
 { "power": { "area": "NO3" } }

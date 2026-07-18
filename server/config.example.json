@@ -15,12 +15,12 @@
   },
   "transit": {
     "stopIds": [],
+    "favoriteRadiusMeters": 5000,
     "maxStops": 2,
+    "nearbyRadiusMeters": 2000,
     "departuresPerStop": 5
   },
-  "power": {
-    "area": "NO3"
-  },
+  "power": {},
   "code": {
     "reposRoot": {
       "darwin": "/Users/you/GitHub",

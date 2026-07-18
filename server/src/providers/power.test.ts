@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapPriceHours, priceDayPath } from './power.js';
+import { mapPriceHours, priceDayPath, resolveAreaFromCounty } from './power.js';
 
 const osloHourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Oslo', hour: '2-digit', hour12: false });
 const osloDateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo' });
@@ -28,5 +28,24 @@ describe('priceDayPath', () => {
   it('uses the Oslo-local date, not UTC, near midnight', () => {
     // 23:30 UTC on the 18th is already the 19th in Oslo (summer, UTC+2).
     expect(priceDayPath(new Date('2026-07-18T23:30:00Z'), osloDateFmt, 'NO1')).toBe('2026/07-19_NO1.json');
+  });
+});
+
+describe('resolveAreaFromCounty', () => {
+  it('maps a plain fylke name to its bidding area', () => {
+    expect(resolveAreaFromCounty('Vestland')).toBe('NO5');
+  });
+
+  it('matches through a bilingual Sámi co-name', () => {
+    expect(resolveAreaFromCounty('Troms - Romsa - Tromssa')).toBe('NO4');
+  });
+
+  it('does not confuse Trøndelag with Troms', () => {
+    expect(resolveAreaFromCounty('Trøndelag - Trööndelage')).toBe('NO3');
+  });
+
+  it('returns undefined for an unrecognized or missing county', () => {
+    expect(resolveAreaFromCounty('Not a real fylke')).toBeUndefined();
+    expect(resolveAreaFromCounty(undefined)).toBeUndefined();
   });
 });

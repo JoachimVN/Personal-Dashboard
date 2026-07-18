@@ -18,7 +18,7 @@ export const transitStopSchema = z.object({
   /** National stop register id, e.g. "NSR:StopPlace:41613". */
   id: z.string(),
   name: z.string(),
-  /** Walking-line distance from the dashboard's location; absent for stops pinned by id in config. */
+  /** Straight-line distance from the dashboard's location; absent only when no location is known at all. */
   distanceMeters: z.number().optional(),
   departures: z.array(transitDepartureSchema),
 });

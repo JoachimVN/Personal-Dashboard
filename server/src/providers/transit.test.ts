@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapDepartures, selectNearestStops } from './transit.js';
+import { haversineMeters, mapDepartures, selectNearestStops } from './transit.js';
 
 function feature(id: string, name: string, distance?: number) {
   return { properties: { id, name, distance } };
@@ -74,5 +74,19 @@ describe('mapDepartures', () => {
       }),
     ]);
     expect(departure).toMatchObject({ line: '•', destination: 'Unknown destination', mode: 'bus' });
+  });
+});
+
+describe('haversineMeters', () => {
+  it('is zero for the same point', () => {
+    expect(haversineMeters({ lat: 63.4305, lon: 10.3951 }, { lat: 63.4305, lon: 10.3951 })).toBe(0);
+  });
+
+  it('matches the known straight-line distance between Trondheim and Bergen (~430 km)', () => {
+    const trondheim = { lat: 63.4305, lon: 10.3951 };
+    const bergen = { lat: 60.39299, lon: 5.32415 };
+    const km = haversineMeters(trondheim, bergen) / 1000;
+    expect(km).toBeGreaterThan(420);
+    expect(km).toBeLessThan(440);
   });
 });
