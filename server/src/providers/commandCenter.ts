@@ -183,7 +183,11 @@ export function createCommandCenterProvider(
     id: 'command-center',
     schema: commandCenterSchema,
     refreshMs: 60_000,
-    timeoutMs: 5_000,
+    // The fetch runs ~12 concurrent signal-history transactions against a remote Postgres
+    // (Spotify freshness x9, Steam moments x3), each several round trips — 5s was too tight
+    // and caused this to sit on stale data for stretches under any network latency or pool
+    // contention from other providers sharing the same connection pool.
+    timeoutMs: 15_000,
     isConfigured: () => true,
     async fetch() {
       const envelopes = scheduler.getAllEnvelopes();
