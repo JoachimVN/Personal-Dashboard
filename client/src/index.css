@@ -397,6 +397,18 @@ a {
   z-index: 1;
 }
 
+/* The hero's content sits above its stretched link (z-index 1 vs 0) so text stays crisp, which
+   would otherwise block clicks from reaching the link underneath. Drop content out of hit-testing
+   so clicks fall through to the link, then opt the genuinely interactive descendants (the event's
+   map-location link, the weather-row links) back in. */
+.command-primary > * {
+  pointer-events: none;
+}
+
+.command-primary a {
+  pointer-events: auto;
+}
+
 .command-primary > .command-panel-stretched-link,
 .command-agenda > .command-panel-stretched-link {
   position: absolute;
