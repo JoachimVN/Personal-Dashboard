@@ -1576,6 +1576,17 @@ a {
   height: 100%;
 }
 
+/* Briefly rings the widget a command-center tile deep-linked to, so the scroll's destination
+   reads as deliberate rather than the page just landing somewhere unexplained. */
+.widget-highlight > section {
+  animation: widget-highlight-ring 1.6s ease-out;
+}
+
+@keyframes widget-highlight-ring {
+  0% { box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent-personal) 55%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+
 @media (max-width: 639px) {
   .dashboard-hero {
     padding-bottom: 1.75rem;

@@ -60,14 +60,14 @@ export function calendarCandidates(data: CalendarData | undefined, now: number):
       kicker: 'Next on deck', title: next.title,
       detail: [next.location, next.description].filter((detail): detail is string => Boolean(detail)).join(' · ')
         || (next.allDay ? 'An all-day marker on your calendar' : `${next.startLabel}–${next.endLabel}`),
-      href: '#/personal', render: { type: 'calendar-event', eventId: next.id },
+      href: '#/personal/calendar', render: { type: 'calendar-event', eventId: next.id },
     });
   }
   if (agenda.length) {
     candidates.push({
       id: `calendar:agenda:${agenda.map((event) => event.id).join(',')}`, source: 'calendar', kind: 'calendar', score: 78,
       shapes: ['secondary', 'tile'], kicker: 'Coming up', title: `${agenda.length} more on your calendar`,
-      detail: agenda[0].title, href: '#/personal', render: { type: 'calendar-agenda', eventIds: agenda.map((event) => event.id) },
+      detail: agenda[0].title, href: '#/personal/calendar', render: { type: 'calendar-agenda', eventIds: agenda.map((event) => event.id) },
     });
   }
   return candidates;
@@ -157,7 +157,7 @@ export function gmailCandidates(
   return [{
     id: 'gmail:inbox', source: 'gmail', kind: 'gmail', score,
     shapes, kicker, title: `${data.unreadThreads} unread`, detail,
-    href: '#/personal',
+    href: '#/personal/gmail',
     render: unreadIds.length ? { type: 'gmail-threads', threadIds: unreadIds } : { type: 'text' },
   }];
 }
@@ -175,7 +175,7 @@ export function imessageCandidates(data: IMessageData | undefined, freshMs: numb
     id: 'imessage:unread', source: 'imessage', kind: 'imessage', score: fresh ? 76 : 40,
     shapes: fresh ? [...allShapes] : ['tile'], kicker: fresh ? 'New message' : 'Messages',
     title: `${totalUnread} unread`, detail: `${latest.label}: ${latest.lastMessage}`,
-    href: '#/personal', render: { type: 'text' },
+    href: '#/personal/imessage', render: { type: 'text' },
   }];
 }
 
@@ -770,7 +770,7 @@ export function transitCandidates(data: TransitData | undefined, now = Date.now(
       score: 21, shapes: ['tile'], kicker: `Next ${departure.mode}`,
       title: `${departure.line} · ${minutes} min`,
       detail: `${departure.destination} · from ${stop.name}`,
-      href: '#/personal', render: { type: 'text' },
+      href: '#/personal/transit', render: { type: 'text' },
     }];
   }
   return [];
@@ -811,7 +811,7 @@ export function powerCandidates(
     candidates.push({
       id: `power:negative:${current.time}`, source: 'power', kind: 'power', score: 62, shapes: ['secondary', 'tile'],
       kicker: 'Negative power price', title: 'You get paid to use power',
-      detail: `${priceFmt(price)}/kWh right now in ${data.area}`, href: '#/personal', render: { type: 'text' },
+      detail: `${priceFmt(price)}/kWh right now in ${data.area}`, href: '#/personal/power', render: { type: 'text' },
     });
   } else if (average > 0 && price >= average * spikeRatio && price >= spikeMinNok) {
     candidates.push({
@@ -820,7 +820,7 @@ export function powerCandidates(
       detail: cheapest
         ? `${(price / average).toFixed(1)}× today's average · down to ${priceFmt(cheapest.priceNokPerKwh)} at ${cheapest.hourLabel}:00`
         : `${(price / average).toFixed(1)}× today's average`,
-      href: '#/personal', render: { type: 'text' },
+      href: '#/personal/power', render: { type: 'text' },
     });
   } else if (cheapest && price >= spikeMinNok / 2 && cheapest.priceNokPerKwh <= price / 2) {
     // Halving an already-cheap price saves øre, not kroner — only worth a tile when the
@@ -828,7 +828,7 @@ export function powerCandidates(
     candidates.push({
       id: `power:cheap-ahead:${cheapest.time}`, source: 'power', kind: 'power', score: 30, shapes: ['tile'],
       kicker: 'Cheaper power ahead', title: `${priceFmt(cheapest.priceNokPerKwh)} at ${cheapest.hourLabel}:00`,
-      detail: `vs ${priceFmt(price)}/kWh right now`, href: '#/personal', render: { type: 'text' },
+      detail: `vs ${priceFmt(price)}/kWh right now`, href: '#/personal/power', render: { type: 'text' },
     });
   }
 
@@ -837,7 +837,7 @@ export function powerCandidates(
     id: `power:now:${current.time}`, source: 'power', kind: 'power', score: 20, shapes: ['tile'],
     kicker: `Power · ${data.area}`, title: `${priceFmt(price)}/kWh`,
     detail: `Today ${priceFmt(range[0]!.priceNokPerKwh)}–${priceFmt(range.at(-1)!.priceNokPerKwh)}`,
-    href: '#/personal', render: { type: 'text' },
+    href: '#/personal/power', render: { type: 'text' },
   });
   return candidates;
 }
@@ -849,7 +849,7 @@ export function hueCandidates(data: HueData | undefined): Candidate[] {
   return [{
     id: 'hue:lights-on', source: 'hue', kind: 'hue', score: 24, shapes: ['tile'],
     kicker: 'Lights on', title: `${onLights.length} light${onLights.length === 1 ? '' : 's'} active`,
-    detail: onRooms.slice(0, 2).join(' · ') || 'Open lights controls', href: '#/personal', render: { type: 'text' },
+    detail: onRooms.slice(0, 2).join(' · ') || 'Open lights controls', href: '#/personal/hue', render: { type: 'text' },
   }];
 }
 
@@ -858,7 +858,7 @@ export function newsCandidates(data: NewsData | undefined): Candidate[] {
   if (!headline) return [];
   return [{
     id: `news:${headline.url}`, source: 'news', kind: 'news', score: 23, shapes: ['tile'],
-    kicker: headline.source, title: headline.title, detail: 'Latest headline', href: '#/personal', render: { type: 'text' },
+    kicker: headline.source, title: headline.title, detail: 'Latest headline', href: '#/personal/news', render: { type: 'text' },
   }];
 }
 

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type {
   AiNewsData,
   CalendarData,
@@ -91,8 +92,24 @@ function PersonalSignals() {
   );
 }
 
-export function PersonalDetail() {
+/** Scrolls a command-center tile's target widget into view and briefly highlights it — the card
+ *  already exists on mount (ArrangeableWidgetGrid renders its default order synchronously), so
+ *  this doesn't need to wait on any widget data to load. */
+function useScrollToWidget(anchor: string | undefined): void {
+  useEffect(() => {
+    if (!anchor) return;
+    const el = document.getElementById(`widget-${anchor}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.classList.add('widget-highlight');
+    const timer = window.setTimeout(() => el.classList.remove('widget-highlight'), 1600);
+    return () => window.clearTimeout(timer);
+  }, [anchor]);
+}
+
+export function PersonalDetail({ anchor }: Readonly<{ anchor?: string }>) {
   const items = useEnabledItems();
+  useScrollToWidget(anchor);
   return (
     <div>
       <DetailIntro

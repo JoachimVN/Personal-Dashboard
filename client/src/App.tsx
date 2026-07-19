@@ -244,7 +244,7 @@ export default function App() {
                 {route.view === 'overview' ? (
                   <Overview key="overview" now={skyNow} />
                 ) : (
-                  <SectionView key={route.sectionId} section={sectionById(route.sectionId)} />
+                  <SectionView key={route.sectionId} section={sectionById(route.sectionId)} anchor={route.anchor} />
                 )}
               </AnimatePresence>
             </div>
