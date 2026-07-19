@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { SECTION_IDS, type SectionId } from './sections/registry';
 
-export type Route = { view: 'overview' } | { view: 'section'; sectionId: SectionId };
+export type Route = { view: 'overview' } | { view: 'section'; sectionId: SectionId; anchor?: string };
 
 function parseHash(): Route {
-  const id = window.location.hash.replace(/^#\/?/, '');
+  const path = window.location.hash.replace(/^#\/?/, '');
+  const [id, anchor] = path.split('/');
   return (SECTION_IDS as readonly string[]).includes(id)
-    ? { view: 'section', sectionId: id as SectionId }
+    ? { view: 'section', sectionId: id as SectionId, anchor: anchor || undefined }
     : { view: 'overview' };
 }
 
@@ -26,8 +27,8 @@ export function useHashRoute() {
   return route;
 }
 
-export function sectionHref(id: SectionId): string {
-  return `#/${id}`;
+export function sectionHref(id: SectionId, anchor?: string): string {
+  return anchor ? `#/${id}/${anchor}` : `#/${id}`;
 }
 
 export const OVERVIEW_HREF = '#/';

@@ -27,8 +27,9 @@ export interface SectionDef {
   accentVar: string;
   /** Condensed content for the overview block. */
   Overview: ComponentType;
-  /** Full content for the expanded section view. */
-  Detail: ComponentType;
+  /** Full content for the expanded section view. `anchor` is the optional sub-widget id to
+   *  scroll to on open (e.g. from a command-center tile) — only PersonalDetail uses it today. */
+  Detail: ComponentType<{ anchor?: string }>;
 }
 
 /** Adding a section = one entry here plus its Overview/Detail components; routing and layout derive from this. */

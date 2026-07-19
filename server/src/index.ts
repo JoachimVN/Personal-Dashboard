@@ -34,8 +34,18 @@ const signalHistory = new SignalHistoryStore(database);
 scheduler.register(createCommandCenterProvider(scheduler, signalHistory, config));
 // Recompute the ranking as soon as any source settles, not just on command-center's own timer —
 // otherwise a cold start can snapshot an all-fallback ranking and sit on it for a full cycle.
+// Throttled: with ~15 providers settling independently (some every few seconds), triggering the
+// DB-heavy command-center fetch on every single settle saturates the Postgres pool and starves
+// command-center's own 5s budget — see the timeout incident this was written to fix.
+const COMMAND_CENTER_SETTLE_THROTTLE_MS = 10_000;
+let commandCenterSettleTimer: NodeJS.Timeout | undefined;
 scheduler.onSettled((id) => {
-  if (id !== 'command-center') void scheduler.refresh('command-center');
+  if (id === 'command-center' || commandCenterSettleTimer) return;
+  commandCenterSettleTimer = setTimeout(() => {
+    commandCenterSettleTimer = undefined;
+    void scheduler.refresh('command-center');
+  }, COMMAND_CENTER_SETTLE_THROTTLE_MS);
+  commandCenterSettleTimer.unref?.();
 });
 scheduler.start();
 

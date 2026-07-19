@@ -15,7 +15,7 @@ widget you don't configure simply shows as "not configured" rather than breaking
 <p align="center">
   <img src="docs/screenshots/01-overview.png" alt="Personal Dashboard overview: next calendar event, weather, inbox, GitHub, activity, and now playing"/>
   <br>
-  <em>Overview: the command center picks its own hero and tiles by importance, not a fixed layout</em>
+  <em>Overview: the command center picks its own hero and tiles by importance, not a fixed layout — tap a tile to jump straight to its widget</em>
 </p>
 
 <p align="center">
@@ -109,8 +109,8 @@ into `~/.local/share/personal-dashboard/state` and symlinked into both checkouts
 single set of OAuth tokens: keeping two copies would mean two clients refreshing the same grant, and
 Spotify and Hue rotate refresh tokens on use, so one copy would eventually be left with a dead token.
 
-Opt in to auto-update and a second agent polls your `origin/main` every 5 minutes, fast-forwards the
-deploy clone and restarts, so merging to `main` updates the dashboard on your phone by itself:
+Opt in to auto-update and a second agent polls your `origin/main` every 5 minutes, hard-resets the
+deploy clone to it and restarts, so merging to `main` updates the dashboard on your phone by itself:
 
 ```bash
 PD_AUTO_UPDATE=1 ./scripts/install-launchd.sh     # PD_UPDATE_INTERVAL=300 to change the cadence
@@ -198,6 +198,8 @@ Set `GITHUB_USERNAME` and `GITHUB_TOKEN` in `server/.env`. Create a **classic PA
 
 The repo-health card shows all your owned, non-fork, non-archived repos, fetched live from the GitHub API; there's no pinned-repo list to maintain in `server/config.json`.
 
+Optionally set `GITHUB_ISSUES_TOKEN` for the **capture issue** button (creates an issue on a repo from the dashboard). Falls back to `GITHUB_TOKEN` when unset, so it only needs setting if you want the issue-creation token scoped differently from the read/activity one.
+
 Note: the activity feed uses GitHub's events API, which is **delayed** (typically minutes); it is not real-time.
 
 ### AI usage (Claude Code / Codex)
@@ -207,7 +209,26 @@ Each service has its own card showing its current rolling allowance: **five-hour
 - **Codex:** no setup when Codex is signed in locally; its local session snapshots contain the current account limits. This card polls those local files only (no network call), so it refreshes independently and much more often than Claude; tune the interval with `aiUsage.codexRefreshMs` (ms, default `30000`) in `server/config.json`.
 - **Claude Code:** no setup beyond having the `claude` CLI signed in locally on this machine. The card shells out to `claude -p "/usage"` (the same local command `/usage` runs inside an interactive session) and parses its report. This is free and reliable, unlike the account-wide quota endpoint, which turned out to be rate-limited to the point of never returning a usable reading from server-side automation. Each call writes a small local session transcript file, so this card refreshes on a coarser cadence than Codex; tune it with `aiUsage.claudeRefreshMs` (ms, default `900000` / 15 min) in `server/config.json`.
 
-Each machine's dashboard reports that machine's signed-in accounts only. News feeds are configured in `server/config.json`.
+Each machine's dashboard reports that machine's signed-in accounts only.
+
+### News
+
+No key needed, no defaults — both feed lists start empty until you add RSS feeds in `server/config.json`:
+
+- `news.feeds`: general-purpose RSS feeds (e.g. Hacker News), shown in the Personal section.
+- `aiNews.feeds`: RSS feeds each tagged with a `provider` (`"openai"` or `"anthropic"`), shown in the AI usage section alongside the Claude Code / Codex allowance cards.
+
+```json
+{
+  "news": { "feeds": [{ "name": "Hacker News", "url": "https://news.ycombinator.com/rss" }] },
+  "aiNews": {
+    "feeds": [
+      { "name": "OpenAI", "url": "https://openai.com/news/rss.xml", "provider": "openai" },
+      { "name": "Anthropic", "url": "https://news.google.com/rss/search?q=site:anthropic.com/news&hl=en-US&gl=US&ceid=US:en", "provider": "anthropic" }
+    ]
+  }
+}
+```
 
 ### Calendar (iCloud / Apple Calendar)
 

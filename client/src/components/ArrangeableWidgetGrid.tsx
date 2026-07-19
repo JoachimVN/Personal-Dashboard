@@ -93,6 +93,7 @@ function ArrangeableCard(props: Readonly<ArrangeableCardProps>) {
     : '';
   return (
     <motion.div
+      id={`widget-${item.id}`}
       layout="position"
       transition={{ type: 'spring', stiffness: 520, damping: 38 }}
       draggable={arranging}

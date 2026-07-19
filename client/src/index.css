@@ -397,6 +397,18 @@ a {
   z-index: 1;
 }
 
+/* The hero's content sits above its stretched link (z-index 1 vs 0) so text stays crisp, which
+   would otherwise block clicks from reaching the link underneath. Drop content out of hit-testing
+   so clicks fall through to the link, then opt the genuinely interactive descendants (the event's
+   map-location link, the weather-row links) back in. */
+.command-primary > * {
+  pointer-events: none;
+}
+
+.command-primary a {
+  pointer-events: auto;
+}
+
 .command-primary > .command-panel-stretched-link,
 .command-agenda > .command-panel-stretched-link {
   position: absolute;
@@ -1562,6 +1574,17 @@ a {
    visible gap instead of matching its neighbor's height. */
 .arrangeable-grid--personal > * > section {
   height: 100%;
+}
+
+/* Briefly rings the widget a command-center tile deep-linked to, so the scroll's destination
+   reads as deliberate rather than the page just landing somewhere unexplained. */
+.widget-highlight > section {
+  animation: widget-highlight-ring 1.6s ease-out;
+}
+
+@keyframes widget-highlight-ring {
+  0% { box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent-personal) 55%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
 }
 
 @media (max-width: 639px) {
