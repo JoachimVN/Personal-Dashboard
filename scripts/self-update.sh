@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Fast-forwards the deploy clone to origin/main and restarts the dashboard, but only
+# Hard-resets the deploy clone to origin/main and restarts the dashboard, but only
 # when main actually moved — so the phone picks up a merge to main without anyone
 # touching the Mac. Polled by the local.personal-dashboard-update launchd agent.
 #
