@@ -29,8 +29,12 @@ const knownQuota: ClaudeQuota = {
 };
 
 describe('retainKnownClaudeQuota', () => {
+  const beforeBothReset = Date.parse('2026-07-17T02:00:00.000Z');
+  const afterBothReset = Date.parse('2026-07-21T00:00:00.000Z');
+
   it('keeps the last quota report when Claude only returns run statistics at the cap', () => {
-    expect(retainKnownClaudeQuota({ fiveHourStatus: 'unknown', weeklyStatus: 'unknown' }, knownQuota)).toEqual(knownQuota);
+    expect(retainKnownClaudeQuota({ fiveHourStatus: 'unknown', weeklyStatus: 'unknown' }, knownQuota, beforeBothReset))
+      .toEqual(knownQuota);
   });
 
   it('uses a new explicit no-limits report instead of stale quota data', () => {
@@ -40,7 +44,29 @@ describe('retainKnownClaudeQuota', () => {
       asOf: '2026-07-17T01:00:00.000Z',
     };
 
-    expect(retainKnownClaudeQuota(unlimited, knownQuota)).toEqual(unlimited);
+    expect(retainKnownClaudeQuota(unlimited, knownQuota, beforeBothReset)).toEqual(unlimited);
+  });
+
+  it('drops a retained window once its own resetsAt has passed, instead of serving it forever', () => {
+    const live: ClaudeQuota = { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+
+    // Both knownQuota windows (fiveHour resets 07-17T05:00, weekly resets 07-20T05:00) are behind us.
+    expect(retainKnownClaudeQuota(live, knownQuota, afterBothReset)).toEqual(live);
+  });
+
+  it('drops only the expired window, keeping a still-current one from the same retained report', () => {
+    const live: ClaudeQuota = { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+    // Between the two resetsAt values: fiveHour (07-17T05:00) has passed, weekly (07-20T05:00) hasn't.
+    const between = Date.parse('2026-07-18T00:00:00.000Z');
+
+    expect(retainKnownClaudeQuota(live, knownQuota, between)).toEqual({
+      fiveHour: undefined,
+      weekly: knownQuota.weekly,
+      modelWeekly: undefined,
+      fiveHourStatus: 'unknown',
+      weeklyStatus: 'limited',
+      asOf: knownQuota.asOf,
+    });
   });
 });
 
