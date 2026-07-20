@@ -13,6 +13,7 @@ import type {
   SpotifyData,
   SteamData,
   TransitData,
+  UsageHistoryPoint,
   WeatherData,
   WidgetStatus,
 } from '@personal-dashboard/shared';
@@ -438,6 +439,27 @@ function aiResetCandidates(available: AiTool[]): Candidate[] {
   }];
 }
 
+/**
+ * One average `fiveHourUsedPercent` per calendar day (UTC), oldest first. History points are
+ * sampled every ~15 minutes (see `usageHistory.ts`), so slicing the raw array by `baselineWindowDays`
+ * would take the last few hours, not the last few days — bucketing first keeps the unit the caller
+ * actually asked for, matching how `githubCandidates` compares against trailing daily counts.
+ */
+function dailyFiveHourAverages(history: UsageHistoryPoint[]): number[] {
+  const byDay = new Map<string, { sum: number; count: number }>();
+  for (const point of history) {
+    if (point.fiveHourUsedPercent === undefined) continue;
+    const day = point.at.slice(0, 10);
+    const bucket = byDay.get(day) ?? { sum: 0, count: 0 };
+    bucket.sum += point.fiveHourUsedPercent;
+    bucket.count += 1;
+    byDay.set(day, bucket);
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, { sum, count }]) => sum / count);
+}
+
 function aiToolCandidates(
   tool: AiTool,
   baselineWindowDays: number,
@@ -450,10 +472,8 @@ function aiToolCandidates(
   // pace, so comparing it against trailing samples would flag every Friday as "anomalous."
   const currentFiveHour = data.fiveHour?.usedPercent;
   if (currentFiveHour === undefined) return candidates;
-  const priorFiveHour = data.history
-    .map((point) => point.fiveHourUsedPercent)
-    .filter((value): value is number => value !== undefined)
-    .slice(-baselineWindowDays);
+  // Excludes today's (partial, still-forming) bucket, mirroring githubCandidates' own trailing window.
+  const priorFiveHour = dailyFiveHourAverages(data.history).slice(-(baselineWindowDays + 1), -1);
   const deviation = computeDeviation(currentFiveHour, priorFiveHour, baselineDeviationPercent);
   if (deviation?.anomalous && deviation.direction === 'above') {
     candidates.push({
