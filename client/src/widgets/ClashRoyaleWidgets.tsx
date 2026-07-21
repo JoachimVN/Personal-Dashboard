@@ -1,6 +1,21 @@
 import type { ClashRoyaleBattle, ClashRoyaleData } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
+const TROPHY_ROAD_MAX = 14_000;
+const CARD_LEVEL_CAP = 16;
+const PATH_OF_LEGENDS_LEAGUES = [
+  'Challenger I', 'Challenger II', 'Challenger III', 'Master I', 'Master II',
+  'Master III', 'Champion', 'Grand Champion', 'Royal Champion', 'Ultimate Champion',
+] as const;
+
+type DeckSlotKind = 'evolution' | 'hero' | 'wild';
+
+interface DeckSlot {
+  kind: DeckSlotKind;
+  label: string;
+  card?: ClashRoyaleData['currentDeck'][number];
+}
+
 function formatNumber(value: number): string {
   return value.toLocaleString('en-GB');
 }
@@ -59,8 +74,8 @@ function Stat({ value, label, detail }: Readonly<{ value: string | number; label
 
 export function ClashRoyaleHero({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
   const { profile } = data;
-  const toBest = Math.max(profile.bestTrophies - profile.trophies, 0);
-  const bestProgress = profile.bestTrophies > 0 ? Math.min((profile.trophies / profile.bestTrophies) * 100, 100) : 0;
+  const toFinish = Math.max(TROPHY_ROAD_MAX - profile.trophies, 0);
+  const trophyRoadProgress = Math.min((profile.trophies / TROPHY_ROAD_MAX) * 100, 100);
 
   return (
     <section className={`clash-hero${compact ? ' clash-hero--compact' : ''}`}>
@@ -81,16 +96,38 @@ export function ClashRoyaleHero({ data, compact = false }: Readonly<{ data: Clas
       <div className="clash-trophy-panel">
         <p className="clash-trophy-label">Trophy road</p>
         <p className="clash-trophy-value">{formatNumber(profile.trophies)}</p>
-        <div className="clash-trophy-progress" aria-label={`${Math.round(bestProgress)} percent of personal best`}>
-          <span style={{ width: `${bestProgress}%` }} />
+        <div className="clash-trophy-progress" aria-label={`${Math.round(trophyRoadProgress)} percent of the 14,000-trophy Trophy Road`}>
+          <span style={{ width: `${trophyRoadProgress}%` }} />
         </div>
         <p className="clash-trophy-note">
-          {toBest === 0 ? 'At personal best' : `${formatNumber(toBest)} to personal best · ${formatNumber(profile.bestTrophies)}`}
+          {toFinish === 0 ? 'Trophy Road complete · 14,000 max' : `${formatNumber(toFinish)} to 14,000 max`}
         </p>
       </div>
       <div className="clash-level-badge" aria-label={`King level ${profile.expLevel}`}>
         <span>King</span>
         <strong>{profile.expLevel}</strong>
+      </div>
+    </section>
+  );
+}
+
+export function ClashRoyalePath({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
+  const path = data.profile.pathOfLegends;
+  if (!path) return null;
+  const leagueName = PATH_OF_LEGENDS_LEAGUES[path.leagueNumber - 1] ?? `League ${path.leagueNumber}`;
+  return (
+    <section className={`clash-path${compact ? ' clash-path--compact' : ''}`} aria-label="Path of Legends">
+      <div>
+        <p className="clash-eyebrow">Ranked</p>
+        <p className="clash-path-title">Path of Legends</p>
+      </div>
+      <div className="clash-path-league">
+        <span>League {path.leagueNumber}</span>
+        <strong>{leagueName}</strong>
+      </div>
+      <div className="clash-path-result">
+        <strong>{formatNumber(path.trophies)}</strong>
+        <span>{path.rank ? `#${formatNumber(path.rank)}` : 'current season'}</span>
       </div>
     </section>
   );
@@ -112,7 +149,18 @@ export function ClashRoyaleStats({ data }: Readonly<{ data: ClashRoyaleData }>) 
 }
 
 export function ClashRoyaleDeck({ data }: Readonly<{ data: ClashRoyaleData }>) {
-  if (data.currentDeck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;
+  const deck = [...data.currentDeck];
+  if (data.deckHero) deck.splice(Math.min(data.deckHeroIndex ?? deck.length, deck.length), 0, data.deckHero);
+  if (deck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;
+  // In the game deck builder, the first three cards are the Evolution, Hero, and Wild slots.
+  // The player endpoint omits the Hero, so the provider restores it at its battle-deck position.
+  const hasCompleteDeck = deck.length === 8;
+  const deckSlots: DeckSlot[] = [
+    { kind: 'evolution', label: 'Evolution slot', card: hasCompleteDeck ? deck[0] : undefined },
+    { kind: 'hero', label: 'Hero slot', card: hasCompleteDeck ? deck[1] : undefined },
+    { kind: 'wild', label: 'Wild slot', card: hasCompleteDeck ? deck[2] : undefined },
+  ];
+  const cardSlots = new Map(deckSlots.filter((slot): slot is DeckSlot & { card: ClashRoyaleData['currentDeck'][number] } => slot.card !== undefined).map((slot) => [slot.card.id, slot]));
   return (
     <div className="clash-deck">
       <div className="clash-deck-heading">
@@ -120,19 +168,36 @@ export function ClashRoyaleDeck({ data }: Readonly<{ data: ClashRoyaleData }>) {
           <p className="clash-eyebrow">Battle ready</p>
           <p className="clash-deck-title">Current deck</p>
         </div>
-        <span>{data.currentDeck.length} cards</span>
+        <span>{deck.length} cards{data.deckHero ? ' · Special slot included' : ''}</span>
       </div>
+      {data.towerTroop && <p className="clash-deck-meta">Tower Troop <strong>{data.towerTroop.name}</strong> · Level {displayCardLevel(data.towerTroop.level, data.towerTroop.maxLevel)}</p>}
+      <ol className="clash-deck-slots" aria-label="Special deck slots">
+        {deckSlots.map((slot) => (
+          <li key={slot.kind} data-slot={slot.kind}>
+            <span className="clash-deck-slot-label">{slot.label}</span>
+            {slot.card ? (
+              <span className="clash-deck-slot-card">
+                {slot.card.iconUrl && <img src={slot.card.iconUrl} alt="" loading="lazy" decoding="async" />}
+                <strong>{slot.card.name}</strong>
+              </span>
+            ) : <span className="clash-deck-slot-empty">Not reported</span>}
+          </li>
+        ))}
+      </ol>
       <ul className="clash-deck-grid">
-        {data.currentDeck.map((card) => {
-          const levelProgress = card.maxLevel > 0 ? Math.min((card.level / card.maxLevel) * 100, 100) : 0;
+        {deck.map((card) => {
+          const displayLevel = displayCardLevel(card.level, card.maxLevel);
+          const levelProgress = Math.min((displayLevel / CARD_LEVEL_CAP) * 100, 100);
+          const slot = cardSlots.get(card.id);
           return (
-            <li key={card.id} className="clash-card" title={`${card.name}, level ${card.level} of ${card.maxLevel}`}>
+            <li key={card.id} className="clash-card" data-slot={slot?.kind} title={`${card.name}, level ${displayLevel} of ${CARD_LEVEL_CAP}${slot ? `, ${slot.label}` : ''}`}>
               <div className="clash-card-art">
                 {card.iconUrl ? <img src={card.iconUrl} alt="" loading="lazy" decoding="async" /> : <span aria-hidden>{card.name.charAt(0)}</span>}
-                <span className="clash-card-level">{card.level}</span>
+                {slot && <span className="clash-card-slot">{slot.kind === 'evolution' ? 'Evo' : slot.kind === 'hero' ? 'Hero' : 'Wild'}</span>}
+                <span className="clash-card-level">{displayLevel}</span>
               </div>
               <p className="clash-card-name">{card.name}</p>
-              <div className="clash-card-progress" aria-label={`${card.name}: level ${card.level} of ${card.maxLevel}`}>
+              <div className="clash-card-progress" aria-label={`${card.name}: level ${displayLevel} of ${CARD_LEVEL_CAP}`}>
                 <span style={{ width: `${levelProgress}%` }} />
               </div>
             </li>
@@ -141,6 +206,10 @@ export function ClashRoyaleDeck({ data }: Readonly<{ data: ClashRoyaleData }>) {
       </ul>
     </div>
   );
+}
+
+function displayCardLevel(level: number, maxLevel: number): number {
+  return Math.min(level + Math.max(CARD_LEVEL_CAP - maxLevel, 0), CARD_LEVEL_CAP);
 }
 
 export function ClashRoyaleChests({ data }: Readonly<{ data: ClashRoyaleData }>) {

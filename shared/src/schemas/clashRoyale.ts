@@ -5,6 +5,8 @@ export const clashRoyaleCardSchema = z.object({
   name: z.string(),
   level: z.number(),
   maxLevel: z.number(),
+  /** Present when the player has unlocked an Evolution for this card. */
+  evolutionLevel: z.number().optional(),
   iconUrl: z.string().optional(),
 });
 
@@ -38,8 +40,19 @@ export const clashRoyaleSchema = z.object({
     clanName: z.string().optional(),
     clanTag: z.string().optional(),
     clanScore: z.number().optional(),
+    pathOfLegends: z.object({
+      leagueNumber: z.number(),
+      trophies: z.number(),
+      rank: z.number().nullable().optional(),
+    }).optional(),
   }),
   currentDeck: z.array(clashRoyaleCardSchema),
+  /** Heroes and Champions now occupy a special deck slot which is absent from currentDeck. */
+  deckHero: clashRoyaleCardSchema.optional(),
+  /** Original position of the recovered special-slot card in the eight-card battle deck. */
+  deckHeroIndex: z.number().int().nonnegative().optional(),
+  /** The selected Tower Troop is reported separately from the eight battle cards. */
+  towerTroop: clashRoyaleCardSchema.optional(),
   /** Next 10 chests in the player's chest cycle, oldest (next-opened) first. */
   upcomingChests: z.array(z.string()),
   recentBattles: z.array(clashRoyaleBattleSchema),

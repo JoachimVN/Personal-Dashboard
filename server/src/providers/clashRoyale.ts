@@ -14,6 +14,7 @@ interface RawCard {
   name: string;
   level: number;
   maxLevel: number;
+  evolutionLevel?: number;
   iconUrls?: { medium?: string };
 }
 
@@ -30,13 +31,17 @@ interface RawPlayer {
   arena?: { name: string };
   clan?: { tag: string; name: string; clanScore?: number };
   currentDeck?: RawCard[];
+  currentDeckSupportCards?: RawCard[];
+  currentPathOfLegendSeasonResult?: { leagueNumber: number; trophies: number; rank?: number | null };
 }
 
 interface RawBattleTeamMember {
+  tag?: string;
   crowns: number;
   name?: string;
   startingTrophies?: number;
   trophyChange?: number;
+  cards?: RawCard[];
 }
 
 interface RawBattle {
@@ -102,8 +107,28 @@ export function mapCard(card: RawCard): ClashRoyaleCard {
     name: card.name,
     level: card.level,
     maxLevel: card.maxLevel,
+    evolutionLevel: card.evolutionLevel,
     iconUrl: card.iconUrls?.medium,
   };
+}
+
+/**
+ * The player endpoint currently returns seven regular cards, omitting the active Hero/Champion
+ * special slot. A battle whose seven regular cards exactly match the player deck lets us recover
+ * that single missing card without confusing it with an older deck from a different mode.
+ */
+export function findDeckHero(playerTag: string, currentDeck: RawCard[], battles: RawBattle[]): { card: RawCard; index: number } | undefined {
+  if (currentDeck.length !== 7) return undefined;
+  const currentIds = new Set(currentDeck.map((card) => card.id));
+  for (const battle of battles) {
+    const member = battle.team.find((candidate) => candidate.tag === playerTag);
+    if (!member?.cards || member.cards.length !== 8) continue;
+    const missing = member.cards.filter((card) => !currentIds.has(card.id));
+    if (missing.length === 1 && currentDeck.every((card) => member.cards?.some((candidate) => candidate.id === card.id))) {
+      return { card: missing[0], index: member.cards.findIndex((card) => card.id === missing[0].id) };
+    }
+  }
+  return undefined;
 }
 
 export function battleResult(team: RawBattleTeamMember[], opponent: RawBattleTeamMember[]): 'win' | 'loss' | 'draw' {
@@ -149,6 +174,7 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
         'GetUpcomingChests',
       );
 
+      const deckHero = findDeckHero(player.tag, player.currentDeck ?? [], battleLog);
       const data: ClashRoyaleData = {
         profile: {
           tag: player.tag,
@@ -164,8 +190,12 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
           clanName: player.clan?.name,
           clanTag: player.clan?.tag,
           clanScore: player.clan?.clanScore,
+          pathOfLegends: player.currentPathOfLegendSeasonResult,
         },
         currentDeck: (player.currentDeck ?? []).map(mapCard),
+        deckHero: deckHero ? mapCard(deckHero.card) : undefined,
+        deckHeroIndex: deckHero?.index,
+        towerTroop: player.currentDeckSupportCards?.[0] ? mapCard(player.currentDeckSupportCards[0]) : undefined,
         upcomingChests: upcomingChests.items.map((item) => item.name),
         recentBattles: battleLog.slice(0, RECENT_BATTLES_COUNT).map(mapBattle),
       };

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { battleResult, createClashRoyaleProvider, mapBattle, mapCard, normalizeTag, toIsoTimestamp } from './clashRoyale.js';
+import { battleResult, createClashRoyaleProvider, findDeckHero, mapBattle, mapCard, normalizeTag, toIsoTimestamp } from './clashRoyale.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -36,17 +36,31 @@ describe('toIsoTimestamp', () => {
 
 describe('mapCard', () => {
   it('maps a raw card, carrying through the medium icon URL', () => {
-    expect(mapCard({ id: 1, name: 'Knight', level: 10, maxLevel: 14, iconUrls: { medium: 'https://x/knight.png' } })).toEqual({
+    expect(mapCard({ id: 1, name: 'Knight', level: 10, maxLevel: 14, evolutionLevel: 1, iconUrls: { medium: 'https://x/knight.png' } })).toEqual({
       id: 1,
       name: 'Knight',
       level: 10,
       maxLevel: 14,
+      evolutionLevel: 1,
       iconUrl: 'https://x/knight.png',
     });
   });
 
   it('leaves iconUrl undefined when no iconUrls are reported', () => {
     expect(mapCard({ id: 1, name: 'Knight', level: 10, maxLevel: 14 }).iconUrl).toBeUndefined();
+  });
+});
+
+describe('findDeckHero', () => {
+  it('recovers the one special-slot card from a battle matching all seven regular cards', () => {
+    const deck = Array.from({ length: 7 }, (_, index) => ({ id: index + 1, name: `Card ${index + 1}`, level: 14, maxLevel: 14 }));
+    const hero = { id: 99, name: 'Archer Queen', level: 6, maxLevel: 6 };
+    expect(findDeckHero('#PLAYER', deck, [{ battleTime: '20260721T120000.000Z', type: 'pathOfLegend', team: [{ tag: '#PLAYER', crowns: 1, cards: [deck[0], hero, ...deck.slice(1)] }], opponent: [{ crowns: 0 }] }])).toEqual({ card: hero, index: 1 });
+  });
+
+  it('does not take a card from a battle with a different regular deck', () => {
+    const deck = Array.from({ length: 7 }, (_, index) => ({ id: index + 1, name: `Card ${index + 1}`, level: 14, maxLevel: 14 }));
+    expect(findDeckHero('#PLAYER', deck, [{ battleTime: '20260721T120000.000Z', type: 'pathOfLegend', team: [{ tag: '#PLAYER', crowns: 1, cards: [{ ...deck[0], id: 77 }, ...deck.slice(1), { id: 99, name: 'Archer Queen', level: 6, maxLevel: 6 }] }], opponent: [{ crowns: 0 }] }])).toBeUndefined();
   });
 });
 
@@ -107,6 +121,8 @@ describe('createClashRoyaleProvider', () => {
           arena: { name: 'Legendary Arena' },
           clan: { tag: '#CLAN1', name: 'Synthetic Clan', clanScore: 1234 },
           currentDeck: [{ id: 1, name: 'Knight', level: 10, maxLevel: 14 }],
+          currentDeckSupportCards: [{ id: 101, name: 'Tower Princess', level: 16, maxLevel: 16 }],
+          currentPathOfLegendSeasonResult: { leagueNumber: 5, trophies: 0, rank: null },
         }),
       )
       .mockResolvedValueOnce(
@@ -125,6 +141,8 @@ describe('createClashRoyaleProvider', () => {
     }
     expect(data.profile.name).toBe('Player');
     expect(data.profile).toMatchObject({ clanName: 'Synthetic Clan', clanTag: '#CLAN1', clanScore: 1234 });
+    expect(data.profile.pathOfLegends).toEqual({ leagueNumber: 5, trophies: 0, rank: null });
+    expect(data.towerTroop?.name).toBe('Tower Princess');
     expect(data.upcomingChests).toEqual(['Silver Chest', 'Gold Chest']);
     expect(data.recentBattles).toHaveLength(1);
     fetchMock.mockRestore();

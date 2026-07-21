@@ -125,6 +125,15 @@
 .clash-hero--compact { padding: 1rem; }
 .clash-hero--compact .clash-hero-name { font-size: 1.25rem; }
 
+.clash-path { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 0.9rem 1.4rem; padding: 1rem 1.05rem; border: 1px solid color-mix(in oklab, var(--clash-blue) 28%, var(--color-card-border)); border-radius: 1rem; background: linear-gradient(115deg, color-mix(in oklab, var(--clash-blue) 11%, var(--color-card)), color-mix(in oklab, var(--color-accent-clash-royale) 7%, var(--color-card))); }
+.clash-path-title { margin: 0.28rem 0 0; color: var(--color-ink); font-size: 1rem; font-weight: 730; letter-spacing: -0.03em; }
+.clash-path-league, .clash-path-result { display: grid; gap: 0.16rem; text-align: right; }
+.clash-path-league span, .clash-path-result span { color: var(--color-ink-faint); font-size: 0.55rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.clash-path-league strong, .clash-path-result strong { color: var(--color-ink); font-size: 0.8rem; font-weight: 760; white-space: nowrap; }
+.clash-path-result { min-width: 4.2rem; padding-left: 0.9rem; border-left: 1px solid var(--color-card-border); }
+.clash-path-result strong { color: var(--color-accent-clash-royale); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.clash-path--compact { padding: 0.8rem 0.9rem; }
+
 .clash-stats-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -143,8 +152,23 @@
 .clash-deck-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 0.85rem; }
 .clash-deck-heading > span { color: var(--color-ink-faint); font-size: 0.65rem; font-variant-numeric: tabular-nums; }
 .clash-deck-title { margin: 0.28rem 0 0; color: var(--color-ink); font-size: 1rem; font-weight: 700; letter-spacing: -0.03em; }
+.clash-deck-meta { margin: -0.38rem 0 0.85rem; color: var(--color-ink-faint); font-size: 0.63rem; }
+.clash-deck-meta strong { color: var(--color-ink-muted); font-weight: 700; }
+.clash-deck-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin: 0 0 0.9rem; padding: 0; list-style: none; }
+.clash-deck-slots li { min-width: 0; padding: 0.42rem; border: 1px solid var(--color-card-border); border-radius: 0.62rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-deck-slots li[data-slot='evolution'] { border-color: color-mix(in oklab, #a55cff 48%, var(--color-card-border)); background: color-mix(in oklab, #8f4ee1 11%, var(--color-card)); }
+.clash-deck-slots li[data-slot='hero'] { border-color: color-mix(in oklab, var(--color-accent-clash-royale) 52%, var(--color-card-border)); background: color-mix(in oklab, var(--color-accent-clash-royale) 10%, var(--color-card)); }
+.clash-deck-slots li[data-slot='wild'] { border-color: color-mix(in oklab, var(--clash-blue) 49%, var(--color-card-border)); background: color-mix(in oklab, var(--clash-blue) 10%, var(--color-card)); }
+.clash-deck-slot-label { display: block; overflow: hidden; color: var(--color-ink-faint); font-size: 0.47rem; font-weight: 850; letter-spacing: 0.08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.clash-deck-slot-card { display: flex; align-items: center; gap: 0.32rem; min-width: 0; margin-top: 0.28rem; }
+.clash-deck-slot-card img { width: 1.25rem; height: 1.25rem; flex: 0 0 auto; border-radius: 0.32rem; object-fit: cover; }
+.clash-deck-slot-card strong, .clash-deck-slot-empty { overflow: hidden; color: var(--color-ink); font-size: 0.57rem; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+.clash-deck-slot-empty { display: block; margin-top: 0.34rem; color: var(--color-ink-faint); }
 .clash-deck-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
 .clash-card { min-width: 0; }
+.clash-card[data-slot='evolution'] .clash-card-art { border-color: color-mix(in oklab, #a55cff 60%, var(--color-card-border)); box-shadow: inset 0 0 0 1px rgb(181 106 255 / 0.2), 0 0.4rem 1rem rgb(156 76 255 / 0.11); }
+.clash-card[data-slot='hero'] .clash-card-art { border-color: color-mix(in oklab, var(--color-accent-clash-royale) 68%, var(--color-card-border)); box-shadow: inset 0 0 0 1px rgb(245 189 49 / 0.2), 0 0.4rem 1rem rgb(192 120 0 / 0.12); }
+.clash-card[data-slot='wild'] .clash-card-art { border-color: color-mix(in oklab, var(--clash-blue) 68%, var(--color-card-border)); box-shadow: inset 0 0 0 1px rgb(86 168 255 / 0.2), 0 0.4rem 1rem rgb(38 117 210 / 0.12); }
 .clash-card-art {
   position: relative;
   aspect-ratio: 0.84;
@@ -158,6 +182,10 @@
 .clash-card:hover .clash-card-art img { transform: scale(1.05); }
 .clash-card-art > span:first-child { display: grid; width: 100%; height: 100%; place-content: center; color: var(--color-ink); font-size: 1.2rem; font-weight: 800; }
 .clash-card-level { position: absolute; right: 0.3rem; bottom: 0.3rem; display: grid; min-width: 1.22rem; height: 1.22rem; place-content: center; padding: 0 0.18rem; border: 1px solid rgb(255 255 255 / 0.34); border-radius: 0.38rem; background: color-mix(in oklab, var(--clash-blue) 82%, #071a35); color: white; font-size: 0.6rem; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 0.14rem 0.45rem rgb(0 0 0 / 0.28); }
+.clash-card-slot { position: absolute; top: 0.3rem; left: 0.3rem; display: grid; min-height: 1.05rem; place-content: center; padding: 0 0.28rem; border: 1px solid rgb(255 255 255 / 0.24); border-radius: 0.32rem; color: white; font-size: 0.48rem; font-weight: 850; letter-spacing: 0.05em; line-height: 1; text-transform: uppercase; box-shadow: 0 0.12rem 0.36rem rgb(0 0 0 / 0.24); }
+.clash-card[data-slot='evolution'] .clash-card-slot { background: linear-gradient(135deg, #7b35d7, #b66cff); }
+.clash-card[data-slot='hero'] .clash-card-slot { background: linear-gradient(135deg, #a15c0a, #edbc48); }
+.clash-card[data-slot='wild'] .clash-card-slot { background: linear-gradient(135deg, #1f72c4, #61b6ff); }
 .clash-card-name { overflow: hidden; margin: 0.42rem 0 0; color: var(--color-ink-muted); font-size: 0.62rem; font-weight: 650; line-height: 1.1; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .clash-card-progress { height: 0.18rem; margin-top: 0.32rem; }
 
@@ -209,6 +237,8 @@
 .clash-trophy-change { min-width: 2.2rem; color: var(--color-ink-faint); font-size: 0.72rem; font-weight: 750; text-align: right; font-variant-numeric: tabular-nums; }
 
 @media (max-width: 480px) {
+  .clash-path { grid-template-columns: minmax(0, 1fr) auto; gap: 0.7rem; }
+  .clash-path-result { grid-column: 2; padding-left: 0; border-left: 0; }
   .clash-hero { gap: 1.2rem 0.75rem; padding: 1rem; }
   .clash-trophy-panel { min-width: 6.9rem; }
   .clash-trophy-value { font-size: 1.25rem; }
