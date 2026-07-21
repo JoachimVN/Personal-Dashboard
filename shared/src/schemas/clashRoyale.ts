@@ -35,6 +35,9 @@ export const clashRoyaleSchema = z.object({
     threeCrownWins: z.number(),
     battleCount: z.number(),
     arenaName: z.string(),
+    clanName: z.string().optional(),
+    clanTag: z.string().optional(),
+    clanScore: z.number().optional(),
   }),
   currentDeck: z.array(clashRoyaleCardSchema),
   /** Next 10 chests in the player's chest cycle, oldest (next-opened) first. */

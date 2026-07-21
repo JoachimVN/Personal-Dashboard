@@ -105,6 +105,7 @@ describe('createClashRoyaleProvider', () => {
           threeCrownWins: 20,
           battleCount: 150,
           arena: { name: 'Legendary Arena' },
+          clan: { tag: '#CLAN1', name: 'Synthetic Clan', clanScore: 1234 },
           currentDeck: [{ id: 1, name: 'Knight', level: 10, maxLevel: 14 }],
         }),
       )
@@ -123,6 +124,7 @@ describe('createClashRoyaleProvider', () => {
       expect(String(call[0])).toContain('%23ABC123');
     }
     expect(data.profile.name).toBe('Player');
+    expect(data.profile).toMatchObject({ clanName: 'Synthetic Clan', clanTag: '#CLAN1', clanScore: 1234 });
     expect(data.upcomingChests).toEqual(['Silver Chest', 'Gold Chest']);
     expect(data.recentBattles).toHaveLength(1);
     fetchMock.mockRestore();

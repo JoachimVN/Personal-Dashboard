@@ -28,6 +28,7 @@ interface RawPlayer {
   threeCrownWins: number;
   battleCount: number;
   arena?: { name: string };
+  clan?: { tag: string; name: string; clanScore?: number };
   currentDeck?: RawCard[];
 }
 
@@ -160,6 +161,9 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
           threeCrownWins: player.threeCrownWins,
           battleCount: player.battleCount,
           arenaName: player.arena?.name ?? 'Unknown arena',
+          clanName: player.clan?.name,
+          clanTag: player.clan?.tag,
+          clanScore: player.clan?.clanScore,
         },
         currentDeck: (player.currentDeck ?? []).map(mapCard),
         upcomingChests: upcomingChests.items.map((item) => item.name),

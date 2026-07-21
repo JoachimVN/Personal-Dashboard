@@ -1,46 +1,112 @@
-import type { ClashRoyaleData } from '@personal-dashboard/shared';
+import type { ClashRoyaleBattle, ClashRoyaleData } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
-const accent = 'var(--color-accent-clash-royale)';
+function formatNumber(value: number): string {
+  return value.toLocaleString('en-GB');
+}
 
-function Stat({ value, label }: Readonly<{ value: string | number; label: string }>) {
+function winRate(data: ClashRoyaleData): number {
+  const total = data.profile.wins + data.profile.losses;
+  return total === 0 ? 0 : Math.round((data.profile.wins / total) * 100);
+}
+
+function recentRecord(battles: ClashRoyaleBattle[]) {
+  return battles.reduce((record, battle) => {
+    if (battle.result === 'win') record.wins += 1;
+    else if (battle.result === 'loss') record.losses += 1;
+    else record.draws += 1;
+    record.trophies += battle.trophyChange ?? 0;
+    return record;
+  }, { wins: 0, losses: 0, draws: 0, trophies: 0 });
+}
+
+function currentStreak(battles: ClashRoyaleBattle[]): { result: ClashRoyaleBattle['result']; length: number } | undefined {
+  const latest = battles[0];
+  if (!latest) return undefined;
+  let length = 0;
+  for (const battle of battles) {
+    if (battle.result !== latest.result) break;
+    length += 1;
+  }
+  return { result: latest.result, length };
+}
+
+function formatBattleType(type: string): string {
+  return type
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll(/[_-]/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function Crown({ filled }: Readonly<{ filled: boolean }>) {
   return (
-    <div>
-      <p className="text-xl font-semibold tabular-nums tracking-[-0.03em]">{value}</p>
-      <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-ink-faint">{label}</p>
+    <svg viewBox="0 0 24 18" aria-hidden className="clash-crown">
+      <path d="M2 15.5h20l-1.1-8.9-5.4 4.3L12 2.5 8.5 10.9 3.1 6.6 2 15.5Z" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M4 17h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Stat({ value, label, detail }: Readonly<{ value: string | number; label: string; detail?: string }>) {
+  return (
+    <div className="clash-stat">
+      <p className="clash-stat-value">{value}</p>
+      <p className="clash-stat-label">{label}</p>
+      {detail && <p className="clash-stat-detail">{detail}</p>}
     </div>
   );
 }
 
-export function ClashRoyaleHero({ data }: Readonly<{ data: ClashRoyaleData }>) {
+export function ClashRoyaleHero({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
   const { profile } = data;
+  const toBest = Math.max(profile.bestTrophies - profile.trophies, 0);
+  const bestProgress = profile.bestTrophies > 0 ? Math.min((profile.trophies / profile.bestTrophies) * 100, 100) : 0;
+
   return (
-    <div className="flex items-center gap-4 rounded-xl bg-track/25 p-4">
-      <div
-        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-bold"
-        style={{ background: `color-mix(in oklab, ${accent} 22%, var(--color-track))`, color: accent }}
-      >
-        {profile.expLevel}
+    <section className={`clash-hero${compact ? ' clash-hero--compact' : ''}`}>
+      <div aria-hidden className="clash-hero-sunburst" />
+      <div className="clash-hero-copy">
+        <div className="clash-hero-kicker">
+          <Crown filled />
+          <span>{profile.arenaName}</span>
+        </div>
+        <h2 className="clash-hero-name">{profile.name}</h2>
+        <p className="clash-hero-tag">{profile.tag}</p>
+        {profile.clanName && (
+          <p className="clash-hero-clan">
+            <span aria-hidden>◆</span> {profile.clanName}{profile.clanScore !== undefined ? ` · ${formatNumber(profile.clanScore)}` : ''}
+          </p>
+        )}
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>{profile.arenaName}</p>
-        <p className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-ink">{profile.name}</p>
-        <p className="mt-1 text-xs tabular-nums text-ink-muted">
-          🏆 {profile.trophies.toLocaleString()} <span className="text-ink-faint">(best {profile.bestTrophies.toLocaleString()})</span>
+      <div className="clash-trophy-panel">
+        <p className="clash-trophy-label">Trophy road</p>
+        <p className="clash-trophy-value">{formatNumber(profile.trophies)}</p>
+        <div className="clash-trophy-progress" aria-label={`${Math.round(bestProgress)} percent of personal best`}>
+          <span style={{ width: `${bestProgress}%` }} />
+        </div>
+        <p className="clash-trophy-note">
+          {toBest === 0 ? 'At personal best' : `${formatNumber(toBest)} to personal best · ${formatNumber(profile.bestTrophies)}`}
         </p>
       </div>
-    </div>
+      <div className="clash-level-badge" aria-label={`King level ${profile.expLevel}`}>
+        <span>King</span>
+        <strong>{profile.expLevel}</strong>
+      </div>
+    </section>
   );
 }
 
 export function ClashRoyaleStats({ data }: Readonly<{ data: ClashRoyaleData }>) {
-  const { profile } = data;
-  const winRate = profile.wins + profile.losses > 0 ? Math.round((profile.wins / (profile.wins + profile.losses)) * 100) : 0;
+  const record = recentRecord(data.recentBattles);
   return (
-    <div className="grid grid-cols-3 gap-3">
-      <Stat value={`${winRate}%`} label="win rate" />
-      <Stat value={profile.wins} label="wins" />
-      <Stat value={profile.threeCrownWins} label="3-crown wins" />
+    <div className="clash-stats-grid">
+      <Stat value={`${winRate(data)}%`} label="career win rate" detail={`${formatNumber(data.profile.wins)} wins`} />
+      <Stat value={formatNumber(data.profile.threeCrownWins)} label="three crowns" detail={`${formatNumber(data.profile.battleCount)} battles`} />
+      <Stat
+        value={data.recentBattles.length === 0 ? '—' : `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ''}`}
+        label="last battles"
+        detail={record.trophies === 0 ? 'No trophy swing' : `${record.trophies > 0 ? '+' : ''}${record.trophies} trophies`}
+      />
     </div>
   );
 }
@@ -48,62 +114,113 @@ export function ClashRoyaleStats({ data }: Readonly<{ data: ClashRoyaleData }>) 
 export function ClashRoyaleDeck({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.currentDeck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;
   return (
-    <ul className="grid grid-cols-4 gap-2 sm:grid-cols-8">
-      {data.currentDeck.map((card) => (
-        <li key={card.id} className="overflow-hidden rounded-lg bg-track/25 text-center">
-          {card.iconUrl ? (
-            <img src={card.iconUrl} alt="" className="aspect-[3/4] w-full object-cover" loading="lazy" />
-          ) : (
-            <div className="aspect-[3/4] w-full bg-track" />
-          )}
-          <p className="truncate px-1 py-1 text-[10px] font-medium text-ink-muted">{card.level}/{card.maxLevel}</p>
-        </li>
-      ))}
-    </ul>
+    <div className="clash-deck">
+      <div className="clash-deck-heading">
+        <div>
+          <p className="clash-eyebrow">Battle ready</p>
+          <p className="clash-deck-title">Current deck</p>
+        </div>
+        <span>{data.currentDeck.length} cards</span>
+      </div>
+      <ul className="clash-deck-grid">
+        {data.currentDeck.map((card) => {
+          const levelProgress = card.maxLevel > 0 ? Math.min((card.level / card.maxLevel) * 100, 100) : 0;
+          return (
+            <li key={card.id} className="clash-card" title={`${card.name}, level ${card.level} of ${card.maxLevel}`}>
+              <div className="clash-card-art">
+                {card.iconUrl ? <img src={card.iconUrl} alt="" loading="lazy" decoding="async" /> : <span aria-hidden>{card.name.charAt(0)}</span>}
+                <span className="clash-card-level">{card.level}</span>
+              </div>
+              <p className="clash-card-name">{card.name}</p>
+              <div className="clash-card-progress" aria-label={`${card.name}: level ${card.level} of ${card.maxLevel}`}>
+                <span style={{ width: `${levelProgress}%` }} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }
 
 export function ClashRoyaleChests({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.upcomingChests.length === 0) return <p className="text-sm text-ink-faint">No upcoming chests reported.</p>;
+  const nextChest = data.upcomingChests[0];
   return (
-    <ol className="flex flex-wrap gap-2">
-      {data.upcomingChests.map((chest, i) => (
-        <li key={`${chest}-${i}`} className="rounded-full bg-track/25 px-3 py-1 text-xs font-medium text-ink-muted">
-          {chest}
-        </li>
-      ))}
-    </ol>
+    <div className="clash-chest-cycle">
+      <div className="clash-next-chest">
+        <div className="clash-chest-icon" aria-hidden>
+          <span />
+        </div>
+        <div>
+          <p className="clash-eyebrow">Next to unlock</p>
+          <p className="clash-next-chest-name">{nextChest}</p>
+          <p className="clash-next-chest-note">Win a battle to move the cycle forward.</p>
+        </div>
+      </div>
+      <ol className="clash-chest-queue" aria-label="Upcoming chest cycle">
+        {data.upcomingChests.slice(0, 10).map((chest, index) => (
+          <li key={`${chest}-${index}`} className={index === 0 ? 'is-next' : ''}>
+            <span className="clash-chest-position">{index === 0 ? 'Next' : `+${index}`}</span>
+            <span className="clash-chest-name">{chest}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleData }>) {
+  if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">Play a battle to start a fresh activity readout.</p>;
+  const record = recentRecord(data.recentBattles);
+  const streak = currentStreak(data.recentBattles);
+  const streakLabel = streak ? `${streak.length}${streak.result === 'win' ? 'W' : streak.result === 'loss' ? 'L' : 'D'} streak` : 'No streak yet';
+  return (
+    <div className="clash-battle-pulse">
+      <div className="clash-battle-pulse-record">
+        <p className="clash-eyebrow">Recent form</p>
+        <p><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
+      </div>
+      <div className="clash-battle-pulse-trend">
+        <span className={`clash-trend-value ${record.trophies > 0 ? 'is-up' : record.trophies < 0 ? 'is-down' : ''}`}>{record.trophies > 0 ? '+' : ''}{record.trophies}</span>
+        <span>{streakLabel}</span>
+      </div>
+      <ol className="clash-form-strip" aria-label="Results of recent battles">
+        {data.recentBattles.slice(0, 10).reverse().map((battle, index) => <li key={`${battle.battleTime}-${index}`} data-result={battle.result}>{battle.result.charAt(0).toUpperCase()}</li>)}
+      </ol>
+    </div>
   );
 }
 
 export function ClashRoyaleBattleLog({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">No recent battles.</p>;
   return (
-    <ul className="space-y-2 text-sm">
-      {data.recentBattles.map((battle, i) => (
-        <li key={`${battle.battleTime}-${i}`} className="flex items-center gap-3 rounded-xl bg-track/25 px-3 py-2">
-          <span
-            className="w-12 shrink-0 rounded-full px-2 py-0.5 text-center text-[10px] font-bold uppercase tracking-wide"
-            style={{
-              color: battle.result === 'win' ? 'light-dark(#0a7a3d, #4ade80)' : battle.result === 'loss' ? 'light-dark(#b91c1c, #fb7185)' : 'var(--color-ink-faint)',
-              background: battle.result === 'win' ? 'color-mix(in oklab, #22c55e 18%, transparent)' : battle.result === 'loss' ? 'color-mix(in oklab, #ef4444 18%, transparent)' : 'var(--color-track)',
-            }}
-          >
-            {battle.result}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-ink">{battle.opponentName ?? 'Unknown opponent'}</p>
-            <p className="truncate text-xs text-ink-faint">
-              {battle.crownsFor}–{battle.crownsAgainst} crowns · {battle.type} · {relativeTime(battle.battleTime)}
-            </p>
+    <ol className="clash-battle-log">
+      {data.recentBattles.map((battle, index) => (
+        <li key={`${battle.battleTime}-${index}`} className="clash-battle-row" data-result={battle.result}>
+          <div className="clash-result-mark" aria-label={battle.result}>
+            <span>{battle.result === 'win' ? 'W' : battle.result === 'loss' ? 'L' : 'D'}</span>
+          </div>
+          <div className="clash-battle-main">
+            <div className="clash-battle-title-row">
+              <p>{battle.opponentName ?? 'Unknown opponent'}</p>
+              <time dateTime={battle.battleTime}>{relativeTime(battle.battleTime)}</time>
+            </div>
+            <div className="clash-battle-meta">
+              <span>{formatBattleType(battle.type)}</span>
+              <span>{battle.result === 'win' ? 'Victory' : battle.result === 'loss' ? 'Defeat' : 'Draw'}</span>
+            </div>
+          </div>
+          <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
+            <div><span>{battle.crownsFor}</span><Crown filled={battle.crownsFor > 0} /></div>
+            <em>–</em>
+            <div><Crown filled={battle.crownsAgainst > 0} /><span>{battle.crownsAgainst}</span></div>
           </div>
           {battle.trophyChange !== undefined && (
-            <span className={`shrink-0 text-xs tabular-nums ${battle.trophyChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-              {battle.trophyChange >= 0 ? '+' : ''}{battle.trophyChange}
-            </span>
+            <span className={`clash-trophy-change ${battle.trophyChange > 0 ? 'is-up' : battle.trophyChange < 0 ? 'is-down' : ''}`}>{battle.trophyChange > 0 ? '+' : ''}{battle.trophyChange}</span>
           )}
         </li>
       ))}
-    </ul>
+    </ol>
   );
 }
