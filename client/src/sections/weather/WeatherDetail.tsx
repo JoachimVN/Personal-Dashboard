@@ -292,26 +292,6 @@ function nearestHourlyIndex(event: React.PointerEvent<Element>, hourCount: numbe
   return Math.min(hourCount - 1, Math.max(0, Math.floor(position * hourCount)));
 }
 
-/** A shared, deliberately compact label keeps the selected hour legible without making the
- * chart feel like a desktop-only tooltip. It is also useful on touch, where the readout below
- * remains visible after tapping the chart. */
-function HourlyHoverLabel({ index, hourCount, title, detail }: Readonly<{ index: number | null; hourCount: number; title: string; detail: string }>) {
-  if (index == null) return null;
-
-  const position = ((index + 0.5) / hourCount) * 100;
-  const alignment = position < 18 ? 'translateX(0)' : position > 82 ? 'translateX(-100%)' : 'translateX(-50%)';
-  return (
-    <div
-      aria-hidden
-      className="pointer-events-none absolute top-2 z-10 rounded-md border border-card-border bg-card/95 px-2 py-1 shadow-sm backdrop-blur-sm"
-      style={{ left: `${position}%`, transform: alignment }}
-    >
-      <p className="text-[10px] font-medium tabular-nums text-ink">{title}</p>
-      <p className="text-[9px] tabular-nums text-ink-muted">{detail}</p>
-    </div>
-  );
-}
-
 function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProps>) {
   const gradientId = `${useId().replaceAll(':', '')}-hourly`;
   if (hours.length < 2) return <p className="text-sm text-ink-faint">Hourly forecast is syncing.</p>;
@@ -323,17 +303,14 @@ function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProp
   const yAt = (t: number) => CHART_H - ((t - min) / (max - min)) * CHART_H;
   const line = temps.map((t, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(t)}`).join(' ');
 
-  const totalRain = Math.round(hours.reduce((sum, h) => sum + h.precipitationMm, 0) * 10) / 10;
   const peak = temps.indexOf(Math.max(...temps));
 
   const readNearest = (event: React.PointerEvent<Element>) => onActiveChange(nearestHourlyIndex(event, hours.length));
 
   let readout = `peak ${deg(temps[peak])} at ${hours[peak].hourLabel}:00`;
-  if (totalRain > 0) readout += ` · ${totalRain} mm rain expected`;
   if (active != null) {
     const hour = hours[active];
     readout = `${hour.hourLabel}:00 · ${symbolLabel(hour.symbol)} · ${deg(hour.temperature)}`;
-    if (hour.precipitationMm > 0) readout += ` · ${hour.precipitationMm} mm`;
   }
 
   return (
@@ -402,15 +379,9 @@ function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProp
             style={{ left: `${(xAt(active) / CHART_W) * 100}%` }}
           />
         )}
-        <HourlyHoverLabel
-          index={active}
-          hourCount={hours.length}
-          title={`${hours[active ?? 0].hourLabel}:00 · ${deg(hours[active ?? 0].temperature)}`}
-          detail={`${symbolLabel(hours[active ?? 0].symbol)}${hours[active ?? 0].precipitationMm > 0 ? ` · ${hours[active ?? 0].precipitationMm} mm` : ''}`}
-        />
       </div>
       <HourAxisLabels hours={hours} />
-      <HourlyReadout text={readout} unit={`°C${totalRain > 0 ? ' · mm' : ''}`} />
+      <HourlyReadout text={readout} unit="°C" />
     </div>
   );
 }
@@ -458,12 +429,6 @@ function HourlyRainChart({ hours, active, onActiveChange }: Readonly<HourlyChart
             style={{ left: `${((active + 0.5) / hours.length) * 100}%` }}
           />
         )}
-        <HourlyHoverLabel
-          index={active}
-          hourCount={hours.length}
-          title={`${hours[active ?? 0].hourLabel}:00 · ${hours[active ?? 0].precipitationMm.toFixed(1)} mm`}
-          detail={hours[active ?? 0].precipitationMm > 0 ? 'precipitation expected' : 'no precipitation expected'}
-        />
       </div>
       <HourAxisLabels hours={hours} />
       <HourlyReadout text={readout} unit="mm" />
@@ -514,8 +479,6 @@ function HourlyLineChart({
     const point = points.find((p) => p.i === active);
     if (point) readout = `${point.hour.hourLabel}:00 · ${format(point.value)}`;
   }
-  const activeValue = active == null ? undefined : valueOf(hours[active]);
-
   const readNearest = (event: React.PointerEvent<Element>) => onActiveChange(nearestHourlyIndex(event, hours.length));
 
   return (
@@ -571,12 +534,6 @@ function HourlyLineChart({
         {active != null && (
           <div aria-hidden className="pointer-events-none absolute inset-y-0 w-px bg-ink-faint/40" style={{ left: `${(xAt(active) / CHART_W) * 100}%` }} />
         )}
-        <HourlyHoverLabel
-          index={active}
-          hourCount={hours.length}
-          title={`${hours[active ?? 0].hourLabel}:00 · ${activeValue == null ? 'no data' : format(activeValue)}`}
-          detail={symbolLabel(hours[active ?? 0].symbol)}
-        />
       </div>
       <HourAxisLabels hours={hours} />
       <HourlyReadout text={readout} unit={unit} />
