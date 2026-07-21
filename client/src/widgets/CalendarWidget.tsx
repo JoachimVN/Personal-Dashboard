@@ -22,6 +22,30 @@ function NoteIcon() {
   );
 }
 
+function ChevronIcon({ direction }: Readonly<{ direction: 'left' | 'right' }>) {
+  return (
+    <svg aria-hidden viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+      <path
+        d={direction === 'left' ? 'M10 3.5 5.5 8l4.5 4.5' : 'M6 3.5 10.5 8 6 12.5'}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** How many months either side of the current one the server keeps cached. */
+const MAX_MONTH_OFFSET = 1;
+
+function monthReference(offset: number): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + offset, 1);
+}
+
+function firstOfMonthKey(offset: number): string {
+  return monthReference(offset).toLocaleDateString('en-CA');
+}
+
 function todayKey(): string {
   return new Date().toLocaleDateString('en-CA');
 }
@@ -69,6 +93,23 @@ function buildMonthGrid(reference: Date): GridDay[] {
     days.push({ key, day: cursor.getDate(), inMonth: cursor.getMonth() === month, isToday: key === today });
   }
   return days;
+}
+
+/** All date-grid buckets an event should appear under — every day it spans for multi-day all-day
+ *  events (DTEND is exclusive per iCal convention), just its start day otherwise. */
+function datesForEvent(event: CalendarEvent): string[] {
+  if (!event.allDay) return [event.date];
+  const startDay = event.start.slice(0, 10);
+  const endDay = event.end.slice(0, 10);
+  const dates: string[] = [];
+  for (
+    let cursor = new Date(`${startDay}T00:00:00Z`);
+    cursor.toISOString().slice(0, 10) < endDay;
+    cursor = new Date(cursor.getTime() + 86_400_000)
+  ) {
+    dates.push(cursor.toISOString().slice(0, 10));
+  }
+  return dates.length > 0 ? dates : [startDay];
 }
 
 /** One dot per distinct calendar represented that day, not one per event. */
@@ -144,28 +185,66 @@ function UpNext({ events }: Readonly<{ events: CalendarEvent[] }>) {
 export function CalendarWidget() {
   const { envelope, offline } = useWidget<CalendarData>('calendar');
   const [selectedDate, setSelectedDate] = useState<string>(todayKey);
+  const [monthOffset, setMonthOffset] = useState(0);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const event of envelope?.data?.events ?? []) {
-      const bucket = map.get(event.date);
-      if (bucket) bucket.push(event);
-      else map.set(event.date, [event]);
+      for (const dateKey of datesForEvent(event)) {
+        const bucket = map.get(dateKey);
+        if (bucket) bucket.push(event);
+        else map.set(dateKey, [event]);
+      }
     }
     return map;
   }, [envelope?.data]);
 
+  function goToMonth(offset: number) {
+    const clamped = Math.max(-MAX_MONTH_OFFSET, Math.min(MAX_MONTH_OFFSET, offset));
+    setMonthOffset(clamped);
+    setSelectedDate(clamped === 0 ? todayKey() : firstOfMonthKey(clamped));
+  }
+
   return (
     <WidgetCard title="Calendar" envelope={envelope} offline={offline}>
       {(data) => {
-        const grid = buildMonthGrid(new Date());
-        const monthLabel = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+        const grid = buildMonthGrid(monthReference(monthOffset));
+        const monthLabel = monthReference(monthOffset).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
         const selectedEvents = eventsByDate.get(selectedDate) ?? [];
 
         return (
           <div className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="text-sm font-semibold text-ink">{monthLabel}</p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => goToMonth(monthOffset - 1)}
+                  disabled={monthOffset <= -MAX_MONTH_OFFSET}
+                  aria-label="Previous month"
+                  className="rounded p-0.5 text-ink-faint transition hover:bg-track hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
+                >
+                  <ChevronIcon direction="left" />
+                </button>
+                <p className="text-sm font-semibold text-ink">{monthLabel}</p>
+                <button
+                  type="button"
+                  onClick={() => goToMonth(monthOffset + 1)}
+                  disabled={monthOffset >= MAX_MONTH_OFFSET}
+                  aria-label="Next month"
+                  className="rounded p-0.5 text-ink-faint transition hover:bg-track hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
+                >
+                  <ChevronIcon direction="right" />
+                </button>
+                {monthOffset !== 0 && (
+                  <button
+                    type="button"
+                    onClick={() => goToMonth(0)}
+                    className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint transition hover:text-ink"
+                  >
+                    Today
+                  </button>
+                )}
+              </div>
               <UpNext events={data.events} />
             </div>
 

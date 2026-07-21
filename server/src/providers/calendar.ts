@@ -3,13 +3,6 @@ import ical from 'node-ical';
 import { calendarSchema, type CalendarData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 
-/**
- * Extra days fetched past the visible grid purely so the client's "up next" indicator can still
- * see an event that falls just past the current month (e.g. the 1st, if the grid's trailing
- * padding is short) without waiting for the calendar to roll over.
- */
-const LOOKAHEAD_BUFFER_DAYS = 14;
-
 const MAX_EVENTS = 500;
 
 type CalendarEvent = CalendarData['events'][number];
@@ -172,21 +165,18 @@ function eventsForCalendarObject(
 }
 
 /**
- * The month-grid display range (current month plus leading/trailing days to fill whole weeks,
- * Monday-start) in the dashboard's timezone, expressed as UTC day boundaries — precise enough for
- * the CalDAV time-range query and the later instant comparisons, which already tolerate day-ish
- * slop via their own margins.
+ * The display range spanning the previous, current, and next month's grids (each Monday-start,
+ * padded to whole weeks) in the dashboard's timezone, expressed as UTC day boundaries — wide
+ * enough that the client can page a month either way from cached data, with no per-request fetch.
  */
 function monthGridRange(now: Date, dateFmt: DateFormatter): { start: Date; end: Date } {
   const [year, month] = dateFmt.format(now).split('-').map(Number);
-  const monthStart = new Date(Date.UTC(year, month - 1, 1));
-  const monthEnd = new Date(Date.UTC(year, month, 0));
-  const leadingDays = (monthStart.getUTCDay() + 6) % 7;
-  const trailingDays = 6 - ((monthEnd.getUTCDay() + 6) % 7);
-  const start = new Date(monthStart.getTime() - leadingDays * 86_400_000);
-  const end = new Date(
-    monthEnd.getTime() + (trailingDays + 1 + LOOKAHEAD_BUFFER_DAYS) * 86_400_000,
-  );
+  const prevMonthStart = new Date(Date.UTC(year, month - 2, 1));
+  const nextMonthEnd = new Date(Date.UTC(year, month + 1, 0));
+  const leadingDays = (prevMonthStart.getUTCDay() + 6) % 7;
+  const trailingDays = 6 - ((nextMonthEnd.getUTCDay() + 6) % 7);
+  const start = new Date(prevMonthStart.getTime() - leadingDays * 86_400_000);
+  const end = new Date(nextMonthEnd.getTime() + (trailingDays + 1) * 86_400_000);
   return { start, end };
 }
 
