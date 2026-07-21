@@ -8,6 +8,10 @@ export const clashRoyaleCardSchema = z.object({
   /** Present when the player has unlocked an Evolution for this card. */
   evolutionLevel: z.number().optional(),
   iconUrl: z.string().optional(),
+  /** common / rare / epic / legendary / champion, lower-cased. Drives the rarity-colored card
+   * frame; absent (rather than validated against a fixed enum) so a new rarity Supercell ships
+   * doesn't fail schema validation — it just falls back to the default frame color client-side. */
+  rarity: z.string().optional(),
 });
 
 export type ClashRoyaleCard = z.infer<typeof clashRoyaleCardSchema>;

@@ -2,19 +2,10 @@ import type { ClashRoyaleBattle, ClashRoyaleData } from '@personal-dashboard/sha
 import { relativeTime } from '../lib/time';
 
 const TROPHY_ROAD_MAX = 14_000;
-const CARD_LEVEL_CAP = 16;
 const PATH_OF_LEGENDS_LEAGUES = [
   'Challenger I', 'Challenger II', 'Challenger III', 'Master I', 'Master II',
   'Master III', 'Champion', 'Grand Champion', 'Royal Champion', 'Ultimate Champion',
 ] as const;
-
-type DeckSlotKind = 'evolution' | 'hero' | 'wild';
-
-interface DeckSlot {
-  kind: DeckSlotKind;
-  label: string;
-  card?: ClashRoyaleData['currentDeck'][number];
-}
 
 function formatNumber(value: number): string {
   return value.toLocaleString('en-GB');
@@ -152,64 +143,15 @@ export function ClashRoyaleDeck({ data }: Readonly<{ data: ClashRoyaleData }>) {
   const deck = [...data.currentDeck];
   if (data.deckHero) deck.splice(Math.min(data.deckHeroIndex ?? deck.length, deck.length), 0, data.deckHero);
   if (deck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;
-  // In the game deck builder, the first three cards are the Evolution, Hero, and Wild slots.
-  // The player endpoint omits the Hero, so the provider restores it at its battle-deck position.
-  const hasCompleteDeck = deck.length === 8;
-  const deckSlots: DeckSlot[] = [
-    { kind: 'evolution', label: 'Evolution slot', card: hasCompleteDeck ? deck[0] : undefined },
-    { kind: 'hero', label: 'Hero slot', card: hasCompleteDeck ? deck[1] : undefined },
-    { kind: 'wild', label: 'Wild slot', card: hasCompleteDeck ? deck[2] : undefined },
-  ];
-  const cardSlots = new Map(deckSlots.filter((slot): slot is DeckSlot & { card: ClashRoyaleData['currentDeck'][number] } => slot.card !== undefined).map((slot) => [slot.card.id, slot]));
   return (
-    <div className="clash-deck">
-      <div className="clash-deck-heading">
-        <div>
-          <p className="clash-eyebrow">Battle ready</p>
-          <p className="clash-deck-title">Current deck</p>
-        </div>
-        <span>{deck.length} cards{data.deckHero ? ' · Special slot included' : ''}</span>
-      </div>
-      {data.towerTroop && <p className="clash-deck-meta">Tower Troop <strong>{data.towerTroop.name}</strong> · Level {displayCardLevel(data.towerTroop.level, data.towerTroop.maxLevel)}</p>}
-      <ol className="clash-deck-slots" aria-label="Special deck slots">
-        {deckSlots.map((slot) => (
-          <li key={slot.kind} data-slot={slot.kind}>
-            <span className="clash-deck-slot-label">{slot.label}</span>
-            {slot.card ? (
-              <span className="clash-deck-slot-card">
-                {slot.card.iconUrl && <img src={slot.card.iconUrl} alt="" loading="lazy" decoding="async" />}
-                <strong>{slot.card.name}</strong>
-              </span>
-            ) : <span className="clash-deck-slot-empty">Not reported</span>}
-          </li>
-        ))}
-      </ol>
-      <ul className="clash-deck-grid">
-        {deck.map((card) => {
-          const displayLevel = displayCardLevel(card.level, card.maxLevel);
-          const levelProgress = Math.min((displayLevel / CARD_LEVEL_CAP) * 100, 100);
-          const slot = cardSlots.get(card.id);
-          return (
-            <li key={card.id} className="clash-card" data-slot={slot?.kind} title={`${card.name}, level ${displayLevel} of ${CARD_LEVEL_CAP}${slot ? `, ${slot.label}` : ''}`}>
-              <div className="clash-card-art">
-                {card.iconUrl ? <img src={card.iconUrl} alt="" loading="lazy" decoding="async" /> : <span aria-hidden>{card.name.charAt(0)}</span>}
-                {slot && <span className="clash-card-slot">{slot.kind === 'evolution' ? 'Evo' : slot.kind === 'hero' ? 'Hero' : 'Wild'}</span>}
-                <span className="clash-card-level">{displayLevel}</span>
-              </div>
-              <p className="clash-card-name">{card.name}</p>
-              <div className="clash-card-progress" aria-label={`${card.name}: level ${displayLevel} of ${CARD_LEVEL_CAP}`}>
-                <span style={{ width: `${levelProgress}%` }} />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <ul className="clash-deck-grid">
+      {deck.map((card) => (
+        <li key={card.id} className="clash-card">
+          {card.iconUrl ? <img src={card.iconUrl} alt={card.name} loading="lazy" decoding="async" /> : <span aria-hidden>{card.name.charAt(0)}</span>}
+        </li>
+      ))}
+    </ul>
   );
-}
-
-function displayCardLevel(level: number, maxLevel: number): number {
-  return Math.min(level + Math.max(CARD_LEVEL_CAP - maxLevel, 0), CARD_LEVEL_CAP);
 }
 
 export function ClashRoyaleChests({ data }: Readonly<{ data: ClashRoyaleData }>) {

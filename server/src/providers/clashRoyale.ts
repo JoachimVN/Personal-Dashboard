@@ -15,7 +15,15 @@ interface RawCard {
   level: number;
   maxLevel: number;
   evolutionLevel?: number;
+  rarity?: string;
   iconUrls?: { medium?: string };
+}
+
+/** Entry from the static `/cards` reference endpoint — the per-player deck/battle payloads don't
+ * carry rarity, so it's looked up by card id from this separate, non-personal reference list. */
+interface RawCardReference {
+  id: number;
+  rarity: string;
 }
 
 interface RawPlayer {
@@ -101,7 +109,7 @@ export async function logClashRoyalePublicIp(): Promise<void> {
   }
 }
 
-export function mapCard(card: RawCard): ClashRoyaleCard {
+export function mapCard(card: RawCard, rarityById: Map<number, string> = new Map()): ClashRoyaleCard {
   return {
     id: card.id,
     name: card.name,
@@ -109,6 +117,7 @@ export function mapCard(card: RawCard): ClashRoyaleCard {
     maxLevel: card.maxLevel,
     evolutionLevel: card.evolutionLevel,
     iconUrl: card.iconUrls?.medium,
+    rarity: (card.rarity ?? rarityById.get(card.id))?.toLowerCase(),
   };
 }
 
@@ -173,6 +182,12 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
         `/players/${encodedTag}/upcomingchests`,
         'GetUpcomingChests',
       );
+      // Rarity is decorative (drives the card frame color) and isn't in the per-player payload;
+      // fall back to an empty map on failure rather than losing the whole widget over it.
+      const cardReference = await crRequest<{ items: RawCardReference[] }>(signal, auth.apiKey, '/cards', 'GetCards').catch(
+        () => ({ items: [] as RawCardReference[] }),
+      );
+      const rarityById = new Map(cardReference.items.map((card) => [card.id, card.rarity]));
 
       const deckHero = findDeckHero(player.tag, player.currentDeck ?? [], battleLog);
       const data: ClashRoyaleData = {
@@ -192,10 +207,10 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
           clanScore: player.clan?.clanScore,
           pathOfLegends: player.currentPathOfLegendSeasonResult,
         },
-        currentDeck: (player.currentDeck ?? []).map(mapCard),
-        deckHero: deckHero ? mapCard(deckHero.card) : undefined,
+        currentDeck: (player.currentDeck ?? []).map((card) => mapCard(card, rarityById)),
+        deckHero: deckHero ? mapCard(deckHero.card, rarityById) : undefined,
         deckHeroIndex: deckHero?.index,
-        towerTroop: player.currentDeckSupportCards?.[0] ? mapCard(player.currentDeckSupportCards[0]) : undefined,
+        towerTroop: player.currentDeckSupportCards?.[0] ? mapCard(player.currentDeckSupportCards[0], rarityById) : undefined,
         upcomingChests: upcomingChests.items.map((item) => item.name),
         recentBattles: battleLog.slice(0, RECENT_BATTLES_COUNT).map(mapBattle),
       };

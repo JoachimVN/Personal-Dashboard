@@ -49,6 +49,14 @@ describe('mapCard', () => {
   it('leaves iconUrl undefined when no iconUrls are reported', () => {
     expect(mapCard({ id: 1, name: 'Knight', level: 10, maxLevel: 14 }).iconUrl).toBeUndefined();
   });
+
+  it('lower-cases rarity carried directly on the card', () => {
+    expect(mapCard({ id: 1, name: 'Knight', level: 10, maxLevel: 14, rarity: 'Rare' }).rarity).toBe('rare');
+  });
+
+  it('falls back to the rarity reference map by card id', () => {
+    expect(mapCard({ id: 1, name: 'Knight', level: 10, maxLevel: 14 }, new Map([[1, 'Legendary']])).rarity).toBe('legendary');
+  });
 });
 
 describe('findDeckHero', () => {
@@ -130,13 +138,14 @@ describe('createClashRoyaleProvider', () => {
           { battleTime: '20260721T120000.000Z', type: 'PvP', team: [{ crowns: 1 }], opponent: [{ crowns: 0 }] },
         ]),
       )
-      .mockResolvedValueOnce(jsonResponse({ items: [{ name: 'Silver Chest' }, { name: 'Gold Chest' }] }));
+      .mockResolvedValueOnce(jsonResponse({ items: [{ name: 'Silver Chest' }, { name: 'Gold Chest' }] }))
+      .mockResolvedValueOnce(jsonResponse({ items: [{ id: 1, rarity: 'Common' }] }));
 
     const provider = createClashRoyaleProvider({ apiKey: 'key', playerTag: 'abc123' });
     const data = await provider.fetch(new AbortController().signal, false);
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    for (const call of fetchMock.mock.calls) {
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    for (const call of fetchMock.mock.calls.slice(0, 3)) {
       expect(String(call[0])).toContain('%23ABC123');
     }
     expect(data.profile.name).toBe('Player');
@@ -145,6 +154,35 @@ describe('createClashRoyaleProvider', () => {
     expect(data.towerTroop?.name).toBe('Tower Princess');
     expect(data.upcomingChests).toEqual(['Silver Chest', 'Gold Chest']);
     expect(data.recentBattles).toHaveLength(1);
+    expect(data.currentDeck[0]).toMatchObject({ rarity: 'common' });
+    fetchMock.mockRestore();
+  });
+
+  it('still returns data if the card rarity reference lookup fails', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        jsonResponse({
+          tag: '#ABC123',
+          name: 'Player',
+          expLevel: 12,
+          trophies: 5000,
+          bestTrophies: 5200,
+          wins: 100,
+          losses: 50,
+          threeCrownWins: 20,
+          battleCount: 150,
+          currentDeck: [{ id: 1, name: 'Knight', level: 10, maxLevel: 14 }],
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse({ items: [] }))
+      .mockResolvedValueOnce(jsonResponse({}, 500));
+
+    const provider = createClashRoyaleProvider({ apiKey: 'key', playerTag: 'abc123' });
+    const data = await provider.fetch(new AbortController().signal, false);
+
+    expect(data.currentDeck[0].rarity).toBeUndefined();
     fetchMock.mockRestore();
   });
 });
