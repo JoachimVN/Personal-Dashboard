@@ -6,6 +6,7 @@ import { enturReverseGeocode } from './entur.js';
 // Free, no-key day-ahead spot prices per Norwegian bidding area. Their API terms only ask for
 // attribution, which the client widget renders ("Strømpriser levert av Hva koster strømmen.no").
 const API_BASE = 'https://www.hvakosterstrommen.no/api/v1/prices';
+const TRANSIENT_RETRY_DELAY_MS = 500;
 
 const priceDaySchema = z.array(
   z.object({
@@ -100,7 +101,23 @@ export function createPowerProvider(
   }
 
   async function fetchDay(date: Date, area: PowerArea, signal: AbortSignal): Promise<PowerHour[] | undefined> {
-    const res = await fetch(`${API_BASE}/${priceDayPath(date, dateFmt, area)}`, { signal });
+    const url = `${API_BASE}/${priceDayPath(date, dateFmt, area)}`;
+    let res: Response;
+    try {
+      res = await fetch(url, { signal });
+    } catch (error) {
+      // This free endpoint sits behind Cloudflare. A short retry absorbs occasional connection
+      // timeouts without treating the day's already-published prices as permanently unavailable.
+      if (signal.aborted || !(error instanceof TypeError)) throw error;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS);
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(signal.reason);
+        }, { once: true });
+      });
+      res = await fetch(url, { signal });
+    }
     // Tomorrow's prices 404 until Nord Pool publishes them (~13:00) — absent, not broken.
     if (res.status === 404) return undefined;
     if (!res.ok) throw new Error(`hvakosterstrommen responded ${res.status}`);
@@ -112,7 +129,8 @@ export function createPowerProvider(
     schema: powerDataSchema,
     // Prices change once a day; the point of polling is catching tomorrow's ~13:00 publication promptly.
     refreshMs: 20 * 60_000,
-    timeoutMs: 10_000,
+    // Allow one retry after Undici's 10-second connect timeout.
+    timeoutMs: 25_000,
     isConfigured: () => configuredArea !== undefined || coords !== undefined,
     setCoords(next) {
       coords = next;
