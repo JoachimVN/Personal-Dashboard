@@ -1,5 +1,5 @@
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import type {
   CalendarData,
   CommandCenterData,
@@ -17,7 +17,7 @@ import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { Thumb } from '../widgets/SpotifyWidget';
 import { GitHubMark } from './GitHubMark';
-import { AiToolMark, heroExtraFor, SecondaryContent } from './command-center/SecondaryContent';
+import { AiToolMark, heroExtraFor, SecondaryContent, useRobloxArtPalette } from './command-center/SecondaryContent';
 import { useCommandCenterData } from './command-center/useCommandCenterData';
 import '../sections/spotify/spotify.css';
 
@@ -73,15 +73,17 @@ function CommandPanel({
   className,
   children,
   fullCardLink = false,
+  style,
 }: Readonly<{
   href: string;
   label: string;
   className: string;
   children: ReactNode;
   fullCardLink?: boolean;
+  style?: CSSProperties;
 }>) {
   return (
-    <div className={`${className} cursor-pointer${fullCardLink ? ' command-panel--full-link' : ''}`}>
+    <div className={`${className} cursor-pointer${fullCardLink ? ' command-panel--full-link' : ''}`} style={style}>
       <a href={href} aria-label={label} className="command-panel-stretched-link" />
       {children}
     </div>
@@ -343,17 +345,24 @@ export function DailyCommandCenter() {
   const { commandCenter, calendar, weather, github, health, gmail, aiUsage, spotify, spotifyFetchedAt, steam, roblox } = useCommandCenterData();
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
   const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
+  // A running server may be refreshed separately from the Vite client during local development.
+  // Keep the overview usable while the server still returns the pre-carousel single-slot payload.
+  const secondarySlots = commandCenter
+    ? (Array.isArray(commandCenter.secondary)
+      ? commandCenter.secondary
+      : [commandCenter.secondary as unknown as CommandCenterSlot])
+    : [];
+  const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
+  const isRobloxSecondary = activeSecondary?.render.type === 'roblox-now-playing';
+  const robloxArtPalette = useRobloxArtPalette(isRobloxSecondary && roblox?.presence?.status === 'in-game' ? roblox.presence.iconUrl : undefined);
+  const robloxArtStyle = robloxArtPalette ? {
+    '--roblox-art-primary': robloxArtPalette[0].join(' '),
+    '--roblox-art-secondary': robloxArtPalette[1].join(' '),
+  } as CSSProperties : undefined;
 
   if (!commandCenter) return <CommandCenterSkeleton />;
 
   const ranked = commandCenter;
-  // A running server may be refreshed separately from the Vite client during local development.
-  // Keep the overview usable while the server still returns the pre-carousel single-slot payload.
-  const secondarySlots = Array.isArray(ranked.secondary)
-    ? ranked.secondary
-    : [ranked.secondary as unknown as CommandCenterSlot];
-  const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
-  const isRobloxSecondary = activeSecondary?.render.type === 'roblox-now-playing';
   const heroRender = ranked.hero.render;
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
@@ -383,6 +392,7 @@ export function DailyCommandCenter() {
         label={`Open ${activeSecondary.kicker}: ${activeSecondary.title}`}
         className={`command-agenda command-panel--${toneFor(activeSecondary)}${isRobloxSecondary ? ' command-agenda--roblox' : ''}`}
         fullCardLink
+        style={robloxArtStyle}
       >
         <SecondaryCarousel
           items={secondarySlots}
