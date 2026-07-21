@@ -386,20 +386,26 @@ export type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'modelWeek
  * indefinitely, since nothing else ever re-validates it.
  */
 export function retainKnownClaudeQuota(live: ClaudeQuota, previous?: ClaudeQuota, now = Date.now()): ClaudeQuota {
-  if (live.asOf || !previous) return live;
+  if (!previous) return live;
   const stillCurrent = <T extends { resetsAt: string }>(window: T | undefined) =>
     window && Date.parse(window.resetsAt) > now ? window : undefined;
-  const fiveHour = stillCurrent(previous.fiveHour);
-  const weekly = stillCurrent(previous.weekly);
-  const modelWeekly = stillCurrent(previous.modelWeekly);
-  if (!fiveHour && !weekly && !modelWeekly) return live;
+
+  // Backfill per window, not per report: a live read can genuinely capture one window (e.g. the
+  // 5-hour block) while missing another (e.g. weekly didn't render in time), and that partial read
+  // still stamps `asOf`. Gating backfill on "the whole report has no asOf" would let a real 5-hour
+  // reading silently blow away a still-valid weekly one merely because weekly didn't parse this tick.
+  const retainedFiveHour = live.fiveHourStatus === 'unknown' ? stillCurrent(previous.fiveHour) : undefined;
+  const retainedWeekly = live.weeklyStatus === 'unknown' ? stillCurrent(previous.weekly) : undefined;
+  const retainedModelWeekly = live.weeklyStatus === 'unknown' ? stillCurrent(previous.modelWeekly) : undefined;
+  if (!retainedFiveHour && !retainedWeekly && !retainedModelWeekly) return live;
+
   return {
-    fiveHour,
-    weekly,
-    modelWeekly,
-    fiveHourStatus: fiveHour ? previous.fiveHourStatus : live.fiveHourStatus,
-    weeklyStatus: weekly ? previous.weeklyStatus : live.weeklyStatus,
-    asOf: previous.asOf,
+    fiveHour: retainedFiveHour ?? live.fiveHour,
+    weekly: retainedWeekly ?? live.weekly,
+    modelWeekly: retainedModelWeekly ?? live.modelWeekly,
+    fiveHourStatus: retainedFiveHour ? previous.fiveHourStatus : live.fiveHourStatus,
+    weeklyStatus: retainedWeekly ? previous.weeklyStatus : live.weeklyStatus,
+    asOf: live.asOf ?? previous.asOf,
   };
 }
 
@@ -492,10 +498,10 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
   const text = latestScreen(stripTerminalControls(screen));
   // Terminal cursor updates can erase visual spaces from the captured stream, so accept both
   // the readable UI labels and their compact `Currentsession` / `Currentweek(allmodels)` form.
-  const session = new RegExp(String.raw`Current${WS}session([\s\S]*?)(?=${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}|$)`, 'i').exec(text)?.[1] ?? '';
-  const weekly = new RegExp(String.raw`${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}([\s\S]*)`, 'i').exec(text)?.[1] ?? '';
-  const fiveHour = parseUsageWindow(session, now);
-  const week = parseUsageWindow(weekly, now);
+  const sessionMatch = new RegExp(String.raw`Current${WS}session([\s\S]*?)(?=${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}|$)`, 'i').exec(text);
+  const weeklyMatch = new RegExp(String.raw`${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}([\s\S]*)`, 'i').exec(text);
+  const fiveHour = parseUsageWindow(sessionMatch?.[1] ?? '', now);
+  const week = parseUsageWindow(weeklyMatch?.[1] ?? '', now);
   const modelMatch = new RegExp(
     String.raw`${CURRENT_WEEK}${WS}(?!${ALL_MODELS_CLOSE})([^)]+)\)([\s\S]*?)(?=${CURRENT_WEEK}|What's${WS}contributing|$)`,
     'i',
@@ -510,8 +516,13 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
     fiveHour,
     weekly: week,
     modelWeekly,
-    fiveHourStatus: limitStatus(Boolean(fiveHour), hasQuotaReport),
-    weeklyStatus: limitStatus(Boolean(week), hasQuotaReport),
+    // Status is per-window, not per-report: whether *that window's own header* rendered at all,
+    // not whether some other window (e.g. session) happened to parse. Otherwise a 5-hour reading
+    // that lands fine would mark a weekly window that simply failed to capture this tick as an
+    // explicit "unlimited" instead of "unknown" — see retainKnownClaudeQuota, which relies on this
+    // distinction to know when it's safe to backfill from the last known-good weekly reading.
+    fiveHourStatus: limitStatus(Boolean(fiveHour), Boolean(sessionMatch)),
+    weeklyStatus: limitStatus(Boolean(week), Boolean(weeklyMatch)),
     asOf,
   };
 }
