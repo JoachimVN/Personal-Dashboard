@@ -96,20 +96,21 @@ function buildMonthGrid(reference: Date): GridDay[] {
 }
 
 /** All date-grid buckets an event should appear under — every day it spans for multi-day all-day
- *  events (DTEND is exclusive per iCal convention), just its start day otherwise. */
+ *  events (DTEND is exclusive per iCal convention), just its start day otherwise. Reads dates back
+ *  through the local calendar (like `event.date` already does), not raw UTC — an all-day event's
+ *  instant isn't necessarily UTC midnight, so slicing the ISO string can land on the wrong day. */
 function datesForEvent(event: CalendarEvent): string[] {
   if (!event.allDay) return [event.date];
-  const startDay = event.start.slice(0, 10);
-  const endDay = event.end.slice(0, 10);
+  const endDay = new Date(event.end).toLocaleDateString('en-CA');
   const dates: string[] = [];
   for (
-    let cursor = new Date(`${startDay}T00:00:00Z`);
-    cursor.toISOString().slice(0, 10) < endDay;
-    cursor = new Date(cursor.getTime() + 86_400_000)
+    const cursor = new Date(`${event.date}T12:00:00`);
+    cursor.toLocaleDateString('en-CA') < endDay;
+    cursor.setDate(cursor.getDate() + 1)
   ) {
-    dates.push(cursor.toISOString().slice(0, 10));
+    dates.push(cursor.toLocaleDateString('en-CA'));
   }
-  return dates.length > 0 ? dates : [startDay];
+  return dates.length > 0 ? dates : [event.date];
 }
 
 /** One dot per distinct calendar represented that day, not one per event. */

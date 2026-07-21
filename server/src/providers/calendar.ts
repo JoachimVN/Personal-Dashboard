@@ -129,9 +129,11 @@ function eventFromOccurrence(
     description: text(event.description).trim() || undefined,
     start: start.toISOString(),
     end: end.toISOString(),
-    // All-day DTSTARTs are date-only (midnight UTC) — read the date
-    // straight off them instead of shifting through the timezone.
-    date: allDay ? start.toISOString().slice(0, 10) : dateFmt.format(start),
+    // node-ical parses date-only (VALUE=DATE) fields as local midnight in the server's OS
+    // timezone, not UTC midnight, so its instant must be read back through the dashboard
+    // timezone formatter rather than sliced off the raw ISO string (which silently lands on
+    // the previous day whenever the OS timezone is ahead of UTC).
+    date: dateFmt.format(start),
     startLabel: allDay ? 'all day' : timeFmt.format(start),
     endLabel: allDay ? '' : timeFmt.format(end),
   };
