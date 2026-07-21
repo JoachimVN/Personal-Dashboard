@@ -1,8 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { CalendarData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 import { mapsSearchHref } from '../lib/maps';
+
+type CalendarEvent = CalendarData['events'][number];
 
 /** Stable per-calendar dot color derived from the calendar's name; readable in both modes. */
 function calendarColor(name: string): string {
@@ -20,10 +22,13 @@ function NoteIcon() {
   );
 }
 
+function todayKey(): string {
+  return new Date().toLocaleDateString('en-CA');
+}
+
 function dayHeading(date: string): string {
-  const today = new Date();
-  const todayStr = today.toLocaleDateString('en-CA');
-  const tomorrowStr = new Date(today.getTime() + 86_400_000).toLocaleDateString('en-CA');
+  const todayStr = todayKey();
+  const tomorrowStr = new Date(Date.now() + 86_400_000).toLocaleDateString('en-CA');
   if (date === todayStr) return 'Today';
   if (date === tomorrowStr) return 'Tomorrow';
   return new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', {
@@ -33,77 +38,181 @@ function dayHeading(date: string): string {
   });
 }
 
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+interface GridDay {
+  key: string;
+  day: number;
+  inMonth: boolean;
+  isToday: boolean;
+}
+
+/** Monday-start weeks covering the whole month, padded with the edge days of neighboring months
+ *  so every row is a full week. */
+function buildMonthGrid(reference: Date): GridDay[] {
+  const year = reference.getFullYear();
+  const month = reference.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  const leadingDays = (monthStart.getDay() + 6) % 7;
+  const trailingDays = 6 - ((monthEnd.getDay() + 6) % 7);
+
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(gridStart.getDate() - leadingDays);
+  const gridEnd = new Date(monthEnd);
+  gridEnd.setDate(gridEnd.getDate() + trailingDays);
+
+  const today = todayKey();
+  const days: GridDay[] = [];
+  for (const cursor = new Date(gridStart); cursor <= gridEnd; cursor.setDate(cursor.getDate() + 1)) {
+    const key = cursor.toLocaleDateString('en-CA');
+    days.push({ key, day: cursor.getDate(), inMonth: cursor.getMonth() === month, isToday: key === today });
+  }
+  return days;
+}
+
+/** One dot per distinct calendar represented that day, not one per event. */
+function dotsForDay(events: CalendarEvent[]): string[] {
+  const colors = new Map<string, string>();
+  for (const event of events) {
+    if (!colors.has(event.calendar)) colors.set(event.calendar, calendarColor(event.calendar));
+  }
+  return [...colors.values()];
+}
+
+function EventList({ events }: Readonly<{ events: CalendarEvent[] }>) {
+  if (events.length === 0) {
+    return <p className="text-sm text-ink-faint">Nothing scheduled.</p>;
+  }
+  return (
+    <ul className="space-y-1 text-sm">
+      {events.map((event) => (
+        <li key={event.id} className="flex items-baseline gap-2">
+          <span className="w-20 shrink-0 tabular-nums text-ink-muted">
+            {event.allDay ? 'all day' : `${event.startLabel}–${event.endLabel}`}
+          </span>
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5">
+              <span
+                aria-hidden
+                title={event.calendar}
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: calendarColor(event.calendar) }}
+              />
+              <span className="truncate font-medium">{event.title}</span>
+            </span>
+            {event.location && (
+              <a
+                href={mapsSearchHref(event.location)}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-ink-faint transition hover:text-ink"
+              >
+                <span aria-hidden className="shrink-0">📍</span>
+                <span className="truncate">{event.location}</span>
+              </a>
+            )}
+            {event.description && (
+              <span className="mt-1.5 flex gap-1.5 border-l border-card-border pl-2 text-xs text-ink-muted">
+                <NoteIcon />
+                <span className="line-clamp-2 whitespace-pre-line">{event.description}</span>
+              </span>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The very next event, wherever it falls — including past the visible grid (e.g. early next
+ *  month) — so it's never hidden just because the calendar hasn't turned the page yet. */
+function UpNext({ events }: Readonly<{ events: CalendarEvent[] }>) {
+  const next = events.find((event) => new Date(event.end).getTime() >= Date.now());
+  if (!next) return null;
+  const when = next.allDay ? dayHeading(next.date) : `${dayHeading(next.date)} · ${next.startLabel}`;
+  return (
+    <p className="flex min-w-0 items-baseline gap-1.5 text-xs text-ink-muted">
+      <span className="shrink-0 font-semibold uppercase tracking-wide text-ink-faint">Next</span>
+      <span className="truncate">
+        <span className="font-medium text-ink">{next.title}</span> · {when}
+      </span>
+    </p>
+  );
+}
+
 export function CalendarWidget() {
   const { envelope, offline } = useWidget<CalendarData>('calendar');
+  const [selectedDate, setSelectedDate] = useState<string>(todayKey);
 
-  const grouped = useMemo(() => {
-    const groups = new Map<string, CalendarData['events']>();
+  const eventsByDate = useMemo(() => {
+    const map = new Map<string, CalendarEvent[]>();
     for (const event of envelope?.data?.events ?? []) {
-      const bucket = groups.get(event.date);
+      const bucket = map.get(event.date);
       if (bucket) bucket.push(event);
-      else groups.set(event.date, [event]);
+      else map.set(event.date, [event]);
     }
-    return [...groups.entries()];
+    return map;
   }, [envelope?.data]);
 
   return (
     <WidgetCard title="Calendar" envelope={envelope} offline={offline}>
-      {(data) =>
-        data.events.length === 0 ? (
-          <p className="text-sm text-ink-faint">
-            Nothing scheduled in the next 7 days.
-          </p>
-        ) : (
+      {(data) => {
+        const grid = buildMonthGrid(new Date());
+        const monthLabel = new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+        const selectedEvents = eventsByDate.get(selectedDate) ?? [];
+
+        return (
           <div className="space-y-3">
-            {grouped.map(([date, events]) => (
-              <div key={date}>
-                <h3 className="mb-1 text-xs font-medium text-ink-faint">
-                  {dayHeading(date)}
-                </h3>
-                <ul className="space-y-1 text-sm">
-                  {events.map((event) => (
-                    <li key={event.id} className="flex items-baseline gap-2">
-                      <span className="w-20 shrink-0 tabular-nums text-ink-muted">
-                        {event.allDay
-                          ? 'all day'
-                          : `${event.startLabel}–${event.endLabel}`}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="flex items-center gap-1.5">
-                          <span
-                            aria-hidden
-                            title={event.calendar}
-                            className="h-1.5 w-1.5 shrink-0 rounded-full"
-                            style={{ backgroundColor: calendarColor(event.calendar) }}
-                          />
-                          <span className="truncate font-medium">{event.title}</span>
-                        </span>
-                        {event.location && (
-                          <a
-                            href={mapsSearchHref(event.location)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-ink-faint transition hover:text-ink"
-                          >
-                            <span aria-hidden className="shrink-0">📍</span>
-                            <span className="truncate">{event.location}</span>
-                          </a>
-                        )}
-                        {event.description && (
-                          <span className="mt-1.5 flex gap-1.5 border-l border-card-border pl-2 text-xs text-ink-muted">
-                            <NoteIcon />
-                            <span className="line-clamp-2 whitespace-pre-line">{event.description}</span>
-                          </span>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+            <div className="flex items-baseline justify-between gap-2">
+              <p className="text-sm font-semibold text-ink">{monthLabel}</p>
+              <UpNext events={data.events} />
+            </div>
+
+            <div>
+              <div className="grid grid-cols-7 text-center text-[10px] font-medium uppercase tracking-wide text-ink-faint">
+                {WEEKDAY_LABELS.map((label) => (
+                  <span key={label} className="py-1">{label}</span>
+                ))}
               </div>
-            ))}
+              <div className="grid grid-cols-7 gap-0.5">
+                {grid.map((cell) => {
+                  const dots = dotsForDay(eventsByDate.get(cell.key) ?? []);
+                  const isSelected = cell.key === selectedDate;
+                  return (
+                    <button
+                      key={cell.key}
+                      type="button"
+                      onClick={() => setSelectedDate(cell.key)}
+                      className={[
+                        'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-xs transition',
+                        cell.inMonth ? 'text-ink' : 'text-ink-faint/60',
+                        isSelected
+                          ? 'bg-(--color-accent-personal)/15 ring-1 ring-(--color-accent-personal)'
+                          : 'hover:bg-track',
+                      ].join(' ')}
+                    >
+                      <span className={cell.isToday && !isSelected ? 'font-semibold text-(--color-accent-personal)' : undefined}>
+                        {cell.day}
+                      </span>
+                      <span className="flex h-1 gap-0.5">
+                        {dots.slice(0, 4).map((color) => (
+                          <span key={color} aria-hidden className="h-1 w-1 rounded-full" style={{ backgroundColor: color }} />
+                        ))}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="border-t border-card-border pt-3">
+              <h3 className="mb-1 text-xs font-medium text-ink-faint">{dayHeading(selectedDate)}</h3>
+              <EventList events={selectedEvents} />
+            </div>
           </div>
-        )
-      }
+        );
+      }}
     </WidgetCard>
   );
 }

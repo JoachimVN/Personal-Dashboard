@@ -3,7 +3,14 @@ import ical from 'node-ical';
 import { calendarSchema, type CalendarData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 
-const RANGE_DAYS = 7;
+/**
+ * Extra days fetched past the visible grid purely so the client's "up next" indicator can still
+ * see an event that falls just past the current month (e.g. the 1st, if the grid's trailing
+ * padding is short) without waiting for the calendar to roll over.
+ */
+const LOOKAHEAD_BUFFER_DAYS = 14;
+
+const MAX_EVENTS = 500;
 
 type CalendarEvent = CalendarData['events'][number];
 type ExpandedEvent = { event: VEvent; start: Date; end: Date };
@@ -164,6 +171,25 @@ function eventsForCalendarObject(
     eventsForComponent(component, calendarName, rangeStart, rangeEnd, dateFmt, timeFmt));
 }
 
+/**
+ * The month-grid display range (current month plus leading/trailing days to fill whole weeks,
+ * Monday-start) in the dashboard's timezone, expressed as UTC day boundaries — precise enough for
+ * the CalDAV time-range query and the later instant comparisons, which already tolerate day-ish
+ * slop via their own margins.
+ */
+function monthGridRange(now: Date, dateFmt: DateFormatter): { start: Date; end: Date } {
+  const [year, month] = dateFmt.format(now).split('-').map(Number);
+  const monthStart = new Date(Date.UTC(year, month - 1, 1));
+  const monthEnd = new Date(Date.UTC(year, month, 0));
+  const leadingDays = (monthStart.getUTCDay() + 6) % 7;
+  const trailingDays = 6 - ((monthEnd.getUTCDay() + 6) % 7);
+  const start = new Date(monthStart.getTime() - leadingDays * 86_400_000);
+  const end = new Date(
+    monthEnd.getTime() + (trailingDays + 1 + LOOKAHEAD_BUFFER_DAYS) * 86_400_000,
+  );
+  return { start, end };
+}
+
 export function createCalendarProvider(
   auth: { username: string; password: string } | undefined,
   allowlist: string[],
@@ -204,8 +230,7 @@ export function createCalendarProvider(
         }),
       );
 
-      const rangeStart = new Date();
-      const rangeEnd = new Date(rangeStart.getTime() + RANGE_DAYS * 86_400_000);
+      const { start: rangeStart, end: rangeEnd } = monthGridRange(new Date(), dateFmt);
 
       const calendars = (await race(client.fetchCalendars())).filter((calendar) => {
         const name = text(calendar.displayName as string | undefined);
@@ -226,7 +251,7 @@ export function createCalendarProvider(
       const events = eventGroups.flat();
 
       events.sort((a, b) => a.start.localeCompare(b.start));
-      return { events: events.slice(0, 50) };
+      return { events: events.slice(0, MAX_EVENTS) };
     },
   };
 }
