@@ -310,15 +310,54 @@ a {
   transition: fill 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* The steam glyph now only appears in the Games detail page's tab switcher (registry.tsx no
-   longer uses it for the section nav icon, which is platform-neutral) — colored badge when that
-   tab is the active one, echoing the original "plain swirl -> full colored badge" intent. */
-.games-tab-switcher button[data-active='true'] .section-icon-steam-disc {
+.dashboard-section-card .section-icon-steam-disc {
   opacity: 1;
 }
 
-.games-tab-switcher button[data-active='true'] .section-icon-steam-swirl {
+.dashboard-section-card .section-icon-steam-swirl {
   fill: #fff;
+}
+
+@media (hover: hover) {
+  .command-nav a:hover .section-icon-steam-disc {
+    opacity: 1;
+  }
+
+  .command-nav a:hover .section-icon-steam-swirl {
+    fill: #fff;
+  }
+}
+
+/* Roblox's real mark (black badge + white glyph) sits on top of a plain currentColor glyph —
+   same idea as the Steam disc/swirl pair above, just two positioned layers instead of two SVG
+   paths, since the real mark needs an <img>. Hidden by default so the nav pill stays one
+   consistent currentColor set; revealed on the section card and on nav hover. */
+.section-icon-roblox-mono {
+  opacity: 1;
+  transition: opacity 300ms ease;
+}
+
+.section-icon-roblox-mark {
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.dashboard-section-card .section-icon-roblox-mono {
+  opacity: 0;
+}
+
+.dashboard-section-card .section-icon-roblox-mark {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .command-nav a:hover .section-icon-roblox-mono {
+    opacity: 0;
+  }
+
+  .command-nav a:hover .section-icon-roblox-mark {
+    opacity: 1;
+  }
 }
 
 .command-layout {
