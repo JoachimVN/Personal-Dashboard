@@ -354,7 +354,6 @@ export function DailyCommandCenter() {
     : [ranked.secondary as unknown as CommandCenterSlot];
   const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
   const isRobloxSecondary = activeSecondary?.render.type === 'roblox-now-playing';
-  const robloxSecondaryBackdrop = isRobloxSecondary ? roblox?.presence?.thumbnailUrl : undefined;
   const heroRender = ranked.hero.render;
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
@@ -385,7 +384,6 @@ export function DailyCommandCenter() {
         className={`command-agenda command-panel--${toneFor(activeSecondary)}${isRobloxSecondary ? ' command-agenda--roblox' : ''}`}
         fullCardLink
       >
-        {robloxSecondaryBackdrop && <img aria-hidden src={robloxSecondaryBackdrop} alt="" className="command-roblox-agenda-backdrop" />}
         <SecondaryCarousel
           items={secondarySlots}
           activeIndex={activeSecondaryIndex}

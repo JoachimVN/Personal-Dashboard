@@ -364,19 +364,6 @@ a {
   opacity: 0;
 }
 
-.command-agenda > .command-roblox-agenda-backdrop {
-  position: absolute;
-  z-index: 0;
-  inset: -14%;
-  width: 128%;
-  height: 128%;
-  object-fit: cover;
-  opacity: 0.23;
-  filter: blur(24px) saturate(1.1);
-  pointer-events: none;
-  transform: translateZ(0);
-}
-
 .command-agenda--roblox > .command-secondary-carousel {
   z-index: 1;
 }
