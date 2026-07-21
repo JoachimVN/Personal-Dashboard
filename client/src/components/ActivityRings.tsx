@@ -1,4 +1,5 @@
-import { useId } from 'react';
+import { motion, useInView, useReducedMotion } from 'motion/react';
+import { useId, useRef } from 'react';
 import type { HealthData } from '@personal-dashboard/shared';
 
 interface ActivityRingsProps {
@@ -13,6 +14,31 @@ interface CompactActivityRingsProps extends ActivityRingsProps {
   size?: number;
 }
 
+function AnimatedRing({
+  circumference,
+  progress,
+  delay,
+  inView,
+  ...props
+}: Readonly<React.ComponentProps<typeof motion.circle> & {
+  circumference: number;
+  progress: number;
+  delay: number;
+  inView: boolean;
+}>) {
+  const prefersReducedMotion = useReducedMotion();
+  const targetOffset = circumference * (1 - progress);
+
+  return (
+    <motion.circle
+      {...props}
+      initial={prefersReducedMotion ? false : { strokeDashoffset: circumference }}
+      animate={{ strokeDashoffset: prefersReducedMotion || inView ? targetOffset : circumference }}
+      transition={prefersReducedMotion ? { duration: 0 } : { duration: 1.4, delay, ease: [0.22, 1, 0.36, 1] }}
+    />
+  );
+}
+
 export function ActivityRings({
   activeEnergyKcal,
   exerciseMinutes,
@@ -20,6 +46,8 @@ export function ActivityRings({
   goals,
 }: Readonly<ActivityRingsProps>) {
   const gradientPrefix = useId().replaceAll(':', '');
+  const svgRef = useRef<SVGSVGElement>(null);
+  const inView = useInView(svgRef, { once: true, amount: 0.5 });
   const rings = [
     { id: 'move', label: 'Move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, unit: 'kcal', start: '#d91f3b', end: '#ff5a8b', legend: 'light-dark(#ec4899, #ff5a8b)', track: 'light-dark(#f6c7d2, #4c0717)', radius: 48 },
     { id: 'exercise', label: 'Exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, unit: 'min', start: '#70cc00', end: '#d4ff00', legend: 'light-dark(#84cc16, #d4ff00)', track: 'light-dark(#d8efc4, #173c0a)', radius: 33 },
@@ -29,7 +57,7 @@ export function ActivityRings({
   return (
     <div className="rounded-2xl bg-track/25 p-3">
       <div className="flex items-center gap-4">
-        <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" aria-label="Daily activity rings" role="img">
+        <svg ref={svgRef} viewBox="0 0 120 120" className="h-32 w-32 shrink-0" aria-label="Daily activity rings" role="img">
           <defs>
             {rings.map((ring) => (
               <linearGradient key={ring.id} id={`${gradientPrefix}-${ring.id}-ring-gradient`} x1="20" y1="20" x2="100" y2="100" gradientUnits="userSpaceOnUse">
@@ -38,14 +66,14 @@ export function ActivityRings({
               </linearGradient>
             ))}
           </defs>
-          {rings.map((ring) => {
+          {rings.map((ring, index) => {
             const circumference = 2 * Math.PI * ring.radius;
             const progress = Math.min(Math.max(ring.value / ring.goal, 0), 1);
             return (
               <g key={ring.id} transform="rotate(-90 60 60)">
                 <circle cx="60" cy="60" r={ring.radius} fill="none" strokeWidth="14" style={{ stroke: 'light-dark(transparent, #090c10)' }} />
                 <circle cx="60" cy="60" r={ring.radius} fill="none" strokeWidth="12" style={{ stroke: ring.track }} />
-                <circle
+                <AnimatedRing
                   cx="60"
                   cy="60"
                   r={ring.radius}
@@ -54,8 +82,10 @@ export function ActivityRings({
                   strokeWidth="12"
                   strokeLinecap="round"
                   strokeDasharray={circumference}
-                  strokeDashoffset={circumference * (1 - progress)}
-                  className="transition-[stroke-dashoffset] duration-500"
+                  circumference={circumference}
+                  progress={progress}
+                  delay={index * 0.18}
+                  inView={inView}
                   style={{ filter: 'drop-shadow(1px 2px 1.5px light-dark(rgb(15 23 42 / 0.22), rgb(0 0 0 / 0.42)))' }}
                 />
               </g>
@@ -86,6 +116,8 @@ export function CompactActivityRings({
   size = 40,
 }: Readonly<CompactActivityRingsProps>) {
   const gradientPrefix = useId().replaceAll(':', '');
+  const svgRef = useRef<SVGSVGElement>(null);
+  const inView = useInView(svgRef, { once: true, amount: 0.5 });
   const rings = [
     { id: 'move', value: activeEnergyKcal, goal: goals.activeEnergyKcal, start: '#d91f3b', end: '#ff5a8b', track: 'light-dark(#f6c7d2, #4c0717)', radius: 48 },
     { id: 'exercise', value: exerciseMinutes, goal: goals.exerciseMinutes, start: '#70cc00', end: '#d4ff00', track: 'light-dark(#d8efc4, #173c0a)', radius: 33 },
@@ -93,7 +125,7 @@ export function CompactActivityRings({
   ];
 
   return (
-    <svg viewBox="0 0 120 120" style={{ width: size, height: size }} className="shrink-0" aria-label="Daily activity rings" role="img">
+    <svg ref={svgRef} viewBox="0 0 120 120" style={{ width: size, height: size }} className="shrink-0" aria-label="Daily activity rings" role="img">
       <defs>
         {rings.map((ring) => (
           <linearGradient key={ring.id} id={`${gradientPrefix}-compact-${ring.id}-ring-gradient`} x1="20" y1="20" x2="100" y2="100" gradientUnits="userSpaceOnUse">
@@ -102,13 +134,13 @@ export function CompactActivityRings({
           </linearGradient>
         ))}
       </defs>
-      {rings.map((ring) => {
+      {rings.map((ring, index) => {
         const circumference = 2 * Math.PI * ring.radius;
         const progress = Math.min(Math.max(ring.value / ring.goal, 0), 1);
         return (
           <g key={ring.id} transform="rotate(-90 60 60)">
             <circle cx="60" cy="60" r={ring.radius} fill="none" strokeWidth="14" style={{ stroke: ring.track }} />
-            <circle
+            <AnimatedRing
               cx="60"
               cy="60"
               r={ring.radius}
@@ -117,7 +149,10 @@ export function CompactActivityRings({
               strokeWidth="14"
               strokeLinecap="round"
               strokeDasharray={circumference}
-              strokeDashoffset={circumference * (1 - progress)}
+              circumference={circumference}
+              progress={progress}
+              delay={index * 0.18}
+              inView={inView}
             />
           </g>
         );

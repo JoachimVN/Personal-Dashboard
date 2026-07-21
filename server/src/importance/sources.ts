@@ -245,7 +245,11 @@ const TIMEFRAME_PERIOD: Record<Timeframe, string> = {
   allTime: 'of all time', long: 'this past year', medium: 'these last few months', short: 'this month',
 };
 
-export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyFreshness): Candidate[] {
+export function spotifyCandidates(
+  data: SpotifyData | undefined,
+  fresh: SpotifyFreshness,
+  recentPlayedMaxAgeMs: number,
+): Candidate[] {
   if (!data) return [];
   const candidates: Candidate[] = [];
 
@@ -292,9 +296,11 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
     });
   }
 
-  // No fresh change to headline — still worth a quiet tile naming your current favorite.
+  // No fresh change to headline — still worth a quiet tile naming your current favorite, but
+  // only while the play itself is recent enough to still be "last played" and not a fixture.
   const recent = data.recentlyPlayed[0];
-  if (recent && !candidates.length) {
+  const recentIsFresh = recent !== undefined && Date.now() - new Date(recent.playedAt).getTime() < recentPlayedMaxAgeMs;
+  if (recent && recentIsFresh && !candidates.length) {
     candidates.push({
       id: `spotify:recent:${recent.id ?? recent.track}`, source: 'spotify', kind: 'spotify', score: 28, shapes: ['tile'],
       kicker: 'Last played', title: recent.track, detail: recent.artist,

@@ -293,6 +293,8 @@ describe('aiCandidates', () => {
 });
 
 describe('spotifyCandidates', () => {
+  const RECENT_PLAYED_MAX_AGE_MS = 6 * 60 * 60_000;
+
   it('uses the primary artist for a newly surfaced album', () => {
     const data: SpotifyData = {
       nowPlaying: null,
@@ -317,7 +319,7 @@ describe('spotifyCandidates', () => {
       trackAllTime: false,
       artistShort: false, artistMedium: false, artistLong: false, artistAllTime: false,
       albumAllTime: true,
-    });
+    }, RECENT_PLAYED_MAX_AGE_MS);
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-album:album-id')).toMatchObject({
       detail: 'Primary Artist',
@@ -343,7 +345,7 @@ describe('spotifyCandidates', () => {
       trackAllTime: false,
       artistShort: false, artistMedium: false, artistLong: false, artistAllTime: false,
       albumAllTime: false,
-    });
+    }, RECENT_PLAYED_MAX_AGE_MS);
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-track:long:Baptized In Fear')?.kicker)
       .toBe('New top track this past year');
@@ -362,7 +364,7 @@ describe('spotifyCandidates', () => {
       trackShort: false, trackMedium: false, trackLong: false, trackAllTime: false,
       artistShort: true, artistMedium: false, artistLong: false, artistAllTime: false,
       albumAllTime: false,
-    });
+    }, RECENT_PLAYED_MAX_AGE_MS);
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-artist:short:artist-id')).toMatchObject({
       kicker: 'New #1 artist · this month',
@@ -389,7 +391,7 @@ describe('spotifyCandidates', () => {
       trackShort: false, trackMedium: false, trackLong: false, trackAllTime: true,
       artistShort: false, artistMedium: false, artistLong: false, artistAllTime: true,
       albumAllTime: false,
-    });
+    }, RECENT_PLAYED_MAX_AGE_MS);
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-track:allTime:track-id')).toMatchObject({
       kicker: 'New top track of all time',
@@ -399,6 +401,44 @@ describe('spotifyCandidates', () => {
       kicker: 'New #1 artist · of all time',
       score: 90,
     });
+  });
+
+  const NO_FRESH_CHANGES = {
+    trackShort: false, trackMedium: false, trackLong: false, trackAllTime: false,
+    artistShort: false, artistMedium: false, artistLong: false, artistAllTime: false,
+    albumAllTime: false,
+  };
+
+  it('surfaces "Last played" for a track that played within the max age', () => {
+    const data: SpotifyData = {
+      nowPlaying: null,
+      recentlyPlayed: [{ id: 'track-id', track: 'Recent Track', artist: 'Recent Artist', playedAt: '2026-07-21T08:00:00.000Z' }],
+      topArtists: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      topTracks: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      allTime: { artists: [], tracks: [], albums: [] },
+    };
+
+    const candidates = spotifyCandidates(data, NO_FRESH_CHANGES, RECENT_PLAYED_MAX_AGE_MS);
+
+    expect(candidates.find((candidate) => candidate.id === 'spotify:recent:track-id')).toMatchObject({
+      kicker: 'Last played',
+      title: 'Recent Track',
+    });
+  });
+
+  it('drops "Last played" once the track is older than the max age, instead of lingering forever', () => {
+    const staleDate = new Date(Date.now() - RECENT_PLAYED_MAX_AGE_MS - 60_000).toISOString();
+    const data: SpotifyData = {
+      nowPlaying: null,
+      recentlyPlayed: [{ id: 'track-id', track: 'Stale Track', artist: 'Stale Artist', playedAt: staleDate }],
+      topArtists: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      topTracks: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      allTime: { artists: [], tracks: [], albums: [] },
+    };
+
+    const candidates = spotifyCandidates(data, NO_FRESH_CHANGES, RECENT_PLAYED_MAX_AGE_MS);
+
+    expect(candidates).toHaveLength(0);
   });
 });
 
