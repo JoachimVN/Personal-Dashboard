@@ -410,9 +410,10 @@ describe('spotifyCandidates', () => {
   };
 
   it('surfaces "Last played" for a track that played within the max age', () => {
+    const recentDate = new Date(Date.now() - RECENT_PLAYED_MAX_AGE_MS + 60_000).toISOString();
     const data: SpotifyData = {
       nowPlaying: null,
-      recentlyPlayed: [{ id: 'track-id', track: 'Recent Track', artist: 'Recent Artist', playedAt: '2026-07-21T08:00:00.000Z' }],
+      recentlyPlayed: [{ id: 'track-id', track: 'Recent Track', artist: 'Recent Artist', playedAt: recentDate }],
       topArtists: { shortTerm: [], mediumTerm: [], longTerm: [] },
       topTracks: { shortTerm: [], mediumTerm: [], longTerm: [] },
       allTime: { artists: [], tracks: [], albums: [] },
