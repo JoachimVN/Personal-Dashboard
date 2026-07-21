@@ -679,7 +679,7 @@ function steamCompletedGameCandidate(data: SteamData, moments: SteamMoments): Ca
   return {
     id: `steam:completed:${appId}`, source: 'steam', kind: 'steam', score: 92, shapes: [...allShapes],
     kicker: 'Game completed', title: gameName, detail: `All ${totalCount} achievements unlocked`,
-    href: '#/steam', render: { type: 'text' },
+    href: '#/games', render: { type: 'text' },
   };
 }
 
@@ -694,7 +694,7 @@ function steamAchievementCandidate(data: SteamData, achievementFreshMs: number, 
     id: `steam:achievement:${data.achievements!.appId}:${recentUnlock.apiName}`, source: 'steam', kind: 'steam',
     score: rare ? 85 : 80, shapes: [...allShapes], kicker: rare ? 'Rare achievement unlocked' : 'Achievement unlocked', title: recentUnlock.displayName,
     detail: [data.achievements!.gameName, rarity].filter((value): value is string => Boolean(value)).join(' · '),
-    href: '#/steam', render: { type: 'steam-achievement', appId: data.achievements!.appId, apiName: recentUnlock.apiName },
+    href: '#/games', render: { type: 'steam-achievement', appId: data.achievements!.appId, apiName: recentUnlock.apiName },
   };
 }
 
@@ -705,7 +705,7 @@ function steamPlaytimeMilestoneCandidate(data: SteamData, moments: SteamMoments)
   return {
     id: `steam:playtime-milestone:${trackedGame.appId}:${moments.playtimeMilestoneHours}`, source: 'steam', kind: 'steam',
     score: 65, shapes: ['secondary', 'tile'], kicker: 'Playtime milestone', title: `${moments.playtimeMilestoneHours}h in ${trackedGame.name}`,
-    detail: 'Open Steam for the full breakdown', href: '#/steam', render: { type: 'text' },
+    detail: 'Open Steam for the full breakdown', href: '#/games', render: { type: 'text' },
   };
 }
 
@@ -716,7 +716,7 @@ function steamNowPlayingCandidate(data: SteamData): Candidate | undefined {
     id: `steam:now-playing:${data.currentGame.appId}`, source: 'steam', kind: 'steam', score: 58,
     shapes: ['secondary', 'tile'], kicker: 'Playing now', title: data.currentGame.name,
     detail: minutes !== undefined ? `${formatSteamHours(minutes)} played` : 'Open Steam',
-    href: '#/steam', render: { type: 'steam-now-playing', appId: data.currentGame.appId },
+    href: '#/games', render: { type: 'steam-now-playing', appId: data.currentGame.appId },
   };
 }
 
@@ -726,7 +726,7 @@ function steamLeaderboardClimbCandidate(moments: SteamMoments): Candidate | unde
   return {
     id: `steam:leaderboard-climb:${rank}`, source: 'steam', kind: 'steam', score: 45, shapes: ['tile'],
     kicker: 'Friends leaderboard', title: `Up to #${rank + 1}`, detail: `Climbed ${delta} spot${delta === 1 ? '' : 's'}`,
-    href: '#/steam', render: { type: 'text' },
+    href: '#/games', render: { type: 'text' },
   };
 }
 
@@ -737,7 +737,7 @@ function steamFriendsOnlineCandidate(data: SteamData): Candidate | undefined {
     id: 'steam:friends', source: 'steam', kind: 'steam', score: 25, shapes: ['tile'],
     kicker: 'Friends online',
     title: `${data.friendsInGame.length} friend${data.friendsInGame.length === 1 ? '' : 's'} playing`,
-    detail: first.gameName, href: '#/steam', render: { type: 'text' },
+    detail: first.gameName, href: '#/games', render: { type: 'text' },
   };
 }
 
@@ -748,7 +748,7 @@ function steamRecentPlaytimeCandidate(data: SteamData): Candidate | undefined {
   return {
     id: 'steam:recent-playtime', source: 'steam', kind: 'steam', score: 22, shapes: ['tile'],
     kicker: 'This week on Steam', title: `${formatSteamHours(recentMinutes)} this week`, detail: recentGameName,
-    href: '#/steam', render: { type: 'text' },
+    href: '#/games', render: { type: 'text' },
   };
 }
 

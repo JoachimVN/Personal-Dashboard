@@ -12,10 +12,10 @@ import {
   SteamPlaytimeTrend,
   SteamRecentGames,
 } from '../../widgets/SteamWidgets';
-import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
+import { DetailSectionHeading } from '../DetailIntro';
 import './steam.css';
 
-function SteamSignals() {
+export function SteamSignals() {
   const { envelope, offline } = useWidget<SteamData>('steam');
   return (
     <div className="detail-signal-panel">
@@ -53,14 +53,6 @@ export function SteamDetail() {
 
   return (
     <div>
-      <DetailIntro
-        title="Steam activity"
-        description="Your current game, library totals, and achievement progress for whichever game is tracked right now."
-        accent="var(--color-accent-steam)"
-      >
-        <SteamSignals />
-      </DetailIntro>
-
       <DetailSectionHeading label="Now" title="Current game" />
       {/* Neutral title — SteamNowPlaying's own kicker ("Playing now"/"Last played"/"Most played") states the actual status. */}
       <WidgetShell title="Game">

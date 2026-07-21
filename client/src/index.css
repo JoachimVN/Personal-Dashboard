@@ -310,22 +310,15 @@ a {
   transition: fill 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.dashboard-section-card .section-icon-steam-disc {
+/* The steam glyph now only appears in the Games detail page's tab switcher (registry.tsx no
+   longer uses it for the section nav icon, which is platform-neutral) — colored badge when that
+   tab is the active one, echoing the original "plain swirl -> full colored badge" intent. */
+.games-tab-switcher button[data-active='true'] .section-icon-steam-disc {
   opacity: 1;
 }
 
-.dashboard-section-card .section-icon-steam-swirl {
+.games-tab-switcher button[data-active='true'] .section-icon-steam-swirl {
   fill: #fff;
-}
-
-@media (hover: hover) {
-  .command-nav a:hover .section-icon-steam-disc {
-    opacity: 1;
-  }
-
-  .command-nav a:hover .section-icon-steam-swirl {
-    fill: #fff;
-  }
 }
 
 .command-layout {

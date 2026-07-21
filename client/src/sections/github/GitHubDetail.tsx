@@ -1,4 +1,4 @@
-import type { GitHubData } from '@personal-dashboard/shared';
+import type { GitHubData, SonarCloudData } from '@personal-dashboard/shared';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { WidgetBody } from '../../components/WidgetCard';
 import { useWidget } from '../../useWidget';
@@ -8,9 +8,31 @@ import {
   GitHubWorkWidget,
   RepoHealthWidget,
 } from '../../widgets/GitHubWidgets';
+import { SonarProjectCard } from '../../widgets/SonarCloudWidgets';
 import { IssueCapture } from './IssueCapture';
 import { CodeLauncher } from './CodeLauncher';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
+
+function SonarSection() {
+  const { envelope, offline } = useWidget<SonarCloudData>('sonar-cloud');
+  if (envelope?.status === 'disabled') return null;
+  return (
+    <>
+      <DetailSectionHeading label="Quality" title="Code quality" detail="Quality gate status, ratings and coverage across your SonarCloud org." />
+      <WidgetBody envelope={envelope} offline={offline}>
+        {(data) =>
+          data.projects.length === 0 ? (
+            <p className="text-sm text-ink-faint">No projects found in this org.</p>
+          ) : (
+            <div className="space-y-4">
+              {data.projects.map((project) => <SonarProjectCard key={project.key} project={project} />)}
+            </div>
+          )
+        }
+      </WidgetBody>
+    </>
+  );
+}
 
 function GitHubSignals() {
   const { envelope, offline } = useWidget<GitHubData>('github');
@@ -66,6 +88,7 @@ export function GitHubDetail() {
           <RepoHealthWidget />
         </div>
       </div>
+      <SonarSection />
     </div>
   );
 }
