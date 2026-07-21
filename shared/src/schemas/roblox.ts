@@ -15,7 +15,6 @@ export const robloxGameSchema = z.object({
   name: z.string(),
   iconUrl: z.string().optional(),
   visits: z.number().optional(),
-  relation: z.enum(['created', 'favorite']),
 });
 
 export type RobloxGame = z.infer<typeof robloxGameSchema>;
@@ -34,12 +33,13 @@ export const robloxSchema = z.object({
     username: z.string(),
     displayName: z.string(),
     avatarUrl: z.string().optional(),
+    joinedAt: z.string().optional(),
   }),
   /** null when no session cookie is configured, or the cookie has expired/is invalid. */
   presence: robloxPresenceSchema.nullable(),
   friendsCount: z.number(),
   recentBadges: z.array(robloxBadgeSchema),
-  /** Created (public) and favorited (requires the session cookie) games, most-recent first. */
+  /** Favorited games — requires the session cookie, most-recent first. */
   games: z.array(robloxGameSchema),
   availability: z.object({
     /** 'unauthorized' distinguishes an expired/invalid cookie (or a cookie-gated endpoint with no
@@ -48,7 +48,6 @@ export const robloxSchema = z.object({
     /** Roblox has been gradually gating legacy endpoints like this one behind auth — degrades
      * independently rather than taking the whole provider down when it happens. */
     badges: z.enum(['available', 'unavailable', 'unauthorized']),
-    createdGames: z.enum(['available', 'unavailable', 'unauthorized']),
     favoriteGames: z.enum(['available', 'unavailable', 'unauthorized']),
   }),
 });

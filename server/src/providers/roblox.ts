@@ -13,6 +13,7 @@ interface RawUser {
   id: number;
   name: string;
   displayName: string;
+  created: string;
 }
 
 /** The badge-listing endpoint itself has no award date — that comes from a separate
@@ -26,6 +27,7 @@ interface RawBadge {
 interface RawGame {
   id: number;
   name: string;
+  placeVisits?: number;
 }
 
 interface RawUniverseThumbnail {
@@ -127,7 +129,7 @@ async function fetchProfile(signal: AbortSignal, userId: number): Promise<{ prof
     ),
   ]);
   return {
-    profile: { userId: user.id, username: user.name, displayName: user.displayName, avatarUrl: avatar },
+    profile: { userId: user.id, username: user.name, displayName: user.displayName, avatarUrl: avatar, joinedAt: user.created },
     friendsCount,
   };
 }
@@ -206,36 +208,29 @@ async function fetchGameIcons(signal: AbortSignal, universeIds: number[]): Promi
   return new Map(data.data.map((entry) => [entry.targetId, entry.imageUrl]));
 }
 
-async function fetchCreatedGames(signal: AbortSignal, userId: number, robloSecurity?: string): Promise<FetchResult<RobloxGame[]>> {
-  try {
-    const data = await robloxGet<{ data: RawGame[] }>(
-      signal,
-      `https://games.roblox.com/v1/users/${userId}/games?limit=${GAMES_PER_LIST}`,
-      'GetCreatedGames',
-      robloSecurity,
-    );
-    const icons = await fetchGameIcons(signal, data.data.map((g) => g.id));
-    return {
-      status: 'available',
-      data: data.data.map((game) => ({ id: game.id, name: game.name, iconUrl: icons.get(game.id), relation: 'created' as const })),
-    };
-  } catch (err) {
-    return { status: toFetchStatus(err) };
-  }
-}
-
 async function fetchFavoriteGames(signal: AbortSignal, userId: number, robloSecurity: string): Promise<FetchResult<RobloxGame[]>> {
   try {
-    const data = await robloxGet<{ data: RawGame[] }>(
-      signal,
-      `https://games.roblox.com/v1/users/${userId}/favorite/games?limit=${GAMES_PER_LIST}`,
-      'GetFavoriteGames',
-      robloSecurity,
-    );
-    const icons = await fetchGameIcons(signal, data.data.map((g) => g.id));
+    // v1 of this endpoint was retired by Roblox (now a 404); v2 returns placeVisits, which the old
+    // response never had. v2 also ignores `limit` for the page size it actually returns (seen: 6
+    // back per page even when limit=10 is requested) and instead expects you to page through
+    // nextPageCursor for the rest — a single request was silently under-reporting someone's
+    // favorites, so this pages until GAMES_PER_LIST is reached or the list runs out.
+    const games: RawGame[] = [];
+    let cursor: string | undefined;
+    while (games.length < GAMES_PER_LIST) {
+      const url = new URL(`https://games.roblox.com/v2/users/${userId}/favorite/games`);
+      url.searchParams.set('limit', String(GAMES_PER_LIST));
+      if (cursor) url.searchParams.set('cursor', cursor);
+      const page = await robloxGet<{ data: RawGame[]; nextPageCursor?: string | null }>(signal, url.toString(), 'GetFavoriteGames', robloSecurity);
+      games.push(...page.data);
+      if (!page.nextPageCursor) break;
+      cursor = page.nextPageCursor;
+    }
+    const trimmed = games.slice(0, GAMES_PER_LIST);
+    const icons = await fetchGameIcons(signal, trimmed.map((g) => g.id));
     return {
       status: 'available',
-      data: data.data.map((game) => ({ id: game.id, name: game.name, iconUrl: icons.get(game.id), relation: 'favorite' as const })),
+      data: trimmed.map((game) => ({ id: game.id, name: game.name, iconUrl: icons.get(game.id), visits: game.placeVisits })),
     };
   } catch (err) {
     return { status: toFetchStatus(err) };
@@ -277,10 +272,7 @@ export function createRobloxProvider(auth: RobloxAuth | undefined): Provider<Rob
       // degrades independently so one gated/broken Roblox endpoint doesn't blank the whole card.
       const { profile, friendsCount } = await fetchProfile(signal, userId);
 
-      const [badges, createdGames] = await Promise.all([
-        fetchBadges(signal, userId, auth.robloSecurity),
-        fetchCreatedGames(signal, userId, auth.robloSecurity),
-      ]);
+      const badges = await fetchBadges(signal, userId, auth.robloSecurity);
       const favorites = auth.robloSecurity
         ? await fetchFavoriteGames(signal, userId, auth.robloSecurity)
         : ({ status: 'unavailable' } as const);
@@ -288,21 +280,15 @@ export function createRobloxProvider(auth: RobloxAuth | undefined): Provider<Rob
         ? await fetchPresence(signal, userId, auth.robloSecurity)
         : ({ status: 'unavailable' } as const);
 
-      const games = [
-        ...(createdGames.status === 'available' ? createdGames.data : []),
-        ...(favorites.status === 'available' ? favorites.data : []),
-      ];
-
       const data: RobloxData = {
         profile,
         presence: presenceResult.status === 'available' ? presenceResult.data : null,
         friendsCount,
         recentBadges: badges.status === 'available' ? badges.data : [],
-        games,
+        games: favorites.status === 'available' ? favorites.data : [],
         availability: {
           presence: presenceResult.status,
           badges: badges.status,
-          createdGames: createdGames.status,
           favoriteGames: favorites.status,
         },
       };

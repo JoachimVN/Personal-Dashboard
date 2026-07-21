@@ -1,7 +1,13 @@
+import { useState } from 'react';
 import type { RobloxData } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
 const accent = 'var(--color-accent-roblox)';
+
+const visitsFormatter = new Intl.NumberFormat('en', { notation: 'compact' });
+function formatVisits(visits: number): string {
+  return visitsFormatter.format(visits);
+}
 
 function Stat({ value, label }: Readonly<{ value: string | number; label: string }>) {
   return (
@@ -20,6 +26,7 @@ const PRESENCE_LABEL: Record<NonNullable<RobloxData['presence']>['status'], stri
 };
 
 export function RobloxNowPlaying({ data }: Readonly<{ data: RobloxData }>) {
+  const [avatarFailed, setAvatarFailed] = useState(false);
   if (data.availability.presence === 'unauthorized') {
     return <p className="text-sm text-rose-500">Roblox session cookie expired — grab a fresh one from your browser.</p>;
   }
@@ -27,24 +34,36 @@ export function RobloxNowPlaying({ data }: Readonly<{ data: RobloxData }>) {
     return <p className="text-sm text-ink-faint">Presence isn&apos;t configured for this account.</p>;
   }
   const { status, gameName } = data.presence;
+  const hasAvatar = Boolean(data.profile.avatarUrl) && !avatarFailed;
   return (
-    <div className="flex items-center gap-4 rounded-xl bg-track/25 p-4">
-      {data.profile.avatarUrl ? (
-        <img src={data.profile.avatarUrl} alt="" className="h-14 w-14 shrink-0 rounded-full object-cover" />
-      ) : (
-        <div className="h-14 w-14 shrink-0 rounded-full bg-track" />
+    <div className="roblox-hero p-4 sm:p-5">
+      {hasAvatar && (
+        <img aria-hidden src={data.profile.avatarUrl} alt="" className="roblox-hero-backdrop" onError={() => setAvatarFailed(true)} />
       )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          {status === 'in-game' && <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: accent }} />}
-          <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>{PRESENCE_LABEL[status]}</p>
-        </div>
-        <p className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-ink">
-          {status === 'in-game' && gameName ? gameName : data.profile.displayName}
-        </p>
-        {status === 'offline' && data.presence.lastOnline && (
-          <p className="mt-1 text-xs text-ink-faint">Last online {relativeTime(data.presence.lastOnline)}</p>
+      <div className="roblox-hero-scrim" />
+      <div className="relative flex items-center gap-4">
+        {hasAvatar ? (
+          <img
+            src={data.profile.avatarUrl}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-full object-cover shadow-lg sm:h-20 sm:w-20"
+            onError={() => setAvatarFailed(true)}
+          />
+        ) : (
+          <div className="h-16 w-16 shrink-0 rounded-full bg-track sm:h-20 sm:w-20" />
         )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {status === 'in-game' && <span aria-hidden className="roblox-live-dot" />}
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>{PRESENCE_LABEL[status]}</p>
+          </div>
+          <p className="mt-1 truncate text-lg font-semibold tracking-[-0.02em] text-ink sm:text-xl">
+            {status === 'in-game' && gameName ? gameName : data.profile.displayName}
+          </p>
+          {status === 'offline' && data.presence.lastOnline && (
+            <p className="mt-1 text-xs text-ink-faint">Last online {relativeTime(data.presence.lastOnline)}</p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -55,7 +74,7 @@ export function RobloxProfileStats({ data }: Readonly<{ data: RobloxData }>) {
     <div className="grid grid-cols-3 gap-3">
       <Stat value={data.friendsCount} label="friends" />
       <Stat value={data.recentBadges.length} label="recent badges" />
-      <Stat value={data.games.length} label="games listed" />
+      <Stat value={data.games.length} label="favorites" />
     </div>
   );
 }
@@ -88,25 +107,20 @@ export function RobloxBadges({ data }: Readonly<{ data: RobloxData }>) {
 }
 
 export function RobloxGames({ data }: Readonly<{ data: RobloxData }>) {
-  if (data.availability.createdGames === 'unauthorized' || data.availability.favoriteGames === 'unauthorized') {
-    return <p className="text-sm text-rose-500">Roblox session cookie expired — games can&apos;t be fetched right now.</p>;
+  if (data.availability.favoriteGames === 'unauthorized') {
+    return <p className="text-sm text-rose-500">Roblox session cookie expired — favorites can&apos;t be fetched right now.</p>;
   }
-  if (data.games.length === 0) return <p className="text-sm text-ink-faint">No games to show yet.</p>;
+  if (data.games.length === 0) return <p className="text-sm text-ink-faint">No favorite games to show yet.</p>;
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <ul className="roblox-favorites-grid">
       {data.games.map((game) => (
-        <li key={`${game.relation}-${game.id}`} className="overflow-hidden rounded-xl bg-track/25">
+        <li key={game.id} className="roblox-favorite-tile" title={game.name}>
           {game.iconUrl ? (
-            <img src={game.iconUrl} alt="" className="aspect-square w-full object-cover" loading="lazy" />
+            <img src={game.iconUrl} alt={game.name} className="roblox-favorite-icon" loading="lazy" />
           ) : (
-            <div className="aspect-square w-full bg-track" />
+            <div className="roblox-favorite-icon bg-track" />
           )}
-          <div className="p-2">
-            <p className="truncate text-xs font-medium text-ink">{game.name}</p>
-            <p className="truncate text-[10px] uppercase tracking-[0.1em] text-ink-faint">
-              {game.relation === 'created' ? 'Created' : 'Favorite'}
-            </p>
-          </div>
+          {game.visits !== undefined && <p className="roblox-favorite-visits">{formatVisits(game.visits)}</p>}
         </li>
       ))}
     </ul>
