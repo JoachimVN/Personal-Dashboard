@@ -566,14 +566,17 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
       const timeout = setTimeout(() => finish(undefined, new Error('Claude Usage screen timed out')), 35_000);
       pty.onData((chunk) => {
         terminal += chunk;
-        const quota = parseClaudeUsageScreen(terminal);
-        // Both windows parsing is necessary but not sufficient: a trailing "rate limited, showing
-        // last-known usage" banner can still stream in afterward, so wait for the screen to go
-        // quiet before treating this render as the final one (see parseClaudeUsageScreen).
-        if (quota.fiveHour && quota.weekly) {
-          clearTimeout(settleTimer);
-          settleTimer = setTimeout(() => finish(terminal), 750);
-        }
+        // Re-arm on every chunk, not just ones that parse cleanly. The Usage screen redraws in
+        // place as data streams in, and a redraw's header line can land in an earlier chunk than
+        // its percentage line; debouncing only on successful parses left a stale timer free to
+        // fire mid-redraw, capturing a header with no digits yet — which the parser reads as an
+        // explicit "no limit" instead of "still rendering" (see parseClaudeUsageScreen/limitStatus).
+        // Waiting for genuine quiet, then re-checking, avoids freezing on that half-drawn state.
+        clearTimeout(settleTimer);
+        settleTimer = setTimeout(() => {
+          const quota = parseClaudeUsageScreen(terminal);
+          if (quota.fiveHour && quota.weekly) finish(terminal);
+        }, 750);
       });
       pty.onExit(({ exitCode }) => {
         if (!settled) finish(undefined, new Error(`Claude exited before Usage rendered (${exitCode})`));
