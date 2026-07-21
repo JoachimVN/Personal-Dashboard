@@ -711,7 +711,16 @@ a {
 .command-roblox-brand img {
   width: 4.7rem;
   height: auto;
-  filter: light-dark(invert(1), none);
+}
+
+:root[style*="color-scheme: light"] .command-roblox-brand img {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([style*="color-scheme: dark"]) .command-roblox-brand img {
+    filter: invert(1);
+  }
 }
 
 .command-roblox-brand span {
