@@ -276,6 +276,9 @@ function HeroPanel({
   weather: WeatherData | undefined;
 }>) {
   const today = weather?.days[0];
+  const nonEventDetail = hero.render.type === 'gmail-threads' && extra
+    ? null
+    : <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{track?.artist ?? hero.detail}</p>;
   return (
     <CommandPanel
       href={hero.href}
@@ -303,9 +306,7 @@ function HeroPanel({
               )}
               {!event.location && !event.description && <p>{hero.detail}</p>}
             </div>
-          ) : hero.render.type === 'gmail-threads' && extra ? null : (
-            <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{track?.artist ?? hero.detail}</p>
-          )}
+          ) : nonEventDetail}
         </div>
       </div>
       {extra}

@@ -75,23 +75,21 @@ async function fetchIntoRecord(id: string, record: WidgetRecord, init?: RequestI
 
 export function readWidget(id: string): Promise<void> {
   const record = getRecord(id);
-  if (!record.readInFlight) {
-    record.readInFlight = fetchIntoRecord(id, record).finally(() => {
-      record.readInFlight = undefined;
-    });
-  }
+  record.readInFlight ??= fetchIntoRecord(id, record).finally(() => {
+    record.readInFlight = undefined;
+  });
   return record.readInFlight;
 }
 
 export function refreshWidget(id: string): Promise<void> {
   const record = getRecord(id);
-  if (!record.refreshInFlight) {
+  record.refreshInFlight ??= (() => {
     setSnapshot(record, { ...record.snapshot, refreshing: true });
-    record.refreshInFlight = fetchIntoRecord(id, record, { method: 'POST' }).finally(() => {
+    return fetchIntoRecord(id, record, { method: 'POST' }).finally(() => {
       record.refreshInFlight = undefined;
       setSnapshot(record, { ...record.snapshot, refreshing: false });
     });
-  }
+  })();
   return record.refreshInFlight;
 }
 
