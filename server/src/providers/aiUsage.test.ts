@@ -37,6 +37,27 @@ describe('retainKnownClaudeQuota', () => {
       .toEqual(knownQuota);
   });
 
+  it('backfills a window that failed to capture this tick even though another window in the same live report parsed fine', () => {
+    // Real bug: the 5-hour block captured cleanly (asOf gets stamped) but the weekly block's header
+    // never rendered in the PTY capture that tick, so its status is 'unknown', not 'unlimited'.
+    // A whole-report gate on live.asOf would discard the still-valid weekly reading here.
+    const live: ClaudeQuota = {
+      fiveHour: { usedPercent: 71, resetsAt: '2026-07-17T05:00:00.000Z' },
+      fiveHourStatus: 'limited',
+      weeklyStatus: 'unknown',
+      asOf: '2026-07-17T01:00:00.000Z',
+    };
+
+    expect(retainKnownClaudeQuota(live, knownQuota, beforeBothReset)).toEqual({
+      fiveHour: live.fiveHour,
+      weekly: knownQuota.weekly,
+      modelWeekly: undefined,
+      fiveHourStatus: 'limited',
+      weeklyStatus: 'limited',
+      asOf: live.asOf,
+    });
+  });
+
   it('uses a new explicit no-limits report instead of stale quota data', () => {
     const unlimited: ClaudeQuota = {
       fiveHourStatus: 'unlimited',
@@ -149,6 +170,21 @@ describe('parseClaudeUsageScreen', () => {
     expect(quota.fiveHour?.usedPercent).toBe(80);
     expect(quota.weekly?.usedPercent).toBe(13);
     expect(quota.modelWeekly).toMatchObject({ model: 'Fable', usedPercent: 9 });
+  });
+
+  it('reports weekly as unknown, not unlimited, when its header never rendered this capture', () => {
+    // A 5-hour-only capture (weekly section missing entirely, e.g. a truncated/early PTY read)
+    // must not be conflated with Claude explicitly reporting no weekly cap.
+    const quota = parseClaudeUsageScreen(
+      `Current session
+      71% used
+      Resets 5:20pm (Europe/Oslo)`,
+      new Date(2026, 6, 17, 13, 0),
+    );
+
+    expect(quota.fiveHourStatus).toBe('limited');
+    expect(quota.weekly).toBeUndefined();
+    expect(quota.weeklyStatus).toBe('unknown');
   });
 
   it('backdates asOf when the screen reports rate-limited last-known usage instead of a live read', () => {

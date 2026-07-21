@@ -7,6 +7,8 @@
 // an increment.
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
+import { dirname, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { accessToken, toPlayedTrackInput, type RawTrack } from '../src/providers/spotify.js';
 import { SpotifyHistoryStore, type PlayedTrackInput } from '../src/spotifyHistory.js';
 import { createDatabase } from '../src/db/client.js';
@@ -23,9 +25,16 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const csvPath = process.argv[2];
-if (!csvPath) {
+const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+const csvPathArg = process.argv[2];
+if (!csvPathArg) {
   console.error('Pass the path to the tab-separated Spotify export as the first argument.');
+  process.exit(1);
+}
+const csvPath = resolve(serverRoot, csvPathArg);
+if (csvPath !== serverRoot && !csvPath.startsWith(serverRoot + sep)) {
+  console.error(`CSV path must be inside ${serverRoot}.`);
   process.exit(1);
 }
 
@@ -92,7 +101,9 @@ async function main() {
   console.log('If the dashboard server is currently running, restart it to pick up the change.');
 }
 
-main().catch((err) => {
+try {
+  await main();
+} catch (err) {
   console.error('✗ Import failed:', (err as Error).message);
   process.exitCode = 1;
-});
+}

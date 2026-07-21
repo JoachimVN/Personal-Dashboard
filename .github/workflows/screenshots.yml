@@ -28,10 +28,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Install Playwright Chromium
-        run: npx --prefix server playwright install --with-deps chromium
+        run: npx --no-install --prefix server playwright install --with-deps chromium
 
       - name: Generate screenshots
         run: npm run screenshots -w server
