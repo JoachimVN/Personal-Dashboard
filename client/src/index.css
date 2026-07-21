@@ -21,6 +21,8 @@
   --color-accent-github: light-dark(#2d72d9, #65a7ff);
   --color-accent-personal: light-dark(#108879, #45d7be);
   --color-accent-health: light-dark(#d9385a, #ff6f91);
+  /* No dedicated section anymore — kept only for the command-center "playing now" tile/secondary. */
+  --color-accent-roblox: light-dark(#c2281e, #ff6b57);
 
   /* Brand accents */
   --color-claude: #de7356;
@@ -328,38 +330,6 @@ a {
   }
 }
 
-/* Roblox's real mark (black badge + white glyph) sits on top of a plain currentColor glyph —
-   same idea as the Steam disc/swirl pair above, just two positioned layers instead of two SVG
-   paths, since the real mark needs an <img>. Hidden by default so the nav pill stays one
-   consistent currentColor set; revealed on the section card and on nav hover. */
-.section-icon-roblox-mono {
-  opacity: 1;
-  transition: opacity 300ms ease;
-}
-
-.section-icon-roblox-mark {
-  opacity: 0;
-  transition: opacity 300ms ease;
-}
-
-.dashboard-section-card .section-icon-roblox-mono {
-  opacity: 0;
-}
-
-.dashboard-section-card .section-icon-roblox-mark {
-  opacity: 1;
-}
-
-@media (hover: hover) {
-  .command-nav a:hover .section-icon-roblox-mono {
-    opacity: 0;
-  }
-
-  .command-nav a:hover .section-icon-roblox-mark {
-    opacity: 1;
-  }
-}
-
 .command-layout {
   position: relative;
   display: grid;
@@ -382,6 +352,7 @@ a {
 .command-panel--spotify { --panel-accent: var(--color-accent-spotify); }
 .command-panel--weather { --panel-accent: var(--color-accent-weather); }
 .command-panel--steam { --panel-accent: var(--color-accent-steam); }
+.command-panel--roblox { --panel-accent: var(--color-accent-roblox); }
 
 .command-agenda {
   position: relative;
@@ -634,6 +605,50 @@ a {
 .command-signal--spotify { --signal-color: var(--color-accent-spotify); }
 .command-signal--weather { --signal-color: var(--color-accent-weather); }
 .command-signal--steam { --signal-color: var(--color-accent-steam); }
+.command-signal--roblox { --signal-color: var(--color-accent-roblox); }
+
+/* Mirrors .steam-game-row in steam.css: the game's own icon, blurred, as an ambient backdrop
+   behind a crisp foreground cover — instead of a large raw gameplay screenshot dominating the
+   card (Roblox's thumbnail API returns a live screenshot, not curated box art like Steam's). */
+.command-roblox-row {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  overflow: hidden;
+  width: 100%;
+  min-height: var(--secondary-carousel-content-height);
+  padding: 1rem 1.1rem;
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--color-accent-roblox) 6%, var(--color-track));
+}
+
+.command-roblox-row-backdrop {
+  position: absolute;
+  z-index: -1;
+  inset: -20%;
+  width: 140%;
+  height: 140%;
+  object-fit: cover;
+  opacity: 0.3;
+  filter: blur(20px) saturate(1.3);
+  /* Forces its own compositing layer — without this, the blurred image can fail to repaint its
+     full width while the ancestor carousel slide is mid-animation (its own filter/transform
+     entrance transition), leaving a stale partial paint until something else forces a recomposite
+     (e.g. hovering the card, which is why the cutoff visibly "fixes itself" on hover). */
+  transform: translateZ(0);
+}
+
+.command-roblox-icon {
+  position: relative;
+  flex: 0 0 auto;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  object-fit: cover;
+  box-shadow: 0 5px 14px rgb(0 0 0 / 0.22);
+}
 
 .command-signal-arrow {
   font-size: 0.85rem;

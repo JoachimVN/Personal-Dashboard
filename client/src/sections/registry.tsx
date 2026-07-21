@@ -14,12 +14,10 @@ import { HealthOverview } from './health/HealthOverview';
 import { HealthDetail } from './health/HealthDetail';
 import { SteamOverview } from './steam/SteamOverview';
 import { SteamDetail } from './steam/SteamDetail';
-import { RobloxOverview } from './roblox/RobloxOverview';
-import { RobloxDetail } from './roblox/RobloxDetail';
 import { ClashRoyaleOverview } from './clashRoyale/ClashRoyaleOverview';
 import { ClashRoyaleDetail } from './clashRoyale/ClashRoyaleDetail';
 
-export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health', 'steam', 'roblox', 'clash-royale'] as const;
+export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health', 'steam', 'clash-royale'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 export interface SectionDef {
@@ -100,15 +98,6 @@ export const SECTIONS: SectionDef[] = [
     accentVar: '--color-accent-steam',
     Overview: SteamOverview,
     Detail: SteamDetail,
-  },
-  {
-    id: 'roblox',
-    title: 'Roblox',
-    label: 'Blocks',
-    description: 'Presence, badges and games',
-    accentVar: '--color-accent-roblox',
-    Overview: RobloxOverview,
-    Detail: RobloxDetail,
   },
   {
     id: 'clash-royale',
@@ -242,25 +231,6 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
           <path className="section-icon-steam-swirl" d="M30.31 23.985l.003.158-7.83 11.375c-1.268-.058-2.54.165-3.748.662a8.14 8.14 0 0 0-1.498.8L.042 29.893s-.398 6.546 1.26 11.424l12.156 5.016c.6 2.728 2.48 5.12 5.242 6.27a8.88 8.88 0 0 0 11.603-4.782 8.89 8.89 0 0 0 .684-3.656L42.18 36.16l.275.005c6.705 0 12.155-5.466 12.155-12.18s-5.44-12.16-12.155-12.174c-6.702 0-12.155 5.46-12.155 12.174zm-1.88 23.05c-1.454 3.5-5.466 5.147-8.953 3.694a6.84 6.84 0 0 1-3.524-3.362l3.957 1.64a5.04 5.04 0 0 0 6.591-2.719 5.05 5.05 0 0 0-2.715-6.601l-4.1-1.695c1.578-.6 3.372-.62 5.05.077 1.7.703 3 2.027 3.696 3.72s.692 3.56-.01 5.246M42.466 32.1a8.12 8.12 0 0 1-8.098-8.113 8.12 8.12 0 0 1 8.098-8.111 8.12 8.12 0 0 1 8.1 8.111 8.12 8.12 0 0 1-8.1 8.113m-6.068-8.126a6.09 6.09 0 0 1 6.08-6.095c3.355 0 6.084 2.73 6.084 6.095a6.09 6.09 0 0 1-6.084 6.093 6.09 6.09 0 0 1-6.081-6.093z" />
         </g>
       </svg>
-    );
-  }
-    case 'roblox': {
-    /* Same two-layer trick as the Steam mark above: both layers always render, and CSS decides
-       per context whether the plain currentColor glyph shows (nav pill, unhovered — matching its
-       monochrome siblings) or the real mark takes over (section card, or nav pill on hover) — see
-       .section-icon-roblox-* in index.css. The real mark needs an <img>, which can't sit inside an
-       <svg> the way Steam's two paths do, so this wraps both layers in a positioned span instead. */
-    return (
-      <span aria-hidden className="relative grid h-5 w-5 shrink-0 place-items-center">
-        <svg viewBox="0 0 24 24" className="section-icon-roblox-mono absolute inset-0 h-5 w-5">
-          <rect x="3.6" y="8.4" width="11.6" height="11.6" rx="2.6" transform="rotate(-12 9.4 14.2)" fill="currentColor" opacity="0.5" />
-          <rect x="8.8" y="3.8" width="11.6" height="11.6" rx="2.6" transform="rotate(-12 14.6 9.6)" fill="currentColor" />
-          <rect x="12.4" y="7.3" width="4.6" height="4.6" rx="1.1" transform="rotate(-12 14.7 9.6)" fill="var(--color-card)" opacity="0.4" />
-        </svg>
-        <span className="section-icon-roblox-mark absolute inset-0 grid place-items-center rounded-[0.3rem] bg-black p-[3px]">
-          <img src="/roblox.svg" alt="" className="h-full w-full object-contain" />
-        </span>
-      </span>
     );
   }
     case 'clash-royale': {

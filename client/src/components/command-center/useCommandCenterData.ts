@@ -5,6 +5,7 @@ import type {
   GitHubData,
   GmailData,
   HealthData,
+  RobloxData,
   SpotifyData,
   SteamData,
   WeatherData,
@@ -34,6 +35,7 @@ export function useCommandCenterData() {
   };
   const spotifyEnvelope = useWidget<SpotifyData>('spotify').envelope;
   const steam = useWidget<SteamData>('steam').envelope?.data;
+  const roblox = useWidget<RobloxData>('roblox').envelope?.data;
 
   return {
     commandCenter,
@@ -46,5 +48,6 @@ export function useCommandCenterData() {
     spotify: spotifyEnvelope?.data,
     spotifyFetchedAt: spotifyEnvelope?.fetchedAt,
     steam,
+    roblox,
   };
 }

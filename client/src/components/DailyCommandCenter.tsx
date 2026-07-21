@@ -6,6 +6,7 @@ import type {
   CommandCenterSlot,
   GitHubData,
   HealthData,
+  RobloxData,
   WeatherData,
 } from '@personal-dashboard/shared';
 import { deg, glyph, weatherLocation } from '../lib/weather';
@@ -51,7 +52,7 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'claude' | 'codex' {
+function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
@@ -59,6 +60,7 @@ function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'healt
   if (slot.source === 'spotify') return 'spotify';
   if (slot.source === 'weather') return 'weather';
   if (slot.source === 'steam') return 'steam';
+  if (slot.source === 'roblox') return 'roblox';
   return 'personal';
 }
 
@@ -87,7 +89,7 @@ function CommandPanel({
   );
 }
 
-function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined }>) {
+function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined }>) {
   const activityDay = health ? latestActivityDay(health) : undefined;
   const rings = slot.render.type === 'health-rings' && health && activityDay
     ? <CompactActivityRings
@@ -113,9 +115,12 @@ function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; gi
   const weatherMark = slot.render.type === 'weather-signal'
     ? <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>
     : undefined;
+  const robloxIcon = slot.render.type === 'roblox-now-playing' && roblox?.presence?.iconUrl
+    ? <img src={roblox.presence.iconUrl} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />
+    : undefined;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      {rings ?? toolMark ?? dualToolMarks ?? githubMark ?? weatherMark ?? <span className="command-signal-dot" aria-hidden />}
+      {rings ?? toolMark ?? dualToolMarks ?? githubMark ?? weatherMark ?? robloxIcon ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
@@ -335,7 +340,7 @@ function HeroPanel({
 }
 
 export function DailyCommandCenter() {
-  const { commandCenter, calendar, weather, github, health, gmail, aiUsage, spotify, spotifyFetchedAt, steam } = useCommandCenterData();
+  const { commandCenter, calendar, weather, github, health, gmail, aiUsage, spotify, spotifyFetchedAt, steam, roblox } = useCommandCenterData();
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
   const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
 
@@ -370,7 +375,7 @@ export function DailyCommandCenter() {
       </div>
       <div className="command-layout">
         <HeroPanel hero={ranked.hero} event={heroEvent} track={heroTrack} kicker={heroKicker} extra={heroExtra} activity={heroActivity} weather={weather} />
-        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} />)}</div>
+        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} />)}</div>
       </div>
       {activeSecondary && <CommandPanel
         href={activeSecondary.href}
@@ -384,7 +389,7 @@ export function DailyCommandCenter() {
           onActiveChange={setActiveSecondaryIndex}
           renderItem={(slot) => <>
             <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>
-            <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyFetchedAt} health={health} github={github} gmail={gmail} weather={weather} steam={steam} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
+            <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyFetchedAt} health={health} github={github} gmail={gmail} weather={weather} steam={steam} roblox={roblox} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
           </>}
         />
       </CommandPanel>}

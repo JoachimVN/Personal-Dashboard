@@ -7,6 +7,7 @@ import type {
   GitHubData,
   GmailData,
   HealthData,
+  RobloxData,
   SpotifyData,
   SteamData,
   WeatherData,
@@ -145,6 +146,30 @@ function SteamNowPlayingSecondary({ slot, steam }: Readonly<{ slot: CommandCente
     {game.playtimeForeverMinutes !== undefined && (
       <p className="mt-0.5 text-sm text-ink-muted">{formatSteamHours(game.playtimeForeverMinutes)} total playtime</p>
     )}
+  </div>;
+}
+
+const robloxCompactNumber = new Intl.NumberFormat('en', { notation: 'compact' });
+
+function RobloxNowPlayingSecondary({ slot, roblox }: Readonly<{ slot: CommandCenterSlot; roblox: RobloxData | undefined }>): ReactNode {
+  if (slot.render.type !== 'roblox-now-playing') return null;
+  const presence = roblox?.presence;
+  if (!presence || presence.status !== 'in-game') return null;
+  const stats = [
+    presence.playing !== undefined ? `${robloxCompactNumber.format(presence.playing)} playing now` : undefined,
+    presence.visits !== undefined ? `${robloxCompactNumber.format(presence.visits)} visits` : undefined,
+  ].filter((value): value is string => Boolean(value)).join(' · ');
+  return <div className="command-roblox-row mt-4">
+    {presence.thumbnailUrl && <img aria-hidden src={presence.thumbnailUrl} alt="" className="command-roblox-row-backdrop" />}
+    {presence.iconUrl ? (
+      <img src={presence.iconUrl} alt="" className="command-roblox-icon" />
+    ) : (
+      <div className="command-roblox-icon bg-track" />
+    )}
+    <div className="min-w-0 flex-1">
+      <p className="truncate text-sm font-semibold text-ink">{presence.gameName ?? 'Roblox'}</p>
+      {stats && <p className="mt-0.5 text-xs tabular-nums text-ink-muted">{stats}</p>}
+    </div>
   </div>;
 }
 
@@ -356,11 +381,12 @@ export function SecondaryContent(props: Readonly<{
   gmail: GmailData | undefined;
   weather: WeatherData | undefined;
   steam: SteamData | undefined;
+  roblox: RobloxData | undefined;
   aiUsage: AiUsageByTool;
   hoveredDay: { date: string; count: number } | null;
   onHover: (day: { date: string; count: number } | null) => void;
 }>): ReactNode {
-  const { slot, calendar, spotify, spotifyFetchedAt, health, github, gmail, weather, steam, aiUsage, hoveredDay, onHover } = props;
+  const { slot, calendar, spotify, spotifyFetchedAt, health, github, gmail, weather, steam, roblox, aiUsage, hoveredDay, onHover } = props;
   switch (slot.render.type) {
     case 'calendar-agenda': return CalendarAgendaSecondary({ slot, calendar }) ?? <FallbackSecondary slot={slot} />;
     case 'spotify-now-playing': return SpotifyNowPlayingSecondary({ spotify, spotifyFetchedAt }) ?? <FallbackSecondary slot={slot} />;
@@ -375,6 +401,7 @@ export function SecondaryContent(props: Readonly<{
     case 'ai-usage-tool': return AiUsageSecondary({ slot, aiUsage }) ?? <FallbackSecondary slot={slot} />;
     case 'steam-now-playing': return SteamNowPlayingSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     case 'steam-achievement': return SteamAchievementSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
+    case 'roblox-now-playing': return RobloxNowPlayingSecondary({ slot, roblox }) ?? <FallbackSecondary slot={slot} />;
     default: return <FallbackSecondary slot={slot} />;
   }
 }

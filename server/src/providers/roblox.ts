@@ -1,39 +1,9 @@
-import { robloxSchema, type RobloxBadge, type RobloxData, type RobloxGame } from '@personal-dashboard/shared';
+import { robloxSchema, type RobloxData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
-
-const RECENT_BADGES_COUNT = 10;
-const GAMES_PER_LIST = 10;
 
 export interface RobloxAuth {
   idOrUsername: string;
   robloSecurity?: string;
-}
-
-interface RawUser {
-  id: number;
-  name: string;
-  displayName: string;
-  created: string;
-}
-
-/** The badge-listing endpoint itself has no award date — that comes from a separate
- * /badges/awarded-dates call, merged in by fetchBadges below. */
-interface RawBadge {
-  id: number;
-  name: string;
-  displayIconImageId?: string;
-}
-
-interface RawGame {
-  id: number;
-  name: string;
-  placeVisits?: number;
-}
-
-interface RawUniverseThumbnail {
-  targetId: number;
-  imageUrl?: string;
-  state: string;
 }
 
 /** Roblox's presence status codes: 0 offline, 1 online, 2 in-game, 3 in-studio. */
@@ -48,9 +18,6 @@ class RobloxHttpError extends Error {
   }
 }
 
-/** `robloSecurity` is optional — most of these reads used to be fully public, but Roblox has been
- * gradually gating more legacy v1 endpoints (e.g. badges) behind auth, so the cookie is attached
- * whenever it's configured even for calls that don't strictly require it. */
 async function robloxGet<T>(signal: AbortSignal, url: string, label: string, robloSecurity?: string): Promise<T> {
   const res = await fetch(url, {
     signal,
@@ -116,140 +83,81 @@ export async function resolveUserId(signal: AbortSignal, idOrUsername: string): 
   return match.id;
 }
 
-async function fetchProfile(signal: AbortSignal, userId: number): Promise<{ profile: RobloxData['profile']; friendsCount: number }> {
-  const [user, avatar, friendsCount] = await Promise.all([
-    robloxGet<RawUser>(signal, `https://users.roblox.com/v1/users/${userId}`, 'GetUser'),
-    robloxGet<{ data: { imageUrl?: string }[] }>(
-      signal,
-      `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`,
-      'GetAvatar',
-    ).then((data) => data.data[0]?.imageUrl),
-    robloxGet<{ count: number }>(signal, `https://friends.roblox.com/v1/users/${userId}/friends/count`, 'GetFriendsCount').then(
-      (data) => data.count,
-    ),
-  ]);
-  return {
-    profile: { userId: user.id, username: user.name, displayName: user.displayName, avatarUrl: avatar, joinedAt: user.created },
-    friendsCount,
-  };
-}
-
 type FetchResult<T> = { status: 'available'; data: T } | { status: 'unavailable' | 'unauthorized' };
 
 function toFetchStatus(err: unknown): 'unavailable' | 'unauthorized' {
   return err instanceof RobloxHttpError && (err.status === 401 || err.status === 403) ? 'unauthorized' : 'unavailable';
 }
 
-/** The badge-listing endpoint returns no award date; it lives on this separate endpoint, keyed by
- * badge id. Best-effort — a failure here still shows badges, just without a "when" readout. */
-async function fetchBadgeAwardedDates(
-  signal: AbortSignal,
-  userId: number,
-  badgeIds: number[],
-  robloSecurity?: string,
-): Promise<Map<number, string>> {
-  if (badgeIds.length === 0) return new Map();
-  try {
-    const data = await robloxGet<{ data: { badgeId: number; awardedDate: string }[] }>(
+interface GameContext {
+  iconUrl?: string;
+  thumbnailUrl?: string;
+  playing?: number;
+  visits?: number;
+}
+
+/** Best-effort context for the currently-played universe — art (a square icon for tile-sized
+ * rendering, a wide thumbnail for hero/secondary-sized rendering) plus live stats (concurrent
+ * players, total visits) to give the card something to show beyond just a name. Failures here
+ * shouldn't take down presence itself, so each call is caught independently. */
+async function fetchGameContext(signal: AbortSignal, universeId: number): Promise<GameContext> {
+  const [iconUrl, thumbnailUrl, stats] = await Promise.all([
+    robloxGet<{ data: { targetId: number; imageUrl?: string }[] }>(
       signal,
-      `https://badges.roblox.com/v1/users/${userId}/badges/awarded-dates?badgeIds=${badgeIds.join(',')}`,
-      'GetBadgeAwardedDates',
-      robloSecurity,
-    );
-    return new Map(data.data.map((entry) => [entry.badgeId, entry.awardedDate]));
-  } catch {
-    return new Map();
-  }
-}
-
-/** Roblox started gating this endpoint behind auth at some point — degrades independently rather
- * than taking the whole provider down, same as presence/favorites. */
-async function fetchBadges(signal: AbortSignal, userId: number, robloSecurity?: string): Promise<FetchResult<RobloxBadge[]>> {
-  try {
-    const data = await robloxGet<{ data: RawBadge[] }>(
+      `https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeId}&size=150x150&format=Png`,
+      'GetGameIcon',
+    ).then((res) => res.data[0]?.imageUrl).catch(() => undefined),
+    robloxGet<{ data: { universeId: number; thumbnails: { imageUrl?: string }[] }[] }>(
       signal,
-      `https://badges.roblox.com/v1/users/${userId}/badges?limit=${RECENT_BADGES_COUNT}&sortOrder=Desc`,
-      'GetBadges',
-      robloSecurity,
-    );
-    const badgeIds = data.data.map((b) => b.id);
-    const [icons, awardedDates] = await Promise.all([
-      badgeIds.length
-        ? robloxGet<{ data: { targetId: number; imageUrl?: string }[] }>(
-            signal,
-            `https://thumbnails.roblox.com/v1/badges/icons?badgeIds=${badgeIds.join(',')}&size=150x150&format=Png`,
-            'GetBadgeIcons',
-            robloSecurity,
-          ).then((res) => new Map(res.data.map((entry) => [entry.targetId, entry.imageUrl])))
-        : Promise.resolve(new Map<number, string | undefined>()),
-      fetchBadgeAwardedDates(signal, userId, badgeIds, robloSecurity),
-    ]);
-    return {
-      status: 'available',
-      data: data.data.map((badge) => ({
-        id: badge.id,
-        name: badge.name,
-        iconUrl: icons.get(badge.id),
-        awardedAt: awardedDates.get(badge.id),
-      })),
-    };
-  } catch (err) {
-    return { status: toFetchStatus(err) };
-  }
+      `https://thumbnails.roblox.com/v1/games/multiget/thumbnails?universeIds=${universeId}&countPerUniverse=1&size=768x432&format=Png`,
+      'GetGameThumbnail',
+    ).then((res) => res.data[0]?.thumbnails[0]?.imageUrl).catch(() => undefined),
+    robloxGet<{ data: { playing?: number; visits?: number }[] }>(
+      signal,
+      `https://games.roblox.com/v1/games?universeIds=${universeId}`,
+      'GetGameStats',
+    ).then((res) => ({ playing: res.data[0]?.playing, visits: res.data[0]?.visits })).catch(() => ({})),
+  ]);
+  return { iconUrl, thumbnailUrl, playing: stats.playing, visits: stats.visits };
 }
 
-async function fetchGameIcons(signal: AbortSignal, universeIds: number[]): Promise<Map<number, string | undefined>> {
-  if (universeIds.length === 0) return new Map();
-  const data = await robloxGet<{ data: RawUniverseThumbnail[] }>(
-    signal,
-    `https://thumbnails.roblox.com/v1/games/icons?universeIds=${universeIds.join(',')}&size=150x150&format=Png`,
-    'GetGameIcons',
-  );
-  return new Map(data.data.map((entry) => [entry.targetId, entry.imageUrl]));
-}
-
-async function fetchFavoriteGames(signal: AbortSignal, userId: number, robloSecurity: string): Promise<FetchResult<RobloxGame[]>> {
-  try {
-    // v1 of this endpoint was retired by Roblox (now a 404); v2 returns placeVisits, which the old
-    // response never had. v2 also ignores `limit` for the page size it actually returns (seen: 6
-    // back per page even when limit=10 is requested) and instead expects you to page through
-    // nextPageCursor for the rest — a single request was silently under-reporting someone's
-    // favorites, so this pages until GAMES_PER_LIST is reached or the list runs out.
-    const games: RawGame[] = [];
-    let cursor: string | undefined;
-    while (games.length < GAMES_PER_LIST) {
-      const url = new URL(`https://games.roblox.com/v2/users/${userId}/favorite/games`);
-      url.searchParams.set('limit', String(GAMES_PER_LIST));
-      if (cursor) url.searchParams.set('cursor', cursor);
-      const page = await robloxGet<{ data: RawGame[]; nextPageCursor?: string | null }>(signal, url.toString(), 'GetFavoriteGames', robloSecurity);
-      games.push(...page.data);
-      if (!page.nextPageCursor) break;
-      cursor = page.nextPageCursor;
-    }
-    const trimmed = games.slice(0, GAMES_PER_LIST);
-    const icons = await fetchGameIcons(signal, trimmed.map((g) => g.id));
-    return {
-      status: 'available',
-      data: trimmed.map((game) => ({ id: game.id, name: game.name, iconUrl: icons.get(game.id), visits: game.placeVisits })),
-    };
-  } catch (err) {
-    return { status: toFetchStatus(err) };
-  }
+/** Roblox sends these as explicit `null` (not omitted) whenever they don't apply — e.g. every
+ * field here is null when you're not currently in a game. */
+interface RawPresenceEntry {
+  userPresenceType: number;
+  lastLocation?: string | null;
+  lastOnline?: string | null;
+  rootPlaceId?: number | null;
+  universeId?: number | null;
 }
 
 async function fetchPresence(signal: AbortSignal, userId: number, robloSecurity: string): Promise<FetchResult<RobloxData['presence']>> {
   try {
-    const data = await robloxAuthedPost<{
-      userPresences: { userPresenceType: number; lastLocation?: string; lastOnline?: string }[];
-    }>(signal, robloSecurity, 'https://presence.roblox.com/v1/presence/users', { userIds: [userId] }, 'GetPresence');
+    const data = await robloxAuthedPost<{ userPresences: RawPresenceEntry[] }>(
+      signal,
+      robloSecurity,
+      'https://presence.roblox.com/v1/presence/users',
+      { userIds: [userId] },
+      'GetPresence',
+    );
     const entry = data.userPresences[0];
     if (!entry) return { status: 'unavailable' };
+    const status = PRESENCE_STATUS[entry.userPresenceType] ?? 'offline';
+    const universeId = entry.universeId ?? undefined;
+    const context: GameContext = status === 'in-game' && universeId !== undefined
+      ? await fetchGameContext(signal, universeId)
+      : {};
     return {
       status: 'available',
       data: {
-        status: PRESENCE_STATUS[entry.userPresenceType] ?? 'offline',
-        gameName: entry.lastLocation,
-        lastOnline: entry.lastOnline,
+        status,
+        gameName: entry.lastLocation ?? undefined,
+        lastOnline: entry.lastOnline ?? undefined,
+        placeId: entry.rootPlaceId ?? undefined,
+        iconUrl: context.iconUrl,
+        thumbnailUrl: context.thumbnailUrl,
+        playing: context.playing,
+        visits: context.visits,
       },
     };
   } catch (err) {
@@ -263,34 +171,17 @@ export function createRobloxProvider(auth: RobloxAuth | undefined): Provider<Rob
     schema: robloxSchema,
     refreshMs: 5 * 60_000,
     timeoutMs: 15_000,
-    isConfigured: () => auth !== undefined,
+    // Presence needs the session cookie — without it there's nothing for this provider to show.
+    isConfigured: () => auth !== undefined && auth.robloSecurity !== undefined,
     async fetch(signal) {
-      if (!auth) throw new Error('roblox is not configured');
+      if (!auth?.robloSecurity) throw new Error('roblox is not configured');
 
       const userId = await resolveUserId(signal, auth.idOrUsername);
-      // Profile is the one failure that takes the whole provider down — everything else below
-      // degrades independently so one gated/broken Roblox endpoint doesn't blank the whole card.
-      const { profile, friendsCount } = await fetchProfile(signal, userId);
-
-      const badges = await fetchBadges(signal, userId, auth.robloSecurity);
-      const favorites = auth.robloSecurity
-        ? await fetchFavoriteGames(signal, userId, auth.robloSecurity)
-        : ({ status: 'unavailable' } as const);
-      const presenceResult = auth.robloSecurity
-        ? await fetchPresence(signal, userId, auth.robloSecurity)
-        : ({ status: 'unavailable' } as const);
+      const presence = await fetchPresence(signal, userId, auth.robloSecurity);
 
       const data: RobloxData = {
-        profile,
-        presence: presenceResult.status === 'available' ? presenceResult.data : null,
-        friendsCount,
-        recentBadges: badges.status === 'available' ? badges.data : [],
-        games: favorites.status === 'available' ? favorites.data : [],
-        availability: {
-          presence: presenceResult.status,
-          badges: badges.status,
-          favoriteGames: favorites.status,
-        },
+        presence: presence.status === 'available' ? presence.data : null,
+        availability: presence.status,
       };
 
       return robloxSchema.parse(data);
