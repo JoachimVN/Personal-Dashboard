@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 export const calendarSchema = z.object({
   /**
-   * The previous, current, and next month's display grids, expanded (recurrence applied) and
-   * sorted by start.
+   * The display grids for the current month and a few months either side, expanded (recurrence
+   * applied) and sorted by start.
    */
   events: z.array(
     z.object({

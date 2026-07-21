@@ -166,19 +166,23 @@ function eventsForCalendarObject(
     eventsForComponent(component, calendarName, rangeStart, rangeEnd, dateFmt, timeFmt));
 }
 
+/** How many months either side of the current one the client is allowed to page to. */
+const MONTH_RANGE = 3;
+
 /**
- * The display range spanning the previous, current, and next month's grids (each Monday-start,
- * padded to whole weeks) in the dashboard's timezone, expressed as UTC day boundaries — wide
- * enough that the client can page a month either way from cached data, with no per-request fetch.
+ * The display range spanning MONTH_RANGE months either side of the current one, each grid
+ * Monday-start and padded to whole weeks, in the dashboard's timezone, expressed as UTC day
+ * boundaries — wide enough that the client can page between them from cached data, with no
+ * per-request fetch.
  */
 function monthGridRange(now: Date, dateFmt: DateFormatter): { start: Date; end: Date } {
   const [year, month] = dateFmt.format(now).split('-').map(Number);
-  const prevMonthStart = new Date(Date.UTC(year, month - 2, 1));
-  const nextMonthEnd = new Date(Date.UTC(year, month + 1, 0));
-  const leadingDays = (prevMonthStart.getUTCDay() + 6) % 7;
-  const trailingDays = 6 - ((nextMonthEnd.getUTCDay() + 6) % 7);
-  const start = new Date(prevMonthStart.getTime() - leadingDays * 86_400_000);
-  const end = new Date(nextMonthEnd.getTime() + (trailingDays + 1) * 86_400_000);
+  const rangeStartMonth = new Date(Date.UTC(year, month - 1 - MONTH_RANGE, 1));
+  const rangeEndMonth = new Date(Date.UTC(year, month + MONTH_RANGE, 0));
+  const leadingDays = (rangeStartMonth.getUTCDay() + 6) % 7;
+  const trailingDays = 6 - ((rangeEndMonth.getUTCDay() + 6) % 7);
+  const start = new Date(rangeStartMonth.getTime() - leadingDays * 86_400_000);
+  const end = new Date(rangeEndMonth.getTime() + (trailingDays + 1) * 86_400_000);
   return { start, end };
 }
 

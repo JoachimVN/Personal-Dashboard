@@ -35,7 +35,7 @@ function ChevronIcon({ direction }: Readonly<{ direction: 'left' | 'right' }>) {
 }
 
 /** How many months either side of the current one the server keeps cached. */
-const MAX_MONTH_OFFSET = 1;
+const MAX_MONTH_OFFSET = 3;
 
 function monthReference(offset: number): Date {
   const now = new Date();
@@ -215,8 +215,8 @@ export function CalendarWidget() {
 
         return (
           <div className="space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex shrink-0 items-center gap-1">
                 <button
                   type="button"
                   onClick={() => goToMonth(monthOffset - 1)}
@@ -226,7 +226,7 @@ export function CalendarWidget() {
                 >
                   <ChevronIcon direction="left" />
                 </button>
-                <p className="text-sm font-semibold text-ink">{monthLabel}</p>
+                <p className="whitespace-nowrap text-sm font-semibold text-ink">{monthLabel}</p>
                 <button
                   type="button"
                   onClick={() => goToMonth(monthOffset + 1)}
@@ -240,7 +240,7 @@ export function CalendarWidget() {
                   <button
                     type="button"
                     onClick={() => goToMonth(0)}
-                    className="ml-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint transition hover:text-ink"
+                    className="ml-1 whitespace-nowrap rounded-full border border-card-border px-2 py-0.5 text-[10px] font-medium text-ink-faint transition hover:border-ink-faint hover:text-ink"
                   >
                     Today
                   </button>
