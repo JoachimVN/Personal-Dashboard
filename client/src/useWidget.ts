@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 import type { WidgetEnvelope } from '@personal-dashboard/shared';
-import { WEATHER_LOCATION_UPDATED_EVENT } from './useDeviceLocation';
-
-const MIN_POLL_MS = 15_000;
-const MAX_POLL_MS = 300_000;
+import { readWidget, refreshWidget, subscribeWidget, widgetSnapshot } from './widgetStore';
 
 export interface WidgetState<T> {
   envelope: WidgetEnvelope<T> | null;
@@ -21,59 +18,25 @@ export interface WidgetState<T> {
  * and again whenever the tab/PWA becomes visible.
  */
 export function useWidget<T>(id: string): WidgetState<T> {
-  const [envelope, setEnvelope] = useState<WidgetEnvelope<T> | null>(null);
-  const [offline, setOffline] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const request = useCallback(async (url: string, init?: RequestInit) => {
-    try {
-      const res = await fetch(url, init);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const next = (await res.json()) as WidgetEnvelope<T>;
-      setEnvelope(next);
-      setOffline(false);
-    } catch {
-      setOffline(true);
-    }
-  }, []);
-
   const refetch = useCallback(() => {
-    return request(`/api/widgets/${id}`);
-  }, [id, request]);
+    return readWidget(id);
+  }, [id]);
 
   const refresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await request(`/api/widgets/${id}/refresh`, { method: 'POST' });
-    } finally {
-      setRefreshing(false);
-    }
-  }, [id, request]);
+    await refreshWidget(id);
+  }, [id]);
 
-  useEffect(() => {
-    refetch();
+  const snapshot = useSyncExternalStore(
+    useCallback((listener) => subscribeWidget(id, listener), [id]),
+    useCallback(() => widgetSnapshot<T>(id), [id]),
+    useCallback(() => widgetSnapshot<T>(id), [id]),
+  );
 
-    const pollMs = Math.min(
-      Math.max((envelope?.refreshMs ?? 60_000) / 2, MIN_POLL_MS),
-      MAX_POLL_MS,
-    );
-    const timer = setInterval(refetch, pollMs);
-
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') refetch();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-
-    // The weather provider's cache updates as soon as the device reports a new
-    // location, ahead of this widget's own poll interval — refetch right away.
-    if (id === 'weather') window.addEventListener(WEATHER_LOCATION_UPDATED_EVENT, refetch);
-
-    return () => {
-      clearInterval(timer);
-      document.removeEventListener('visibilitychange', onVisible);
-      if (id === 'weather') window.removeEventListener(WEATHER_LOCATION_UPDATED_EVENT, refetch);
-    };
-  }, [id, refetch, envelope?.refreshMs]);
-
-  return { envelope, offline, refetch, refresh, refreshing };
+  return {
+    envelope: snapshot.envelope,
+    offline: snapshot.offline,
+    refreshing: snapshot.refreshing,
+    refetch,
+    refresh,
+  };
 }
