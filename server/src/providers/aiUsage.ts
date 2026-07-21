@@ -378,9 +378,29 @@ export type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'modelWeek
  * Recent Claude Code versions can return only run statistics from `claude -p "/usage"` when
  * an account is at its cap. That is not an authoritative zero-quota report, so retain the last
  * report that did include quota data. An explicit no-limits report has `asOf` and still replaces it.
+ *
+ * The retained report only holds while its own windows haven't reset yet: once a window's
+ * `resetsAt` has passed, that percentage is provably wrong (the real window has moved on), not
+ * merely stale, so it's dropped rather than kept forever — without this a single missed live read
+ * (the interactive probe times out, transcripts are empty) could pin the widget to an old reading
+ * indefinitely, since nothing else ever re-validates it.
  */
-export function retainKnownClaudeQuota(live: ClaudeQuota, previous?: ClaudeQuota): ClaudeQuota {
-  return live.asOf ? live : previous ?? live;
+export function retainKnownClaudeQuota(live: ClaudeQuota, previous?: ClaudeQuota, now = Date.now()): ClaudeQuota {
+  if (live.asOf || !previous) return live;
+  const stillCurrent = <T extends { resetsAt: string }>(window: T | undefined) =>
+    window && Date.parse(window.resetsAt) > now ? window : undefined;
+  const fiveHour = stillCurrent(previous.fiveHour);
+  const weekly = stillCurrent(previous.weekly);
+  const modelWeekly = stillCurrent(previous.modelWeekly);
+  if (!fiveHour && !weekly && !modelWeekly) return live;
+  return {
+    fiveHour,
+    weekly,
+    modelWeekly,
+    fiveHourStatus: fiveHour ? previous.fiveHourStatus : live.fiveHourStatus,
+    weeklyStatus: weekly ? previous.weeklyStatus : live.weeklyStatus,
+    asOf: previous.asOf,
+  };
 }
 
 const MONTH_ABBREVIATIONS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];

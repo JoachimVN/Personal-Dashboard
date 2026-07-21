@@ -248,9 +248,53 @@ describe('aiCandidates', () => {
     expect(runway).toMatchObject({ title: '20% available', accent: 'codex' });
     expect(runway?.detail).toContain('Codex · 5-hour limit');
   });
+
+  it('does not flag heavy usage from a few hours of same-day samples right after a window reset', () => {
+    // All samples land on the same UTC day as "now" and are excluded as the partial, still-forming
+    // bucket — mirroring githubCandidates' own trailing window — so there's no prior-day baseline yet.
+    const data: AiUsageToolData = {
+      available: true,
+      fiveHour: { usedPercent: 70, resetsAt: '2026-07-20T18:00:00.000Z' },
+      history: [
+        { at: '2026-07-20T10:00:00.000Z', fiveHourUsedPercent: 0 },
+        { at: '2026-07-20T10:15:00.000Z', fiveHourUsedPercent: 1 },
+        { at: '2026-07-20T10:30:00.000Z', fiveHourUsedPercent: 2 },
+        { at: '2026-07-20T13:00:00.000Z', fiveHourUsedPercent: 70 },
+      ],
+    };
+
+    const anomaly = aiCandidates([{ id: 'claude', label: 'Claude', data }], 14, 50)
+      .find((candidate) => candidate.id === 'ai-usage:anomaly:claude');
+
+    expect(anomaly).toBeUndefined();
+  });
+
+  it('flags heavy usage against a trailing daily-average baseline, not a raw sample-count slice', () => {
+    const priorDay = (date: string, percent: number): AiUsageToolData['history'][number] => (
+      { at: `${date}T12:00:00.000Z`, fiveHourUsedPercent: percent }
+    );
+    const data: AiUsageToolData = {
+      available: true,
+      fiveHour: { usedPercent: 90, resetsAt: '2026-07-20T18:00:00.000Z' },
+      history: [
+        priorDay('2026-07-15', 10),
+        priorDay('2026-07-16', 12),
+        priorDay('2026-07-17', 8),
+        priorDay('2026-07-18', 11),
+        { at: '2026-07-20T09:00:00.000Z', fiveHourUsedPercent: 90 },
+      ],
+    };
+
+    const anomaly = aiCandidates([{ id: 'claude', label: 'Claude', data }], 14, 50)
+      .find((candidate) => candidate.id === 'ai-usage:anomaly:claude');
+
+    expect(anomaly).toMatchObject({ kicker: 'Heavy usage', title: 'Claude running well above usual' });
+  });
 });
 
 describe('spotifyCandidates', () => {
+  const RECENT_PLAYED_MAX_AGE_MS = 6 * 60 * 60_000;
+
   it('uses the primary artist for a newly surfaced album', () => {
     const data: SpotifyData = {
       nowPlaying: null,
@@ -275,7 +319,7 @@ describe('spotifyCandidates', () => {
       trackAllTime: false,
       artistShort: false, artistMedium: false, artistLong: false, artistAllTime: false,
       albumAllTime: true,
-    });
+    }, RECENT_PLAYED_MAX_AGE_MS);
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-album:album-id')).toMatchObject({
       detail: 'Primary Artist',
@@ -301,7 +345,7 @@ describe('spotifyCandidates', () => {
       trackAllTime: false,
       artistShort: false, artistMedium: false, artistLong: false, artistAllTime: false,
       albumAllTime: false,
-    });
+    }, RECENT_PLAYED_MAX_AGE_MS);
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-track:long:Baptized In Fear')?.kicker)
       .toBe('New top track this past year');
@@ -320,7 +364,7 @@ describe('spotifyCandidates', () => {
       trackShort: false, trackMedium: false, trackLong: false, trackAllTime: false,
       artistShort: true, artistMedium: false, artistLong: false, artistAllTime: false,
       albumAllTime: false,
-    });
+    }, RECENT_PLAYED_MAX_AGE_MS);
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-artist:short:artist-id')).toMatchObject({
       kicker: 'New #1 artist · this month',
@@ -347,7 +391,7 @@ describe('spotifyCandidates', () => {
       trackShort: false, trackMedium: false, trackLong: false, trackAllTime: true,
       artistShort: false, artistMedium: false, artistLong: false, artistAllTime: true,
       albumAllTime: false,
-    });
+    }, RECENT_PLAYED_MAX_AGE_MS);
 
     expect(candidates.find((candidate) => candidate.id === 'spotify:new-track:allTime:track-id')).toMatchObject({
       kicker: 'New top track of all time',
@@ -357,6 +401,44 @@ describe('spotifyCandidates', () => {
       kicker: 'New #1 artist · of all time',
       score: 90,
     });
+  });
+
+  const NO_FRESH_CHANGES = {
+    trackShort: false, trackMedium: false, trackLong: false, trackAllTime: false,
+    artistShort: false, artistMedium: false, artistLong: false, artistAllTime: false,
+    albumAllTime: false,
+  };
+
+  it('surfaces "Last played" for a track that played within the max age', () => {
+    const data: SpotifyData = {
+      nowPlaying: null,
+      recentlyPlayed: [{ id: 'track-id', track: 'Recent Track', artist: 'Recent Artist', playedAt: '2026-07-21T08:00:00.000Z' }],
+      topArtists: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      topTracks: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      allTime: { artists: [], tracks: [], albums: [] },
+    };
+
+    const candidates = spotifyCandidates(data, NO_FRESH_CHANGES, RECENT_PLAYED_MAX_AGE_MS);
+
+    expect(candidates.find((candidate) => candidate.id === 'spotify:recent:track-id')).toMatchObject({
+      kicker: 'Last played',
+      title: 'Recent Track',
+    });
+  });
+
+  it('drops "Last played" once the track is older than the max age, instead of lingering forever', () => {
+    const staleDate = new Date(Date.now() - RECENT_PLAYED_MAX_AGE_MS - 60_000).toISOString();
+    const data: SpotifyData = {
+      nowPlaying: null,
+      recentlyPlayed: [{ id: 'track-id', track: 'Stale Track', artist: 'Stale Artist', playedAt: staleDate }],
+      topArtists: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      topTracks: { shortTerm: [], mediumTerm: [], longTerm: [] },
+      allTime: { artists: [], tracks: [], albums: [] },
+    };
+
+    const candidates = spotifyCandidates(data, NO_FRESH_CHANGES, RECENT_PLAYED_MAX_AGE_MS);
+
+    expect(candidates).toHaveLength(0);
   });
 });
 

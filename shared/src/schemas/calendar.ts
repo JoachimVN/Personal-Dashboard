@@ -1,7 +1,10 @@
 import { z } from 'zod';
 
 export const calendarSchema = z.object({
-  /** Next 7 days of events, expanded (recurrence applied) and sorted by start. */
+  /**
+   * The display grids for the current month and a few months either side, expanded (recurrence
+   * applied) and sorted by start.
+   */
   events: z.array(
     z.object({
       id: z.string(),

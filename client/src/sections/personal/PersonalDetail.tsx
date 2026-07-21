@@ -66,18 +66,21 @@ function PersonalSignals() {
   const gmail = useWidget<GmailData>('gmail').envelope?.data;
   const imessage = useWidget<IMessageData>('imessage').envelope?.data;
   const unreadMessages = imessage?.conversations.reduce((sum, c) => sum + c.unreadCount, 0);
-  const next = calendar?.events[0];
+  const next = calendar?.events.find((event) => new Date(event.end).getTime() >= Date.now());
   let nextEventDetail = 'Nothing scheduled next';
   if (next) {
     nextEventDetail = next.allDay ? 'All day' : next.startLabel;
   }
+  // The badge shows the *next event's* date, not always today's — otherwise a future event
+  // reads as if it's happening today.
+  const badgeDate = next ? new Date(`${next.date}T12:00:00`) : new Date();
 
   return (
     <div className="detail-signal-panel grid grid-cols-[auto_1fr] items-center gap-x-5 gap-y-3">
       <div className="row-span-2 text-center">
-        <p className="text-4xl font-semibold tracking-[-0.07em] tabular-nums">{new Date().getDate()}</p>
+        <p className="text-4xl font-semibold tracking-[-0.07em] tabular-nums">{badgeDate.getDate()}</p>
         <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
-          {new Date().toLocaleDateString('en-GB', { month: 'short' })}
+          {badgeDate.toLocaleDateString('en-GB', { month: 'short' })}
         </p>
       </div>
       <div className="min-w-0 border-l border-card-border pl-5">

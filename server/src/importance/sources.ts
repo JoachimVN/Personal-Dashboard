@@ -13,6 +13,7 @@ import type {
   SpotifyData,
   SteamData,
   TransitData,
+  UsageHistoryPoint,
   WeatherData,
   WidgetStatus,
 } from '@personal-dashboard/shared';
@@ -244,7 +245,11 @@ const TIMEFRAME_PERIOD: Record<Timeframe, string> = {
   allTime: 'of all time', long: 'this past year', medium: 'these last few months', short: 'this month',
 };
 
-export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyFreshness): Candidate[] {
+export function spotifyCandidates(
+  data: SpotifyData | undefined,
+  fresh: SpotifyFreshness,
+  recentPlayedMaxAgeMs: number,
+): Candidate[] {
   if (!data) return [];
   const candidates: Candidate[] = [];
 
@@ -291,9 +296,11 @@ export function spotifyCandidates(data: SpotifyData | undefined, fresh: SpotifyF
     });
   }
 
-  // No fresh change to headline — still worth a quiet tile naming your current favorite.
+  // No fresh change to headline — still worth a quiet tile naming your current favorite, but
+  // only while the play itself is recent enough to still be "last played" and not a fixture.
   const recent = data.recentlyPlayed[0];
-  if (recent && !candidates.length) {
+  const recentIsFresh = recent !== undefined && Date.now() - new Date(recent.playedAt).getTime() < recentPlayedMaxAgeMs;
+  if (recent && recentIsFresh && !candidates.length) {
     candidates.push({
       id: `spotify:recent:${recent.id ?? recent.track}`, source: 'spotify', kind: 'spotify', score: 28, shapes: ['tile'],
       kicker: 'Last played', title: recent.track, detail: recent.artist,
@@ -438,6 +445,27 @@ function aiResetCandidates(available: AiTool[]): Candidate[] {
   }];
 }
 
+/**
+ * One average `fiveHourUsedPercent` per calendar day (UTC), oldest first. History points are
+ * sampled every ~15 minutes (see `usageHistory.ts`), so slicing the raw array by `baselineWindowDays`
+ * would take the last few hours, not the last few days — bucketing first keeps the unit the caller
+ * actually asked for, matching how `githubCandidates` compares against trailing daily counts.
+ */
+function dailyFiveHourAverages(history: UsageHistoryPoint[]): number[] {
+  const byDay = new Map<string, { sum: number; count: number }>();
+  for (const point of history) {
+    if (point.fiveHourUsedPercent === undefined) continue;
+    const day = point.at.slice(0, 10);
+    const bucket = byDay.get(day) ?? { sum: 0, count: 0 };
+    bucket.sum += point.fiveHourUsedPercent;
+    bucket.count += 1;
+    byDay.set(day, bucket);
+  }
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, { sum, count }]) => sum / count);
+}
+
 function aiToolCandidates(
   tool: AiTool,
   baselineWindowDays: number,
@@ -450,10 +478,8 @@ function aiToolCandidates(
   // pace, so comparing it against trailing samples would flag every Friday as "anomalous."
   const currentFiveHour = data.fiveHour?.usedPercent;
   if (currentFiveHour === undefined) return candidates;
-  const priorFiveHour = data.history
-    .map((point) => point.fiveHourUsedPercent)
-    .filter((value): value is number => value !== undefined)
-    .slice(-baselineWindowDays);
+  // Excludes today's (partial, still-forming) bucket, mirroring githubCandidates' own trailing window.
+  const priorFiveHour = dailyFiveHourAverages(data.history).slice(-(baselineWindowDays + 1), -1);
   const deviation = computeDeviation(currentFiveHour, priorFiveHour, baselineDeviationPercent);
   if (deviation?.anomalous && deviation.direction === 'above') {
     candidates.push({

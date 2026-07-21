@@ -3,7 +3,7 @@ import ical from 'node-ical';
 import { calendarSchema, type CalendarData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 
-const RANGE_DAYS = 7;
+const MAX_EVENTS = 2000;
 
 type CalendarEvent = CalendarData['events'][number];
 type ExpandedEvent = { event: VEvent; start: Date; end: Date };
@@ -129,9 +129,11 @@ function eventFromOccurrence(
     description: text(event.description).trim() || undefined,
     start: start.toISOString(),
     end: end.toISOString(),
-    // All-day DTSTARTs are date-only (midnight UTC) — read the date
-    // straight off them instead of shifting through the timezone.
-    date: allDay ? start.toISOString().slice(0, 10) : dateFmt.format(start),
+    // node-ical parses date-only (VALUE=DATE) fields as local midnight in the server's OS
+    // timezone, not UTC midnight, so its instant must be read back through the dashboard
+    // timezone formatter rather than sliced off the raw ISO string (which silently lands on
+    // the previous day whenever the OS timezone is ahead of UTC).
+    date: dateFmt.format(start),
     startLabel: allDay ? 'all day' : timeFmt.format(start),
     endLabel: allDay ? '' : timeFmt.format(end),
   };
@@ -162,6 +164,26 @@ function eventsForCalendarObject(
   const parsed = ical.sync.parseICS(data) as Record<string, VEvent>;
   return Object.values(parsed).flatMap((component) =>
     eventsForComponent(component, calendarName, rangeStart, rangeEnd, dateFmt, timeFmt));
+}
+
+/** How many months either side of the current one the client is allowed to page to. */
+const MONTH_RANGE = 12;
+
+/**
+ * The display range spanning MONTH_RANGE months either side of the current one, each grid
+ * Monday-start and padded to whole weeks, in the dashboard's timezone, expressed as UTC day
+ * boundaries — wide enough that the client can page between them from cached data, with no
+ * per-request fetch.
+ */
+function monthGridRange(now: Date, dateFmt: DateFormatter): { start: Date; end: Date } {
+  const [year, month] = dateFmt.format(now).split('-').map(Number);
+  const rangeStartMonth = new Date(Date.UTC(year, month - 1 - MONTH_RANGE, 1));
+  const rangeEndMonth = new Date(Date.UTC(year, month + MONTH_RANGE, 0));
+  const leadingDays = (rangeStartMonth.getUTCDay() + 6) % 7;
+  const trailingDays = 6 - ((rangeEndMonth.getUTCDay() + 6) % 7);
+  const start = new Date(rangeStartMonth.getTime() - leadingDays * 86_400_000);
+  const end = new Date(rangeEndMonth.getTime() + (trailingDays + 1) * 86_400_000);
+  return { start, end };
 }
 
 export function createCalendarProvider(
@@ -204,8 +226,7 @@ export function createCalendarProvider(
         }),
       );
 
-      const rangeStart = new Date();
-      const rangeEnd = new Date(rangeStart.getTime() + RANGE_DAYS * 86_400_000);
+      const { start: rangeStart, end: rangeEnd } = monthGridRange(new Date(), dateFmt);
 
       const calendars = (await race(client.fetchCalendars())).filter((calendar) => {
         const name = text(calendar.displayName as string | undefined);
@@ -226,7 +247,7 @@ export function createCalendarProvider(
       const events = eventGroups.flat();
 
       events.sort((a, b) => a.start.localeCompare(b.start));
-      return { events: events.slice(0, 50) };
+      return { events: events.slice(0, MAX_EVENTS) };
     },
   };
 }

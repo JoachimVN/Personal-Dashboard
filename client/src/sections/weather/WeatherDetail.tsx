@@ -286,7 +286,7 @@ interface HourlyChartProps {
   onActiveChange: (index: number | null) => void;
 }
 
-function nearestHourlyIndex(event: React.PointerEvent<SVGSVGElement>, hourCount: number): number {
+function nearestHourlyIndex(event: React.PointerEvent<Element>, hourCount: number): number {
   const rect = event.currentTarget.getBoundingClientRect();
   const position = (event.clientX - rect.left) / rect.width;
   return Math.min(hourCount - 1, Math.max(0, Math.floor(position * hourCount)));
@@ -303,17 +303,14 @@ function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProp
   const yAt = (t: number) => CHART_H - ((t - min) / (max - min)) * CHART_H;
   const line = temps.map((t, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(t)}`).join(' ');
 
-  const totalRain = Math.round(hours.reduce((sum, h) => sum + h.precipitationMm, 0) * 10) / 10;
   const peak = temps.indexOf(Math.max(...temps));
 
-  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => onActiveChange(nearestHourlyIndex(event, hours.length));
+  const readNearest = (event: React.PointerEvent<Element>) => onActiveChange(nearestHourlyIndex(event, hours.length));
 
   let readout = `peak ${deg(temps[peak])} at ${hours[peak].hourLabel}:00`;
-  if (totalRain > 0) readout += ` · ${totalRain} mm rain expected`;
   if (active != null) {
     const hour = hours[active];
     readout = `${hour.hourLabel}:00 · ${symbolLabel(hour.symbol)} · ${deg(hour.temperature)}`;
-    if (hour.precipitationMm > 0) readout += ` · ${hour.precipitationMm} mm`;
   }
 
   return (
@@ -384,7 +381,7 @@ function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProp
         )}
       </div>
       <HourAxisLabels hours={hours} />
-      <HourlyReadout text={readout} unit={`°C${totalRain > 0 ? ' · mm' : ''}`} />
+      <HourlyReadout text={readout} unit="°C" />
     </div>
   );
 }
@@ -394,29 +391,47 @@ function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProp
 function HourlyRainChart({ hours, active, onActiveChange }: Readonly<HourlyChartProps>) {
   const rainMax = Math.max(...hours.map((h) => h.precipitationMm), 0);
   const totalRain = Math.round(hours.reduce((sum, h) => sum + h.precipitationMm, 0) * 10) / 10;
+  const readNearest = (event: React.PointerEvent<Element>) => onActiveChange(nearestHourlyIndex(event, hours.length));
+  let readout = rainMax > 0 ? `${totalRain} mm total over the next ${hours.length} h` : `no rain expected in the next ${hours.length} h`;
+  if (active != null) {
+    const hour = hours[active];
+    readout = `${hour.hourLabel}:00 · ${symbolLabel(hour.symbol)} · ${hour.precipitationMm.toFixed(1)} mm precipitation`;
+  }
 
   return (
     <div>
-      <div className="flex h-32 items-end" aria-label="Precipitation per hour" onPointerLeave={() => onActiveChange(null)}>
-        {hours.map((hour, i) => (
-          <div key={hour.time} className="flex h-full flex-1 items-end justify-center" onPointerEnter={() => onActiveChange(i)}>
-            {hour.precipitationMm > 0 && (
-              <motion.div
-                className="w-1/2 max-w-5 rounded-t-[4px]"
-                style={{ background: PRECIP_COLOR, opacity: active == null || active === i ? 0.85 : 0.4 }}
-                initial={{ height: 0 }}
-                animate={{ height: `${Math.max((hour.precipitationMm / Math.max(rainMax, 1)) * 100, 8)}%` }}
-                transition={{ duration: 0.7, delay: 0.1 + i * 0.03, ease: [0.22, 1, 0.36, 1] }}
-              />
-            )}
-          </div>
-        ))}
+      <div
+        className="relative h-32 touch-none"
+        aria-label="Precipitation per hour"
+        onPointerMove={readNearest}
+        onPointerDown={readNearest}
+        onPointerLeave={() => onActiveChange(null)}
+      >
+        <div className="flex h-full items-end">
+          {hours.map((hour, i) => (
+            <div key={hour.time} className="flex h-full flex-1 items-end justify-center">
+              {hour.precipitationMm > 0 && (
+                <motion.div
+                  className="w-1/2 max-w-5 rounded-t-[4px]"
+                  style={{ background: PRECIP_COLOR, opacity: active == null || active === i ? 0.85 : 0.4 }}
+                  initial={{ height: 0 }}
+                  animate={{ height: `${Math.max((hour.precipitationMm / Math.max(rainMax, 1)) * 100, 8)}%` }}
+                  transition={{ duration: 0.7, delay: 0.1 + i * 0.03, ease: [0.22, 1, 0.36, 1] }}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+        {active != null && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 w-px bg-ink-faint/40"
+            style={{ left: `${((active + 0.5) / hours.length) * 100}%` }}
+          />
+        )}
       </div>
       <HourAxisLabels hours={hours} />
-      <HourlyReadout
-        text={rainMax > 0 ? `${totalRain} mm total over the next ${hours.length} h` : `no rain expected in the next ${hours.length} h`}
-        unit="mm"
-      />
+      <HourlyReadout text={readout} unit="mm" />
     </div>
   );
 }
@@ -464,8 +479,7 @@ function HourlyLineChart({
     const point = points.find((p) => p.i === active);
     if (point) readout = `${point.hour.hourLabel}:00 · ${format(point.value)}`;
   }
-
-  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => onActiveChange(nearestHourlyIndex(event, hours.length));
+  const readNearest = (event: React.PointerEvent<Element>) => onActiveChange(nearestHourlyIndex(event, hours.length));
 
   return (
     <div>

@@ -210,7 +210,7 @@ export function createCommandCenterProvider(
         ...hueCandidates(widgetData<HueData>(envelopes, 'hue')),
         ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
         ...aiNewsCandidates(widgetData<AiNewsData>(envelopes, 'ai-news')),
-        ...spotifyCandidates(spotify, spotifyFresh),
+        ...spotifyCandidates(spotify, spotifyFresh, config.commandCenter.spotifyRecentPlayedMaxAgeMs),
         ...steamCandidates(steam, config.commandCenter.steamAchievementFreshMs, steamMoments, config.commandCenter.steamRareAchievementPercent),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),

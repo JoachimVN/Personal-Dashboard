@@ -46,6 +46,7 @@ import {
 const MOCK_PORT = 4823;
 const CLIENT_PORT = 5199;
 const GMAIL_FRESH_MS = 30 * 60_000;
+const SPOTIFY_RECENT_PLAYED_MAX_AGE_MS = 6 * 60 * 60_000;
 const VIEWPORT = { width: 1600, height: 900 };
 
 // A capture only overwrites the committed PNG once more than this many pixels differ beyond the
@@ -139,7 +140,7 @@ async function buildPages(): Promise<Page[]> {
       trackAllTime: false,
       artistAllTime: false,
       albumAllTime: false,
-    }),
+    }, SPOTIFY_RECENT_PLAYED_MAX_AGE_MS),
     ...aiCandidates(
       [
         { id: 'claude', label: 'Claude', data: overviewAiClaudeFixture },
