@@ -35,7 +35,7 @@ function ChevronIcon({ direction }: Readonly<{ direction: 'left' | 'right' }>) {
 }
 
 /** How many months either side of the current one the server keeps cached. */
-const MAX_MONTH_OFFSET = 3;
+const MAX_MONTH_OFFSET = 12;
 
 function monthReference(offset: number): Date {
   const now = new Date();
@@ -226,7 +226,7 @@ export function CalendarWidget() {
                 >
                   <ChevronIcon direction="left" />
                 </button>
-                <p className="whitespace-nowrap text-sm font-semibold text-ink">{monthLabel}</p>
+                <p className="w-32 shrink-0 whitespace-nowrap text-center text-sm font-semibold text-ink">{monthLabel}</p>
                 <button
                   type="button"
                   onClick={() => goToMonth(monthOffset + 1)}
@@ -236,15 +236,13 @@ export function CalendarWidget() {
                 >
                   <ChevronIcon direction="right" />
                 </button>
-                {monthOffset !== 0 && (
-                  <button
-                    type="button"
-                    onClick={() => goToMonth(0)}
-                    className="ml-1 whitespace-nowrap rounded-full border border-card-border px-2 py-0.5 text-[10px] font-medium text-ink-faint transition hover:border-ink-faint hover:text-ink"
-                  >
-                    Today
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => goToMonth(0)}
+                  className={`ml-1 whitespace-nowrap rounded-full border border-card-border px-2 py-0.5 text-[10px] font-medium text-ink-faint transition hover:border-ink-faint hover:text-ink ${monthOffset === 0 ? 'invisible' : ''}`}
+                >
+                  Today
+                </button>
               </div>
               <UpNext events={data.events} />
             </div>

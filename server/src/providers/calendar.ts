@@ -3,7 +3,7 @@ import ical from 'node-ical';
 import { calendarSchema, type CalendarData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 
-const MAX_EVENTS = 500;
+const MAX_EVENTS = 2000;
 
 type CalendarEvent = CalendarData['events'][number];
 type ExpandedEvent = { event: VEvent; start: Date; end: Date };
@@ -167,7 +167,7 @@ function eventsForCalendarObject(
 }
 
 /** How many months either side of the current one the client is allowed to page to. */
-const MONTH_RANGE = 3;
+const MONTH_RANGE = 12;
 
 /**
  * The display range spanning MONTH_RANGE months either side of the current one, each grid
