@@ -15,6 +15,9 @@ export interface ServerEnv {
   spotify?: { clientId: string; clientSecret: string };
   hue?: { clientId: string; clientSecret: string };
   steam?: { apiKey: string; steamId: string };
+  clashRoyale?: { apiKey: string; playerTag: string };
+  roblox?: { idOrUsername: string; robloSecurity?: string };
+  sonarCloud?: { token: string; orgKey: string };
 }
 
 function parseWeather(): ServerEnv['weather'] {
@@ -37,6 +40,26 @@ export function parseSteam(): ServerEnv['steam'] {
     return undefined;
   }
   return { apiKey, steamId };
+}
+
+export function parseClashRoyale(): ServerEnv['clashRoyale'] {
+  const apiKey = process.env.CLASH_ROYALE_API_KEY;
+  const playerTag = process.env.CLASH_ROYALE_ID;
+  if (!apiKey || !playerTag) return undefined;
+  return { apiKey, playerTag };
+}
+
+export function parseRoblox(): ServerEnv['roblox'] {
+  const idOrUsername = process.env.ROBLOX_ID;
+  if (!idOrUsername) return undefined;
+  return { idOrUsername, robloSecurity: process.env.ROBLOSECURITY || undefined };
+}
+
+export function parseSonarCloud(): ServerEnv['sonarCloud'] {
+  const token = process.env.SONARCLOUD_TOKEN;
+  const orgKey = process.env.SONARCLOUD_ORG;
+  if (!token || !orgKey) return undefined;
+  return { token, orgKey };
 }
 
 export function loadEnv(): ServerEnv {
@@ -91,5 +114,8 @@ export function loadEnv(): ServerEnv {
         ? { clientId: process.env.HUE_CLIENT_ID, clientSecret: process.env.HUE_CLIENT_SECRET }
         : undefined,
     steam: parseSteam(),
+    clashRoyale: parseClashRoyale(),
+    roblox: parseRoblox(),
+    sonarCloud: parseSonarCloud(),
   };
 }
