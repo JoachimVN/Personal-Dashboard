@@ -42,7 +42,8 @@ describeDatabase('Postgres stores', () => {
 
   it('deduplicates usage samples and retains the last good snapshot', async () => {
     const store = new UsageHistoryStore(database, 15 * 60_000, 7 * 24 * 60 * 60_000);
-    const snapshot = { available: true, asOf: '2026-07-13T12:00:00.000Z', fiveHour: { usedPercent: 12, resetsAt: '2026-07-13T14:00:00.000Z' } };
+    const asOf = new Date(Date.now() - 60_000).toISOString();
+    const snapshot = { available: true, asOf, fiveHour: { usedPercent: 12, resetsAt: '2026-07-13T14:00:00.000Z' } };
     expect(await store.record('codex', snapshot)).toHaveLength(1);
     expect(await store.record('codex', snapshot)).toHaveLength(1);
     expect(await store.getSnapshot('codex')).toEqual(snapshot);
