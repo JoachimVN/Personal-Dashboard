@@ -127,22 +127,20 @@ function EventList({ events }: Readonly<{ events: CalendarEvent[] }>) {
     return <p className="text-sm text-ink-faint">Nothing scheduled.</p>;
   }
   return (
-    <ul className="space-y-1 text-sm">
+    <ul className="space-y-0.5 text-sm">
       {events.map((event) => (
-        <li key={event.id} className="flex items-baseline gap-2">
-          <span className="w-20 shrink-0 tabular-nums text-ink-muted">
-            {event.allDay ? 'all day' : `${event.startLabel}–${event.endLabel}`}
+        <li key={event.id} className="-mx-2 flex gap-3 rounded-xl px-2 py-1.5 transition hover:bg-track">
+          <span
+            aria-hidden
+            title={event.calendar}
+            className="w-1 shrink-0 self-stretch rounded-full"
+            style={{ backgroundColor: calendarColor(event.calendar) }}
+          />
+          <span className="w-20 shrink-0 pt-px tabular-nums text-ink-muted">
+            {event.allDay ? 'All day' : `${event.startLabel}–${event.endLabel}`}
           </span>
-          <span className="min-w-0">
-            <span className="flex items-center gap-1.5">
-              <span
-                aria-hidden
-                title={event.calendar}
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: calendarColor(event.calendar) }}
-              />
-              <span className="truncate font-medium">{event.title}</span>
-            </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium text-ink">{event.title}</span>
             {event.location && (
               <a
                 href={mapsSearchHref(event.location)}
@@ -169,17 +167,21 @@ function EventList({ events }: Readonly<{ events: CalendarEvent[] }>) {
 
 /** The very next event, wherever it falls — including past the visible grid (e.g. early next
  *  month) — so it's never hidden just because the calendar hasn't turned the page yet. */
-function UpNext({ events }: Readonly<{ events: CalendarEvent[] }>) {
+function UpNext({ events, onSelect }: Readonly<{ events: CalendarEvent[]; onSelect: (date: string) => void }>) {
   const next = events.find((event) => new Date(event.end).getTime() >= Date.now());
   if (!next) return null;
   const when = next.allDay ? dayHeading(next.date) : `${dayHeading(next.date)} · ${next.startLabel}`;
   return (
-    <p className="flex min-w-0 items-baseline gap-1.5 text-xs text-ink-muted">
-      <span className="shrink-0 font-semibold uppercase tracking-wide text-ink-faint">Next</span>
+    <button
+      type="button"
+      onClick={() => onSelect(next.date)}
+      className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded-full bg-track px-2.5 py-1 text-xs text-ink-muted transition hover:bg-(--color-accent-personal)/15 hover:text-ink"
+    >
+      <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-(--color-accent-personal)" />
       <span className="truncate">
         <span className="font-medium text-ink">{next.title}</span> · {when}
       </span>
-    </p>
+    </button>
   );
 }
 
@@ -206,6 +208,15 @@ export function CalendarWidget() {
     setSelectedDate(clamped === 0 ? todayKey() : firstOfMonthKey(clamped));
   }
 
+  /** Jump the visible month (if needed) and select an arbitrary date, e.g. from the "up next" chip. */
+  function goToDate(date: string) {
+    const target = new Date(`${date}T12:00:00`);
+    const now = new Date();
+    const offset = (target.getFullYear() - now.getFullYear()) * 12 + (target.getMonth() - now.getMonth());
+    setMonthOffset(Math.max(-MAX_MONTH_OFFSET, Math.min(MAX_MONTH_OFFSET, offset)));
+    setSelectedDate(date);
+  }
+
   return (
     <WidgetCard title="Calendar" envelope={envelope} offline={offline}>
       {(data) => {
@@ -222,7 +233,7 @@ export function CalendarWidget() {
                   onClick={() => goToMonth(monthOffset - 1)}
                   disabled={monthOffset <= -MAX_MONTH_OFFSET}
                   aria-label="Previous month"
-                  className="rounded p-0.5 text-ink-faint transition hover:bg-track hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
+                  className="cursor-pointer rounded p-0.5 text-ink-faint transition hover:bg-track hover:text-ink disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
                 >
                   <ChevronIcon direction="left" />
                 </button>
@@ -232,50 +243,67 @@ export function CalendarWidget() {
                   onClick={() => goToMonth(monthOffset + 1)}
                   disabled={monthOffset >= MAX_MONTH_OFFSET}
                   aria-label="Next month"
-                  className="rounded p-0.5 text-ink-faint transition hover:bg-track hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
+                  className="cursor-pointer rounded p-0.5 text-ink-faint transition hover:bg-track hover:text-ink disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
                 >
                   <ChevronIcon direction="right" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => goToMonth(0)}
-                  className={`ml-1 whitespace-nowrap rounded-full border border-card-border px-2 py-0.5 text-[10px] font-medium text-ink-faint transition hover:border-ink-faint hover:text-ink ${monthOffset === 0 ? 'invisible' : ''}`}
+                <span
+                  className={`grid overflow-hidden transition-[grid-template-columns] duration-300 ease-out ${
+                    monthOffset === 0 ? 'grid-cols-[0fr]' : 'grid-cols-[1fr]'
+                  }`}
                 >
-                  Today
-                </button>
+                  <span className="overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => goToMonth(0)}
+                      className="ml-1 block cursor-pointer whitespace-nowrap rounded-full bg-(--color-accent-personal) px-2 py-0.5 text-[10px] font-semibold text-(--color-canvas) transition hover:brightness-110"
+                    >
+                      Today
+                    </button>
+                  </span>
+                </span>
               </div>
-              <UpNext events={data.events} />
+              <UpNext events={data.events} onSelect={goToDate} />
             </div>
 
             <div>
               <div className="grid grid-cols-7 text-center text-[10px] font-medium uppercase tracking-wide text-ink-faint">
-                {WEEKDAY_LABELS.map((label) => (
-                  <span key={label} className="py-1">{label}</span>
+                {WEEKDAY_LABELS.map((label, index) => (
+                  <span key={label} className={index >= 5 ? 'py-1 text-ink-faint/60' : 'py-1'}>{label}</span>
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-0.5">
-                {grid.map((cell) => {
+                {grid.map((cell, index) => {
                   const dots = dotsForDay(eventsByDate.get(cell.key) ?? []);
                   const isSelected = cell.key === selectedDate;
+                  const isWeekend = index % 7 >= 5;
                   return (
                     <button
                       key={cell.key}
                       type="button"
                       onClick={() => setSelectedDate(cell.key)}
                       className={[
-                        'flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-xs transition',
-                        cell.inMonth ? 'text-ink' : 'text-ink-faint/60',
-                        isSelected
-                          ? 'bg-(--color-accent-personal)/15 ring-1 ring-(--color-accent-personal)'
-                          : 'hover:bg-track',
-                      ].join(' ')}
+                        'flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl text-xs transition',
+                        !cell.inMonth && 'text-ink-faint/60',
+                        cell.inMonth && isWeekend && !cell.isToday && 'text-ink-muted',
+                        cell.inMonth && !isWeekend && 'text-ink',
+                        isSelected ? 'bg-(--color-accent-personal)/15 ring-1 ring-(--color-accent-personal)' : 'hover:bg-track',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
                     >
-                      <span className={cell.isToday && !isSelected ? 'font-semibold text-(--color-accent-personal)' : undefined}>
+                      <span
+                        className={
+                          cell.isToday
+                            ? 'flex h-5 w-5 items-center justify-center rounded-full bg-(--color-accent-personal) font-semibold text-(--color-canvas)'
+                            : undefined
+                        }
+                      >
                         {cell.day}
                       </span>
-                      <span className="flex h-1 gap-0.5">
+                      <span className="flex h-1.5 gap-0.5">
                         {dots.slice(0, 4).map((color) => (
-                          <span key={color} aria-hidden className="h-1 w-1 rounded-full" style={{ backgroundColor: color }} />
+                          <span key={color} aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
                         ))}
                       </span>
                     </button>
