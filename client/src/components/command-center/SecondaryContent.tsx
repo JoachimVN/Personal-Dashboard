@@ -155,21 +155,26 @@ function RobloxNowPlayingSecondary({ slot, roblox }: Readonly<{ slot: CommandCen
   if (slot.render.type !== 'roblox-now-playing') return null;
   const presence = roblox?.presence;
   if (!presence || presence.status !== 'in-game') return null;
-  const stats = [
-    presence.playing !== undefined ? `${robloxCompactNumber.format(presence.playing)} playing now` : undefined,
-    presence.visits !== undefined ? `${robloxCompactNumber.format(presence.visits)} visits` : undefined,
-  ].filter((value): value is string => Boolean(value)).join(' · ');
-  return <div className="command-roblox-row mt-4">
-    {presence.thumbnailUrl && <img aria-hidden src={presence.thumbnailUrl} alt="" className="command-roblox-row-backdrop" />}
-    {presence.iconUrl ? (
-      <img src={presence.iconUrl} alt="" className="command-roblox-icon" />
-    ) : (
-      <div className="command-roblox-icon bg-track" />
-    )}
-    <div className="min-w-0 flex-1">
-      <p className="truncate text-sm font-semibold text-ink">{presence.gameName ?? 'Roblox'}</p>
-      {stats && <p className="mt-0.5 text-xs tabular-nums text-ink-muted">{stats}</p>}
+  const gameIcon = presence.iconUrl ? (
+    <img src={presence.iconUrl} alt="" className="command-roblox-icon" />
+  ) : (
+    <span className="command-roblox-icon command-roblox-icon--fallback" aria-hidden><img src="/roblox.svg" alt="" /></span>
+  );
+  return <div className="command-roblox-now mt-4">
+    <div className="command-roblox-brand" aria-label="Roblox">
+      <img src="/roblox_wordmark.svg" alt="Roblox" />
+      <span>In game</span>
     </div>
+    <div className="command-roblox-game">
+      <div className="min-w-0">
+        <p className="truncate text-base font-semibold text-ink">{presence.gameName ?? 'Roblox'}</p>
+        <dl className="command-roblox-stats">
+          {presence.playing !== undefined && <div><dt>Playing now</dt><dd>{robloxCompactNumber.format(presence.playing)}</dd></div>}
+          {presence.visits !== undefined && <div><dt>Visits</dt><dd>{robloxCompactNumber.format(presence.visits)}</dd></div>}
+        </dl>
+      </div>
+    </div>
+    {gameIcon}
   </div>;
 }
 

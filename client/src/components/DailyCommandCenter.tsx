@@ -6,7 +6,6 @@ import type {
   CommandCenterSlot,
   GitHubData,
   HealthData,
-  RobloxData,
   WeatherData,
 } from '@personal-dashboard/shared';
 import { deg, glyph, weatherLocation } from '../lib/weather';
@@ -89,7 +88,7 @@ function CommandPanel({
   );
 }
 
-function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined }>) {
+function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined }>) {
   const activityDay = health ? latestActivityDay(health) : undefined;
   const rings = slot.render.type === 'health-rings' && health && activityDay
     ? <CompactActivityRings
@@ -115,14 +114,15 @@ function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenter
   const weatherMark = slot.render.type === 'weather-signal'
     ? <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>
     : undefined;
-  const robloxIcon = slot.render.type === 'roblox-now-playing' && roblox?.presence?.iconUrl
-    ? <img src={roblox.presence.iconUrl} alt="" className="h-8 w-8 shrink-0 rounded-lg object-cover" />
+  const robloxIcon = slot.render.type === 'roblox-now-playing'
+    ? <span className="command-roblox-tile-mark" aria-hidden><img src="/roblox.svg" alt="" /></span>
     : undefined;
+  const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now' : slot.kicker;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
       {rings ?? toolMark ?? dualToolMarks ?? githubMark ?? weatherMark ?? robloxIcon ?? <span className="command-signal-dot" aria-hidden />}
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{signalKicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
         {contributionDays?.length
           ? <div className="command-contribution-squares" aria-label="Contributions over the last seven days">
@@ -353,6 +353,8 @@ export function DailyCommandCenter() {
     ? ranked.secondary
     : [ranked.secondary as unknown as CommandCenterSlot];
   const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
+  const isRobloxSecondary = activeSecondary?.render.type === 'roblox-now-playing';
+  const robloxSecondaryBackdrop = isRobloxSecondary ? roblox?.presence?.thumbnailUrl : undefined;
   const heroRender = ranked.hero.render;
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
@@ -375,20 +377,21 @@ export function DailyCommandCenter() {
       </div>
       <div className="command-layout">
         <HeroPanel hero={ranked.hero} event={heroEvent} track={heroTrack} kicker={heroKicker} extra={heroExtra} activity={heroActivity} weather={weather} />
-        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} />)}</div>
+        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} />)}</div>
       </div>
       {activeSecondary && <CommandPanel
         href={activeSecondary.href}
         label={`Open ${activeSecondary.kicker}: ${activeSecondary.title}`}
-        className={`command-agenda command-panel--${toneFor(activeSecondary)}`}
+        className={`command-agenda command-panel--${toneFor(activeSecondary)}${isRobloxSecondary ? ' command-agenda--roblox' : ''}`}
         fullCardLink
       >
+        {robloxSecondaryBackdrop && <img aria-hidden src={robloxSecondaryBackdrop} alt="" className="command-roblox-agenda-backdrop" />}
         <SecondaryCarousel
           items={secondarySlots}
           activeIndex={activeSecondaryIndex}
           onActiveChange={setActiveSecondaryIndex}
           renderItem={(slot) => <>
-            <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>
+            {slot.render.type !== 'roblox-now-playing' && <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>}
             <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyFetchedAt} health={health} github={github} gmail={gmail} weather={weather} steam={steam} roblox={roblox} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
           </>}
         />
