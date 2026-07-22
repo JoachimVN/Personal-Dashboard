@@ -57,8 +57,6 @@ export const clashRoyaleSchema = z.object({
   deckHeroIndex: z.number().int().nonnegative().optional(),
   /** The selected Tower Troop is reported separately from the eight battle cards. */
   towerTroop: clashRoyaleCardSchema.optional(),
-  /** Next 10 chests in the player's chest cycle, oldest (next-opened) first. */
-  upcomingChests: z.array(z.string()),
   recentBattles: z.array(clashRoyaleBattleSchema),
 });
 

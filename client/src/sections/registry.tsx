@@ -234,16 +234,17 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
     );
   }
     case 'clash-royale': {
-    /* A filled three-point crown with jeweled tips — Clash Royale's central emblem (you win
-       crowns, the logo itself is a gold crown) — instead of the previous plain zigzag outline. */
-    const accent = monochrome ? 'currentColor' : 'var(--accent)';
+    /* The game's own app icon, not a hand-drawn crown — reads correctly in both the colored
+       card header and the monochrome nav pill since it's art, not a currentColor glyph. */
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill={accent}>
-        <path d="M4 9.2 7.6 11.6 12 5.4l4.4 6.2L20 9.2l-1.3 8.4a1 1 0 0 1-1 .84H6.3a1 1 0 0 1-1-.84Z" />
-        <circle cx="4" cy="9.2" r="1.15" />
-        <circle cx="12" cy="5.4" r="1.25" />
-        <circle cx="20" cy="9.2" r="1.15" />
-      </svg>
+      <img
+        src="https://media.ffycdn.net/eu/supercell/nxaaEWAgbRGADkoAETG8.png"
+        alt=""
+        aria-hidden
+        className="h-5 w-5 rounded-[0.3rem] object-cover"
+        loading="lazy"
+        decoding="async"
+      />
     );
   }
   default:

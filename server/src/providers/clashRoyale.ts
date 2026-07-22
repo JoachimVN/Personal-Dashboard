@@ -176,12 +176,6 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
 
       const player = await crRequest<RawPlayer>(signal, auth.apiKey, `/players/${encodedTag}`, 'GetPlayer');
       const battleLog = await crRequest<RawBattle[]>(signal, auth.apiKey, `/players/${encodedTag}/battlelog`, 'GetBattleLog');
-      const upcomingChests = await crRequest<{ items: { name: string }[] }>(
-        signal,
-        auth.apiKey,
-        `/players/${encodedTag}/upcomingchests`,
-        'GetUpcomingChests',
-      );
       // Rarity is decorative (drives the card frame color) and isn't in the per-player payload;
       // fall back to an empty map on failure rather than losing the whole widget over it.
       const cardReference = await crRequest<{ items: RawCardReference[] }>(signal, auth.apiKey, '/cards', 'GetCards').catch(
@@ -211,7 +205,6 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
         deckHero: deckHero ? mapCard(deckHero.card, rarityById) : undefined,
         deckHeroIndex: deckHero?.index,
         towerTroop: player.currentDeckSupportCards?.[0] ? mapCard(player.currentDeckSupportCards[0], rarityById) : undefined,
-        upcomingChests: upcomingChests.items.map((item) => item.name),
         recentBattles: battleLog.slice(0, RECENT_BATTLES_COUNT).map(mapBattle),
       };
 

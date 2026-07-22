@@ -16,14 +16,17 @@ function winRate(data: ClashRoyaleData): number {
   return total === 0 ? 0 : Math.round((data.profile.wins / total) * 100);
 }
 
+/** Win/loss/draw tally only — battle trophyChange isn't safe to sum across battles: Path of
+ * Legends swings share the same field but aren't fixed-size like ladder trophies, so a mixed-mode
+ * sum reads as a plausible but meaningless "trophy gain". Individual battles still show their own
+ * real trophyChange in the battle log, just never combined across battles of different types. */
 function recentRecord(battles: ClashRoyaleBattle[]) {
   return battles.reduce((record, battle) => {
     if (battle.result === 'win') record.wins += 1;
     else if (battle.result === 'loss') record.losses += 1;
     else record.draws += 1;
-    record.trophies += battle.trophyChange ?? 0;
     return record;
-  }, { wins: 0, losses: 0, draws: 0, trophies: 0 });
+  }, { wins: 0, losses: 0, draws: 0 });
 }
 
 function currentStreak(battles: ClashRoyaleBattle[]): { result: ClashRoyaleBattle['result']; length: number } | undefined {
@@ -63,62 +66,53 @@ function Stat({ value, label, detail }: Readonly<{ value: string | number; label
   );
 }
 
-export function ClashRoyaleHero({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
+export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
   const { profile } = data;
+  const path = profile.pathOfLegends;
   const toFinish = Math.max(TROPHY_ROAD_MAX - profile.trophies, 0);
   const trophyRoadProgress = Math.min((profile.trophies / TROPHY_ROAD_MAX) * 100, 100);
+  const leagueName = path ? PATH_OF_LEGENDS_LEAGUES[path.leagueNumber - 1] ?? `League ${path.leagueNumber}` : undefined;
 
   return (
-    <section className={`clash-hero${compact ? ' clash-hero--compact' : ''}`}>
-      <div aria-hidden className="clash-hero-sunburst" />
-      <div className="clash-hero-copy">
-        <div className="clash-hero-kicker">
+    <section className={`clash-profile${compact ? ' clash-profile--compact' : ''}`}>
+      <div className="clash-profile-main">
+        <div className="clash-profile-kicker">
           <Crown filled />
           <span>{profile.arenaName}</span>
         </div>
-        <h2 className="clash-hero-name">{profile.name}</h2>
-        <p className="clash-hero-tag">{profile.tag}</p>
+        <h2 className="clash-profile-name">{profile.name}</h2>
+        <p className="clash-profile-tag">{profile.tag}</p>
         {profile.clanName && (
-          <p className="clash-hero-clan">
+          <p className="clash-profile-clan">
             <span aria-hidden>◆</span> {profile.clanName}{profile.clanScore !== undefined ? ` · ${formatNumber(profile.clanScore)}` : ''}
           </p>
         )}
       </div>
-      <div className="clash-trophy-panel">
-        <p className="clash-trophy-label">Trophy road</p>
-        <p className="clash-trophy-value">{formatNumber(profile.trophies)}</p>
-        <div className="clash-trophy-progress" aria-label={`${Math.round(trophyRoadProgress)} percent of the 14,000-trophy Trophy Road`}>
-          <span style={{ width: `${trophyRoadProgress}%` }} />
+      <div className="clash-profile-panels">
+        <div className="clash-trophy-panel">
+          <p className="clash-trophy-label">Trophy road</p>
+          <p className="clash-trophy-value">{formatNumber(profile.trophies)}</p>
+          <div className="clash-trophy-progress" aria-label={`${Math.round(trophyRoadProgress)} percent of the 14,000-trophy Trophy Road`}>
+            <span style={{ width: `${trophyRoadProgress}%` }} />
+          </div>
+          <p className="clash-trophy-note">
+            {toFinish === 0 ? 'Trophy Road complete · 14,000 max' : `${formatNumber(toFinish)} to 14,000 max`}
+          </p>
         </div>
-        <p className="clash-trophy-note">
-          {toFinish === 0 ? 'Trophy Road complete · 14,000 max' : `${formatNumber(toFinish)} to 14,000 max`}
-        </p>
+        {path && (
+          <div className="clash-path-panel">
+            <p className="clash-eyebrow">Path of Legends</p>
+            <p className="clash-path-league-name">{leagueName}</p>
+            <div className="clash-path-figures">
+              <strong>{formatNumber(path.trophies)}</strong>
+              <span>{path.rank ? `#${formatNumber(path.rank)}` : 'current season'}</span>
+            </div>
+          </div>
+        )}
       </div>
       <div className="clash-level-badge" aria-label={`King level ${profile.expLevel}`}>
         <span>King</span>
         <strong>{profile.expLevel}</strong>
-      </div>
-    </section>
-  );
-}
-
-export function ClashRoyalePath({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
-  const path = data.profile.pathOfLegends;
-  if (!path) return null;
-  const leagueName = PATH_OF_LEGENDS_LEAGUES[path.leagueNumber - 1] ?? `League ${path.leagueNumber}`;
-  return (
-    <section className={`clash-path${compact ? ' clash-path--compact' : ''}`} aria-label="Path of Legends">
-      <div>
-        <p className="clash-eyebrow">Ranked</p>
-        <p className="clash-path-title">Path of Legends</p>
-      </div>
-      <div className="clash-path-league">
-        <span>League {path.leagueNumber}</span>
-        <strong>{leagueName}</strong>
-      </div>
-      <div className="clash-path-result">
-        <strong>{formatNumber(path.trophies)}</strong>
-        <span>{path.rank ? `#${formatNumber(path.rank)}` : 'current season'}</span>
       </div>
     </section>
   );
@@ -133,51 +127,23 @@ export function ClashRoyaleStats({ data }: Readonly<{ data: ClashRoyaleData }>) 
       <Stat
         value={data.recentBattles.length === 0 ? '—' : `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ''}`}
         label="last battles"
-        detail={record.trophies === 0 ? 'No trophy swing' : `${record.trophies > 0 ? '+' : ''}${record.trophies} trophies`}
       />
     </div>
   );
 }
 
-export function ClashRoyaleDeck({ data }: Readonly<{ data: ClashRoyaleData }>) {
+export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
   const deck = [...data.currentDeck];
   if (data.deckHero) deck.splice(Math.min(data.deckHeroIndex ?? deck.length, deck.length), 0, data.deckHero);
   if (deck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;
   return (
-    <ul className="clash-deck-grid">
+    <ul className={`clash-deck-grid${compact ? ' clash-deck-grid--compact' : ''}`}>
       {deck.map((card) => (
         <li key={card.id} className="clash-card">
           {card.iconUrl ? <img src={card.iconUrl} alt={card.name} loading="lazy" decoding="async" /> : <span aria-hidden>{card.name.charAt(0)}</span>}
         </li>
       ))}
     </ul>
-  );
-}
-
-export function ClashRoyaleChests({ data }: Readonly<{ data: ClashRoyaleData }>) {
-  if (data.upcomingChests.length === 0) return <p className="text-sm text-ink-faint">No upcoming chests reported.</p>;
-  const nextChest = data.upcomingChests[0];
-  return (
-    <div className="clash-chest-cycle">
-      <div className="clash-next-chest">
-        <div className="clash-chest-icon" aria-hidden>
-          <span />
-        </div>
-        <div>
-          <p className="clash-eyebrow">Next to unlock</p>
-          <p className="clash-next-chest-name">{nextChest}</p>
-          <p className="clash-next-chest-note">Win a battle to move the cycle forward.</p>
-        </div>
-      </div>
-      <ol className="clash-chest-queue" aria-label="Upcoming chest cycle">
-        {data.upcomingChests.slice(0, 10).map((chest, index) => (
-          <li key={`${chest}-${index}`} className={index === 0 ? 'is-next' : ''}>
-            <span className="clash-chest-position">{index === 0 ? 'Next' : `+${index}`}</span>
-            <span className="clash-chest-name">{chest}</span>
-          </li>
-        ))}
-      </ol>
-    </div>
   );
 }
 
@@ -193,8 +159,7 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
         <p><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
       </div>
       <div className="clash-battle-pulse-trend">
-        <span className={`clash-trend-value ${record.trophies > 0 ? 'is-up' : record.trophies < 0 ? 'is-down' : ''}`}>{record.trophies > 0 ? '+' : ''}{record.trophies}</span>
-        <span>{streakLabel}</span>
+        <span className={`clash-streak-badge${streak?.result === 'win' ? ' is-up' : streak?.result === 'loss' ? ' is-down' : ''}`}>{streakLabel}</span>
       </div>
       <ol className="clash-form-strip" aria-label="Results of recent battles">
         {data.recentBattles.slice(0, 10).reverse().map((battle, index) => <li key={`${battle.battleTime}-${index}`} data-result={battle.result}>{battle.result.charAt(0).toUpperCase()}</li>)}
@@ -209,8 +174,16 @@ export function ClashRoyaleBattleLog({ data }: Readonly<{ data: ClashRoyaleData 
     <ol className="clash-battle-log">
       {data.recentBattles.map((battle, index) => (
         <li key={`${battle.battleTime}-${index}`} className="clash-battle-row" data-result={battle.result}>
-          <div className="clash-result-mark" aria-label={battle.result}>
-            <span>{battle.result === 'win' ? 'W' : battle.result === 'loss' ? 'L' : 'D'}</span>
+          <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
+            <div className="clash-crown-count">
+              <strong>{battle.crownsFor}</strong>
+              <Crown filled={battle.crownsFor > 0} />
+            </div>
+            <span aria-hidden className="clash-score-versus">vs</span>
+            <div className="clash-crown-count">
+              <Crown filled={battle.crownsAgainst > 0} />
+              <strong>{battle.crownsAgainst}</strong>
+            </div>
           </div>
           <div className="clash-battle-main">
             <div className="clash-battle-title-row">
@@ -222,14 +195,6 @@ export function ClashRoyaleBattleLog({ data }: Readonly<{ data: ClashRoyaleData 
               <span>{battle.result === 'win' ? 'Victory' : battle.result === 'loss' ? 'Defeat' : 'Draw'}</span>
             </div>
           </div>
-          <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
-            <div><span>{battle.crownsFor}</span><Crown filled={battle.crownsFor > 0} /></div>
-            <em>–</em>
-            <div><Crown filled={battle.crownsAgainst > 0} /><span>{battle.crownsAgainst}</span></div>
-          </div>
-          {battle.trophyChange !== undefined && (
-            <span className={`clash-trophy-change ${battle.trophyChange > 0 ? 'is-up' : battle.trophyChange < 0 ? 'is-down' : ''}`}>{battle.trophyChange > 0 ? '+' : ''}{battle.trophyChange}</span>
-          )}
         </li>
       ))}
     </ol>

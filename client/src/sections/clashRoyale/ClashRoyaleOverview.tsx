@@ -1,7 +1,7 @@
 import type { ClashRoyaleData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
-import { ClashRoyaleBattlePulse, ClashRoyaleHero, ClashRoyalePath, ClashRoyaleStats } from '../../widgets/ClashRoyaleWidgets';
+import { ClashRoyaleBattlePulse, ClashRoyaleDeck, ClashRoyaleProfile, ClashRoyaleStats } from '../../widgets/ClashRoyaleWidgets';
 import './clashRoyale.css';
 
 /* The whole overview card is one link (see SectionCard), same convention as SteamOverview. */
@@ -13,9 +13,9 @@ export function ClashRoyaleOverview() {
     <WidgetBody envelope={envelope} offline={offline}>
       {(data) => (
         <div className="clash-overview">
-          <ClashRoyaleHero data={data} compact />
-          <ClashRoyalePath data={data} compact />
+          <ClashRoyaleProfile data={data} compact />
           <ClashRoyaleStats data={data} />
+          <ClashRoyaleDeck data={data} compact />
           <ClashRoyaleBattlePulse data={data} />
         </div>
       )}

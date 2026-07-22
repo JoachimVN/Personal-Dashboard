@@ -112,7 +112,7 @@ describe('createClashRoyaleProvider', () => {
     expect(createClashRoyaleProvider(undefined).isConfigured()).toBe(false);
   });
 
-  it('fetches player, battle log and upcoming chests, encoding the tag once each', async () => {
+  it('fetches player and battle log, encoding the tag once each', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(
@@ -138,21 +138,19 @@ describe('createClashRoyaleProvider', () => {
           { battleTime: '20260721T120000.000Z', type: 'PvP', team: [{ crowns: 1 }], opponent: [{ crowns: 0 }] },
         ]),
       )
-      .mockResolvedValueOnce(jsonResponse({ items: [{ name: 'Silver Chest' }, { name: 'Gold Chest' }] }))
       .mockResolvedValueOnce(jsonResponse({ items: [{ id: 1, rarity: 'Common' }] }));
 
     const provider = createClashRoyaleProvider({ apiKey: 'key', playerTag: 'abc123' });
     const data = await provider.fetch(new AbortController().signal, false);
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-    for (const call of fetchMock.mock.calls.slice(0, 3)) {
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const call of fetchMock.mock.calls.slice(0, 2)) {
       expect(String(call[0])).toContain('%23ABC123');
     }
     expect(data.profile.name).toBe('Player');
     expect(data.profile).toMatchObject({ clanName: 'Synthetic Clan', clanTag: '#CLAN1', clanScore: 1234 });
     expect(data.profile.pathOfLegends).toEqual({ leagueNumber: 5, trophies: 0, rank: null });
     expect(data.towerTroop?.name).toBe('Tower Princess');
-    expect(data.upcomingChests).toEqual(['Silver Chest', 'Gold Chest']);
     expect(data.recentBattles).toHaveLength(1);
     expect(data.currentDeck[0]).toMatchObject({ rarity: 'common' });
     fetchMock.mockRestore();
@@ -176,7 +174,6 @@ describe('createClashRoyaleProvider', () => {
         }),
       )
       .mockResolvedValueOnce(jsonResponse([]))
-      .mockResolvedValueOnce(jsonResponse({ items: [] }))
       .mockResolvedValueOnce(jsonResponse({}, 500));
 
     const provider = createClashRoyaleProvider({ apiKey: 'key', playerTag: 'abc123' });

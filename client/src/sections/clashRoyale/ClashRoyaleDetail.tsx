@@ -1,7 +1,7 @@
 import type { ClashRoyaleData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
-import { ClashRoyaleBattleLog, ClashRoyaleBattlePulse, ClashRoyaleChests, ClashRoyaleDeck, ClashRoyaleHero, ClashRoyalePath, ClashRoyaleStats } from '../../widgets/ClashRoyaleWidgets';
+import { ClashRoyaleBattleLog, ClashRoyaleBattlePulse, ClashRoyaleDeck, ClashRoyaleProfile, ClashRoyaleStats } from '../../widgets/ClashRoyaleWidgets';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 import './clashRoyale.css';
 
@@ -31,23 +31,16 @@ export function ClashRoyaleDetail() {
     <div>
       <DetailIntro
         title="Clash Royale command center"
-        description="Your Trophy Road, Ranked standing, active deck forms, chest rewards, and recent battle form."
+        description="Your Trophy Road, Ranked standing, deck lineup, and recent battle form."
         accent="var(--color-accent-clash-royale)"
       >
         <ClashRoyaleSignals />
       </DetailIntro>
 
-      <DetailSectionHeading label="Arena" title="Your Trophy Road" detail="A precise read on the 14,000-trophy road, with your career record alongside it." />
+      <DetailSectionHeading label="Arena" title="Trophy Road & Ranked" detail="A precise read on the 14,000-trophy road, with your Path of Legends standing right beside it." />
       <WidgetShell title="Arena profile">
         <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <ClashRoyaleHero data={data} />}
-        </WidgetBody>
-      </WidgetShell>
-
-      <DetailSectionHeading label="Ranked" title="Path of Legends" detail="Your current seasonal league and ranked standing, kept separate from Trophy Road." />
-      <WidgetShell title="Ranked progress">
-        <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <ClashRoyalePath data={data} />}
+          {(data) => <ClashRoyaleProfile data={data} />}
         </WidgetBody>
       </WidgetShell>
 
@@ -58,17 +51,10 @@ export function ClashRoyaleDetail() {
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="Deck" title="Your eight cards" detail="The missing special-slot card is restored from your matching latest battle, and every rarity is shown on the game’s level-16 scale." />
+      <DetailSectionHeading label="Deck" title="Your eight cards" detail="Rarity-coded frames and evolution/level detail, plus the tower troop backing them up. The missing special-slot card is restored from your matching latest battle." />
       <WidgetShell title="Current deck">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleDeck data={data} />}
-        </WidgetBody>
-      </WidgetShell>
-
-      <DetailSectionHeading label="Rewards" title="Upcoming chests" detail="Chests remain in Clash Royale; this is the live reward cycle reported by the official player API." />
-      <WidgetShell title="Chest rewards">
-        <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <ClashRoyaleChests data={data} />}
         </WidgetBody>
       </WidgetShell>
 
