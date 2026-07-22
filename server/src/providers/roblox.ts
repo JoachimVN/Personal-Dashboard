@@ -116,7 +116,8 @@ async function fetchGameContext(signal: AbortSignal, universeId: number): Promis
       signal,
       `https://games.roblox.com/v1/games?universeIds=${universeId}`,
       'GetGameStats',
-    ).then((res) => ({ playing: res.data[0]?.playing, visits: res.data[0]?.visits })).catch(() => ({})),
+    ).then((res) => ({ playing: res.data[0]?.playing, visits: res.data[0]?.visits }))
+      .catch(() => ({ playing: undefined, visits: undefined })),
   ]);
   return { iconUrl, thumbnailUrl, playing: stats.playing, visits: stats.visits };
 }
