@@ -343,6 +343,33 @@ a {
   background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
 }
 
+/* Registered so the secondary card's tint interpolates when the carousel swaps slots. The colors
+   have to animate inside a single background stack — layering a translucent fade surface over the
+   agenda's own glass compounds into a gray wash instead of crossfading. */
+@property --panel-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+@property --agenda-surface {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+@property --agenda-art-primary {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+@property --agenda-art-secondary {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
 .command-panel--personal { --panel-accent: var(--color-accent-personal); }
 .command-panel--github { --panel-accent: var(--color-accent-github); }
 .command-panel--ai { --panel-accent: var(--color-accent-ai); }
@@ -356,11 +383,9 @@ a {
 
 .command-agenda.command-agenda--roblox {
   --panel-accent: var(--color-ink);
-  background:
-    radial-gradient(circle at 79% -24%, rgb(var(--roblox-art-primary, 194 40 30) / 0.24), transparent 58%),
-    linear-gradient(118deg, rgb(var(--roblox-art-secondary, 194 40 30) / 0.16), transparent 70%),
-    linear-gradient(135deg, color-mix(in oklab, var(--color-ink) 3%, transparent), transparent 58%),
-    light-dark(rgb(255 255 255 / 0.58), rgb(17 20 28 / 0.7));
+  --agenda-art-primary: rgb(var(--roblox-art-primary, 194 40 30) / 0.24);
+  --agenda-art-secondary: rgb(var(--roblox-art-secondary, 194 40 30) / 0.16);
+  --agenda-surface: light-dark(rgb(255 255 255 / 0.58), rgb(17 20 28 / 0.7));
   border-color: var(--color-card-border);
 }
 
@@ -381,10 +406,20 @@ a {
   border: 1px solid var(--color-card-border);
   border-radius: 1.4rem;
   padding: 1rem 1.25rem;
+  --agenda-surface: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
   background:
+    radial-gradient(circle at 79% -24%, var(--agenda-art-primary), transparent 58%),
+    linear-gradient(118deg, var(--agenda-art-secondary), transparent 70%),
     linear-gradient(135deg, color-mix(in oklab, var(--panel-accent) 3%, transparent), transparent 58%),
-    light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
-  transition: transform 280ms cubic-bezier(.2,.8,.2,1), border-color 240ms ease, box-shadow 240ms ease;
+    var(--agenda-surface);
+  transition:
+    transform 280ms cubic-bezier(.2,.8,.2,1),
+    border-color 240ms ease,
+    box-shadow 240ms ease,
+    --panel-accent 520ms ease,
+    --agenda-surface 520ms ease,
+    --agenda-art-primary 520ms ease,
+    --agenda-art-secondary 520ms ease;
 }
 
 .command-primary {
