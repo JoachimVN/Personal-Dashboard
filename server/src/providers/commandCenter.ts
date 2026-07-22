@@ -3,6 +3,7 @@ import {
   type AiNewsData,
   type AiUsageToolData,
   type CalendarData,
+  type ClashRoyaleData,
   type GitHubData,
   type GmailData,
   type HealthData,
@@ -24,6 +25,7 @@ import {
   aiCandidates,
   aiNewsCandidates,
   calendarCandidates,
+  clashRoyaleCandidates,
   fallbackCandidates,
   githubCandidates,
   gmailCandidates,
@@ -41,7 +43,7 @@ import {
 } from '../importance/sources.js';
 import type { ProviderScheduler, Provider } from '../scheduler.js';
 import { SignalHistoryStore } from '../signalHistory.js';
-import type { SteamMoments } from '../importance/types.js';
+import type { ClashRoyaleMoments, SteamMoments } from '../importance/types.js';
 
 function widgetData<T>(envelopes: Record<string, WidgetEnvelope>, id: string): T | undefined {
   const envelope = envelopes[id];
@@ -176,6 +178,62 @@ export async function computeSteamMoments(
   return { completedGame, playtimeMilestoneHours: playtimeMilestoneHoursMoment, leaderboardClimb };
 }
 
+/** A plain change detector: fresh once the arena name differs from the last-recorded one, not on
+ * the first-ever observation (same guard as computeSpotifyFreshness / steam achievement checks). */
+async function detectClashRoyaleNewArena(
+  signalHistory: SignalHistoryStore,
+  arenaName: string,
+  freshMs: number,
+): Promise<string | undefined> {
+  await signalHistory.record('clash-royale', 'arena', arenaName);
+  return (await isFreshSinceRecord(signalHistory, 'clash-royale', 'arena', freshMs)) ? arenaName : undefined;
+}
+
+async function detectClashRoyaleNewLeague(
+  signalHistory: SignalHistoryStore,
+  pathOfLegends: ClashRoyaleData['profile']['pathOfLegends'],
+  freshMs: number,
+): Promise<{ leagueNumber: number; trophies: number } | undefined> {
+  if (!pathOfLegends) return undefined;
+  const previous = await signalHistory.getValue('clash-royale', 'pol-league');
+  await signalHistory.record('clash-royale', 'pol-league', pathOfLegends.leagueNumber);
+  if (typeof previous !== 'number' || previous >= pathOfLegends.leagueNumber) return undefined;
+  if (!(await isFreshSinceRecord(signalHistory, 'clash-royale', 'pol-league', freshMs))) return undefined;
+  return { leagueNumber: pathOfLegends.leagueNumber, trophies: pathOfLegends.trophies };
+}
+
+async function detectClashRoyaleNewBestTrophies(
+  signalHistory: SignalHistoryStore,
+  bestTrophies: number,
+  freshMs: number,
+): Promise<number | undefined> {
+  const previous = await signalHistory.getValue('clash-royale', 'best-trophies');
+  await signalHistory.record('clash-royale', 'best-trophies', bestTrophies);
+  if (typeof previous !== 'number' || previous >= bestTrophies) return undefined;
+  return (await isFreshSinceRecord(signalHistory, 'clash-royale', 'best-trophies', freshMs)) ? bestTrophies : undefined;
+}
+
+/**
+ * Detects Clash Royale "moments" that need history across polls, not just the latest snapshot: a
+ * new trophy-road arena, a new Path of Legends league, and a new personal-best trophy count. Win
+ * streaks and the session tally don't need this — they're derived straight from `recentBattles`'
+ * own timestamps in clashRoyaleCandidates(), the same way steamAchievementCandidate reads
+ * `unlockedAt` directly rather than tracking it here.
+ */
+export async function computeClashRoyaleMoments(
+  signalHistory: SignalHistoryStore,
+  clashRoyale: ClashRoyaleData | undefined,
+  freshMs: number,
+): Promise<ClashRoyaleMoments> {
+  if (!clashRoyale) return {};
+  const [newArena, newLeague, newBestTrophies] = await Promise.all([
+    detectClashRoyaleNewArena(signalHistory, clashRoyale.profile.arenaName, freshMs),
+    detectClashRoyaleNewLeague(signalHistory, clashRoyale.profile.pathOfLegends, freshMs),
+    detectClashRoyaleNewBestTrophies(signalHistory, clashRoyale.profile.bestTrophies, freshMs),
+  ]);
+  return { newArena, newLeague, newBestTrophies };
+}
+
 export function createCommandCenterProvider(
   scheduler: ProviderScheduler,
   signalHistory: SignalHistoryStore,
@@ -198,11 +256,13 @@ export function createCommandCenterProvider(
       const calendar = widgetData<CalendarData>(envelopes, 'calendar');
       const spotify = widgetData<SpotifyData>(envelopes, 'spotify');
       const steam = widgetData<SteamData>(envelopes, 'steam');
-      const [spotifyFresh, steamMoments] = await Promise.all([
+      const clashRoyale = widgetData<ClashRoyaleData>(envelopes, 'clash-royale');
+      const [spotifyFresh, steamMoments, clashRoyaleMoments] = await Promise.all([
         computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs),
         computeSteamMoments(
           signalHistory, steam, config.commandCenter.steamPlaytimeMilestoneHours, config.commandCenter.steamMomentFreshMs,
         ),
+        computeClashRoyaleMoments(signalHistory, clashRoyale, config.commandCenter.clashRoyaleMomentFreshMs),
       ]);
       return rankCandidates([
         ...calendarCandidates(calendar, Date.now()),
@@ -215,6 +275,12 @@ export function createCommandCenterProvider(
         ...spotifyCandidates(spotify, spotifyFresh, config.commandCenter.spotifyRecentPlayedMaxAgeMs),
         ...steamCandidates(steam, config.commandCenter.steamAchievementFreshMs, steamMoments, config.commandCenter.steamRareAchievementPercent),
         ...robloxCandidates(widgetData<RobloxData>(envelopes, 'roblox')),
+        ...clashRoyaleCandidates(
+          clashRoyale, clashRoyaleMoments,
+          config.commandCenter.clashRoyaleWinStreakMin,
+          config.commandCenter.clashRoyaleSessionGapMs,
+          config.commandCenter.clashRoyaleMomentFreshMs,
+        ),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),
           config.commandCenter.weatherHotC,

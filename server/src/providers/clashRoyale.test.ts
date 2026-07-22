@@ -127,7 +127,7 @@ describe('createClashRoyaleProvider', () => {
           threeCrownWins: 20,
           battleCount: 150,
           arena: { name: 'Legendary Arena' },
-          clan: { tag: '#CLAN1', name: 'Synthetic Clan', clanScore: 1234 },
+          clan: { tag: '#CLAN1', name: 'Synthetic Clan', clanScore: 1234, badgeId: 16000044 },
           currentDeck: [{ id: 1, name: 'Knight', level: 10, maxLevel: 14 }],
           currentDeckSupportCards: [{ id: 101, name: 'Tower Princess', level: 16, maxLevel: 16 }],
           currentPathOfLegendSeasonResult: { leagueNumber: 5, trophies: 0, rank: null },
@@ -138,17 +138,23 @@ describe('createClashRoyaleProvider', () => {
           { battleTime: '20260721T120000.000Z', type: 'PvP', team: [{ crowns: 1 }], opponent: [{ crowns: 0 }] },
         ]),
       )
-      .mockResolvedValueOnce(jsonResponse({ items: [{ id: 1, rarity: 'Common' }] }));
+      .mockResolvedValueOnce(jsonResponse({ items: [{ id: 1, rarity: 'Common' }] }))
+      .mockResolvedValueOnce(jsonResponse([{ id: 16000044, name: 'Synthetic_Badge' }]));
 
     const provider = createClashRoyaleProvider({ apiKey: 'key', playerTag: 'abc123' });
     const data = await provider.fetch(new AbortController().signal, false);
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
     for (const call of fetchMock.mock.calls.slice(0, 2)) {
       expect(String(call[0])).toContain('%23ABC123');
     }
     expect(data.profile.name).toBe('Player');
-    expect(data.profile).toMatchObject({ clanName: 'Synthetic Clan', clanTag: '#CLAN1', clanScore: 1234 });
+    expect(data.profile).toMatchObject({
+      clanName: 'Synthetic Clan',
+      clanTag: '#CLAN1',
+      clanScore: 1234,
+      clanBadgeUrl: 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-assets/master/badges/Synthetic_Badge.png',
+    });
     expect(data.profile.pathOfLegends).toEqual({ leagueNumber: 5, trophies: 0, rank: null });
     expect(data.towerTroop?.name).toBe('Tower Princess');
     expect(data.recentBattles).toHaveLength(1);

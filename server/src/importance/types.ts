@@ -13,3 +13,11 @@ export interface SteamMoments {
   playtimeMilestoneHours?: number;
   leaderboardClimb?: { rank: number; delta: number };
 }
+
+/** Clash Royale "moments" that need cross-poll history to detect (same reasoning as SteamMoments) —
+ * computed once in commandCenter.ts and passed into the otherwise-pure clashRoyaleCandidates(). */
+export interface ClashRoyaleMoments {
+  newArena?: string;
+  newLeague?: { leagueNumber: number; trophies: number };
+  newBestTrophies?: number;
+}

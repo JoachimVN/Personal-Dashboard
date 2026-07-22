@@ -1,13 +1,14 @@
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { activityPushSchema, type ActivityPushData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 import { jsonlFiles } from './aiUsage.js';
 
 const execFileAsync = promisify(execFile);
+const CLAUDE_ACTIVITY_WINDOW_MS = 10 * 60_000;
 
 /** `pgrep -f` matches against the full command line, so this also catches the launcher when it's
  * backgrounded under Login Items rather than run interactively. */
@@ -32,10 +33,41 @@ async function newestMtime(directory: string): Promise<Date | undefined> {
   }
 }
 
+/** Claude continues appending housekeeping records (for example `away_summary`) after a person
+ * stops interacting with a session. File mtime therefore represents Claude's bookkeeping, not
+ * coding activity. Only a real user turn should refresh the public activity signal. */
+async function newestClaudeUserPromptAt(directory: string): Promise<Date | undefined> {
+  try {
+    const files = await jsonlFiles(directory);
+    const recentFiles = (await Promise.all(files.map(async (file) => {
+      const info = await stat(file);
+      return Date.now() - info.mtimeMs <= CLAUDE_ACTIVITY_WINDOW_MS ? file : undefined;
+    }))).filter((file): file is string => file !== undefined);
+    const timestamps = await Promise.all(recentFiles.map(async (file) => {
+      const entries = (await readFile(file, 'utf8')).split('\n');
+      let newest: Date | undefined;
+      for (const line of entries) {
+        try {
+          const entry = JSON.parse(line) as { type?: unknown; timestamp?: unknown };
+          if (entry.type !== 'user' || typeof entry.timestamp !== 'string') continue;
+          const at = new Date(entry.timestamp);
+          if (!Number.isNaN(at.getTime()) && (!newest || at > newest)) newest = at;
+        } catch {
+          // A live transcript can have one incomplete final line.
+        }
+      }
+      return newest;
+    }));
+    return timestamps.filter((at): at is Date => at !== undefined).sort((a, b) => b.getTime() - a.getTime())[0];
+  } catch {
+    return undefined;
+  }
+}
+
 async function claudeLastActiveAt(): Promise<string | null> {
   const dir = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
-  const mtime = await newestMtime(dir);
-  return mtime?.toISOString() ?? null;
+  const userPromptAt = await newestClaudeUserPromptAt(dir);
+  return userPromptAt?.toISOString() ?? null;
 }
 
 async function codexLastActiveAt(): Promise<string | null> {

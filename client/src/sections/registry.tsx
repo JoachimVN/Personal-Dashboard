@@ -1,5 +1,6 @@
 import { useId, type ComponentType, type CSSProperties } from 'react';
 import { GitHubMark } from '../components/GitHubMark';
+import { CLASH_ROYALE_APP_ICON_URL } from '../lib/clashRoyale';
 import { AiOverview } from './ai/AiOverview';
 import { AiDetail } from './ai/AiDetail';
 import { GitHubOverview } from './github/GitHubOverview';
@@ -16,8 +17,10 @@ import { SteamOverview } from './steam/SteamOverview';
 import { SteamDetail } from './steam/SteamDetail';
 import { ClashRoyaleOverview } from './clashRoyale/ClashRoyaleOverview';
 import { ClashRoyaleDetail } from './clashRoyale/ClashRoyaleDetail';
+import { ValorantOverview } from './valorant/ValorantOverview';
+import { ValorantDetail } from './valorant/ValorantDetail';
 
-export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health', 'steam', 'clash-royale'] as const;
+export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health', 'steam', 'clash-royale', 'valorant'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 export interface SectionDef {
@@ -107,6 +110,15 @@ export const SECTIONS: SectionDef[] = [
     accentVar: '--color-accent-clash-royale',
     Overview: ClashRoyaleOverview,
     Detail: ClashRoyaleDetail,
+  },
+  {
+    id: 'valorant',
+    title: 'Valorant',
+    label: 'Ranked',
+    description: 'Rank, RR and recent match form',
+    accentVar: '--color-accent-valorant',
+    Overview: ValorantOverview,
+    Detail: ValorantDetail,
   },
 ];
 
@@ -238,12 +250,35 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
        card header and the monochrome nav pill since it's art, not a currentColor glyph. */
     return (
       <img
-        src="https://media.ffycdn.net/eu/supercell/nxaaEWAgbRGADkoAETG8.png"
+        src={CLASH_ROYALE_APP_ICON_URL}
         alt=""
         aria-hidden
         className="h-5 w-5 rounded-[0.3rem] object-cover"
         loading="lazy"
         decoding="async"
+      />
+    );
+  }
+    case 'valorant': {
+    /* The game's own mark (client/public/valorant.png) is solid black on a transparent ground,
+       so it's applied as a CSS mask rather than an <img> — that recolors it to the accent (or
+       currentColor when monochrome) instead of always rendering flat black. */
+    return (
+      <span
+        aria-hidden
+        className="block h-5"
+        style={{
+          aspectRatio: '1841 / 1514',
+          backgroundColor: monochrome ? 'currentColor' : 'var(--accent)',
+          maskImage: 'url(/valorant.png)',
+          maskRepeat: 'no-repeat',
+          maskPosition: 'center',
+          maskSize: 'contain',
+          WebkitMaskImage: 'url(/valorant.png)',
+          WebkitMaskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center',
+          WebkitMaskSize: 'contain',
+        }}
       />
     );
   }

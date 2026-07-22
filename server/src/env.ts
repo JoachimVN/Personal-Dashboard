@@ -17,6 +17,7 @@ export interface ServerEnv {
   steam?: { apiKey: string; steamId: string };
   clashRoyale?: { apiKey: string; playerTag: string };
   roblox?: { idOrUsername: string; robloSecurity?: string };
+  valorant?: { apiKey: string; name: string; tag: string; region: string };
   sonarCloud?: { token: string; orgKey: string };
   dashboardPush?: { url: string; secret: string };
 }
@@ -54,6 +55,18 @@ export function parseRoblox(): ServerEnv['roblox'] {
   const idOrUsername = process.env.ROBLOX_ID;
   if (!idOrUsername) return undefined;
   return { idOrUsername, robloSecurity: process.env.ROBLOSECURITY || undefined };
+}
+
+export function parseValorant(): ServerEnv['valorant'] {
+  const apiKey = process.env.HENRIKDEV_API_KEY;
+  const riotId = process.env.RIOT_ID;
+  if (!apiKey || !riotId) return undefined;
+  const [name, tag] = riotId.split('#');
+  if (!name || !tag) {
+    console.warn('⚠️  RIOT_ID must be in "Name#Tag" form — Valorant disabled.');
+    return undefined;
+  }
+  return { apiKey, name, tag, region: process.env.RIOT_REGION || 'eu' };
 }
 
 export function parseSonarCloud(): ServerEnv['sonarCloud'] {
@@ -124,6 +137,7 @@ export function loadEnv(): ServerEnv {
     steam: parseSteam(),
     clashRoyale: parseClashRoyale(),
     roblox: parseRoblox(),
+    valorant: parseValorant(),
     sonarCloud: parseSonarCloud(),
     dashboardPush: parseDashboardPush(),
   };

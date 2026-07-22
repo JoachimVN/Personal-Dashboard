@@ -9,6 +9,7 @@ import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { SteamHistoryStore } from '../steamHistory.js';
+import { ValorantHistoryStore } from '../valorantHistory.js';
 import { createActivityPushProvider } from './activityPush.js';
 import { createAiNewsProvider } from './aiNews.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
@@ -24,6 +25,7 @@ import { createSpotifyProvider } from './spotify.js';
 import { createSteamProvider } from './steam.js';
 import { createClashRoyaleProvider } from './clashRoyale.js';
 import { createRobloxProvider } from './roblox.js';
+import { createValorantProvider } from './valorant.js';
 import { createSonarCloudProvider } from './sonarCloud.js';
 import { createSystemProvider } from './system.js';
 import { createTransitProvider, type TransitProvider } from './transit.js';
@@ -67,6 +69,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
   const spotifyHistory = new SpotifyHistoryStore(database);
   const steamSnapshot = new SteamSnapshotStore(database);
   const steamHistory = new SteamHistoryStore(database, config.steam.historyRetentionDays);
+  const valorantHistory = new ValorantHistoryStore(database);
   return {
     weather,
     transit,
@@ -104,6 +107,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
         }),
         createRobloxProvider(env.roblox),
         createClashRoyaleProvider(env.clashRoyale),
+        createValorantProvider(env.valorant, valorantHistory),
         createSonarCloudProvider(env.sonarCloud),
         createActivityPushProvider(env.dashboardPush),
       ] satisfies Provider[]

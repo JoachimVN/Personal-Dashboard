@@ -3,6 +3,15 @@ import type { Provider } from '../scheduler.js';
 
 const CR_API_BASE = 'https://api.clashroyale.com/v1';
 const RECENT_BATTLES_COUNT = 10;
+const CLAN_BADGE_MANIFEST_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-data/master/docs/json/alliance_badges.json';
+const CLAN_BADGE_ASSET_BASE_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-assets/master/badges';
+
+interface ClanBadge {
+  id: number;
+  name: string;
+}
+
+let clanBadgeUrls: Promise<Map<number, string>> | undefined;
 
 export interface ClashRoyaleAuth {
   apiKey: string;
@@ -37,7 +46,7 @@ interface RawPlayer {
   threeCrownWins: number;
   battleCount: number;
   arena?: { name: string };
-  clan?: { tag: string; name: string; clanScore?: number };
+  clan?: { tag: string; name: string; clanScore?: number; badgeId?: number };
   currentDeck?: RawCard[];
   currentDeckSupportCards?: RawCard[];
   currentPathOfLegendSeasonResult?: { leagueNumber: number; trophies: number; rank?: number | null };
@@ -93,6 +102,27 @@ async function crRequest<T>(signal: AbortSignal, apiKey: string, path: string, l
   }
   if (!res.ok) throw new Error(`Clash Royale ${label} failed: HTTP ${res.status}`);
   return (await res.json()) as T;
+}
+
+/** The official player response gives a clan badgeId, but not a usable image URL. RoyaleAPI
+ * maintains the corresponding public ID-to-name manifest and image assets; cache the mapping so
+ * widget refreshes do not repeatedly fetch static game data. */
+function getClanBadgeUrls(): Promise<Map<number, string>> {
+  if (clanBadgeUrls !== undefined) return clanBadgeUrls;
+
+  const badgeUrlsRequest = fetch(CLAN_BADGE_MANIFEST_URL)
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`Clan badge manifest failed: HTTP ${res.status}`);
+      const badges = await res.json() as ClanBadge[];
+      return new Map(badges.map((badge) => [badge.id, `${CLAN_BADGE_ASSET_BASE_URL}/${badge.name}.png`]));
+    })
+    .catch(() => {
+      // Badges are presentational. Leave the clan text intact if the static manifest is down.
+      clanBadgeUrls = undefined;
+      return new Map();
+    });
+  clanBadgeUrls = badgeUrlsRequest;
+  return badgeUrlsRequest;
 }
 
 /** One-off convenience log for developer.clashroyale.com's IP allowlist, called once from server
@@ -183,6 +213,7 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
         () => ({ items: [] as RawCardReference[] }),
       );
       const rarityById = new Map(cardReference.items.map((card) => [card.id, card.rarity]));
+      const clanBadgeUrl = player.clan?.badgeId === undefined ? undefined : (await getClanBadgeUrls()).get(player.clan.badgeId);
 
       const deckHero = findDeckHero(player.tag, player.currentDeck ?? [], battleLog);
       const data: ClashRoyaleData = {
@@ -200,6 +231,7 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
           clanName: player.clan?.name,
           clanTag: player.clan?.tag,
           clanScore: player.clan?.clanScore,
+          clanBadgeUrl,
           pathOfLegends: player.currentPathOfLegendSeasonResult,
         },
         currentDeck: (player.currentDeck ?? []).map((card) => mapCard(card, rarityById)),
