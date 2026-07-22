@@ -196,7 +196,8 @@ export function mapMatch(match: RawMatch, puuid: string): ValorantMatch | undefi
   const me = match.players.find((player) => player.puuid === puuid);
   if (!me) return undefined;
   const myTeam = match.teams.find((team) => team.team_id === me.team_id);
-  const result: ValorantMatch['result'] = myTeam === undefined ? 'draw' : myTeam.won ? 'win' : 'loss';
+  let result: ValorantMatch['result'] = 'draw';
+  if (myTeam !== undefined) result = myTeam.won ? 'win' : 'loss';
   const teammateScores = match.players.filter((player) => player.team_id === me.team_id).map((player) => player.stats.score);
   const allScores = match.players.map((player) => player.stats.score);
   return {
@@ -228,7 +229,8 @@ function mapStoredMatch(match: RawStoredMatch): ValorantMatch {
   const team = match.stats.team.toLowerCase();
   const myRounds = team === 'red' ? match.teams.red : match.teams.blue;
   const opponentRounds = team === 'red' ? match.teams.blue : match.teams.red;
-  const result: ValorantMatch['result'] = myRounds === opponentRounds ? 'draw' : myRounds > opponentRounds ? 'win' : 'loss';
+  let result: ValorantMatch['result'] = 'draw';
+  if (myRounds !== opponentRounds) result = myRounds > opponentRounds ? 'win' : 'loss';
   return {
     matchId: match.meta.id,
     map: match.meta.map.name,

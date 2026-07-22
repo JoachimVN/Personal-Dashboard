@@ -255,7 +255,7 @@
   margin-top: 0.65rem;
   padding: 0.22rem 0.6rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.56);
   font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -265,8 +265,10 @@
 .valorant-hero-rank { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.9rem; }
 .valorant-hero-rank-icon { width: 2.7rem; height: 2.7rem; flex-shrink: 0; }
 .valorant-hero-rank-name { margin: 0; overflow: hidden; color: #fff; font-size: 0.84rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-rr-track { position: relative; width: 100%; max-width: 11rem; height: 0.34rem; margin-top: 0.36rem; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.22); }
-.valorant-rr-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in oklab, var(--color-accent-valorant) 55%, white), var(--color-accent-valorant)); transition: width 400ms ease; }
+.valorant-rr-track { display: block; width: 100%; max-width: 11rem; height: 0.34rem; margin-top: 0.36rem; overflow: hidden; border: 0; border-radius: 999px; appearance: none; background: rgba(255, 255, 255, 0.22); }
+.valorant-rr-track::-webkit-progress-bar { background: rgba(255, 255, 255, 0.22); }
+.valorant-rr-track::-webkit-progress-value { border-radius: inherit; background: linear-gradient(90deg, color-mix(in oklab, var(--color-accent-valorant) 55%, white), var(--color-accent-valorant)); transition: width 400ms ease; }
+.valorant-rr-track::-moz-progress-bar { border-radius: inherit; background: linear-gradient(90deg, color-mix(in oklab, var(--color-accent-valorant) 55%, white), var(--color-accent-valorant)); transition: width 400ms ease; }
 .valorant-hero-rr-value { margin: 0.32rem 0 0; color: rgba(255, 255, 255, 0.82); font-size: 0.66rem; font-variant-numeric: tabular-nums; }
 .valorant-hero-rr-value span { margin-left: 0.4rem; font-weight: 700; }
 .valorant-hero-rr-value span.is-up { color: var(--valorant-hero-win); }

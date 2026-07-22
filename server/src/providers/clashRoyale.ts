@@ -108,20 +108,21 @@ async function crRequest<T>(signal: AbortSignal, apiKey: string, path: string, l
  * maintains the corresponding public ID-to-name manifest and image assets; cache the mapping so
  * widget refreshes do not repeatedly fetch static game data. */
 function getClanBadgeUrls(): Promise<Map<number, string>> {
-  if (!clanBadgeUrls) {
-    clanBadgeUrls = fetch(CLAN_BADGE_MANIFEST_URL)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`Clan badge manifest failed: HTTP ${res.status}`);
-        const badges = await res.json() as ClanBadge[];
-        return new Map(badges.map((badge) => [badge.id, `${CLAN_BADGE_ASSET_BASE_URL}/${badge.name}.png`]));
-      })
-      .catch(() => {
-        // Badges are presentational. Leave the clan text intact if the static manifest is down.
-        clanBadgeUrls = undefined;
-        return new Map();
-      });
-  }
-  return clanBadgeUrls;
+  if (clanBadgeUrls !== undefined) return clanBadgeUrls;
+
+  const badgeUrlsRequest = fetch(CLAN_BADGE_MANIFEST_URL)
+    .then(async (res) => {
+      if (!res.ok) throw new Error(`Clan badge manifest failed: HTTP ${res.status}`);
+      const badges = await res.json() as ClanBadge[];
+      return new Map(badges.map((badge) => [badge.id, `${CLAN_BADGE_ASSET_BASE_URL}/${badge.name}.png`]));
+    })
+    .catch(() => {
+      // Badges are presentational. Leave the clan text intact if the static manifest is down.
+      clanBadgeUrls = undefined;
+      return new Map();
+    });
+  clanBadgeUrls = badgeUrlsRequest;
+  return badgeUrlsRequest;
 }
 
 /** One-off convenience log for developer.clashroyale.com's IP allowlist, called once from server

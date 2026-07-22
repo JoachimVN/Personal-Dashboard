@@ -244,6 +244,9 @@ export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange, se
   const agents = agentSummaries(matches).slice(0, 5);
   const loadedCount = history.matches.length;
   const coverage = `${formatNumber(Math.max(loadedCount, history.totalMatchesAvailable))} matches captured`;
+  const recordDetail = [`${record.wins}W`, `${record.losses}L`, record.draws > 0 ? `${record.draws}D` : undefined]
+    .filter((value): value is string => value !== undefined)
+    .join(' · ');
 
   return (
     <section className="valorant-performance">
@@ -276,7 +279,7 @@ export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange, se
         <>
           <div className="valorant-performance-stats">
             <Stat value={matches.length} label="matches" />
-            <Stat value={winRate === undefined ? '—' : `${winRate}%`} label="win rate" detail={`${record.wins}W · ${record.losses}L${record.draws ? ` · ${record.draws}D` : ''}`} />
+            <Stat value={winRate === undefined ? '—' : `${winRate}%`} label="win rate" detail={recordDetail} />
             <Stat value={acs ?? '—'} label="average ACS" />
           </div>
           <ol className="valorant-agent-pool">

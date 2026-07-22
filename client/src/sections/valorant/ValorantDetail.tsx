@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import type { ValorantData, ValorantMatch } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
@@ -23,25 +23,15 @@ import {
 import { DetailSectionHeading } from '../DetailIntro';
 import './valorant.css';
 
-/* client/public/valorant_wordmark.png is solid black on a transparent ground, so it's applied as
-   a CSS mask (tinted via currentColor) rather than rendered as-is. */
 function ValorantWordmark() {
   return (
-    <span
-      role="img"
-      aria-label="Valorant"
+    <img
+      src="/valorant_wordmark.png"
+      alt="Valorant"
       className="block h-[0.9rem]"
       style={{
         aspectRatio: '3633 / 533',
-        backgroundColor: 'currentColor',
-        maskImage: 'url(/valorant_wordmark.png)',
-        maskRepeat: 'no-repeat',
-        maskPosition: 'left center',
-        maskSize: 'contain',
-        WebkitMaskImage: 'url(/valorant_wordmark.png)',
-        WebkitMaskRepeat: 'no-repeat',
-        WebkitMaskPosition: 'left center',
-        WebkitMaskSize: 'contain',
+        filter: 'brightness(0) invert(1)',
       }}
     />
   );
@@ -194,16 +184,12 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
                 {rank.tierName}
                 {rank.leaderboardRank ? ` · #${formatNumber(rank.leaderboardRank)}` : ''}
               </p>
-              <div
+              <progress
                 className="valorant-rr-track"
-                role="progressbar"
-                aria-valuenow={rrPercent}
-                aria-valuemin={0}
-                aria-valuemax={100}
                 aria-label="Rank rating"
-              >
-                <div className="valorant-rr-fill" style={{ width: `${rrPercent}%` }} />
-              </div>
+                value={rrPercent}
+                max={100}
+              />
               <p className="valorant-hero-rr-value">
                 {rank.rr} RR
                 {rank.lastChange !== 0 && (
@@ -246,6 +232,12 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
             <ol className="valorant-hero-recent">
               {spotlight.map((match: ValorantMatch) => {
                 const mapArtUrl = valorantMapArt(match.map);
+                let mvpBadge: ReactNode;
+                if (match.isMatchMvp) {
+                  mvpBadge = <span className="valorant-hero-mvp-badge is-match">MVP</span>;
+                } else if (match.isTeamMvp) {
+                  mvpBadge = <span className="valorant-hero-mvp-badge is-team">Team MVP</span>;
+                }
                 return (
                   <li
                     key={match.matchId}
@@ -254,11 +246,7 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
                     data-has-art={mapArtUrl ? 'true' : undefined}
                   >
                     {mapArtUrl && <span className="valorant-hero-spotlight-art" aria-hidden style={{ backgroundImage: `url("${mapArtUrl}")` }} />}
-                    {match.isMatchMvp ? (
-                      <span className="valorant-hero-mvp-badge is-match">MVP</span>
-                    ) : match.isTeamMvp ? (
-                      <span className="valorant-hero-mvp-badge is-team">Team MVP</span>
-                    ) : null}
+                    {mvpBadge}
                     {match.agentIconUrl && (
                       <img src={match.agentIconUrl} alt={match.agentName} className="valorant-hero-spotlight-agent" loading="lazy" decoding="async" />
                     )}
