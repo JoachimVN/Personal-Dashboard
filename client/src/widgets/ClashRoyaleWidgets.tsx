@@ -1,5 +1,6 @@
 import type { ClashRoyaleBattle, ClashRoyaleData } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
+import { clashRoyaleLeagueArt } from '../lib/clashRoyale';
 
 const TROPHY_ROAD_MAX = 14_000;
 const PATH_OF_LEGENDS_LEAGUES = [
@@ -124,7 +125,12 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
         {path && (
           <div className="clash-path-panel">
             <p className="clash-eyebrow">Path of Legends</p>
-            <p className="clash-path-league-name">{leagueName}</p>
+            <div className="clash-path-league">
+              {clashRoyaleLeagueArt(path.leagueNumber) && (
+                <img src={clashRoyaleLeagueArt(path.leagueNumber)} alt="" aria-hidden className="clash-path-league-badge" />
+              )}
+              <p className="clash-path-league-name">{leagueName}</p>
+            </div>
             <div className="clash-path-figures">
               <strong>{formatNumber(path.trophies)}</strong>
               <span>{path.rank ? `#${formatNumber(path.rank)}` : 'current season'}</span>

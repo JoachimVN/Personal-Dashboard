@@ -15,7 +15,45 @@
   }
 }
 
-.clash-overview { display: grid; gap: 0.85rem; }
+/* The current arena's key art belongs to the homepage section card, same treatment as Valorant's
+   equipped player card — but `contain`/right-anchored/fade-masked rather than a `cover` crop:
+   these are portrait renders, not wide photo crops, so stretching them full-bleed would distort
+   or crop them into something unrecognizable (see command-center's .command-panel-art for the
+   same reasoning). Falls back to no art at all when the current arena isn't in the local lookup. */
+.dashboard-section-card--clash-royale:has(.clash-overview) {
+  isolation: isolate;
+  background:
+    linear-gradient(112deg, color-mix(in oklab, var(--color-card) 91%, transparent), color-mix(in oklab, var(--color-card) 60%, transparent)),
+    linear-gradient(135deg, color-mix(in oklab, var(--color-accent-clash-royale) 14%, transparent), transparent 62%),
+    var(--color-card);
+}
+.dashboard-section-card--clash-royale:has(.clash-overview)::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--clash-royale-card-art, none) right center / contain no-repeat;
+  opacity: 0.45;
+  -webkit-mask-image: linear-gradient(to left, black 35%, transparent 85%);
+  mask-image: linear-gradient(to left, black 35%, transparent 85%);
+}
+.dashboard-section-card--clash-royale:has(.clash-overview)::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(108deg, color-mix(in oklab, var(--color-card) 94%, transparent), color-mix(in oklab, var(--color-card) 55%, transparent));
+}
+.dashboard-section-card--clash-royale:has(.clash-overview) > header,
+.dashboard-section-card--clash-royale:has(.clash-overview) > .section-card-content,
+.dashboard-section-card--clash-royale:has(.clash-overview) > p { z-index: 1; }
+.dashboard-section-card--clash-royale:has(.clash-overview) > .section-card-aura { z-index: 0; }
+
+.clash-overview { position: relative; display: grid; gap: 0.85rem; }
 .clash-crown { display: inline-block; width: 1rem; height: 0.8rem; }
 
 /* Profile: identity plus Trophy Road and Path of Legends, as one flat neutral panel. */
@@ -71,7 +109,9 @@
 .clash-trophy-note { margin-top: 0.4rem; font-size: 0.6rem; letter-spacing: 0.02em; text-transform: none; }
 
 .clash-path-panel { padding-top: 0.55rem; border-top: 1px solid var(--color-card-border); }
-.clash-path-league-name { margin: 0.2rem 0 0; color: var(--color-ink); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.clash-path-league { display: flex; align-items: center; gap: 0.32rem; margin-top: 0.2rem; }
+.clash-path-league-badge { width: 1.1rem; height: 1.1rem; object-fit: contain; filter: drop-shadow(0 1px 2px color-mix(in oklab, var(--color-accent-clash-royale) 40%, transparent)); }
+.clash-path-league-name { margin: 0; color: var(--color-ink); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
 .clash-path-figures { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-top: 0.3rem; }
 .clash-path-figures strong { color: var(--color-ink); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
 .clash-path-figures span { color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
