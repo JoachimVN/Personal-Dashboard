@@ -47,7 +47,7 @@ function ClashRoyaleOverviewContent({ data }: Readonly<{ data: ClashRoyaleData }
 
   return (
     <div ref={overviewRef} className="clash-overview">
-      <ClashRoyaleProfile data={data} compact showArena={false} showKingLevel={false} />
+      <ClashRoyaleProfile data={data} compact />
       <ClashRoyaleDeck data={data} compact />
       <ClashRoyaleBattlePulse data={data} />
     </div>

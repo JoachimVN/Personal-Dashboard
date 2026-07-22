@@ -68,7 +68,7 @@
   background: color-mix(in oklab, var(--color-track) 25%, transparent);
 }
 .clash-profile-main { min-width: 0; }
-.clash-profile-kicker, .clash-eyebrow {
+.clash-eyebrow {
   display: flex;
   align-items: center;
   gap: 0.32rem;
@@ -80,10 +80,9 @@
   line-height: 1.2;
   text-transform: uppercase;
 }
-.clash-profile-kicker .clash-crown, .clash-eyebrow .clash-crown { color: var(--color-accent-clash-royale); }
 .clash-profile-name {
   overflow: hidden;
-  margin: 0.5rem 0 0;
+  margin: 0.12rem 0 0;
   color: var(--color-ink);
   font-size: clamp(1.3rem, 3vw, 1.7rem);
   font-weight: 700;
@@ -109,24 +108,8 @@
 .clash-path-figures strong { color: var(--color-ink); font-size: 0.88rem; font-variant-numeric: tabular-nums; }
 .clash-path-figures span { color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
 
-.clash-level-badge {
-  position: absolute;
-  top: 0.9rem;
-  right: 0.95rem;
-  display: flex;
-  align-items: baseline;
-  gap: 0.28rem;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--color-accent-clash-royale) 14%, transparent);
-  color: var(--color-accent-clash-royale);
-}
-.clash-level-badge span { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-.clash-level-badge strong { font-size: 0.8rem; font-weight: 700; line-height: 1; }
 .clash-profile--compact { padding: 0.9rem 1rem; }
 .clash-profile--compact .clash-profile-name { font-size: 1.2rem; }
-.clash-profile--no-arena .clash-profile-name { margin-top: 0.12rem; }
-
 
 .clash-deck-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
 .clash-deck-grid--compact { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.45rem; }
@@ -172,37 +155,11 @@
    view, which shares these same components.
    --------------------------------------------------------------------------- */
 
-/* Lit from the top-right corner, away from the King badge. */
 .clash-overview .clash-profile {
   background:
     radial-gradient(115% 130% at 100% 0%, color-mix(in oklab, var(--color-accent-clash-royale) 12%, transparent), transparent 62%),
     color-mix(in oklab, var(--color-track) 25%, transparent);
 }
-/* The arena reads as a badge rather than a caption on the detail view. */
-.clash-overview .clash-profile-kicker {
-  display: inline-flex;
-  padding: 0.22rem 0.55rem 0.22rem 0.45rem;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--color-accent-clash-royale) 13%, transparent);
-  color: color-mix(in oklab, var(--color-accent-clash-royale) 82%, var(--color-ink));
-  font-weight: 700;
-}
-.clash-overview .clash-level-badge {
-  background: color-mix(in oklab, var(--color-accent-clash-royale) 14%, var(--color-card));
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent-clash-royale) 28%, transparent);
-}
-/* Hairline dividers instead of three implicit tiles — keeps the row reading as one strip. */
-.clash-overview .clash-stat { position: relative; }
-.clash-overview .clash-stat + .clash-stat::before {
-  content: '';
-  position: absolute;
-  top: 0.7rem;
-  bottom: 0.7rem;
-  left: 0;
-  width: 1px;
-  background: var(--color-card-border);
-}
-
 /* Deck art stays unboxed so the cards read as the familiar in-game artwork. */
 .clash-overview .clash-card {
   transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);

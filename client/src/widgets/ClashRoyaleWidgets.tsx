@@ -1,4 +1,4 @@
-import type { ClashRoyaleBattle, ClashRoyaleData } from '@personal-dashboard/shared';
+import { pathOfLegendsDisplayLeagueNumber, type ClashRoyaleBattle, type ClashRoyaleData } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 import { clashRoyaleLeagueArt } from '../lib/clashRoyale';
 
@@ -50,20 +50,17 @@ function Crown({ filled }: Readonly<{ filled: boolean }>) {
   );
 }
 
-export function ClashRoyaleProfile({ data, compact = false, showArena = true, showKingLevel = true }: Readonly<{ data: ClashRoyaleData; compact?: boolean; showArena?: boolean; showKingLevel?: boolean }>) {
+export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
   const { profile } = data;
   const path = profile.pathOfLegends;
-  const leagueName = path ? PATH_OF_LEGENDS_LEAGUES[path.leagueNumber - 1] ?? `League ${path.leagueNumber}` : undefined;
+  const displayLeagueNumber = path ? pathOfLegendsDisplayLeagueNumber(path.leagueNumber) : undefined;
+  const leagueName = displayLeagueNumber
+    ? PATH_OF_LEGENDS_LEAGUES[displayLeagueNumber - 1] ?? `League ${displayLeagueNumber}`
+    : undefined;
 
   return (
-    <section className={`clash-profile${compact ? ' clash-profile--compact' : ''}${showArena ? '' : ' clash-profile--no-arena'}`}>
+    <section className={`clash-profile${compact ? ' clash-profile--compact' : ''}`}>
       <div className="clash-profile-main">
-        {showArena && (
-          <div className="clash-profile-kicker">
-            <Crown filled />
-            <span>{profile.arenaName}</span>
-          </div>
-        )}
         <h2 className="clash-profile-name">{profile.name}</h2>
         <p className="clash-profile-tag">{profile.tag}</p>
         {profile.clanName && (
@@ -78,12 +75,12 @@ export function ClashRoyaleProfile({ data, compact = false, showArena = true, sh
           <p className="clash-trophy-label">Trophy road</p>
           <p className="clash-trophy-value">{formatNumber(profile.trophies)}</p>
         </div>
-        {path && (
+        {path && displayLeagueNumber && (
           <div className="clash-path-panel">
             <p className="clash-eyebrow">Path of Legends</p>
             <div className="clash-path-league">
-              {clashRoyaleLeagueArt(path.leagueNumber) && (
-                <img src={clashRoyaleLeagueArt(path.leagueNumber)} alt="" aria-hidden className="clash-path-league-badge" />
+              {clashRoyaleLeagueArt(displayLeagueNumber) && (
+                <img src={clashRoyaleLeagueArt(displayLeagueNumber)} alt="" aria-hidden className="clash-path-league-badge" />
               )}
               <div className="min-w-0">
                 <p className="clash-path-league-name">{leagueName}</p>
@@ -98,12 +95,6 @@ export function ClashRoyaleProfile({ data, compact = false, showArena = true, sh
           </div>
         )}
       </div>
-      {showKingLevel && (
-        <div className="clash-level-badge" aria-label={`King level ${profile.expLevel}`}>
-          <span>King</span>
-          <strong>{profile.expLevel}</strong>
-        </div>
-      )}
     </section>
   );
 }
