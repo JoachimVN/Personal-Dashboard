@@ -84,7 +84,7 @@ function agentIconUrl(agentId: string): string {
 }
 
 function cardIconUrl(cardId: string): string {
-  return `https://media.valorant-api.com/playercards/${cardId}/smallart.png`;
+  return `https://media.valorant-api.com/playercards/${cardId}/wideart.png`;
 }
 
 /** Auth failures never include the response body — HenrikDev's 401/403 text has echoed the
