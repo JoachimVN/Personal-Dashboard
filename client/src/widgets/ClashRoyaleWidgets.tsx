@@ -127,13 +127,17 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
             <p className="clash-eyebrow">Path of Legends</p>
             <div className="clash-path-league">
               {clashRoyaleLeagueArt(path.leagueNumber) && (
-                <img src={clashRoyaleLeagueArt(path.leagueNumber)} alt="" aria-hidden className="clash-path-league-badge" />
+                <span className="clash-path-league-badge-frame">
+                  <img src={clashRoyaleLeagueArt(path.leagueNumber)} alt="" aria-hidden className="clash-path-league-badge" />
+                </span>
               )}
-              <p className="clash-path-league-name">{leagueName}</p>
-            </div>
-            <div className="clash-path-figures">
-              <strong>{formatNumber(path.trophies)}</strong>
-              <span>{path.rank ? `#${formatNumber(path.rank)}` : 'current season'}</span>
+              <div className="min-w-0">
+                <p className="clash-path-league-name">{leagueName}</p>
+                <div className="clash-path-figures">
+                  <strong>{formatNumber(path.trophies)}</strong>
+                  <span>{path.rank ? `#${formatNumber(path.rank)}` : 'current season'}</span>
+                </div>
+              </div>
             </div>
           </div>
         )}
