@@ -173,7 +173,7 @@ export function createRobloxProvider(auth: RobloxAuth | undefined): Provider<Rob
     refreshMs: 5 * 60_000,
     timeoutMs: 15_000,
     // Presence needs the session cookie — without it there's nothing for this provider to show.
-    isConfigured: () => auth !== undefined && auth.robloSecurity !== undefined,
+    isConfigured: () => auth?.robloSecurity !== undefined,
     async fetch(signal) {
       if (!auth?.robloSecurity) throw new Error('roblox is not configured');
 

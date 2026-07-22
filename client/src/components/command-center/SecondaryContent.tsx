@@ -248,7 +248,7 @@ export function useRobloxArtPalette(iconUrl: string | undefined): RobloxArtPalet
 
 function RobloxNowPlayingSecondary({ slot, roblox }: Readonly<{ slot: CommandCenterSlot; roblox: RobloxData | undefined }>): ReactNode {
   const presence = roblox?.presence;
-  if (slot.render.type !== 'roblox-now-playing' || !presence || presence.status !== 'in-game') return <FallbackSecondary slot={slot} />;
+  if (slot.render.type !== 'roblox-now-playing' || presence?.status !== 'in-game') return <FallbackSecondary slot={slot} />;
   const gameIcon = presence.iconUrl ? (
     <img src={presence.iconUrl} alt="" className="command-roblox-icon" />
   ) : (
