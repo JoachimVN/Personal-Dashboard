@@ -12,9 +12,9 @@ function ValorantWordmark() {
     <span
       role="img"
       aria-label="Valorant"
-      className="block h-[0.62em]"
+      className="block h-[0.78em]"
       style={{
-        aspectRatio: '3984 / 595',
+        aspectRatio: '3633 / 533',
         backgroundColor: 'var(--detail-accent)',
         maskImage: 'url(/valorant_wordmark.png)',
         maskRepeat: 'no-repeat',
