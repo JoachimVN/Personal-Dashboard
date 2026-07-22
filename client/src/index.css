@@ -923,8 +923,10 @@ a {
 }
 
 .command-secondary-spotify-artwork {
-  width: var(--secondary-carousel-media-size);
-  height: var(--secondary-carousel-media-size);
+  /* Keep Now Playing legible without letting one album cover outweigh the
+     signal itself in the compact secondary panel. */
+  width: 6.25rem;
+  height: 6.25rem;
 }
 
 .command-secondary-artist-artwork {
