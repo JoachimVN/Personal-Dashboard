@@ -134,26 +134,19 @@
 .clash-card img { display: block; width: 100%; height: auto; }
 .clash-card span:first-child { display: grid; aspect-ratio: 0.84; width: 100%; place-content: center; color: var(--color-ink); font-size: 1.2rem; font-weight: 800; }
 
-.clash-battle-pulse { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.9rem 1.25rem; padding: 0.9rem 1rem; border-radius: 1rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
-.clash-battle-pulse-record > p:last-child { margin: 0.35rem 0 0; color: var(--color-ink-muted); font-size: 0.78rem; }
-.clash-battle-pulse-record strong { color: var(--color-ink); font-size: 1rem; }
-.clash-battle-pulse-record span { margin: 0 0.18rem; color: var(--color-ink-faint); }
-.clash-battle-pulse-trend { display: grid; align-self: center; justify-items: end; text-align: right; }
-.clash-streak-badge {
-  display: inline-flex;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  background: var(--color-track);
-  color: var(--color-ink-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-.clash-streak-badge.is-up { background: color-mix(in oklab, var(--clash-win) 16%, transparent); color: var(--clash-win); }
-.clash-streak-badge.is-down { background: color-mix(in oklab, var(--clash-loss) 16%, transparent); color: var(--clash-loss); }
-.clash-form-strip { grid-column: 1 / -1; display: flex; gap: 0.32rem; margin: 0; padding: 0; list-style: none; }
-.clash-form-strip li { display: grid; width: 1.4rem; height: 1.4rem; place-content: center; border-radius: 0.38rem; background: var(--color-track); color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 800; }
-.clash-form-strip li[data-result='win'] { background: color-mix(in oklab, var(--clash-win) 24%, var(--color-card)); color: var(--clash-win); }
-.clash-form-strip li[data-result='loss'] { background: color-mix(in oklab, var(--clash-loss) 19%, var(--color-card)); color: var(--clash-loss); }
+.clash-recent-games { display: grid; gap: 0.75rem; padding: 0.95rem 1rem; border-radius: 1rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-recent-games-header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
+.clash-recent-games-record { margin: 0.36rem 0 0; color: var(--color-ink-muted); font-size: 0.78rem; }
+.clash-recent-games-record strong { color: var(--color-ink); font-size: 1rem; }
+.clash-recent-games-record span { margin: 0 0.18rem; color: var(--color-ink-faint); }
+.clash-recent-games-rate { display: grid; justify-items: end; margin: 0; color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; line-height: 1.1; text-transform: uppercase; }
+.clash-recent-games-rate strong { color: var(--color-ink); font-size: 1.2rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.clash-recent-games-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.38rem; margin: 0; padding: 0; list-style: none; }
+.clash-recent-games-grid li { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 0.35rem; min-width: 0; padding: 0.42rem 0.45rem; border-radius: 0.55rem; background: var(--color-card); color: var(--color-ink-faint); font-variant-numeric: tabular-nums; }
+.clash-recent-games-result { display: grid; width: 1.05rem; height: 1.05rem; place-content: center; border-radius: 50%; background: var(--color-track); font-size: 0.58rem; font-weight: 800; }
+.clash-recent-games-score { overflow: hidden; color: var(--color-ink-muted); font-size: 0.68rem; font-weight: 700; letter-spacing: -0.02em; text-overflow: ellipsis; white-space: nowrap; }
+.clash-recent-games-grid li[data-result='win'] .clash-recent-games-result { background: color-mix(in oklab, var(--clash-win) 20%, var(--color-card)); color: var(--clash-win); }
+.clash-recent-games-grid li[data-result='loss'] .clash-recent-games-result { background: color-mix(in oklab, var(--clash-loss) 17%, var(--color-card)); color: var(--clash-loss); }
 
 .clash-battle-log { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
 .clash-battle-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-radius: 0.85rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
@@ -218,13 +211,6 @@
   transform: translateY(-2px);
 }
 .clash-overview .clash-card img { filter: drop-shadow(0 2px 3px color-mix(in oklab, var(--color-ink) 22%, transparent)); }
-
-/* Oldest → newest, so the last chip is the most recent battle: it gets a ring to mark "you are
-   here" and the strip fades toward the older end to give the row a direction. */
-.clash-overview .clash-form-strip { gap: 0.3rem; }
-.clash-overview .clash-form-strip li { flex: 1 1 0; width: auto; min-width: 0; height: 1.5rem; border-radius: 0.42rem; opacity: 0.62; }
-.clash-overview .clash-form-strip li:nth-last-child(-n + 5) { opacity: 0.82; }
-.clash-overview .clash-form-strip li:last-child { opacity: 1; box-shadow: 0 0 0 1.5px color-mix(in oklab, currentColor 45%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
   .clash-overview .clash-card { transition: none; }
