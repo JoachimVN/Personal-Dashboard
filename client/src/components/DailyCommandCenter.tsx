@@ -237,11 +237,12 @@ function SecondaryCarousel({
 }
 
 /** Icon-only so the pill row stays a fixed width as sections are added — labels made it grow
-    unbounded. Generated from SECTIONS so a new section doesn't need a second hand-edit here. */
+    unbounded. Clash Royale remains available in the overview grid, but is intentionally omitted
+    from this compact dashboard-level navigation. */
 function CommandNav() {
   return (
     <nav className="command-nav" aria-label="Dashboard sections">
-      {SECTIONS.map((section) => (
+      {SECTIONS.filter((section) => section.id !== 'clash-royale').map((section) => (
         <a key={section.id} href={sectionHref(section.id)} aria-label={section.title} title={section.title} style={accentStyle(section)}>
           <SectionIcon id={section.id} monochrome />
         </a>
