@@ -16,8 +16,10 @@ import { SteamOverview } from './steam/SteamOverview';
 import { SteamDetail } from './steam/SteamDetail';
 import { ClashRoyaleOverview } from './clashRoyale/ClashRoyaleOverview';
 import { ClashRoyaleDetail } from './clashRoyale/ClashRoyaleDetail';
+import { ValorantOverview } from './valorant/ValorantOverview';
+import { ValorantDetail } from './valorant/ValorantDetail';
 
-export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health', 'steam', 'clash-royale'] as const;
+export const SECTION_IDS = ['ai', 'github', 'spotify', 'personal', 'weather', 'health', 'steam', 'clash-royale', 'valorant'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
 
 export interface SectionDef {
@@ -107,6 +109,15 @@ export const SECTIONS: SectionDef[] = [
     accentVar: '--color-accent-clash-royale',
     Overview: ClashRoyaleOverview,
     Detail: ClashRoyaleDetail,
+  },
+  {
+    id: 'valorant',
+    title: 'Valorant',
+    label: 'Ranked',
+    description: 'Rank, RR and recent match form',
+    accentVar: '--color-accent-valorant',
+    Overview: ValorantOverview,
+    Detail: ValorantDetail,
   },
 ];
 
@@ -245,6 +256,18 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
         loading="lazy"
         decoding="async"
       />
+    );
+  }
+    case 'valorant': {
+    /* Abstract angular chevron rather than the trademarked logo mark — reads as a currentColor
+       glyph like the other hand-drawn icons in this set (ai/personal/weather), colored via
+       --accent in the overview header and left monochrome in the nav pill. */
+    const accent = monochrome ? 'currentColor' : 'var(--accent)';
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill={accent}>
+        <path d="M3.4 5.2c0-.7.8-1.1 1.4-.7l8.9 6.4c.5.4.5 1.1 0 1.5L4.8 18.8c-.6.4-1.4 0-1.4-.7z" />
+        <path d="M13 5.2c0-.7.8-1.1 1.4-.7l6.2 4.5a.9.9 0 0 1 0 1.5l-6.2 4.5c-.6.4-1.4 0-1.4-.7z" opacity="0.55" />
+      </svg>
     );
   }
   default:

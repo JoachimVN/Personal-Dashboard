@@ -24,6 +24,7 @@ import { createSpotifyProvider } from './spotify.js';
 import { createSteamProvider } from './steam.js';
 import { createClashRoyaleProvider } from './clashRoyale.js';
 import { createRobloxProvider } from './roblox.js';
+import { createValorantProvider } from './valorant.js';
 import { createSonarCloudProvider } from './sonarCloud.js';
 import { createSystemProvider } from './system.js';
 import { createTransitProvider, type TransitProvider } from './transit.js';
@@ -104,6 +105,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
         }),
         createRobloxProvider(env.roblox),
         createClashRoyaleProvider(env.clashRoyale),
+        createValorantProvider(env.valorant),
         createSonarCloudProvider(env.sonarCloud),
         createActivityPushProvider(env.dashboardPush),
       ] satisfies Provider[]

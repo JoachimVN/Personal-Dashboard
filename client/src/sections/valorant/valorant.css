@@ -1,0 +1,146 @@
+/* Same restrained treatment as Clash Royale/Steam — one accent color plus the shared neutral
+   `--color-track` panels, not bespoke gradients or borders. */
+:root {
+  --color-accent-valorant: light-dark(#c22a3a, #ff4655);
+  --valorant-win: light-dark(#137343, #55dc93);
+  --valorant-loss: light-dark(#b53a45, #ff8c98);
+}
+
+@media (min-width: 1024px) {
+  .dashboard-section-card--valorant {
+    grid-column: span 6;
+    min-height: 25rem;
+  }
+}
+
+.valorant-overview { display: grid; gap: 0.85rem; }
+.valorant-eyebrow {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.valorant-profile {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem 1.4rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.15rem;
+  background:
+    radial-gradient(115% 130% at 100% 0%, color-mix(in oklab, var(--color-accent-valorant) 12%, transparent), transparent 62%),
+    color-mix(in oklab, var(--color-track) 25%, transparent);
+}
+.valorant-card-art { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; opacity: 0.16; mask-image: linear-gradient(90deg, transparent, black 55%); }
+.valorant-profile-main { position: relative; z-index: 1; min-width: 0; }
+.valorant-profile-kicker {
+  display: inline-flex;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-valorant) 13%, transparent);
+  color: color-mix(in oklab, var(--color-accent-valorant) 82%, var(--color-ink));
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.valorant-profile-name {
+  overflow: hidden;
+  margin: 0.5rem 0 0;
+  color: var(--color-ink);
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.valorant-profile-tag { margin: 0.35rem 0 0; color: var(--color-ink-muted); font-size: 0.72rem; line-height: 1.25; }
+
+.valorant-rank-panel { position: relative; z-index: 1; display: flex; align-items: center; gap: 0.55rem; min-width: 8rem; }
+.valorant-rank-icon { width: 2.6rem; height: 2.6rem; }
+.valorant-rank-name { margin: 0; color: var(--color-ink); font-size: 0.9rem; font-weight: 700; white-space: nowrap; }
+.valorant-rank-rr { margin: 0.2rem 0 0; color: var(--color-ink-faint); font-size: 0.68rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.valorant-level-badge {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.95rem;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-valorant) 14%, var(--color-card));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent-valorant) 28%, transparent);
+  color: var(--color-accent-valorant);
+}
+.valorant-level-badge span { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.valorant-level-badge strong { font-size: 0.8rem; font-weight: 700; line-height: 1; }
+.valorant-profile--compact { padding: 0.9rem 1rem; }
+.valorant-profile--compact .valorant-profile-name { font-size: 1.2rem; }
+
+.valorant-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--color-track) 25%, transparent);
+}
+.valorant-stat { position: relative; min-width: 0; padding: 0.75rem 0.7rem; }
+.valorant-stat + .valorant-stat::before {
+  content: '';
+  position: absolute;
+  top: 0.7rem;
+  bottom: 0.7rem;
+  left: 0;
+  width: 1px;
+  background: var(--color-card-border);
+}
+.valorant-stat-value { overflow: hidden; margin: 0; color: var(--color-ink); font-size: 1.05rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.valorant-stat-label { margin: 0.32rem 0 0; color: var(--color-ink-faint); font-size: 0.56rem; font-weight: 600; letter-spacing: 0.09em; line-height: 1.15; text-transform: uppercase; }
+.valorant-stat-detail { overflow: hidden; margin: 0.26rem 0 0; color: var(--color-ink-muted); font-size: 0.62rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+
+.valorant-match-pulse { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.9rem 1.25rem; padding: 0.9rem 1rem; border-radius: 1rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
+.valorant-match-pulse-record > p:last-child { margin: 0.35rem 0 0; color: var(--color-ink-muted); font-size: 0.78rem; }
+.valorant-match-pulse-record strong { color: var(--color-ink); font-size: 1rem; }
+.valorant-match-pulse-record span { margin: 0 0.18rem; color: var(--color-ink-faint); }
+.valorant-match-pulse-trend { display: grid; align-self: center; justify-items: end; text-align: right; }
+.valorant-streak-badge {
+  display: inline-flex;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-track);
+  color: var(--color-ink-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.valorant-streak-badge.is-up { background: color-mix(in oklab, var(--valorant-win) 16%, transparent); color: var(--valorant-win); }
+.valorant-streak-badge.is-down { background: color-mix(in oklab, var(--valorant-loss) 16%, transparent); color: var(--valorant-loss); }
+.valorant-form-strip { grid-column: 1 / -1; display: flex; gap: 0.32rem; margin: 0; padding: 0; list-style: none; }
+.valorant-form-strip li { display: grid; width: 1.4rem; height: 1.4rem; place-content: center; border-radius: 0.38rem; background: var(--color-track); color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 800; }
+.valorant-form-strip li[data-result='win'] { background: color-mix(in oklab, var(--valorant-win) 24%, var(--color-card)); color: var(--valorant-win); }
+.valorant-form-strip li[data-result='loss'] { background: color-mix(in oklab, var(--valorant-loss) 19%, var(--color-card)); color: var(--valorant-loss); }
+
+.valorant-match-log { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.valorant-match-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-radius: 0.85rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
+.valorant-match-row[data-result='win'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-win) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
+.valorant-match-row[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-loss) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
+.valorant-agent-icon { width: 2.4rem; height: 2.4rem; border-radius: 0.6rem; background: var(--color-track); object-fit: cover; }
+.valorant-match-main { min-width: 0; }
+.valorant-match-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+.valorant-match-title-row p { overflow: hidden; margin: 0; color: var(--color-ink); font-size: 0.82rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-match-title-row time { flex: 0 0 auto; color: var(--color-ink-faint); font-size: 0.62rem; }
+.valorant-match-meta { display: flex; gap: 0.38rem; overflow: hidden; margin-top: 0.2rem; color: var(--color-ink-faint); font-size: 0.62rem; white-space: nowrap; }
+.valorant-match-meta span + span::before { content: '·'; margin-right: 0.38rem; }
+
+@media (max-width: 480px) {
+  .valorant-profile { grid-template-columns: minmax(0, 1fr); gap: 1rem 0; padding: 0.9rem 1rem; }
+  .valorant-rank-panel { justify-content: flex-start; }
+  .valorant-match-row { grid-template-columns: auto minmax(0, 1fr); gap: 0.55rem; }
+}

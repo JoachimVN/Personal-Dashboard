@@ -292,6 +292,15 @@ Read-only: player profile, current deck, upcoming chest cycle, and recent battle
 
 If the server's public IP changes (dynamic ISP address, or the machine moves between networks), requests start failing with HTTP 403 until you update the allowlist at developer.clashroyale.com — the server logs its current public IP once at startup (`[clash-royale] server's current public IP is ...`) as a quick copy-paste source when that happens.
 
+### Valorant
+
+Uses [HenrikDev's](https://docs.henrikdev.xyz) unofficial Valorant API — Riot doesn't offer a personal-use stats API of its own (its official Developer keys expire every 24 hours unless you're approved for production access), and HenrikDev's is what most third-party Valorant stat sites are built on.
+
+1. Log into [api.henrikdev.xyz/dashboard](https://api.henrikdev.xyz/dashboard/) (Discord OAuth) and generate a key under **API Keys** — the free Basic tier is instant, no approval wait.
+2. Set `HENRIKDEV_API_KEY`, `RIOT_ID` (your Riot ID as `Name#Tag`), and `RIOT_REGION` (`na`/`eu`/`ap`/`kr`, defaults to `eu`) in `server/.env`, then restart the server.
+
+Read-only: account level, current and peak competitive rank, current-season win rate, and the last 10 matches (map, agent, KDA, headshot %, result). Rank and agent icons are pulled from `valorant-api.com`'s public asset CDN, which needs no key of its own.
+
 ### SonarCloud
 
 Shows up as a "Code quality" block at the bottom of the GitHub page, listing every project in your org with its quality gate status, ratings, coverage, and duplication — one card per repo.
