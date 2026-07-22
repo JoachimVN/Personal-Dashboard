@@ -34,23 +34,6 @@ function recentRecord(battles: ClashRoyaleBattle[]) {
   }, { wins: 0, losses: 0, draws: 0 });
 }
 
-function currentStreak(battles: ClashRoyaleBattle[]): { result: ClashRoyaleBattle['result']; length: number } | undefined {
-  const latest = battles[0];
-  if (!latest) return undefined;
-  let length = 0;
-  for (const battle of battles) {
-    if (battle.result !== latest.result) break;
-    length += 1;
-  }
-  return { result: latest.result, length };
-}
-
-function streakModifier(result: ClashRoyaleBattle['result'] | undefined): string {
-  if (result === 'win') return ' is-up';
-  if (result === 'loss') return ' is-down';
-  return '';
-}
-
 function formatBattleType(type: string): string {
   return type
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -142,25 +125,28 @@ export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: Clas
 
 export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">Play a battle to start a fresh activity readout.</p>;
-  const record = recentRecord(data.recentBattles);
-  const streak = currentStreak(data.recentBattles);
-  let streakLabel = 'No streak yet';
-  if (streak) {
-    streakLabel = `${streak.length}${STREAK_RESULT_LABELS[streak.result]} streak`;
-  }
+  const battles = data.recentBattles;
+  const record = recentRecord(battles);
+  const battleCount = battles.length;
+  const winRate = Math.round((record.wins / battleCount) * 100);
   return (
-    <div className="clash-battle-pulse">
-      <div className="clash-battle-pulse-record">
-        <p className="clash-eyebrow">Recent form</p>
-        <p><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
-      </div>
-      <div className="clash-battle-pulse-trend">
-        <span className={`clash-streak-badge${streakModifier(streak?.result)}`}>{streakLabel}</span>
-      </div>
-      <ol className="clash-form-strip" aria-label="Results of recent battles">
-        {data.recentBattles.slice(0, 10).reverse().map((battle, index) => <li key={`${battle.battleTime}-${index}`} data-result={battle.result}>{battle.result.charAt(0).toUpperCase()}</li>)}
+    <section className="clash-recent-games">
+      <header className="clash-recent-games-header">
+        <div>
+          <p className="clash-eyebrow">Last 10 games</p>
+          <p className="clash-recent-games-record"><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
+        </div>
+        <p className="clash-recent-games-rate"><strong>{winRate}%</strong><span>win rate</span></p>
+      </header>
+      <ol className="clash-recent-games-grid" aria-label="Results of recent battles, oldest to newest">
+        {battles.slice(0, 10).reverse().map((battle, index) => (
+          <li key={`${battle.battleTime}-${index}`} data-result={battle.result} aria-label={`${BATTLE_RESULT_LABELS[battle.result]}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
+            <span className="clash-recent-games-result">{STREAK_RESULT_LABELS[battle.result]}</span>
+            <span className="clash-recent-games-score">{battle.crownsFor}–{battle.crownsAgainst}</span>
+          </li>
+        ))}
       </ol>
-    </div>
+    </section>
   );
 }
 

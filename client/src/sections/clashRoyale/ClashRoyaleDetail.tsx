@@ -23,17 +23,17 @@ export function ClashRoyaleDetail() {
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="Form" title="Recent battle pulse" />
-      <WidgetShell title="Battle pulse">
-        <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <ClashRoyaleBattlePulse data={data} />}
-        </WidgetBody>
-      </WidgetShell>
-
       <DetailSectionHeading label="Deck" title="Your eight cards" />
       <WidgetShell title="Current deck">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleDeck data={data} />}
+        </WidgetBody>
+      </WidgetShell>
+
+      <DetailSectionHeading label="Form" title="Recent games" />
+      <WidgetShell title="Recent games">
+        <WidgetBody envelope={envelope} offline={offline}>
+          {(data) => <ClashRoyaleBattlePulse data={data} />}
         </WidgetBody>
       </WidgetShell>
 
