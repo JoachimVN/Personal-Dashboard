@@ -1,5 +1,6 @@
 import { useId, type ComponentType, type CSSProperties } from 'react';
 import { GitHubMark } from '../components/GitHubMark';
+import { CLASH_ROYALE_APP_ICON_URL } from '../lib/clashRoyale';
 import { AiOverview } from './ai/AiOverview';
 import { AiDetail } from './ai/AiDetail';
 import { GitHubOverview } from './github/GitHubOverview';
@@ -249,7 +250,7 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
        card header and the monochrome nav pill since it's art, not a currentColor glyph. */
     return (
       <img
-        src="https://media.ffycdn.net/eu/supercell/nxaaEWAgbRGADkoAETG8.png"
+        src={CLASH_ROYALE_APP_ICON_URL}
         alt=""
         aria-hidden
         className="h-5 w-5 rounded-[0.3rem] object-cover"

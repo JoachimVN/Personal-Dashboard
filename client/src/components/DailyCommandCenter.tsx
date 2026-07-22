@@ -13,6 +13,7 @@ import { deg, glyph, weatherLocation } from '../lib/weather';
 import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
+import { CLASH_ROYALE_APP_ICON_URL, clashRoyaleArenaArt, clashRoyaleLeagueArt } from '../lib/clashRoyale';
 import { accentStyle, SECTIONS, SectionIcon } from '../sections/registry';
 import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
@@ -52,7 +53,7 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'claude' | 'codex' {
+function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
@@ -61,6 +62,7 @@ function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'healt
   if (slot.source === 'weather') return 'weather';
   if (slot.source === 'steam') return 'steam';
   if (slot.source === 'roblox') return 'roblox';
+  if (slot.source === 'clash-royale') return 'clash-royale';
   return 'personal';
 }
 
@@ -82,6 +84,7 @@ function CommandPanel({
   children,
   fullCardLink = false,
   style,
+  art,
 }: Readonly<{
   href: string;
   label: string;
@@ -89,13 +92,32 @@ function CommandPanel({
   children: ReactNode;
   fullCardLink?: boolean;
   style?: CSSProperties;
+  /** Backdrop key art (arena/league renders) — painted first so it sits behind all other children. */
+  art?: string;
 }>) {
   return (
     <div className={`${className} cursor-pointer${fullCardLink ? ' command-panel--full-link' : ''}`} style={style}>
+      {art && <img src={art} alt="" aria-hidden className="command-panel-art" />}
       <a href={href} aria-label={label} className="command-panel-stretched-link" />
       {children}
     </div>
   );
+}
+
+/** The backdrop art behind hero/secondary Clash Royale cards — only 'arena' and 'league' moments
+ * have real art (see lib/clashRoyale.ts); the rest render as plain panels. */
+function slotArt(slot: CommandCenterSlot): string | undefined {
+  if (slot.render.type !== 'clash-royale-moment') return undefined;
+  if (slot.render.kind === 'arena' && slot.render.arenaName) return clashRoyaleArenaArt(slot.render.arenaName);
+  if (slot.render.kind === 'league' && slot.render.leagueNumber !== undefined) return clashRoyaleLeagueArt(slot.render.leagueNumber);
+  return undefined;
+}
+
+/** A small game-icon badge next to the kicker on hero/secondary cards, so a Clash Royale card reads
+ * unambiguously even without art (or before an unmapped arena's art loads). */
+function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
+  if (slot.render.type !== 'clash-royale-moment') return null;
+  return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-kicker-badge" />;
 }
 
 function signalMark(
@@ -104,6 +126,9 @@ function signalMark(
   roblox: RobloxData | undefined,
 ): ReactNode {
   const activityDay = health ? latestActivityDay(health) : undefined;
+  if (slot.render.type === 'clash-royale-moment') {
+    return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-clash-royale-tile-icon" />;
+  }
   if (slot.render.type === 'health-rings' && health && activityDay) {
     return <CompactActivityRings
       activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
@@ -323,8 +348,9 @@ function HeroPanel({
       href={hero.href}
       label={`Open ${hero.kicker}: ${event?.title ?? track?.track ?? hero.title}`}
       className={`command-primary command-panel--${toneFor(hero)}`}
+      art={slotArt(hero)}
     >
-      <p className="command-label">{hero.kicker}</p>
+      <p className="command-label"><KickerBadge slot={hero} />{hero.kicker}</p>
       <div className="mt-5 flex items-start gap-4">
         {track && <Thumb url={track.imageUrl} size="h-16 w-16" />}
         <div className="min-w-0">
@@ -421,13 +447,14 @@ export function DailyCommandCenter() {
         className={`command-agenda command-panel--${toneFor(activeSecondary)}${isRobloxSecondary ? ' command-agenda--roblox' : ''}`}
         fullCardLink
         style={robloxArtStyle}
+        art={slotArt(activeSecondary)}
       >
         <SecondaryCarousel
           items={secondarySlots}
           activeIndex={activeSecondaryIndex}
           onActiveChange={setActiveSecondaryIndex}
           renderItem={(slot) => <>
-            {slot.render.type !== 'roblox-now-playing' && <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>}
+            {slot.render.type !== 'roblox-now-playing' && <div className="command-agenda-heading"><p className="command-label"><KickerBadge slot={slot} />{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>}
             <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyFetchedAt} health={health} github={github} gmail={gmail} weather={weather} steam={steam} roblox={roblox} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
           </>}
         />

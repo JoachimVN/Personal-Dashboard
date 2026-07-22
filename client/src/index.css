@@ -380,6 +380,7 @@ a {
 .command-panel--weather { --panel-accent: var(--color-accent-weather); }
 .command-panel--steam { --panel-accent: var(--color-accent-steam); }
 .command-panel--roblox { --panel-accent: var(--color-accent-roblox); }
+.command-panel--clash-royale { --panel-accent: var(--color-accent-clash-royale); }
 
 .command-agenda.command-agenda--roblox {
   --panel-accent: var(--color-ink);
@@ -660,6 +661,7 @@ a {
 .command-signal--weather { --signal-color: var(--color-accent-weather); }
 .command-signal--steam { --signal-color: var(--color-accent-steam); }
 .command-signal--roblox { --signal-color: var(--color-accent-roblox); }
+.command-signal--clash-royale { --signal-color: var(--color-accent-clash-royale); }
 
 .command-roblox-tile-mark {
   display: grid;
@@ -684,6 +686,52 @@ a {
   border-radius: 0.625rem;
   object-fit: cover;
   box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-roblox) 32%, transparent);
+}
+
+.command-clash-royale-tile-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  object-fit: cover;
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-clash-royale) 32%, transparent);
+}
+
+/* Disambiguates a hero/secondary card as Clash Royale even when it has no backdrop art (most
+   milestones don't — see lib/clashRoyale.ts). Sits inline with the uppercase kicker label. */
+.command-kicker-badge {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin: 0 0.4rem -0.1rem 0;
+  border-radius: 0.25rem;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+/* Arena/league key art, right-anchored and faded into the card rather than stretched full-bleed —
+   these are portrait renders and square badges, not wide backdrop crops, so `cover` would distort
+   them. Sits behind all other panel children (see the z-index rule below); the panel's own
+   `--panel-accent` tint and glass base still show through the faded edge. */
+.command-panel-art {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 55%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+  opacity: 0.5;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to left, black 45%, transparent 92%);
+  mask-image: linear-gradient(to left, black 45%, transparent 92%);
+}
+
+.command-primary > .command-panel-art,
+.command-agenda > .command-panel-art {
+  z-index: 0;
 }
 
 /* The game artwork adds atmosphere, while the wordmark and structured stats make the surface
