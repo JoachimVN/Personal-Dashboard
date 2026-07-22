@@ -7,8 +7,7 @@ export const CLASH_ROYALE_APP_ICON_URL = 'https://media.ffycdn.net/eu/supercell/
  * (e.g. `player.arena.name`). Sourced from the Clash Royale Fandom wiki's Trophy Road table
  * (clashroyale.fandom.com/wiki/Arenas), covering all 32 current arenas — fan content per
  * Supercell's Fan Content Policy (supercell.com/en/fan-content-policy), hotlinked from Fandom's own
- * asset CDN rather than vendored (unlike the Path of Legends badges below, Fandom doesn't ask
- * consumers not to hotlink).
+ * asset CDN rather than vendored (same sourcing as the league badges below).
  *
  * The CR API doesn't expose a stable numeric arena id in the player payload worth keying off, and
  * Supercell adds new arenas to the trophy road periodically — an arena reached that isn't in this
@@ -61,10 +60,28 @@ export function clashRoyaleArenaArt(arenaName: string): string | undefined {
 }
 
 /**
- * Path of Legends league badges, vendored locally (not hotlinked) at the source repo's own request
- * — see client/public/clash-royale/leagues, sourced from github.com/RoyaleAPI/cr-api-assets under
- * Supercell's Fan Content Policy. Covers leagues 0–10, the full current range.
+ * Path of Legends league badges, keyed by `leagueNumber` (1–10, matching the API and the
+ * PATH_OF_LEGENDS_LEAGUES names in widgets/ClashRoyaleWidgets.tsx — there is no League 0).
+ * Hotlinked from the Clash Royale Fandom wiki's Ranked/League Statistics table
+ * (clashroyale.fandom.com/wiki/Ranked), same sourcing as the arena art above.
+ *
+ * Previously vendored from github.com/RoyaleAPI/cr-api-assets, but that repo's league0.png and
+ * league10.png turned out to be byte-identical (a bug in their own asset set, not a download
+ * error here) — switched to Fandom, which has ten genuinely distinct files.
  */
+const LEAGUE_ART: Record<number, string> = {
+  1: 'https://static.wikia.nocookie.net/clashroyale/images/c/c3/League1.png/revision/latest?cb=20170317224347',
+  2: 'https://static.wikia.nocookie.net/clashroyale/images/3/3a/League2.png/revision/latest?cb=20170317224350',
+  3: 'https://static.wikia.nocookie.net/clashroyale/images/c/cc/League3.png/revision/latest?cb=20170317224352',
+  4: 'https://static.wikia.nocookie.net/clashroyale/images/8/8d/League4.png/revision/latest?cb=20170317224354',
+  5: 'https://static.wikia.nocookie.net/clashroyale/images/3/36/League5.png/revision/latest?cb=20170317224356',
+  6: 'https://static.wikia.nocookie.net/clashroyale/images/1/12/League6.png/revision/latest?cb=20170317224358',
+  7: 'https://static.wikia.nocookie.net/clashroyale/images/3/36/League7.png/revision/latest?cb=20190416022336',
+  8: 'https://static.wikia.nocookie.net/clashroyale/images/b/b2/League8.png/revision/latest?cb=20170317224400',
+  9: 'https://static.wikia.nocookie.net/clashroyale/images/1/16/League9.png/revision/latest?cb=20170317224402',
+  10: 'https://static.wikia.nocookie.net/clashroyale/images/b/be/League10.png/revision/latest?cb=20170317224404',
+};
+
 export function clashRoyaleLeagueArt(leagueNumber: number): string | undefined {
-  return leagueNumber >= 0 && leagueNumber <= 10 ? `/clash-royale/leagues/league-${leagueNumber}.png` : undefined;
+  return LEAGUE_ART[leagueNumber];
 }
