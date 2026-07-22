@@ -356,17 +356,34 @@ a {
 
 .command-agenda.command-agenda--roblox {
   --panel-accent: var(--color-ink);
-  background:
-    radial-gradient(circle at 79% -24%, rgb(var(--roblox-art-primary, 194 40 30) / 0.24), transparent 58%),
-    linear-gradient(118deg, rgb(var(--roblox-art-secondary, 194 40 30) / 0.16), transparent 70%),
-    linear-gradient(135deg, color-mix(in oklab, var(--color-ink) 3%, transparent), transparent 58%),
-    light-dark(rgb(255 255 255 / 0.58), rgb(17 20 28 / 0.7));
   border-color: var(--color-card-border);
 }
 
 .command-agenda.command-agenda--roblox::before,
 .command-agenda.command-agenda--roblox:hover::before {
   opacity: 0;
+}
+
+/* A dedicated fade layer for the Roblox art tint, separate from .command-agenda's own
+   background, so switching in/out of the Roblox slide crossfades instead of hard-swapping the
+   whole card background mid-slide (which read as a black/red flash). */
+.command-agenda::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 79% -24%, rgb(var(--roblox-art-primary, 194 40 30) / 0.24), transparent 58%),
+    linear-gradient(118deg, rgb(var(--roblox-art-secondary, 194 40 30) / 0.16), transparent 70%),
+    linear-gradient(135deg, color-mix(in oklab, var(--color-ink) 3%, transparent), transparent 58%),
+    light-dark(rgb(255 255 255 / 0.58), rgb(17 20 28 / 0.7));
+  opacity: 0;
+  transition: opacity 420ms ease;
+}
+
+.command-agenda.command-agenda--roblox::after {
+  opacity: 1;
 }
 
 .command-agenda--roblox > .command-secondary-carousel {
@@ -902,14 +919,17 @@ a {
 }
 
 .command-secondary-carousel-viewport {
+  position: relative;
   height: var(--secondary-carousel-content-height);
   overflow: hidden;
 }
 
 .command-secondary-carousel-slide {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  min-height: 100%;
-  will-change: opacity, transform, filter;
+  height: 100%;
+  will-change: transform;
 }
 
 .command-secondary-spotify {

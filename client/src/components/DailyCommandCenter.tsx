@@ -142,6 +142,12 @@ function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; gi
   );
 }
 
+const secondarySlideVariants = {
+  enter: (direction: 1 | -1) => ({ x: `${direction * 100}%` }),
+  center: { x: '0%' },
+  exit: (direction: 1 | -1) => ({ x: `${direction * -100}%` }),
+};
+
 function SecondaryCarousel({
   items,
   activeIndex,
@@ -154,6 +160,7 @@ function SecondaryCarousel({
   renderItem: (slot: CommandCenterSlot) => ReactNode;
 }>) {
   const [paused, setPaused] = useState(false);
+  const [direction, setDirection] = useState<1 | -1>(1);
   const hasMultipleItems = items.length > 1;
   const visibleIndex = Math.min(activeIndex, items.length - 1);
 
@@ -164,6 +171,7 @@ function SecondaryCarousel({
   useEffect(() => {
     if (!hasMultipleItems || paused) return undefined;
     const timer = window.setInterval(() => {
+      setDirection(1);
       onActiveChange((activeIndex + 1) % items.length);
     }, SECONDARY_CAROUSEL_INTERVAL_MS);
     return () => window.clearInterval(timer);
@@ -173,7 +181,10 @@ function SecondaryCarousel({
   if (!hasMultipleItems) return <>{renderItem(items[0]!)}</>;
 
   const goTo = (index: number) => {
-    onActiveChange((index + items.length) % items.length);
+    const target = (index + items.length) % items.length;
+    const forwardDistance = (target - visibleIndex + items.length) % items.length;
+    setDirection(forwardDistance <= items.length - forwardDistance ? 1 : -1);
+    onActiveChange(target);
   };
 
   const pause = () => setPaused(true);
@@ -193,14 +204,16 @@ function SecondaryCarousel({
         }}
       >
         <div className="command-secondary-carousel-viewport">
-          <AnimatePresence initial={false} mode="wait">
+          <AnimatePresence initial={false} custom={direction}>
             <motion.div
               key={items[visibleIndex]!.id}
               className="command-secondary-carousel-slide"
-              initial={{ opacity: 0, x: 28, y: 8, filter: 'blur(7px)' }}
-              animate={{ opacity: 1, x: 0, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: -20, y: -5, filter: 'blur(5px)' }}
-              transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
+              custom={direction}
+              variants={secondarySlideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.45, ease: [0.65, 0, 0.35, 1] }}
             >
               {renderItem(items[visibleIndex]!)}
             </motion.div>
