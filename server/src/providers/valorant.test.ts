@@ -30,8 +30,35 @@ const rawMatch = {
   }],
 };
 
+const rawStoredMatch = {
+  meta: {
+    id: 'stored-match-1',
+    map: { name: 'Bind' },
+    mode: 'Competitive',
+    started_at: '2026-07-20T18:00:00.000Z',
+    season: { short: 'e10a2' },
+  },
+  stats: {
+    team: 'Red',
+    character: { id: 'agent-2', name: 'Sova' },
+    score: 3600,
+    kills: 18,
+    deaths: 14,
+    assists: 7,
+    shots: { head: 12, body: 36, leg: 4 },
+    damage: { dealt: 2800, received: 1900 },
+  },
+  teams: { red: 13, blue: 9 },
+};
+
+const incompleteStoredMatch = {
+  ...rawStoredMatch,
+  meta: { ...rawStoredMatch.meta, id: 'stored-match-2' },
+  stats: { ...rawStoredMatch.stats, shots: {}, damage: {} },
+};
+
 describe('Valorant provider history', () => {
-  it('backfills stored matches and attaches their ranked act without delaying the normal snapshot', async () => {
+  it('backfills HenrikDev stored matches and retains the provider archive total', async () => {
     const historyStore = {
       get: vi.fn().mockResolvedValue(undefined),
       set: vi.fn().mockImplementation(async (value) => ({ ...value, fetchedAt: '2026-07-22T00:00:00.000Z' })),
@@ -45,18 +72,24 @@ describe('Valorant provider history', () => {
         seasonal: [{ season: { short: 'e10a2' }, wins: 12, games: 20 }],
       } });
       if (url.includes('/valorant/v4/matches/')) return jsonResponse({ data: [rawMatch] });
-      if (url.includes('/stored-matches/')) return jsonResponse({ results: { total: 1 }, data: [rawMatch] });
-      if (url.includes('/stored-mmr-history/')) return jsonResponse({ results: { total: 1 }, data: [{ match_id: 'match-1', season: { short: 'e10a2' } }] });
+      if (url.includes('/stored-matches/')) return jsonResponse({ results: { total: 250 }, data: [rawStoredMatch] });
+      if (url.includes('/stored-mmr-history/')) return jsonResponse({ results: { total: 1 }, data: [] });
       throw new Error(`Unexpected request: ${url}`);
     });
 
     const provider = createValorantProvider({ apiKey: 'key', name: 'Synthetic', tag: 'VAL', region: 'eu' }, historyStore as never);
     const data = await provider.fetch(new AbortController().signal, false);
 
-    expect(historyStore.set).toHaveBeenCalledWith(expect.objectContaining({ totalMatchesAvailable: 1 }));
+    expect(historyStore.set).toHaveBeenCalledWith(expect.objectContaining({ totalMatchesAvailable: 250 }));
     expect(data.history.currentActShort).toBe('e10a2');
-    expect(data.history.matches).toHaveLength(1);
-    expect(data.history.matches[0]).toMatchObject({ agentName: 'Omen', actShort: 'e10a2' });
+    expect(data.history.matches).toHaveLength(2);
+    expect(data.history.matches).toContainEqual(expect.objectContaining({
+      agentName: 'Sova',
+      result: 'win',
+      roundsWon: 13,
+      roundsLost: 9,
+      actShort: 'e10a2',
+    }));
     fetchMock.mockRestore();
   });
 
@@ -66,7 +99,7 @@ describe('Valorant provider history', () => {
         matches: [],
         totalMatchesAvailable: 42,
         fetchedAt: new Date().toISOString(),
-        sourceVersion: 2,
+        sourceVersion: 3,
       }),
       set: vi.fn(),
     };
@@ -91,6 +124,39 @@ describe('Valorant provider history', () => {
     fetchMock.mockRestore();
   });
 
+  it('keeps older stored matches that omit combat breakdowns', async () => {
+    const historyStore = {
+      get: vi.fn().mockResolvedValue(undefined),
+      set: vi.fn().mockImplementation(async (value) => ({ ...value, fetchedAt: '2026-07-22T00:00:00.000Z' })),
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/account/')) return jsonResponse({ data: { puuid: 'player-1', region: 'eu', account_level: 100, name: 'Synthetic', tag: 'VAL' } });
+      if (url.includes('/valorant/v3/mmr/')) return jsonResponse({ data: {
+        current: { tier: { id: 18, name: 'Diamond 1' }, rr: 42, last_change: 18, leaderboard_placement: null },
+        peak: { tier: { id: 21, name: 'Ascendant 1' } },
+        seasonal: [],
+      } });
+      if (url.includes('/valorant/v4/matches/')) return jsonResponse({ data: [rawMatch] });
+      if (url.includes('/stored-matches/')) return jsonResponse({ results: { total: 1 }, data: [incompleteStoredMatch] });
+      if (url.includes('/stored-mmr-history/')) return jsonResponse({ results: { total: 0 }, data: [] });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const provider = createValorantProvider({ apiKey: 'key', name: 'Synthetic', tag: 'VAL', region: 'eu' }, historyStore as never);
+    const data = await provider.fetch(new AbortController().signal, false);
+
+    expect(data.history.matches).toContainEqual(expect.objectContaining({
+      matchId: 'stored-match-2',
+      headshots: 0,
+      bodyshots: 0,
+      legshots: 0,
+      damageDealt: 0,
+      damageReceived: 0,
+    }));
+    fetchMock.mockRestore();
+  });
+
   it('continues an unfinished archive even when its last sync is fresh', async () => {
     const historyStore = {
       get: vi.fn().mockResolvedValue({
@@ -98,7 +164,7 @@ describe('Valorant provider history', () => {
         totalMatchesAvailable: 10,
         fetchedAt: new Date().toISOString(),
         nextPage: 2,
-        sourceVersion: 2,
+        sourceVersion: 3,
       }),
       set: vi.fn().mockImplementation(async (value) => ({ ...value, fetchedAt: new Date().toISOString() })),
     };
@@ -111,7 +177,8 @@ describe('Valorant provider history', () => {
         seasonal: [],
       } });
       if (url.includes('/valorant/v4/matches/')) return jsonResponse({ data: [rawMatch] });
-      if (url.includes('/stored-mmr-history/')) return jsonResponse({ results: { total: 1 }, data: [{ match_id: 'match-1', season: { short: 'e10a2' } }] });
+      if (url.includes('/stored-matches/')) return jsonResponse({ results: { total: 1 }, data: [rawStoredMatch] });
+      if (url.includes('/stored-mmr-history/')) return jsonResponse({ results: { total: 1 }, data: [] });
       throw new Error(`Unexpected request: ${url}`);
     });
 

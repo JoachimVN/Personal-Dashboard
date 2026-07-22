@@ -4,12 +4,11 @@ import type { ValorantHistoryStore } from '../valorantHistory.js';
 
 const HD_API_BASE = 'https://api.henrikdev.xyz';
 const RECENT_MATCHES_COUNT = 10;
-const HISTORY_MATCHES_PER_PAGE = 10;
 const STORED_HISTORY_PAGE_SIZE = 100;
-/** 3 normal calls + at most 13 match and 13 MMR archive pages uses at most 29 requests of a 30-RPM key. */
+/** 3 normal calls + at most 13 stored-match and 13 MMR archive pages uses at most 29 requests of a 30-RPM key. */
 const MAX_STORED_HISTORY_PAGES_PER_SYNC = 13;
 const STORED_HISTORY_REFRESH_MS = 24 * 60 * 60_000;
-const MATCH_HISTORY_CACHE_VERSION = 2;
+const MATCH_HISTORY_CACHE_VERSION = 3;
 /** The standard rank scheme UUID all current episodes share (Ascendant onward) — tier ids 0-27
  * are stable against it, so the icon URL can be built directly without an extra reference call. */
 const COMPETITIVE_TIERS_UUID = '03621f52-342b-cf4e-4f86-9350a49c6d04';
@@ -86,6 +85,30 @@ interface RawMatch {
   };
   teams: RawMatchTeam[];
   players: RawMatchPlayer[];
+}
+
+/** HenrikDev retains a separate, paginated archive of matches it has already indexed. It has a
+ * simpler per-player shape than the live v4 response, but reports the archive total and can
+ * extend farther back than the live match list. */
+interface RawStoredMatch {
+  meta: {
+    id: string;
+    map: { name: string };
+    mode: string;
+    started_at: string;
+    season?: { short?: string };
+  };
+  stats: {
+    team: string;
+    character: { id?: string; name: string };
+    score?: number;
+    kills?: number;
+    deaths?: number;
+    assists?: number;
+    shots?: { head?: number; body?: number; leg?: number };
+    damage?: { dealt?: number; received?: number };
+  };
+  teams: { red: number; blue: number };
 }
 
 function tierIconUrl(tierId: number): string | undefined {
@@ -169,38 +192,6 @@ async function fetchStoredPages<T>(
   return { data, total, nextPage: lastFetchedPage >= pageCount ? 1 : lastFetchedPage + 1, rateLimitRemaining: remaining };
 }
 
-/** The live v4 history endpoint is paginated but does not report a total. Fetch only a small
- * sequential slice per daily sync; the persisted cursor keeps expanding the local career view. */
-async function fetchMatchHistoryPages(
-  signal: AbortSignal,
-  apiKey: string,
-  region: string,
-  name: string,
-  tag: string,
-  startPage: number,
-): Promise<{ data: RawMatch[]; nextPage: number; rateLimitRemaining?: number }> {
-  const data: RawMatch[] = [];
-  let nextPage = startPage;
-  let remaining: number | undefined;
-  for (let page = startPage; page < startPage + MAX_STORED_HISTORY_PAGES_PER_SYNC; page += 1) {
-    if (remaining !== undefined && remaining <= 3) break;
-    const response = await hdPagedRequest<RawMatch[]>(
-      signal,
-      apiKey,
-      appendQuery(`/valorant/v4/matches/${region}/pc/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`, {
-        size: HISTORY_MATCHES_PER_PAGE,
-        start: (page - 1) * HISTORY_MATCHES_PER_PAGE,
-      }),
-      'GetMatchHistory',
-    );
-    data.push(...response.data);
-    remaining = response.rateLimitRemaining;
-    nextPage = response.data.length < HISTORY_MATCHES_PER_PAGE ? 1 : page + 1;
-    if (nextPage === 1) break;
-  }
-  return { data, nextPage, rateLimitRemaining: remaining };
-}
-
 export function mapMatch(match: RawMatch, puuid: string): ValorantMatch | undefined {
   const me = match.players.find((player) => player.puuid === puuid);
   if (!me) return undefined;
@@ -230,6 +221,40 @@ export function mapMatch(match: RawMatch, puuid: string): ValorantMatch | undefi
     actShort: match.metadata.season?.short,
     isMatchMvp: me.stats.score === Math.max(...allScores),
     isTeamMvp: me.stats.score === Math.max(...teammateScores),
+  };
+}
+
+function mapStoredMatch(match: RawStoredMatch): ValorantMatch {
+  const team = match.stats.team.toLowerCase();
+  const myRounds = team === 'red' ? match.teams.red : match.teams.blue;
+  const opponentRounds = team === 'red' ? match.teams.blue : match.teams.red;
+  const result: ValorantMatch['result'] = myRounds === opponentRounds ? 'draw' : myRounds > opponentRounds ? 'win' : 'loss';
+  return {
+    matchId: match.meta.id,
+    map: match.meta.map.name,
+    mode: match.meta.mode,
+    startedAt: match.meta.started_at,
+    result,
+    roundsWon: myRounds,
+    roundsLost: opponentRounds,
+    agentName: match.stats.character.name,
+    agentIconUrl: match.stats.character.id ? agentIconUrl(match.stats.character.id) : undefined,
+    // Older HenrikDev archive rows can omit combat breakdowns. Retain the match instead of
+    // invalidating the whole provider response; unavailable values are represented as zero.
+    score: match.stats.score ?? 0,
+    kills: match.stats.kills ?? 0,
+    deaths: match.stats.deaths ?? 0,
+    assists: match.stats.assists ?? 0,
+    headshots: match.stats.shots?.head ?? 0,
+    bodyshots: match.stats.shots?.body ?? 0,
+    legshots: match.stats.shots?.leg ?? 0,
+    damageDealt: match.stats.damage?.dealt ?? 0,
+    damageReceived: match.stats.damage?.received ?? 0,
+    actShort: match.meta.season?.short,
+    // The stored-match response only contains this player's statistics, so MVP status cannot
+    // be derived without a separate match-detail request for every archived match.
+    isMatchMvp: false,
+    isTeamMvp: false,
   };
 }
 
@@ -291,12 +316,11 @@ export function createValorantProvider(auth: ValorantAuth | undefined, historySt
       if (!storedHistory || !isHistoryFresh(storedHistory)) {
         try {
           const startPage = storedHistory?.nextPage ?? 1;
-          const storedMatches = await fetchMatchHistoryPages(
+          const storedMatches = await fetchStoredPages<RawStoredMatch>(
             signal,
             apiKey,
-            region,
-            name,
-            tag,
+            `/valorant/v1/stored-matches/${region}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}`,
+            'GetStoredMatches',
             startPage,
           );
           let storedMmrHistory: RawMmrHistoryEntry[] = [];
@@ -314,17 +338,18 @@ export function createValorantProvider(auth: ValorantAuth | undefined, historySt
             }
           }
           const archivedMatches = attachMmrActs(
-            storedMatches.data.map((match) => mapMatch(match, account.puuid)).filter((match): match is ValorantMatch => match !== undefined),
+            storedMatches.data.map(mapStoredMatch),
             storedMmrHistory,
           );
+          const mergedMatches = mergeMatches(storedHistory?.matches ?? [], archivedMatches);
           storedHistory = await historyStore?.set({
-            matches: mergeMatches(storedHistory?.matches ?? [], archivedMatches),
-            totalMatchesAvailable: mergeMatches(storedHistory?.matches ?? [], archivedMatches).length,
+            matches: mergedMatches,
+            totalMatchesAvailable: Math.max(storedMatches.total, mergedMatches.length),
             nextPage: storedMatches.nextPage,
             sourceVersion: MATCH_HISTORY_CACHE_VERSION,
           }) ?? {
-            matches: mergeMatches(storedHistory?.matches ?? [], archivedMatches),
-            totalMatchesAvailable: mergeMatches(storedHistory?.matches ?? [], archivedMatches).length,
+            matches: mergedMatches,
+            totalMatchesAvailable: Math.max(storedMatches.total, mergedMatches.length),
             fetchedAt: new Date().toISOString(),
             nextPage: storedMatches.nextPage,
             sourceVersion: MATCH_HISTORY_CACHE_VERSION,
