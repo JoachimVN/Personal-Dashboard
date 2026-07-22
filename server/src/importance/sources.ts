@@ -784,10 +784,13 @@ export function steamCandidates(
   return candidate ? [candidate] : [];
 }
 
-/** Battles that actually affect the ladder — friendlies/challenges carry no `trophyChange` and
- * shouldn't count toward a streak or session record. */
+/** Battles that actually affect the ladder — friendlies/challenges shouldn't count toward a streak
+ * or session record. Filtering on `type` rather than `trophyChange` presence: Path of Legends
+ * only reports `trophyChange` on a win, so a `trophyChange !== undefined` filter silently dropped
+ * every PoL loss too, letting non-consecutive wins masquerade as one unbroken streak. */
+const NON_LADDER_BATTLE_TYPES = new Set(['friendly', 'challenge', 'tournament', 'clanMate', 'boatBattle']);
 function ladderBattles(battles: ClashRoyaleBattle[]): ClashRoyaleBattle[] {
-  return battles.filter((battle) => battle.trophyChange !== undefined);
+  return battles.filter((battle) => !NON_LADDER_BATTLE_TYPES.has(battle.type));
 }
 
 function clashRoyaleArenaCandidate(moments: ClashRoyaleMoments, data: ClashRoyaleData): Candidate | undefined {
