@@ -44,6 +44,8 @@ export const clashRoyaleSchema = z.object({
     clanName: z.string().optional(),
     clanTag: z.string().optional(),
     clanScore: z.number().optional(),
+    /** Resolved from the clan's official badgeId using RoyaleAPI's public badge manifest. */
+    clanBadgeUrl: z.string().url().optional(),
     pathOfLegends: z.object({
       leagueNumber: z.number(),
       trophies: z.number(),
