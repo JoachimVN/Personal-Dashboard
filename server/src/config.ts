@@ -88,6 +88,12 @@ const configSchema = z.object({
     powerSpikeRatio: z.number().positive().default(1.5),
     /** ...but only when the price is also at least this many NOK/kWh — a spike off a near-zero average isn't worth surfacing. */
     powerSpikeMinNok: z.number().positive().default(1),
+    /** How long a Clash Royale moment (new arena, new Path of Legends league, new personal best trophies, win streak, session tally) stays eligible to appear on the card. */
+    clashRoyaleMomentFreshMs: z.number().int().min(60_000).default(24 * 60 * 60_000),
+    /** Consecutive ladder wins (most recent battles first) needed to count as a "win streak" signal. */
+    clashRoyaleWinStreakMin: z.number().int().min(2).default(3),
+    /** Gap between two ladder battles, in ms, past which they're treated as separate sessions rather than one streak of play. */
+    clashRoyaleSessionGapMs: z.number().int().min(60_000).default(30 * 60_000),
   }).default({
     gmailStaleMs: 24 * 60 * 60_000,
     gmailFreshMs: 30 * 60_000,
@@ -106,6 +112,9 @@ const configSchema = z.object({
     steamMomentFreshMs: 3 * 24 * 60 * 60_000,
     powerSpikeRatio: 1.5,
     powerSpikeMinNok: 1,
+    clashRoyaleMomentFreshMs: 24 * 60 * 60_000,
+    clashRoyaleWinStreakMin: 3,
+    clashRoyaleSessionGapMs: 30 * 60_000,
   }),
   steam: z
     .object({

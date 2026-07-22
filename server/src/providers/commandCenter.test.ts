@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { SpotifyData, SteamData } from '@personal-dashboard/shared';
-import { computeSpotifyFreshness, computeSteamMoments } from './commandCenter.js';
+import type { ClashRoyaleData, SpotifyData, SteamData } from '@personal-dashboard/shared';
+import { computeClashRoyaleMoments, computeSpotifyFreshness, computeSteamMoments } from './commandCenter.js';
 import type { SignalHistoryStore } from '../signalHistory.js';
 
 class InMemorySignals {
@@ -117,5 +117,47 @@ describe('computeSteamMoments', () => {
     await expect(computeSteamMoments(signals, board(3), [], FRESH_MS)).resolves.toEqual({ completedGame: false });
     await expect(computeSteamMoments(signals, board(1), [], FRESH_MS)).resolves.toMatchObject({ leaderboardClimb: { rank: 1, delta: 2 } });
     await expect(computeSteamMoments(signals, board(2), [], FRESH_MS)).resolves.toEqual({ completedGame: false });
+  });
+});
+
+function clashRoyale(overrides: Partial<ClashRoyaleData['profile']>): ClashRoyaleData {
+  return {
+    profile: {
+      tag: '#ABC123', name: 'Alex', expLevel: 40, trophies: 5000, bestTrophies: 5000,
+      wins: 100, losses: 80, threeCrownWins: 20, battleCount: 180, arenaName: 'Executioner\'s Kitchen',
+      ...overrides,
+    },
+    currentDeck: [], recentBattles: [],
+  };
+}
+
+describe('computeClashRoyaleMoments', () => {
+  it('does not fire a new-arena moment on the first poll, only once the arena actually changes', async () => {
+    const signals = new InMemorySignals() as unknown as SignalHistoryStore;
+
+    await expect(computeClashRoyaleMoments(signals, clashRoyale({ arenaName: 'Legendary Arena' }), FRESH_MS))
+      .resolves.toEqual({ newArena: undefined, newLeague: undefined, newBestTrophies: undefined });
+    await expect(computeClashRoyaleMoments(signals, clashRoyale({ arenaName: 'Legendary Arena' }), FRESH_MS))
+      .resolves.toMatchObject({ newArena: undefined });
+    await expect(computeClashRoyaleMoments(signals, clashRoyale({ arenaName: 'Miner\'s Mine' }), FRESH_MS))
+      .resolves.toMatchObject({ newArena: 'Miner\'s Mine' });
+  });
+
+  it('only fires a new-league moment when the league number increases past a baseline', async () => {
+    const signals = new InMemorySignals() as unknown as SignalHistoryStore;
+    const withLeague = (leagueNumber: number) => clashRoyale({ pathOfLegends: { leagueNumber, trophies: 2000 } });
+
+    await expect(computeClashRoyaleMoments(signals, withLeague(6), FRESH_MS)).resolves.toMatchObject({ newLeague: undefined });
+    await expect(computeClashRoyaleMoments(signals, withLeague(7), FRESH_MS)).resolves.toMatchObject({ newLeague: { leagueNumber: 7, trophies: 2000 } });
+    // A drop (e.g. season reset) isn't a "new league" moment.
+    await expect(computeClashRoyaleMoments(signals, withLeague(5), FRESH_MS)).resolves.toMatchObject({ newLeague: undefined });
+  });
+
+  it('only fires a new-best-trophies moment when bestTrophies climbs past its previous high', async () => {
+    const signals = new InMemorySignals() as unknown as SignalHistoryStore;
+
+    await expect(computeClashRoyaleMoments(signals, clashRoyale({ bestTrophies: 5000 }), FRESH_MS)).resolves.toMatchObject({ newBestTrophies: undefined });
+    await expect(computeClashRoyaleMoments(signals, clashRoyale({ bestTrophies: 5200 }), FRESH_MS)).resolves.toMatchObject({ newBestTrophies: 5200 });
+    await expect(computeClashRoyaleMoments(signals, clashRoyale({ bestTrophies: 5200 }), FRESH_MS)).resolves.toMatchObject({ newBestTrophies: undefined });
   });
 });

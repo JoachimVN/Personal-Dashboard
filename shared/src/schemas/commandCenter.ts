@@ -26,12 +26,20 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('steam-now-playing'), appId: z.number() }),
   z.object({ type: z.literal('steam-achievement'), appId: z.number(), apiName: z.string() }),
   z.object({ type: z.literal('roblox-now-playing') }),
+  z.object({
+    type: z.literal('clash-royale-moment'),
+    kind: z.enum(['arena', 'league', 'best-trophies', 'win-streak', 'session']),
+    /** Only present for kind 'arena' — looked up against a local name->art table client-side. */
+    arenaName: z.string().optional(),
+    /** Only present for kind 'league' — looked up against a local league-number->badge table client-side. */
+    leagueNumber: z.number().optional(),
+  }),
 ]);
 
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'transit', 'power', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'transit', 'power', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),
