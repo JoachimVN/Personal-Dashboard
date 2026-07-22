@@ -6,11 +6,6 @@ const PATH_OF_LEGENDS_LEAGUES = [
   'Challenger I', 'Challenger II', 'Challenger III', 'Master I', 'Master II',
   'Master III', 'Champion', 'Grand Champion', 'Royal Champion', 'Ultimate Champion',
 ] as const;
-const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
-  win: 'Victory',
-  loss: 'Defeat',
-  draw: 'Draw',
-};
 
 function formatNumber(value: number): string {
   return value.toLocaleString('en-GB');
@@ -34,12 +29,6 @@ function recentRecord(battles: ClashRoyaleBattle[]) {
   }, { wins: 0, losses: 0, draws: 0 });
 }
 
-function formatRecentRecord(record: ReturnType<typeof recentRecord>): string {
-  return [record.wins, record.losses, record.draws || undefined]
-    .filter((value): value is number => value !== undefined)
-    .join('–');
-}
-
 function currentStreak(battles: ClashRoyaleBattle[]): { result: ClashRoyaleBattle['result']; length: number } | undefined {
   const latest = battles[0];
   if (!latest) return undefined;
@@ -49,12 +38,6 @@ function currentStreak(battles: ClashRoyaleBattle[]): { result: ClashRoyaleBattl
     length += 1;
   }
   return { result: latest.result, length };
-}
-
-function streakModifier(result: ClashRoyaleBattle['result'] | undefined): string {
-  if (result === 'win') return ' is-up';
-  if (result === 'loss') return ' is-down';
-  return '';
 }
 
 function formatBattleType(type: string): string {
@@ -137,13 +120,12 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
 
 export function ClashRoyaleStats({ data }: Readonly<{ data: ClashRoyaleData }>) {
   const record = recentRecord(data.recentBattles);
-  const recordSummary = data.recentBattles.length === 0 ? '—' : formatRecentRecord(record);
   return (
     <div className="clash-stats-grid">
       <Stat value={`${winRate(data)}%`} label="career win rate" detail={`${formatNumber(data.profile.wins)} wins`} />
       <Stat value={formatNumber(data.profile.threeCrownWins)} label="three crowns" detail={`${formatNumber(data.profile.battleCount)} battles`} />
       <Stat
-        value={recordSummary}
+        value={data.recentBattles.length === 0 ? '—' : `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ''}`}
         label="last battles"
       />
     </div>
@@ -177,7 +159,7 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
         <p><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
       </div>
       <div className="clash-battle-pulse-trend">
-        <span className={`clash-streak-badge${streakModifier(streak?.result)}`}>{streakLabel}</span>
+        <span className={`clash-streak-badge${streak?.result === 'win' ? ' is-up' : streak?.result === 'loss' ? ' is-down' : ''}`}>{streakLabel}</span>
       </div>
       <ol className="clash-form-strip" aria-label="Results of recent battles">
         {data.recentBattles.slice(0, 10).reverse().map((battle, index) => <li key={`${battle.battleTime}-${index}`} data-result={battle.result}>{battle.result.charAt(0).toUpperCase()}</li>)}
@@ -210,7 +192,7 @@ export function ClashRoyaleBattleLog({ data }: Readonly<{ data: ClashRoyaleData 
             </div>
             <div className="clash-battle-meta">
               <span>{formatBattleType(battle.type)}</span>
-              <span>{BATTLE_RESULT_LABELS[battle.result]}</span>
+              <span>{battle.result === 'win' ? 'Victory' : battle.result === 'loss' ? 'Defeat' : 'Draw'}</span>
             </div>
           </div>
         </li>

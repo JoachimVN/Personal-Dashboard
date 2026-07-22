@@ -677,6 +677,15 @@ a {
   height: 1rem;
 }
 
+.command-roblox-tile-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  object-fit: cover;
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-roblox) 32%, transparent);
+}
+
 /* The game artwork adds atmosphere, while the wordmark and structured stats make the surface
    unmistakably Roblox instead of reading like another generic game card. The panel-level
    `--roblox` tint swaps the instant the carousel index changes, so these styles stay on the slide

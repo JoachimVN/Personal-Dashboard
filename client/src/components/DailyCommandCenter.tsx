@@ -6,6 +6,7 @@ import type {
   CommandCenterSlot,
   GitHubData,
   HealthData,
+  RobloxData,
   WeatherData,
 } from '@personal-dashboard/shared';
 import { deg, glyph, weatherLocation } from '../lib/weather';
@@ -67,13 +68,6 @@ const WEATHER_KIND_GLYPH: Record<Extract<CommandCenterSlot['render'], { type: 'w
   severe: '⛈️', hot: '🌡️', cold: '🥶', rain: '🌧️', wind: '💨', uv: '☀️', sunset: '🌇', moon: '🌕',
 };
 
-function secondarySlotsFor(commandCenter: CommandCenterData | undefined): CommandCenterSlot[] {
-  if (!commandCenter) return [];
-  return Array.isArray(commandCenter.secondary)
-    ? commandCenter.secondary
-    : [commandCenter.secondary as unknown as CommandCenterSlot];
-}
-
 function CommandPanel({
   href,
   label,
@@ -97,7 +91,7 @@ function CommandPanel({
   );
 }
 
-function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined }>) {
+function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined }>) {
   const activityDay = health ? latestActivityDay(health) : undefined;
   const rings = slot.render.type === 'health-rings' && health && activityDay
     ? <CompactActivityRings
@@ -124,7 +118,9 @@ function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; gi
     ? <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>
     : undefined;
   const robloxIcon = slot.render.type === 'roblox-now-playing'
-    ? <span className="command-roblox-tile-mark" aria-hidden><img src="/roblox.svg" alt="" /></span>
+    ? roblox?.presence?.iconUrl
+      ? <img src={roblox.presence.iconUrl} alt="" className="command-roblox-tile-icon" />
+      : <span className="command-roblox-tile-mark" aria-hidden><img src="/roblox.svg" alt="" /></span>
     : undefined;
   const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now' : slot.kicker;
   return (
@@ -368,7 +364,11 @@ export function DailyCommandCenter() {
   const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
   // A running server may be refreshed separately from the Vite client during local development.
   // Keep the overview usable while the server still returns the pre-carousel single-slot payload.
-  const secondarySlots = secondarySlotsFor(commandCenter);
+  const secondarySlots = commandCenter
+    ? (Array.isArray(commandCenter.secondary)
+      ? commandCenter.secondary
+      : [commandCenter.secondary as unknown as CommandCenterSlot])
+    : [];
   const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
   const isRobloxSecondary = activeSecondary?.render.type === 'roblox-now-playing';
   const robloxArtPalette = useRobloxArtPalette(isRobloxSecondary && roblox?.presence?.status === 'in-game' ? roblox.presence.iconUrl : undefined);
@@ -402,7 +402,7 @@ export function DailyCommandCenter() {
       </div>
       <div className="command-layout">
         <HeroPanel hero={ranked.hero} event={heroEvent} track={heroTrack} kicker={heroKicker} extra={heroExtra} activity={heroActivity} weather={weather} />
-        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} />)}</div>
+        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} />)}</div>
       </div>
       {activeSecondary && <CommandPanel
         href={activeSecondary.href}
