@@ -131,10 +131,11 @@ export function findDeckHero(playerTag: string, currentDeck: RawCard[], battles:
   const currentIds = new Set(currentDeck.map((card) => card.id));
   for (const battle of battles) {
     const member = battle.team.find((candidate) => candidate.tag === playerTag);
-    if (!member?.cards || member.cards.length !== 8) continue;
-    const missing = member.cards.filter((card) => !currentIds.has(card.id));
-    if (missing.length === 1 && currentDeck.every((card) => member.cards?.some((candidate) => candidate.id === card.id))) {
-      return { card: missing[0], index: member.cards.findIndex((card) => card.id === missing[0].id) };
+    const cards = member?.cards;
+    if (cards?.length !== 8) continue;
+    const missing = cards.filter((card) => !currentIds.has(card.id));
+    if (missing.length === 1 && currentDeck.every((card) => cards.some((candidate) => candidate.id === card.id))) {
+      return { card: missing[0], index: cards.findIndex((card) => card.id === missing[0].id) };
     }
   }
   return undefined;

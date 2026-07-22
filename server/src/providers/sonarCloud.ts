@@ -64,11 +64,18 @@ class SonarHttpError extends Error {
   }
 }
 
+function qualityGateStatus(status: string | undefined): SonarProject['qualityGateStatus'] {
+  if (status === 'OK') return 'passed';
+  if (status === 'ERROR') return 'failed';
+  return 'none';
+}
+
 /** Never throws a message containing the URL or the Authorization header — both carry the token. */
 async function sonarRequest<T>(signal: AbortSignal, token: string, path: string, label: string): Promise<T> {
+  const authorization = Buffer.from(token + ':').toString('base64');
   const res = await fetch(`${SONAR_API_BASE}${path}`, {
     signal,
-    headers: { Authorization: `Basic ${Buffer.from(`${token}:`).toString('base64')}` },
+    headers: { Authorization: `Basic ${authorization}` },
   });
   if (!res.ok) throw new SonarHttpError(`SonarCloud ${label} failed: HTTP ${res.status}`, res.status);
   return (await res.json()) as T;
@@ -113,7 +120,7 @@ async function fetchProjectDetails(signal: AbortSignal, token: string, component
     name: component.name,
     visibility: component.visibility,
     lastAnalysis: component.lastAnalysisDate,
-    qualityGateStatus: status === 'OK' ? 'passed' : status === 'ERROR' ? 'failed' : 'none',
+    qualityGateStatus: qualityGateStatus(status),
     linesOfCode: byMetric.has('ncloc') ? Number(byMetric.get('ncloc')) : undefined,
     languages: parseLanguages(byMetric.get('ncloc_language_distribution')),
     security: toRating(byMetric.get('security_rating')),

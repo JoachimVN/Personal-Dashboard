@@ -68,6 +68,13 @@ const WEATHER_KIND_GLYPH: Record<Extract<CommandCenterSlot['render'], { type: 'w
   severe: '⛈️', hot: '🌡️', cold: '🥶', rain: '🌧️', wind: '💨', uv: '☀️', sunset: '🌇', moon: '🌕',
 };
 
+function secondarySlotsFor(commandCenter: CommandCenterData | undefined): CommandCenterSlot[] {
+  if (!commandCenter) return [];
+  return Array.isArray(commandCenter.secondary)
+    ? commandCenter.secondary
+    : [commandCenter.secondary as unknown as CommandCenterSlot];
+}
+
 function CommandPanel({
   href,
   label,
@@ -364,11 +371,7 @@ export function DailyCommandCenter() {
   const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
   // A running server may be refreshed separately from the Vite client during local development.
   // Keep the overview usable while the server still returns the pre-carousel single-slot payload.
-  const secondarySlots = commandCenter
-    ? (Array.isArray(commandCenter.secondary)
-      ? commandCenter.secondary
-      : [commandCenter.secondary as unknown as CommandCenterSlot])
-    : [];
+  const secondarySlots = secondarySlotsFor(commandCenter);
   const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
   const isRobloxSecondary = activeSecondary?.render.type === 'roblox-now-playing';
   const robloxArtPalette = useRobloxArtPalette(isRobloxSecondary && roblox?.presence?.status === 'in-game' ? roblox.presence.iconUrl : undefined);
