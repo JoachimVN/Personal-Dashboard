@@ -127,9 +127,7 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
             <p className="clash-eyebrow">Path of Legends</p>
             <div className="clash-path-league">
               {clashRoyaleLeagueArt(path.leagueNumber) && (
-                <span className="clash-path-league-badge-frame">
-                  <img src={clashRoyaleLeagueArt(path.leagueNumber)} alt="" aria-hidden className="clash-path-league-badge" />
-                </span>
+                <img src={clashRoyaleLeagueArt(path.leagueNumber)} alt="" aria-hidden className="clash-path-league-badge" />
               )}
               <div className="min-w-0">
                 <p className="clash-path-league-name">{leagueName}</p>
