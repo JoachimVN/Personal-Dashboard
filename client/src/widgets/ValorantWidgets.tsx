@@ -71,6 +71,21 @@ export function averageCombatScore(matches: ValorantMatch[]): number | undefined
   return Math.round(matches.reduce((total, match) => total + match.score, 0) / totalRounds);
 }
 
+export function killDeathRatio(matches: ValorantMatch[]): number | undefined {
+  if (matches.length === 0) return undefined;
+  const kills = matches.reduce((total, match) => total + match.kills, 0);
+  const deaths = matches.reduce((total, match) => total + match.deaths, 0);
+  if (deaths === 0) return undefined;
+  return Math.round((kills / deaths) * 100) / 100;
+}
+
+export function aggregateHeadshotRate(matches: ValorantMatch[]): number | undefined {
+  const totalShots = matches.reduce((total, match) => total + match.headshots + match.bodyshots + match.legshots, 0);
+  if (totalShots === 0) return undefined;
+  const headshots = matches.reduce((total, match) => total + match.headshots, 0);
+  return Math.round((headshots / totalShots) * 100);
+}
+
 export function actLabel(short: string): string {
   const match = /^e(\d+)a(\d+)$/i.exec(short);
   return match ? `E${match[1]} · A${match[2]}` : short.toUpperCase();
@@ -119,13 +134,13 @@ export function modeOptions(matches: ValorantMatch[]): ValorantModeOption[] {
   ];
 }
 
-interface AgentSummary {
+export interface AgentSummary {
   name: string;
   iconUrl?: string;
   matches: ValorantMatch[];
 }
 
-function agentSummaries(matches: ValorantMatch[]): AgentSummary[] {
+export function agentSummaries(matches: ValorantMatch[]): AgentSummary[] {
   const agents = new Map<string, AgentSummary>();
   for (const match of matches) {
     const summary = agents.get(match.agentName) ?? { name: match.agentName, iconUrl: match.agentIconUrl, matches: [] };
