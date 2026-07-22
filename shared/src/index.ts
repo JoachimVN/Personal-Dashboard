@@ -18,3 +18,4 @@ export * from './schemas/sonarCloud.js';
 export * from './schemas/transit.js';
 export * from './schemas/power.js';
 export * from './schemas/commandCenter.js';
+export * from './schemas/activityPush.js';

@@ -9,6 +9,7 @@ import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { SteamHistoryStore } from '../steamHistory.js';
+import { createActivityPushProvider } from './activityPush.js';
 import { createAiNewsProvider } from './aiNews.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
@@ -104,6 +105,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
         createRobloxProvider(env.roblox),
         createClashRoyaleProvider(env.clashRoyale),
         createSonarCloudProvider(env.sonarCloud),
+        createActivityPushProvider(env.dashboardPush),
       ] satisfies Provider[]
     ).map((provider) => withEnabledToggle(provider, config)),
   };

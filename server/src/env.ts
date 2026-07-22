@@ -18,6 +18,7 @@ export interface ServerEnv {
   clashRoyale?: { apiKey: string; playerTag: string };
   roblox?: { idOrUsername: string; robloSecurity?: string };
   sonarCloud?: { token: string; orgKey: string };
+  dashboardPush?: { url: string; secret: string };
 }
 
 function parseWeather(): ServerEnv['weather'] {
@@ -60,6 +61,13 @@ export function parseSonarCloud(): ServerEnv['sonarCloud'] {
   const orgKey = process.env.SONARCLOUD_ORG;
   if (!token || !orgKey) return undefined;
   return { token, orgKey };
+}
+
+export function parseDashboardPush(): ServerEnv['dashboardPush'] {
+  const url = process.env.DASHBOARD_PUSH_URL;
+  const secret = process.env.DASHBOARD_PUSH_SECRET;
+  if (!url || !secret) return undefined;
+  return { url, secret };
 }
 
 export function loadEnv(): ServerEnv {
@@ -117,5 +125,6 @@ export function loadEnv(): ServerEnv {
     clashRoyale: parseClashRoyale(),
     roblox: parseRoblox(),
     sonarCloud: parseSonarCloud(),
+    dashboardPush: parseDashboardPush(),
   };
 }

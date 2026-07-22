@@ -48,7 +48,7 @@ export function limitStatus(hasLimit: boolean, hasQuotaReport: boolean): LimitSt
   return hasQuotaReport ? 'unlimited' : 'unknown';
 }
 
-async function jsonlFiles(directory: string): Promise<string[]> {
+export async function jsonlFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(
     entries.map(async (entry) => {
