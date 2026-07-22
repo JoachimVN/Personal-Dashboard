@@ -6,7 +6,7 @@ import { enturReverseGeocode } from './entur.js';
 // Free, no-key day-ahead spot prices per Norwegian bidding area. Their API terms only ask for
 // attribution, which the client widget renders ("Strømpriser levert av Hva koster strømmen.no").
 const API_BASE = 'https://www.hvakosterstrommen.no/api/v1/prices';
-const TRANSIENT_RETRY_DELAY_MS = 500;
+const TRANSIENT_RETRY_DELAYS_MS = [500, 1_000];
 
 const priceDaySchema = z.array(
   z.object({
@@ -74,6 +74,20 @@ async function resolveAreaFromCoords(coords: { lat: number; lon: number }, signa
   return area;
 }
 
+async function waitForRetry(signal: AbortSignal, delayMs: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export interface PowerProvider extends Provider<PowerData> {
   /** Overrides the env-configured location, e.g. with the client's device geolocation — ignored once `power.area` is set explicitly in config.json. */
   setCoords(next: { lat: number; lon: number }): void;
@@ -103,20 +117,17 @@ export function createPowerProvider(
   async function fetchDay(date: Date, area: PowerArea, signal: AbortSignal): Promise<PowerHour[] | undefined> {
     const url = `${API_BASE}/${priceDayPath(date, dateFmt, area)}`;
     let res: Response;
-    try {
-      res = await fetch(url, { signal });
-    } catch (error) {
-      // This free endpoint sits behind Cloudflare. A short retry absorbs occasional connection
-      // timeouts without treating the day's already-published prices as permanently unavailable.
-      if (signal.aborted || !(error instanceof TypeError)) throw error;
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS);
-        signal.addEventListener('abort', () => {
-          clearTimeout(timer);
-          reject(signal.reason);
-        }, { once: true });
-      });
-      res = await fetch(url, { signal });
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        res = await fetch(url, { signal });
+        break;
+      } catch (error) {
+        // This free endpoint sits behind Cloudflare. Undici can also surface a destroyed HTTP/2
+        // session while it replaces the connection, so give it two short, abort-aware retries.
+        const delayMs = TRANSIENT_RETRY_DELAYS_MS[attempt];
+        if (signal.aborted || !(error instanceof TypeError) || delayMs === undefined) throw error;
+        await waitForRetry(signal, delayMs);
+      }
     }
     // Tomorrow's prices 404 until Nord Pool publishes them (~13:00) — absent, not broken.
     if (res.status === 404) return undefined;
