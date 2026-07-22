@@ -20,7 +20,9 @@ import type {
   WeatherData,
   WidgetStatus,
 } from '@personal-dashboard/shared';
+import { pathOfLegendsDisplayLeagueNumber } from '@personal-dashboard/shared';
 import { computeDeviation } from '../deviation.js';
+
 import type { Candidate, ClashRoyaleMoments, SteamMoments } from './types.js';
 
 const allShapes = ['hero', 'secondary', 'tile'] as const;
@@ -802,7 +804,7 @@ function clashRoyaleLeagueCandidate(moments: ClashRoyaleMoments): Candidate | un
   if (!moments.newLeague) return undefined;
   return {
     id: `clash-royale:league:${moments.newLeague.leagueNumber}`, source: 'clash-royale', kind: 'clash-royale', score: 85, shapes: [...allShapes],
-    kicker: 'Path of Legends', title: `League ${moments.newLeague.leagueNumber}`,
+    kicker: 'Path of Legends', title: `League ${pathOfLegendsDisplayLeagueNumber(moments.newLeague.leagueNumber)}`,
     detail: `${moments.newLeague.trophies.toLocaleString()} Path of Legends trophies`,
     href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'league', leagueNumber: moments.newLeague.leagueNumber },
   };

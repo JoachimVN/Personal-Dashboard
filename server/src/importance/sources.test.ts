@@ -726,7 +726,7 @@ describe('clashRoyaleCandidates', () => {
     const moments: ClashRoyaleMoments = { newLeague: { leagueNumber: 8, trophies: 3120 } };
     expect(clashRoyaleCandidates(baseline, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW)).toContainEqual(
       expect.objectContaining({
-        id: 'clash-royale:league:8', score: 85, kicker: 'Path of Legends', title: 'League 8',
+        id: 'clash-royale:league:8', score: 85, kicker: 'Path of Legends', title: 'League 11',
         detail: '3,120 Path of Legends trophies',
       }),
     );
