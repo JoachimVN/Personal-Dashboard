@@ -643,52 +643,27 @@ a {
 }
 
 /* The game artwork adds atmosphere, while the wordmark and structured stats make the surface
-   unmistakably Roblox instead of reading like another generic game card. */
+   unmistakably Roblox instead of reading like another generic game card. The panel-level
+   `--roblox` tint swaps the instant the carousel index changes, so these styles stay on the slide
+   itself — otherwise the outgoing slide would restyle halfway through its exit animation. */
 .command-roblox-now {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   box-sizing: border-box;
-  width: 100%;
-  height: var(--secondary-carousel-media-size);
-  padding: 1rem 1.15rem;
-  border-radius: 1rem;
-  background:
-    linear-gradient(112deg, color-mix(in oklab, var(--color-accent-roblox) 24%, rgb(14 15 19 / 96%)), rgb(14 15 19 / 94%) 68%),
-    var(--color-track);
-}
-
-.command-agenda--roblox .command-roblox-now {
   display: grid;
   grid-template-columns: var(--secondary-carousel-media-size) minmax(0, 1fr);
   gap: 0.9rem;
+  width: 100%;
   height: var(--secondary-carousel-content-height);
-  margin-top: 0;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.command-agenda--roblox .command-roblox-icon {
-  position: static;
-  width: var(--secondary-carousel-media-size);
-  height: var(--secondary-carousel-media-size);
-  border-radius: 0.375rem;
-  box-shadow: none;
-  align-self: center;
-  transform: none;
 }
 
 .command-roblox-icon {
-  position: absolute;
-  top: 50%;
-  left: 1.15rem;
-  width: 3.75rem;
-  height: 3.75rem;
-  border-radius: 0.75rem;
+  width: var(--secondary-carousel-media-size);
+  height: var(--secondary-carousel-media-size);
+  border-radius: 0.375rem;
   object-fit: cover;
-  box-shadow: 0 7px 18px rgb(0 0 0 / 0.28);
-  transform: translateY(-50%);
+  align-self: center;
 }
 
 .command-roblox-brand {
@@ -697,7 +672,6 @@ a {
   align-items: center;
   gap: 0.55rem;
   height: 1rem;
-  margin-left: 4.7rem;
 }
 
 .command-roblox-details {
@@ -737,20 +711,9 @@ a {
 .command-roblox-game {
   position: relative;
   display: flex;
-  align-items: end;
-  height: calc(100% - 1rem);
-  margin-left: 4.7rem;
-  padding-top: 0.5rem;
-}
-
-.command-agenda--roblox .command-roblox-brand,
-.command-agenda--roblox .command-roblox-game {
-  margin-left: 0;
-}
-
-.command-agenda--roblox .command-roblox-game {
   flex: 1;
-  height: auto;
+  align-items: end;
+  padding-top: 0.5rem;
 }
 
 .command-roblox-game > div > p {
@@ -787,11 +750,6 @@ a {
 }
 
 .command-roblox-icon--fallback img {
-  width: 2rem;
-  height: 2rem;
-}
-
-.command-agenda--roblox .command-roblox-icon--fallback img {
   width: 3rem;
   height: 3rem;
 }

@@ -254,7 +254,7 @@ function RobloxNowPlayingSecondary({ slot, roblox }: Readonly<{ slot: CommandCen
   ) : (
     <span className="command-roblox-icon command-roblox-icon--fallback" aria-hidden><img src="/roblox.svg" alt="" /></span>
   );
-  return <div className="command-roblox-now mt-4">
+  return <div className="command-roblox-now">
     {gameIcon}
     <div className="command-roblox-details">
       <div className="command-roblox-brand" aria-label="Roblox">
