@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { ClashRoyaleData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
-import { ClashRoyaleBattlePulse, ClashRoyaleDeck, ClashRoyaleProfile, ClashRoyaleStats } from '../../widgets/ClashRoyaleWidgets';
+import { ClashRoyaleBattlePulse, ClashRoyaleDeck, ClashRoyaleProfile } from '../../widgets/ClashRoyaleWidgets';
 import { clashRoyaleArenaArt } from '../../lib/clashRoyale';
 import './clashRoyale.css';
 
@@ -49,7 +49,6 @@ function ClashRoyaleOverviewContent({ data }: Readonly<{ data: ClashRoyaleData }
     <div ref={overviewRef} className="clash-overview">
       <ClashRoyaleProfile data={data} compact showArena={false} showKingLevel={false} />
       <ClashRoyaleBattlePulse data={data} />
-      <ClashRoyaleStats data={data} />
       <ClashRoyaleDeck data={data} compact />
     </div>
   );

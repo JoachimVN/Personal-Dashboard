@@ -67,16 +67,6 @@ function Crown({ filled }: Readonly<{ filled: boolean }>) {
   );
 }
 
-function Stat({ value, label, detail }: Readonly<{ value: string | number; label: string; detail?: string }>) {
-  return (
-    <div className="clash-stat">
-      <p className="clash-stat-value">{value}</p>
-      <p className="clash-stat-label">{label}</p>
-      {detail && <p className="clash-stat-detail">{detail}</p>}
-    </div>
-  );
-}
-
 export function ClashRoyaleProfile({ data, compact = false, showArena = true, showKingLevel = true }: Readonly<{ data: ClashRoyaleData; compact?: boolean; showArena?: boolean; showKingLevel?: boolean }>) {
   const { profile } = data;
   const path = profile.pathOfLegends;
@@ -132,26 +122,6 @@ export function ClashRoyaleProfile({ data, compact = false, showArena = true, sh
         </div>
       )}
     </section>
-  );
-}
-
-export function ClashRoyaleStats({ data }: Readonly<{ data: ClashRoyaleData }>) {
-  const battles = data.recentBattles;
-  const record = recentRecord(battles);
-  const battleCount = battles.length;
-  const crownsFor = battles.reduce((total, battle) => total + battle.crownsFor, 0);
-  const crownsAgainst = battles.reduce((total, battle) => total + battle.crownsAgainst, 0);
-  const crownDifference = crownsFor - crownsAgainst;
-  const latestBattle = battles[0];
-  const recentWinRate = battleCount === 0 ? '—' : `${Math.round((record.wins / battleCount) * 100)}%`;
-  const recentRecordLabel = battleCount === 1 ? 'last game' : `last ${battleCount} games`;
-  const crownDifferenceLabel = battleCount === 0 ? '—' : `${crownDifference > 0 ? '+' : ''}${crownDifference}`;
-  return (
-    <div className="clash-stats-grid">
-      <Stat value={recentWinRate} label="recent win rate" detail={battleCount === 0 ? undefined : `${record.wins}W · ${record.losses}L${record.draws > 0 ? ` · ${record.draws}D` : ''}`} />
-      <Stat value={crownDifferenceLabel} label="crown balance" detail={battleCount === 0 ? undefined : `${crownsFor} scored · ${crownsAgainst} conceded`} />
-      <Stat value={latestBattle ? BATTLE_RESULT_LABELS[latestBattle.result] : '—'} label={recentRecordLabel} detail={latestBattle ? `${latestBattle.crownsFor}–${latestBattle.crownsAgainst} crowns · ${relativeTime(latestBattle.battleTime)}` : undefined} />
-    </div>
   );
 }
 
