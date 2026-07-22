@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ValorantData, ValorantMatch } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
@@ -49,6 +50,33 @@ function streakModifier(result: ValorantMatch['result'] | undefined): string {
   if (result === 'win') return ' is-up';
   if (result === 'loss') return ' is-down';
   return '';
+}
+
+function averageCombatScore(matches: ValorantMatch[]): number | undefined {
+  const totalRounds = matches.reduce((total, match) => total + (match.roundsWon ?? 0) + (match.roundsLost ?? 0), 0);
+  if (totalRounds === 0) return undefined;
+  return Math.round(matches.reduce((total, match) => total + match.score, 0) / totalRounds);
+}
+
+function actLabel(short: string): string {
+  const match = /^e(\d+)a(\d+)$/i.exec(short);
+  return match ? `E${match[1]} · A${match[2]}` : short.toUpperCase();
+}
+
+interface AgentSummary {
+  name: string;
+  iconUrl?: string;
+  matches: ValorantMatch[];
+}
+
+function agentSummaries(matches: ValorantMatch[]): AgentSummary[] {
+  const agents = new Map<string, AgentSummary>();
+  for (const match of matches) {
+    const summary = agents.get(match.agentName) ?? { name: match.agentName, iconUrl: match.agentIconUrl, matches: [] };
+    summary.matches.push(match);
+    agents.set(match.agentName, summary);
+  }
+  return [...agents.values()].sort((a, b) => b.matches.length - a.matches.length || b.matches.filter((match) => match.result === 'win').length - a.matches.filter((match) => match.result === 'win').length);
 }
 
 function Stat({ value, label, detail }: Readonly<{ value: string | number; label: string; detail?: string }>) {
@@ -107,6 +135,88 @@ export function ValorantStats({ data }: Readonly<{ data: ValorantData }>) {
   );
 }
 
+/** A period selector deliberately works on the server-provided archive so switching scope is
+ * instantaneous and never causes the browser to call HenrikDev or expose its API key. */
+export function ValorantPerformance({ data }: Readonly<{ data: ValorantData }>) {
+  const { history } = data;
+  const now = Date.now();
+  const twoWeekMatches = history.matches.filter((match) => Date.parse(match.startedAt) >= now - 14 * 24 * 60 * 60_000);
+  const actCodes = [...new Set(history.matches.map((match) => match.actShort).filter((act): act is string => Boolean(act)))];
+  const periodOptions = [
+    { id: 'two-weeks', label: '2 weeks', matches: twoWeekMatches },
+    ...(history.currentActShort ? [{ id: `act:${history.currentActShort}`, label: 'Current act', matches: history.matches.filter((match) => match.actShort === history.currentActShort) }] : []),
+    ...actCodes
+      .filter((act) => act !== history.currentActShort)
+      .map((act) => ({ id: `act:${act}`, label: actLabel(act), matches: history.matches.filter((match) => match.actShort === act) })),
+    { id: 'career', label: 'Career', matches: history.matches },
+  ].filter((period) => period.id === 'career' || period.matches.length > 0);
+  const [selectedPeriodId, setSelectedPeriodId] = useState('two-weeks');
+  const selectedPeriod = periodOptions.find((period) => period.id === selectedPeriodId) ?? periodOptions[0];
+  if (!selectedPeriod) return null;
+
+  const matches = selectedPeriod.matches;
+  const record = recentRecord(matches);
+  const winRate = matches.length === 0 ? undefined : Math.round((record.wins / matches.length) * 100);
+  const acs = averageCombatScore(matches);
+  const agents = agentSummaries(matches).slice(0, 5);
+  const loadedCount = history.matches.length;
+  const coverage = `${formatNumber(Math.max(loadedCount, history.totalMatchesAvailable))} matches captured`;
+
+  return (
+    <section className="valorant-performance">
+      <div className="valorant-performance-heading">
+        <div>
+          <p className="valorant-eyebrow">Performance</p>
+          <h3>Agent pool</h3>
+        </div>
+        <p>{coverage}</p>
+      </div>
+      <div className="valorant-periods" role="tablist" aria-label="Valorant performance period">
+        {periodOptions.map((period) => (
+          <button
+            key={period.id}
+            type="button"
+            role="tab"
+            aria-selected={period.id === selectedPeriod.id}
+            className={period.id === selectedPeriod.id ? 'is-selected' : undefined}
+            onClick={() => setSelectedPeriodId(period.id)}
+          >
+            {period.label}
+          </button>
+        ))}
+      </div>
+      {matches.length === 0 ? (
+        <p className="text-sm text-ink-faint">No matches are available for this period yet.</p>
+      ) : (
+        <>
+          <div className="valorant-performance-stats">
+            <Stat value={matches.length} label="matches" />
+            <Stat value={winRate === undefined ? '—' : `${winRate}%`} label="win rate" detail={`${record.wins}W · ${record.losses}L${record.draws ? ` · ${record.draws}D` : ''}`} />
+            <Stat value={acs ?? '—'} label="average ACS" />
+          </div>
+          <ol className="valorant-agent-pool">
+            {agents.map((agent) => {
+              const agentRecord = recentRecord(agent.matches);
+              const agentWinRate = Math.round((agentRecord.wins / agent.matches.length) * 100);
+              return (
+                <li key={agent.name}>
+                  {agent.iconUrl && <img src={agent.iconUrl} alt="" aria-hidden loading="lazy" decoding="async" />}
+                  <div>
+                    <p>{agent.name}</p>
+                    <span>{agent.matches.length} matches · {agentWinRate}% win rate</span>
+                  </div>
+                  <strong>{averageCombatScore(agent.matches) ?? '—'} <small>ACS</small></strong>
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
+      <p className="valorant-history-note">Career expands from HenrikDev&apos;s paginated history and is not a guaranteed complete Riot match record.</p>
+    </section>
+  );
+}
+
 export function ValorantMatchPulse({ data }: Readonly<{ data: ValorantData }>) {
   if (data.recentMatches.length === 0) return <p className="text-sm text-ink-faint">Play a match to start a fresh form readout.</p>;
   const record = recentRecord(data.recentMatches);
@@ -132,10 +242,11 @@ export function ValorantMatchPulse({ data }: Readonly<{ data: ValorantData }>) {
 }
 
 export function ValorantMatchLog({ data }: Readonly<{ data: ValorantData }>) {
-  if (data.recentMatches.length === 0) return <p className="text-sm text-ink-faint">No recent matches.</p>;
+  const matches = data.history.matches;
+  if (matches.length === 0) return <p className="text-sm text-ink-faint">No matches captured yet.</p>;
   return (
     <ol className="valorant-match-log">
-      {data.recentMatches.map((match, index) => (
+      {matches.map((match, index) => (
         <li key={`${match.matchId}-${index}`} className="valorant-match-row" data-result={match.result}>
           {match.agentIconUrl && <img src={match.agentIconUrl} alt={match.agentName} className="valorant-agent-icon" loading="lazy" decoding="async" />}
           <div className="valorant-match-main">

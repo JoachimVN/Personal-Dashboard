@@ -1,7 +1,7 @@
 import type { ValorantData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
-import { ValorantMatchLog, ValorantMatchPulse, ValorantProfile, ValorantStats } from '../../widgets/ValorantWidgets';
+import { ValorantMatchLog, ValorantMatchPulse, ValorantPerformance, ValorantProfile, ValorantStats } from '../../widgets/ValorantWidgets';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 import './valorant.css';
 
@@ -68,6 +68,13 @@ export function ValorantDetail() {
         </WidgetBody>
       </WidgetShell>
 
+      <DetailSectionHeading label="Performance" title="Agent pool" />
+      <WidgetShell title="Performance periods">
+        <WidgetBody envelope={envelope} offline={offline}>
+          {(data) => <ValorantPerformance data={data} />}
+        </WidgetBody>
+      </WidgetShell>
+
       <DetailSectionHeading label="Form" title="Recent match pulse" />
       <WidgetShell title="Match pulse">
         <WidgetBody envelope={envelope} offline={offline}>
@@ -75,7 +82,7 @@ export function ValorantDetail() {
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="History" title="Latest matches" />
+      <DetailSectionHeading label="History" title="Captured matches" />
       <WidgetShell title="Match history">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ValorantMatchLog data={data} />}

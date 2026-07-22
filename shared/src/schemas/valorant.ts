@@ -19,6 +19,8 @@ export const valorantMatchSchema = z.object({
   legshots: z.number(),
   damageDealt: z.number(),
   damageReceived: z.number(),
+  /** Ranked act code when HenrikDev can associate the match with an MMR entry (e.g. "e10a2"). */
+  actShort: z.string().optional(),
 });
 
 export type ValorantMatch = z.infer<typeof valorantMatchSchema>;
@@ -55,6 +57,16 @@ export const valorantSchema = z.object({
     })
     .optional(),
   recentMatches: z.array(valorantMatchSchema),
+  /**
+   * HenrikDev's stored-match archive, retained locally after the first backfill. The archive is
+   * intentionally described as available history rather than a guaranteed Riot-complete career.
+   */
+  history: z.object({
+    matches: z.array(valorantMatchSchema),
+    totalMatchesAvailable: z.number().int().nonnegative(),
+    fetchedAt: z.string(),
+    currentActShort: z.string().optional(),
+  }),
 });
 
 export type ValorantData = z.infer<typeof valorantSchema>;
