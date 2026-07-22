@@ -190,8 +190,8 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
                     className="valorant-hero-spotlight-card"
                     data-result={match.result}
                     data-has-art={mapArtUrl ? 'true' : undefined}
-                    style={mapArtUrl ? { backgroundImage: `url("${mapArtUrl}")` } : undefined}
                   >
+                    {mapArtUrl && <span className="valorant-hero-spotlight-art" aria-hidden style={{ backgroundImage: `url("${mapArtUrl}")` }} />}
                     {match.isMatchMvp ? (
                       <span className="valorant-hero-mvp-badge is-match">MVP</span>
                     ) : match.isTeamMvp ? (

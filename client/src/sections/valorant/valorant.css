@@ -306,29 +306,32 @@
 .valorant-hero-recent { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.55rem; margin: 0.65rem 0 0; padding: 0; list-style: none; }
 .valorant-hero-spotlight-card {
   position: relative;
+  isolation: isolate;
   display: flex;
   min-width: 0;
   flex-direction: column;
   align-items: center;
+  overflow: hidden;
   gap: 0.05rem;
   padding: 0.9rem 0.55rem 0.8rem;
   border-radius: 1.05rem;
-  background: color-mix(in oklab, var(--color-track) 30%, transparent) center / cover no-repeat;
+  background: color-mix(in oklab, var(--color-track) 30%, transparent);
   text-align: center;
 }
 .valorant-hero-spotlight-card[data-result='win'] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--valorant-win) 28%, transparent); }
 .valorant-hero-spotlight-card[data-result='loss'] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--valorant-loss) 24%, transparent); }
-/* Map art sits behind a scrim (::before) so the KDA/score text stays legible regardless of the
-   photo's own brightness or the active light/dark theme — see valorantMapArt in lib/valorant.ts. */
+.valorant-hero-spotlight-art { position: absolute; z-index: 0; inset: 0; background: center / cover no-repeat; opacity: 0.8; }
+/* The dark overlay keeps the map art atmospheric without making the match stats compete with a
+   busy loading-screen image. */
 .valorant-hero-spotlight-card[data-has-art='true']::before {
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.32) 45%, rgba(0, 0, 0, 0.85) 100%);
+  background: linear-gradient(155deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.64) 72%), linear-gradient(180deg, transparent 28%, rgba(0, 0, 0, 0.3));
 }
-.valorant-hero-spotlight-card[data-has-art='true'] > * { position: relative; z-index: 1; }
+.valorant-hero-spotlight-card[data-has-art='true'] > :not(.valorant-hero-spotlight-art, .valorant-hero-mvp-badge) { position: relative; z-index: 2; }
 .valorant-hero-spotlight-card[data-has-art='true'] .valorant-hero-spotlight-map,
 .valorant-hero-spotlight-card[data-has-art='true'] .valorant-hero-spotlight-score,
 .valorant-hero-spotlight-card[data-has-art='true'] .valorant-hero-spotlight-kda,
@@ -339,6 +342,7 @@
 .valorant-hero-spotlight-card[data-has-art='true'][data-result='loss'] .valorant-hero-spotlight-score { color: #ff8c98; }
 .valorant-hero-mvp-badge {
   position: absolute;
+  z-index: 3;
   top: 0.5rem;
   right: 0.5rem;
   padding: 0.1rem 0.4rem;
