@@ -11,6 +11,11 @@ const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
   loss: 'Defeat',
   draw: 'Draw',
 };
+const STREAK_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
+  win: 'W',
+  loss: 'L',
+  draw: 'D',
+};
 
 function formatNumber(value: number): string {
   return value.toLocaleString('en-GB');
@@ -169,7 +174,10 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
   if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">Play a battle to start a fresh activity readout.</p>;
   const record = recentRecord(data.recentBattles);
   const streak = currentStreak(data.recentBattles);
-  const streakLabel = streak ? `${streak.length}${streak.result === 'win' ? 'W' : streak.result === 'loss' ? 'L' : 'D'} streak` : 'No streak yet';
+  let streakLabel = 'No streak yet';
+  if (streak) {
+    streakLabel = `${streak.length}${STREAK_RESULT_LABELS[streak.result]} streak`;
+  }
   return (
     <div className="clash-battle-pulse">
       <div className="clash-battle-pulse-record">

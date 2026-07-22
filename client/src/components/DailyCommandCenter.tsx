@@ -98,41 +98,49 @@ function CommandPanel({
   );
 }
 
-function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined }>) {
+function signalMark(
+  slot: CommandCenterSlot,
+  health: HealthData | undefined,
+  roblox: RobloxData | undefined,
+): ReactNode {
   const activityDay = health ? latestActivityDay(health) : undefined;
-  const rings = slot.render.type === 'health-rings' && health && activityDay
-    ? <CompactActivityRings
-        activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
-        exerciseMinutes={activityDay.exerciseMinutes ?? 0}
-        standHours={activityDay.standHours ?? 0}
-        goals={health.goals}
-      />
-    : undefined;
+  if (slot.render.type === 'health-rings' && health && activityDay) {
+    return <CompactActivityRings
+      activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
+      exerciseMinutes={activityDay.exerciseMinutes ?? 0}
+      standHours={activityDay.standHours ?? 0}
+      goals={health.goals}
+    />;
+  }
+  if (slot.accent) return <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" />;
+  if (slot.render.type === 'ai-usage-tool' && slot.render.toolIds.length > 1) {
+    return <span className="flex shrink-0 flex-col items-center gap-0.5">
+      {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
+    </span>;
+  }
+  if (slot.source === 'github' && slot.render.type === 'github-contributions') {
+    return <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />;
+  }
+  if (slot.render.type === 'weather-signal') {
+    return <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
+  }
+  if (slot.render.type === 'roblox-now-playing') {
+    const iconUrl = roblox?.presence?.iconUrl;
+    if (iconUrl) return <img src={iconUrl} alt="" className="command-roblox-tile-icon" />;
+    return <span className="command-roblox-tile-mark" aria-hidden><img src="/roblox.svg" alt="" /></span>;
+  }
+  return <span className="command-signal-dot" aria-hidden />;
+}
+
+function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined }>) {
   const contributionDays = slot.render.type === 'github-contributions'
     ? github?.contributions.days.slice(-7)
     : undefined;
   const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
-  const toolMark = slot.accent ? <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" /> : undefined;
-  const dualToolMarks = !slot.accent && slot.render.type === 'ai-usage-tool' && slot.render.toolIds.length > 1
-    ? <span className="flex shrink-0 flex-col items-center gap-0.5">
-        {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
-      </span>
-    : undefined;
-  const githubMark = slot.source === 'github' && slot.render.type === 'github-contributions'
-    ? <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />
-    : undefined;
-  const weatherMark = slot.render.type === 'weather-signal'
-    ? <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>
-    : undefined;
-  const robloxIcon = slot.render.type === 'roblox-now-playing'
-    ? roblox?.presence?.iconUrl
-      ? <img src={roblox.presence.iconUrl} alt="" className="command-roblox-tile-icon" />
-      : <span className="command-roblox-tile-mark" aria-hidden><img src="/roblox.svg" alt="" /></span>
-    : undefined;
   const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now' : slot.kicker;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      {rings ?? toolMark ?? dualToolMarks ?? githubMark ?? weatherMark ?? robloxIcon ?? <span className="command-signal-dot" aria-hidden />}
+      {signalMark(slot, health, roblox)}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{signalKicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
