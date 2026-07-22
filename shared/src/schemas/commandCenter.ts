@@ -25,12 +25,13 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('steam-now-playing'), appId: z.number() }),
   z.object({ type: z.literal('steam-achievement'), appId: z.number(), apiName: z.string() }),
+  z.object({ type: z.literal('roblox-now-playing') }),
 ]);
 
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'transit', 'power', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'transit', 'power', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

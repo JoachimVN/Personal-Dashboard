@@ -161,19 +161,29 @@ function isRateLimitError(error: unknown): boolean {
 type SpotifyGet = <T>(path: string) => Promise<T | null>;
 
 function createSpotifyGet(
-  bearer: string,
+  initialBearer: string,
   signal: AbortSignal,
   snapshotStore: SpotifySnapshotStore,
+  refreshBearer: () => Promise<string>,
 ): SpotifyGet {
+  let bearer = initialBearer;
   return async <T>(path: string): Promise<T | null> => {
     const retryInMs = await snapshotStore.getRateLimitedUntil() - Date.now();
     if (retryInMs > 0) {
       throw new Error(`spotify rate limited; retry in ${Math.ceil(retryInMs / 1000)} seconds`);
     }
-    const res = await fetch(`${API}${path}`, {
+    const request = () => fetch(`${API}${path}`, {
       headers: { Authorization: `Bearer ${bearer}` },
       signal,
     });
+    let res = await request();
+    // An access token can become invalid before its recorded expiry (for example after a
+    // Spotify session revocation). Refresh and retry this one request before marking the
+    // whole provider unavailable. A second 401 still surfaces normally and needs reconnecting.
+    if (res.status === 401) {
+      bearer = await refreshBearer();
+      res = await request();
+    }
     if (res.status === 204) return null; // e.g. nothing currently playing
     if (res.status === 429) {
       const retryAfterSeconds = Number(res.headers.get('retry-after'));
@@ -197,10 +207,11 @@ function createSpotifyGet(
 export async function accessToken(
   oauth: { clientId: string; clientSecret: string },
   signal: AbortSignal,
+  forceRefresh = false,
 ): Promise<string> {
   const token = readSpotifyToken();
   if (!token) throw new Error('spotify is not configured');
-  if (token.expires_at - Date.now() > 60_000) return token.access_token;
+  if (!forceRefresh && token.expires_at - Date.now() > 60_000) return token.access_token;
 
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -351,7 +362,12 @@ export function createSpotifyProvider(
         const bearer = await accessToken(oauth, signal);
         const previousSnapshot = await snapshotStore.getSnapshot();
 
-        const get = createSpotifyGet(bearer, signal, snapshotStore);
+        const get = createSpotifyGet(
+          bearer,
+          signal,
+          snapshotStore,
+          () => accessToken(oauth, signal, true),
+        );
 
         // Playback is checked at the expected track end (with a low-frequency idle guard).
         // Recent history is reconciled independently every 15 minutes.

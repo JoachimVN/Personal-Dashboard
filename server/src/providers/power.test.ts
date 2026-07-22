@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { mapPriceHours, priceDayPath, resolveAreaFromCounty } from './power.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createPowerProvider, mapPriceHours, priceDayPath, resolveAreaFromCounty } from './power.js';
 
 const osloHourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Oslo', hour: '2-digit', hour12: false });
 const osloDateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Oslo' });
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe('mapPriceHours', () => {
   it('labels each hour in the dashboard timezone', () => {
@@ -47,5 +52,30 @@ describe('resolveAreaFromCounty', () => {
   it('returns undefined for an unrecognized or missing county', () => {
     expect(resolveAreaFromCounty('Not a real fylke')).toBeUndefined();
     expect(resolveAreaFromCounty(undefined)).toBeUndefined();
+  });
+});
+
+describe('createPowerProvider', () => {
+  it('retries repeated transient fetch failures while Undici replaces a destroyed HTTP/2 session', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ NOK_per_kWh: 0.8, time_start: '2026-07-18T00:00:00+02:00' }])))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ NOK_per_kWh: 0.9, time_start: '2026-07-19T00:00:00+02:00' }])));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = createPowerProvider('NO3', undefined, 'Europe/Oslo');
+    const result = provider.fetch(new AbortController().signal, false);
+    await vi.runAllTimersAsync();
+
+    await expect(result).resolves.toMatchObject({
+      area: 'NO3',
+      today: [{ priceNokPerKwh: 0.8 }],
+      tomorrow: [{ priceNokPerKwh: 0.9 }],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 });

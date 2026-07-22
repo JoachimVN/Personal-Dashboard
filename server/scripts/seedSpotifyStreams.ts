@@ -6,7 +6,7 @@
 // from the CSV text, so matching is exact. Safe to re-run with updated numbers: it's a set, not
 // an increment.
 import 'dotenv/config';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { accessToken, toPlayedTrackInput, type RawTrack } from '../src/providers/spotify.js';
@@ -25,14 +25,14 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const serverRoot = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), '..'));
 
 const csvPathArg = process.argv[2];
 if (!csvPathArg) {
   console.error('Pass the path to the tab-separated Spotify export as the first argument.');
   process.exit(1);
 }
-const csvPath = resolve(serverRoot, csvPathArg);
+const csvPath = realpathSync(resolve(serverRoot, csvPathArg));
 if (csvPath !== serverRoot && !csvPath.startsWith(serverRoot + sep)) {
   console.error(`CSV path must be inside ${serverRoot}.`);
   process.exit(1);

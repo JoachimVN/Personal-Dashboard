@@ -269,6 +269,38 @@ Read-only scopes (`user-read-currently-playing`, `user-read-recently-played`, `u
 
 Steam's own privacy settings gate what the widget can show: **Game details** must be public for library totals and achievement progress, and **Friends list** visibility determines whether the friends-playing signal works — with either set to private, that part of the widget degrades to a quiet empty state rather than failing. The integration is read-only (it never writes to your Steam account) and the API key is only ever used server-side, never sent to the browser.
 
+### Roblox
+
+Sits alongside Steam and Clash Royale as a tab on the Games page.
+
+1. Set `ROBLOX_ID` in `server/.env` to your Roblox username or numeric user ID.
+2. Restart the server. Profile, friends count, badges, and games you've created show up immediately — all read from Roblox's public, unauthenticated endpoints.
+
+Presence (what you're playing right now) and favorited games additionally need `ROBLOSECURITY`, a full-account session cookie (not a scoped API key — anyone holding it can act as your account, no 2FA required, since it *is* an already-logged-in session):
+
+1. Log into roblox.com in a browser, open DevTools → Application/Storage → Cookies → `roblox.com`, and copy the full value of `.ROBLOSECURITY` — including the `_|WARNING:-DO-NOT-SHARE-THIS...|_` prefix, which is part of the literal value, not a comment.
+2. Set `ROBLOSECURITY` in `server/.env`.
+
+It expires/rotates periodically (faster if the requesting IP differs from where it was issued — running the dashboard from the same home network you copied it from helps), so expect to redo this occasionally; a run of 401s from the Roblox widget after it's been working means the cookie is dead, not a bug. Revoke it anytime by logging out of all Roblox sessions or changing your password.
+
+### Clash Royale
+
+1. Create an API key at [developer.clashroyale.com](https://developer.clashroyale.com) — keys are locked to the public IP address making requests (not a redirect URI like the OAuth integrations below; Supercell's API checks the source IP on every request, and there's no wildcard/CIDR option), so use the IP the dashboard server actually runs from.
+2. Set `CLASH_ROYALE_API_KEY` and `CLASH_ROYALE_ID` (your player tag, e.g. `#ABC123`) in `server/.env`, then restart the server.
+
+Read-only: player profile, current deck, upcoming chest cycle, and recent battle log.
+
+If the server's public IP changes (dynamic ISP address, or the machine moves between networks), requests start failing with HTTP 403 until you update the allowlist at developer.clashroyale.com — the server logs its current public IP once at startup (`[clash-royale] server's current public IP is ...`) as a quick copy-paste source when that happens.
+
+### SonarCloud
+
+Shows up as a "Code quality" block at the bottom of the GitHub page, listing every project in your org with its quality gate status, ratings, coverage, and duplication — one card per repo.
+
+1. Generate a user token at [sonarcloud.io/account/security](https://sonarcloud.io/account/security).
+2. Set `SONARCLOUD_TOKEN` and `SONARCLOUD_ORG` (the `key` in `sonarcloud.io/organizations/<key>`) in `server/.env`, then restart the server.
+
+Every project in the org is shown; there's no per-repo allowlist.
+
 ### Philips Hue
 
 Lights go through Philips' cloud (the official [Remote API](https://developers.meethue.com)), the same path the Hue phone app uses, so the widget works no matter what network the Mac is on. The bridge's LAN IP is not involved.

@@ -1,11 +1,12 @@
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import type {
   CalendarData,
   CommandCenterData,
   CommandCenterSlot,
   GitHubData,
   HealthData,
+  RobloxData,
   WeatherData,
 } from '@personal-dashboard/shared';
 import { deg, glyph, weatherLocation } from '../lib/weather';
@@ -17,7 +18,7 @@ import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { Thumb } from '../widgets/SpotifyWidget';
 import { GitHubMark } from './GitHubMark';
-import { AiToolMark, heroExtraFor, SecondaryContent } from './command-center/SecondaryContent';
+import { AiToolMark, heroExtraFor, SecondaryContent, useRobloxArtPalette } from './command-center/SecondaryContent';
 import { useCommandCenterData } from './command-center/useCommandCenterData';
 import '../sections/spotify/spotify.css';
 
@@ -51,7 +52,7 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'claude' | 'codex' {
+function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
@@ -59,6 +60,7 @@ function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'healt
   if (slot.source === 'spotify') return 'spotify';
   if (slot.source === 'weather') return 'weather';
   if (slot.source === 'steam') return 'steam';
+  if (slot.source === 'roblox') return 'roblox';
   return 'personal';
 }
 
@@ -66,58 +68,81 @@ const WEATHER_KIND_GLYPH: Record<Extract<CommandCenterSlot['render'], { type: 'w
   severe: '⛈️', hot: '🌡️', cold: '🥶', rain: '🌧️', wind: '💨', uv: '☀️', sunset: '🌇', moon: '🌕',
 };
 
+function secondarySlotsFor(commandCenter: CommandCenterData | undefined): CommandCenterSlot[] {
+  if (!commandCenter) return [];
+  return Array.isArray(commandCenter.secondary)
+    ? commandCenter.secondary
+    : [commandCenter.secondary as unknown as CommandCenterSlot];
+}
+
 function CommandPanel({
   href,
   label,
   className,
   children,
   fullCardLink = false,
+  style,
 }: Readonly<{
   href: string;
   label: string;
   className: string;
   children: ReactNode;
   fullCardLink?: boolean;
+  style?: CSSProperties;
 }>) {
   return (
-    <div className={`${className} cursor-pointer${fullCardLink ? ' command-panel--full-link' : ''}`}>
+    <div className={`${className} cursor-pointer${fullCardLink ? ' command-panel--full-link' : ''}`} style={style}>
       <a href={href} aria-label={label} className="command-panel-stretched-link" />
       {children}
     </div>
   );
 }
 
-function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined }>) {
+function signalMark(
+  slot: CommandCenterSlot,
+  health: HealthData | undefined,
+  roblox: RobloxData | undefined,
+): ReactNode {
   const activityDay = health ? latestActivityDay(health) : undefined;
-  const rings = slot.render.type === 'health-rings' && health && activityDay
-    ? <CompactActivityRings
-        activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
-        exerciseMinutes={activityDay.exerciseMinutes ?? 0}
-        standHours={activityDay.standHours ?? 0}
-        goals={health.goals}
-      />
-    : undefined;
+  if (slot.render.type === 'health-rings' && health && activityDay) {
+    return <CompactActivityRings
+      activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
+      exerciseMinutes={activityDay.exerciseMinutes ?? 0}
+      standHours={activityDay.standHours ?? 0}
+      goals={health.goals}
+    />;
+  }
+  if (slot.accent) return <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" />;
+  if (slot.render.type === 'ai-usage-tool' && slot.render.toolIds.length > 1) {
+    return <span className="flex shrink-0 flex-col items-center gap-0.5">
+      {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
+    </span>;
+  }
+  if (slot.source === 'github' && slot.render.type === 'github-contributions') {
+    return <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />;
+  }
+  if (slot.render.type === 'weather-signal') {
+    return <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
+  }
+  if (slot.render.type === 'roblox-now-playing') {
+    const iconUrl = roblox?.presence?.iconUrl;
+    if (iconUrl) return <img src={iconUrl} alt="" className="command-roblox-tile-icon" />;
+    return <span className="command-roblox-tile-mark" aria-hidden><img src="/roblox.svg" alt="" /></span>;
+  }
+  return <span className="command-signal-dot" aria-hidden />;
+}
+
+function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined }>) {
   const contributionDays = slot.render.type === 'github-contributions'
     ? github?.contributions.days.slice(-7)
     : undefined;
   const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
-  const toolMark = slot.accent ? <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" /> : undefined;
-  const dualToolMarks = !slot.accent && slot.render.type === 'ai-usage-tool' && slot.render.toolIds.length > 1
-    ? <span className="flex shrink-0 flex-col items-center gap-0.5">
-        {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
-      </span>
-    : undefined;
-  const githubMark = slot.source === 'github' && slot.render.type === 'github-contributions'
-    ? <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />
-    : undefined;
-  const weatherMark = slot.render.type === 'weather-signal'
-    ? <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>
-    : undefined;
+  const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now' : slot.kicker;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      {rings ?? toolMark ?? dualToolMarks ?? githubMark ?? weatherMark ?? <span className="command-signal-dot" aria-hidden />}
+      {signalMark(slot, health, roblox)}
       <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{slot.kicker}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{signalKicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
         {contributionDays?.length
           ? <div className="command-contribution-squares" aria-label="Contributions over the last seven days">
@@ -135,6 +160,12 @@ function Signal({ slot, github, health }: Readonly<{ slot: CommandCenterSlot; gi
   );
 }
 
+const secondarySlideVariants = {
+  enter: (direction: 1 | -1) => ({ x: `${direction * 100}%` }),
+  center: { x: '0%' },
+  exit: (direction: 1 | -1) => ({ x: `${direction * -100}%` }),
+};
+
 function SecondaryCarousel({
   items,
   activeIndex,
@@ -147,6 +178,7 @@ function SecondaryCarousel({
   renderItem: (slot: CommandCenterSlot) => ReactNode;
 }>) {
   const [paused, setPaused] = useState(false);
+  const [direction, setDirection] = useState<1 | -1>(1);
   const hasMultipleItems = items.length > 1;
   const visibleIndex = Math.min(activeIndex, items.length - 1);
 
@@ -157,6 +189,7 @@ function SecondaryCarousel({
   useEffect(() => {
     if (!hasMultipleItems || paused) return undefined;
     const timer = window.setInterval(() => {
+      setDirection(1);
       onActiveChange((activeIndex + 1) % items.length);
     }, SECONDARY_CAROUSEL_INTERVAL_MS);
     return () => window.clearInterval(timer);
@@ -166,7 +199,10 @@ function SecondaryCarousel({
   if (!hasMultipleItems) return <>{renderItem(items[0]!)}</>;
 
   const goTo = (index: number) => {
-    onActiveChange((index + items.length) % items.length);
+    const target = (index + items.length) % items.length;
+    const forwardDistance = (target - visibleIndex + items.length) % items.length;
+    setDirection(forwardDistance <= items.length - forwardDistance ? 1 : -1);
+    onActiveChange(target);
   };
 
   const pause = () => setPaused(true);
@@ -186,14 +222,16 @@ function SecondaryCarousel({
         }}
       >
         <div className="command-secondary-carousel-viewport">
-          <AnimatePresence initial={false} mode="wait">
+          <AnimatePresence initial={false} custom={direction}>
             <motion.div
               key={items[visibleIndex]!.id}
               className="command-secondary-carousel-slide"
-              initial={{ opacity: 0, x: 28, y: 8, filter: 'blur(7px)' }}
-              animate={{ opacity: 1, x: 0, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: -20, y: -5, filter: 'blur(5px)' }}
-              transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
+              custom={direction}
+              variants={secondarySlideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.45, ease: [0.65, 0, 0.35, 1] }}
             >
               {renderItem(items[visibleIndex]!)}
             </motion.div>
@@ -217,11 +255,12 @@ function SecondaryCarousel({
 }
 
 /** Icon-only so the pill row stays a fixed width as sections are added — labels made it grow
-    unbounded. Generated from SECTIONS so a new section doesn't need a second hand-edit here. */
+    unbounded. Clash Royale remains available in the overview grid, but is intentionally omitted
+    from this compact dashboard-level navigation. */
 function CommandNav() {
   return (
     <nav className="command-nav" aria-label="Dashboard sections">
-      {SECTIONS.map((section) => (
+      {SECTIONS.filter((section) => section.id !== 'clash-royale').map((section) => (
         <a key={section.id} href={sectionHref(section.id)} aria-label={section.title} title={section.title} style={accentStyle(section)}>
           <SectionIcon id={section.id} monochrome />
         </a>
@@ -335,19 +374,23 @@ function HeroPanel({
 }
 
 export function DailyCommandCenter() {
-  const { commandCenter, calendar, weather, github, health, gmail, aiUsage, spotify, spotifyFetchedAt, steam } = useCommandCenterData();
+  const { commandCenter, calendar, weather, github, health, gmail, aiUsage, spotify, spotifyFetchedAt, steam, roblox } = useCommandCenterData();
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
   const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
+  // A running server may be refreshed separately from the Vite client during local development.
+  // Keep the overview usable while the server still returns the pre-carousel single-slot payload.
+  const secondarySlots = secondarySlotsFor(commandCenter);
+  const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
+  const isRobloxSecondary = activeSecondary?.render.type === 'roblox-now-playing';
+  const robloxArtPalette = useRobloxArtPalette(isRobloxSecondary && roblox?.presence?.status === 'in-game' ? roblox.presence.iconUrl : undefined);
+  const robloxArtStyle = robloxArtPalette ? {
+    '--roblox-art-primary': robloxArtPalette[0].join(' '),
+    '--roblox-art-secondary': robloxArtPalette[1].join(' '),
+  } as CSSProperties : undefined;
 
   if (!commandCenter) return <CommandCenterSkeleton />;
 
   const ranked = commandCenter;
-  // A running server may be refreshed separately from the Vite client during local development.
-  // Keep the overview usable while the server still returns the pre-carousel single-slot payload.
-  const secondarySlots = Array.isArray(ranked.secondary)
-    ? ranked.secondary
-    : [ranked.secondary as unknown as CommandCenterSlot];
-  const activeSecondary = secondarySlots[Math.min(activeSecondaryIndex, secondarySlots.length - 1)];
   const heroRender = ranked.hero.render;
   const heroEvent = heroRender.type === 'calendar-event'
     ? calendar?.events.find((event) => event.id === heroRender.eventId)
@@ -370,21 +413,22 @@ export function DailyCommandCenter() {
       </div>
       <div className="command-layout">
         <HeroPanel hero={ranked.hero} event={heroEvent} track={heroTrack} kicker={heroKicker} extra={heroExtra} activity={heroActivity} weather={weather} />
-        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} />)}</div>
+        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} />)}</div>
       </div>
       {activeSecondary && <CommandPanel
         href={activeSecondary.href}
         label={`Open ${activeSecondary.kicker}: ${activeSecondary.title}`}
-        className={`command-agenda command-panel--${toneFor(activeSecondary)}`}
+        className={`command-agenda command-panel--${toneFor(activeSecondary)}${isRobloxSecondary ? ' command-agenda--roblox' : ''}`}
         fullCardLink
+        style={robloxArtStyle}
       >
         <SecondaryCarousel
           items={secondarySlots}
           activeIndex={activeSecondaryIndex}
           onActiveChange={setActiveSecondaryIndex}
           renderItem={(slot) => <>
-            <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>
-            <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyFetchedAt} health={health} github={github} gmail={gmail} weather={weather} steam={steam} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
+            {slot.render.type !== 'roblox-now-playing' && <div className="command-agenda-heading"><p className="command-label">{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>}
+            <SecondaryContent slot={slot} calendar={calendar} spotify={spotify} spotifyFetchedAt={spotifyFetchedAt} health={health} github={github} gmail={gmail} weather={weather} steam={steam} roblox={roblox} aiUsage={aiUsage} hoveredDay={hoveredDay} onHover={setHoveredDay} />
           </>}
         />
       </CommandPanel>}

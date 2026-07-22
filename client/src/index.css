@@ -21,6 +21,8 @@
   --color-accent-github: light-dark(#2d72d9, #65a7ff);
   --color-accent-personal: light-dark(#108879, #45d7be);
   --color-accent-health: light-dark(#d9385a, #ff6f91);
+  /* No dedicated section anymore — kept only for the command-center "playing now" tile/secondary. */
+  --color-accent-roblox: light-dark(#c2281e, #ff6b57);
 
   /* Brand accents */
   --color-claude: #de7356;
@@ -341,6 +343,33 @@ a {
   background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
 }
 
+/* Registered so the secondary card's tint interpolates when the carousel swaps slots. The colors
+   have to animate inside a single background stack — layering a translucent fade surface over the
+   agenda's own glass compounds into a gray wash instead of crossfading. */
+@property --panel-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+@property --agenda-surface {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+@property --agenda-art-primary {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+@property --agenda-art-secondary {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
 .command-panel--personal { --panel-accent: var(--color-accent-personal); }
 .command-panel--github { --panel-accent: var(--color-accent-github); }
 .command-panel--ai { --panel-accent: var(--color-accent-ai); }
@@ -350,6 +379,24 @@ a {
 .command-panel--spotify { --panel-accent: var(--color-accent-spotify); }
 .command-panel--weather { --panel-accent: var(--color-accent-weather); }
 .command-panel--steam { --panel-accent: var(--color-accent-steam); }
+.command-panel--roblox { --panel-accent: var(--color-accent-roblox); }
+
+.command-agenda.command-agenda--roblox {
+  --panel-accent: var(--color-ink);
+  --agenda-art-primary: rgb(var(--roblox-art-primary, 194 40 30) / 0.24);
+  --agenda-art-secondary: rgb(var(--roblox-art-secondary, 194 40 30) / 0.16);
+  --agenda-surface: light-dark(rgb(255 255 255 / 0.58), rgb(17 20 28 / 0.7));
+  border-color: var(--color-card-border);
+}
+
+.command-agenda.command-agenda--roblox::before,
+.command-agenda.command-agenda--roblox:hover::before {
+  opacity: 0;
+}
+
+.command-agenda--roblox > .command-secondary-carousel {
+  z-index: 1;
+}
 
 .command-agenda {
   position: relative;
@@ -359,10 +406,20 @@ a {
   border: 1px solid var(--color-card-border);
   border-radius: 1.4rem;
   padding: 1rem 1.25rem;
+  --agenda-surface: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
   background:
+    radial-gradient(circle at 79% -24%, var(--agenda-art-primary), transparent 58%),
+    linear-gradient(118deg, var(--agenda-art-secondary), transparent 70%),
     linear-gradient(135deg, color-mix(in oklab, var(--panel-accent) 3%, transparent), transparent 58%),
-    light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
-  transition: transform 280ms cubic-bezier(.2,.8,.2,1), border-color 240ms ease, box-shadow 240ms ease;
+    var(--agenda-surface);
+  transition:
+    transform 280ms cubic-bezier(.2,.8,.2,1),
+    border-color 240ms ease,
+    box-shadow 240ms ease,
+    --panel-accent 520ms ease,
+    --agenda-surface 520ms ease,
+    --agenda-art-primary 520ms ease,
+    --agenda-art-secondary 520ms ease;
 }
 
 .command-primary {
@@ -602,6 +659,144 @@ a {
 .command-signal--spotify { --signal-color: var(--color-accent-spotify); }
 .command-signal--weather { --signal-color: var(--color-accent-weather); }
 .command-signal--steam { --signal-color: var(--color-accent-steam); }
+.command-signal--roblox { --signal-color: var(--color-accent-roblox); }
+
+.command-roblox-tile-mark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.625rem;
+  background: var(--color-accent-roblox);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-roblox) 32%, transparent);
+}
+
+.command-roblox-tile-mark img {
+  width: 1rem;
+  height: 1rem;
+}
+
+.command-roblox-tile-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  object-fit: cover;
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-roblox) 32%, transparent);
+}
+
+/* The game artwork adds atmosphere, while the wordmark and structured stats make the surface
+   unmistakably Roblox instead of reading like another generic game card. The panel-level
+   `--roblox` tint swaps the instant the carousel index changes, so these styles stay on the slide
+   itself — otherwise the outgoing slide would restyle halfway through its exit animation. */
+.command-roblox-now {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: var(--secondary-carousel-media-size) minmax(0, 1fr);
+  gap: 0.9rem;
+  width: 100%;
+  height: var(--secondary-carousel-content-height);
+}
+
+.command-roblox-icon {
+  width: var(--secondary-carousel-media-size);
+  height: var(--secondary-carousel-media-size);
+  border-radius: 0.375rem;
+  object-fit: cover;
+  align-self: center;
+}
+
+.command-roblox-brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 1rem;
+}
+
+.command-roblox-details {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  padding: 1rem 1.15rem 1rem 0;
+}
+
+.command-roblox-brand img {
+  width: 4.7rem;
+  height: auto;
+}
+
+:root[style*="color-scheme: light"] .command-roblox-brand img {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([style*="color-scheme: dark"]) .command-roblox-brand img {
+    filter: invert(1);
+  }
+}
+
+.command-roblox-brand span {
+  padding-left: 0.55rem;
+  border-left: 1px solid color-mix(in oklab, var(--color-ink) 22%, transparent);
+  color: var(--color-ink-muted);
+  font-size: 0.5625rem;
+  font-weight: 750;
+  letter-spacing: 0.15em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.command-roblox-game {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: end;
+  padding-top: 0.5rem;
+}
+
+.command-roblox-game > div > p {
+  color: var(--color-ink);
+  letter-spacing: -0.025em;
+}
+
+.command-roblox-stats {
+  display: flex;
+  gap: 1.2rem;
+  margin-top: 0.6rem;
+}
+
+.command-roblox-stats dt {
+  color: var(--color-ink-muted);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.command-roblox-stats dd {
+  margin-top: 0.1rem;
+  color: var(--color-ink);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.command-roblox-icon--fallback {
+  display: grid;
+  place-items: center;
+  background: var(--color-accent-roblox);
+}
+
+.command-roblox-icon--fallback img {
+  width: 3rem;
+  height: 3rem;
+}
 
 .command-signal-arrow {
   font-size: 0.85rem;
@@ -709,14 +904,17 @@ a {
 }
 
 .command-secondary-carousel-viewport {
+  position: relative;
   height: var(--secondary-carousel-content-height);
   overflow: hidden;
 }
 
 .command-secondary-carousel-slide {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  min-height: 100%;
-  will-change: opacity, transform, filter;
+  height: 100%;
+  will-change: transform;
 }
 
 .command-secondary-spotify {
@@ -727,8 +925,10 @@ a {
 }
 
 .command-secondary-spotify-artwork {
-  width: var(--secondary-carousel-media-size);
-  height: var(--secondary-carousel-media-size);
+  /* Keep Now Playing legible without letting one album cover outweigh the
+     signal itself in the compact secondary panel. */
+  width: 6.25rem;
+  height: 6.25rem;
 }
 
 .command-secondary-artist-artwork {

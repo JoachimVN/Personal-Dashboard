@@ -1,0 +1,233 @@
+/* Kept deliberately restrained — a single accent color plus the dashboard's shared neutral
+   `--color-track` panels (see HealthOverview/GitHubOverview), not bespoke gradients or borders. */
+:root {
+  --color-accent-clash-royale: light-dark(#aa6900, #f5bd31);
+  --clash-win: light-dark(#137343, #55dc93);
+  --clash-loss: light-dark(#b53a45, #ff8c98);
+  --clash-row-win: light-dark(#00a63e, #32ef7d);
+  --clash-row-loss: light-dark(#d71f34, #ff6474);
+}
+
+@media (min-width: 1024px) {
+  .dashboard-section-card--clash-royale {
+    grid-column: span 6;
+    min-height: 25rem;
+  }
+}
+
+.clash-overview { display: grid; gap: 0.85rem; }
+.clash-crown { display: inline-block; width: 1rem; height: 0.8rem; }
+
+/* Profile: identity plus Trophy Road and Path of Legends, as one flat neutral panel. */
+.clash-profile {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem 1.4rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--color-track) 25%, transparent);
+}
+.clash-profile-main { min-width: 0; }
+.clash-profile-kicker, .clash-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.32rem;
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.clash-profile-kicker .clash-crown, .clash-eyebrow .clash-crown { color: var(--color-accent-clash-royale); }
+.clash-profile-name {
+  overflow: hidden;
+  margin: 0.5rem 0 0;
+  color: var(--color-ink);
+  font-size: clamp(1.3rem, 3vw, 1.7rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.clash-profile-tag, .clash-profile-clan { margin: 0.35rem 0 0; color: var(--color-ink-muted); font-size: 0.72rem; line-height: 1.25; }
+.clash-profile-clan { overflow: hidden; color: var(--color-ink); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.clash-profile-clan span { color: var(--color-accent-clash-royale); }
+
+.clash-profile-panels { display: grid; gap: 0.6rem; min-width: 8rem; align-self: end; }
+.clash-trophy-label, .clash-trophy-note { margin: 0; color: var(--color-ink-faint); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+.clash-trophy-value { margin: 0.18rem 0 0; color: var(--color-ink); font-size: 1.4rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.clash-trophy-progress {
+  height: 0.3rem;
+  overflow: hidden;
+  margin-top: 0.5rem;
+  border-radius: 99px;
+  background: var(--color-track);
+}
+.clash-trophy-progress span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent-clash-royale); }
+.clash-trophy-note { margin-top: 0.4rem; font-size: 0.6rem; letter-spacing: 0.02em; text-transform: none; }
+
+.clash-path-panel { padding-top: 0.55rem; border-top: 1px solid var(--color-card-border); }
+.clash-path-league-name { margin: 0.2rem 0 0; color: var(--color-ink); font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.clash-path-figures { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-top: 0.3rem; }
+.clash-path-figures strong { color: var(--color-ink); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.clash-path-figures span { color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+
+.clash-level-badge {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.95rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-clash-royale) 14%, transparent);
+  color: var(--color-accent-clash-royale);
+}
+.clash-level-badge span { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.clash-level-badge strong { font-size: 0.8rem; font-weight: 700; line-height: 1; }
+.clash-profile--compact { padding: 0.9rem 1rem; }
+.clash-profile--compact .clash-profile-name { font-size: 1.2rem; }
+
+.clash-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--color-track) 25%, transparent);
+}
+.clash-stat { min-width: 0; padding: 0.75rem 0.7rem; }
+.clash-stat-value { overflow: hidden; margin: 0; color: var(--color-ink); font-size: 1.05rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.clash-stat-label { margin: 0.32rem 0 0; color: var(--color-ink-faint); font-size: 0.56rem; font-weight: 600; letter-spacing: 0.09em; line-height: 1.15; text-transform: uppercase; }
+.clash-stat-detail { overflow: hidden; margin: 0.26rem 0 0; color: var(--color-ink-muted); font-size: 0.62rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+
+.clash-deck-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
+.clash-deck-grid--compact { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 0.45rem; }
+.clash-card { min-width: 0; }
+.clash-card img { display: block; width: 100%; height: auto; }
+.clash-card span:first-child { display: grid; aspect-ratio: 0.84; width: 100%; place-content: center; color: var(--color-ink); font-size: 1.2rem; font-weight: 800; }
+
+.clash-battle-pulse { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.9rem 1.25rem; padding: 0.9rem 1rem; border-radius: 1rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-battle-pulse-record > p:last-child { margin: 0.35rem 0 0; color: var(--color-ink-muted); font-size: 0.78rem; }
+.clash-battle-pulse-record strong { color: var(--color-ink); font-size: 1rem; }
+.clash-battle-pulse-record span { margin: 0 0.18rem; color: var(--color-ink-faint); }
+.clash-battle-pulse-trend { display: grid; align-self: center; justify-items: end; text-align: right; }
+.clash-streak-badge {
+  display: inline-flex;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: var(--color-track);
+  color: var(--color-ink-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.clash-streak-badge.is-up { background: color-mix(in oklab, var(--clash-win) 16%, transparent); color: var(--clash-win); }
+.clash-streak-badge.is-down { background: color-mix(in oklab, var(--clash-loss) 16%, transparent); color: var(--clash-loss); }
+.clash-form-strip { grid-column: 1 / -1; display: flex; gap: 0.32rem; margin: 0; padding: 0; list-style: none; }
+.clash-form-strip li { display: grid; width: 1.4rem; height: 1.4rem; place-content: center; border-radius: 0.38rem; background: var(--color-track); color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 800; }
+.clash-form-strip li[data-result='win'] { background: color-mix(in oklab, var(--clash-win) 24%, var(--color-card)); color: var(--clash-win); }
+.clash-form-strip li[data-result='loss'] { background: color-mix(in oklab, var(--clash-loss) 19%, var(--color-card)); color: var(--clash-loss); }
+
+.clash-battle-log { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.clash-battle-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-radius: 0.85rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-battle-row[data-result='win'] { background: linear-gradient(90deg, color-mix(in srgb, var(--clash-row-win) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-battle-row[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--clash-row-loss) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-battle-main { min-width: 0; }
+.clash-battle-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+.clash-battle-title-row p { overflow: hidden; margin: 0; color: var(--color-ink); font-size: 0.82rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.clash-battle-title-row time { flex: 0 0 auto; color: var(--color-ink-faint); font-size: 0.62rem; }
+.clash-battle-meta { display: flex; gap: 0.38rem; overflow: hidden; margin-top: 0.2rem; color: var(--color-ink-faint); font-size: 0.62rem; white-space: nowrap; }
+.clash-battle-meta span + span::before { content: '·'; margin-right: 0.38rem; }
+.clash-battle-score { display: flex; align-items: center; gap: 0.22rem; padding: 0.22rem 0.3rem; border: 1px solid color-mix(in oklab, var(--color-accent-clash-royale) 20%, var(--color-card-border)); border-radius: 999px; background: color-mix(in oklab, var(--color-accent-clash-royale) 7%, var(--color-card)); color: var(--color-ink-muted); font-variant-numeric: tabular-nums; }
+.clash-crown-count { display: flex; align-items: center; gap: 0.16rem; min-width: 1.65rem; }
+.clash-crown-count strong { color: var(--color-ink); font-size: 0.76rem; line-height: 1; }
+.clash-battle-score .clash-crown { width: 0.75rem; height: 0.6rem; color: var(--color-accent-clash-royale); }
+.clash-score-versus { display: grid; width: 1rem; height: 1rem; place-content: center; border-radius: 50%; background: var(--color-card); color: var(--color-ink-faint); font-size: 0.48rem; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
+
+/* ---------------------------------------------------------------------------
+   Homepage overview card only. The detail page keeps the flat, restrained
+   treatment above; the dashboard card gets a little more finish because it has
+   to hold its own next to the other section cards on the landing page. Every
+   rule below is scoped to `.clash-overview` so nothing here reaches the detail
+   view, which shares these same components.
+   --------------------------------------------------------------------------- */
+
+/* Lit from the top-right corner, away from the King badge. */
+.clash-overview .clash-profile {
+  background:
+    radial-gradient(115% 130% at 100% 0%, color-mix(in oklab, var(--color-accent-clash-royale) 12%, transparent), transparent 62%),
+    color-mix(in oklab, var(--color-track) 25%, transparent);
+}
+/* The arena reads as a badge rather than a caption — the one piece of status in the header. */
+.clash-overview .clash-profile-kicker {
+  display: inline-flex;
+  padding: 0.22rem 0.55rem 0.22rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-clash-royale) 13%, transparent);
+  color: color-mix(in oklab, var(--color-accent-clash-royale) 82%, var(--color-ink));
+  font-weight: 700;
+}
+.clash-overview .clash-level-badge {
+  background: color-mix(in oklab, var(--color-accent-clash-royale) 14%, var(--color-card));
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent-clash-royale) 28%, transparent);
+}
+.clash-overview .clash-trophy-progress {
+  height: 0.4rem;
+  box-shadow: inset 0 1px 2px color-mix(in oklab, var(--color-ink) 12%, transparent);
+}
+.clash-overview .clash-trophy-progress span {
+  background: linear-gradient(90deg, color-mix(in oklab, var(--color-accent-clash-royale) 55%, transparent), var(--color-accent-clash-royale));
+  /* Progress is polled, not animated per frame — this only smooths the jump between refreshes. */
+  transition: width 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Hairline dividers instead of three implicit tiles — keeps the row reading as one strip. */
+.clash-overview .clash-stat { position: relative; }
+.clash-overview .clash-stat + .clash-stat::before {
+  content: '';
+  position: absolute;
+  top: 0.7rem;
+  bottom: 0.7rem;
+  left: 0;
+  width: 1px;
+  background: var(--color-card-border);
+}
+
+/* Each card sits in its own recessed slot, so the deck reads as a tray of eight rather than
+   eight loose transparent PNGs floating on the card background. */
+.clash-overview .clash-card {
+  display: grid;
+  padding: 0.2rem;
+  border-radius: 0.6rem;
+  background: color-mix(in oklab, var(--color-track) 25%, transparent);
+  transition: background 200ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.clash-overview .clash-card:hover {
+  background: color-mix(in oklab, var(--color-accent-clash-royale) 12%, color-mix(in oklab, var(--color-track) 25%, transparent));
+  transform: translateY(-2px);
+}
+.clash-overview .clash-card img { filter: drop-shadow(0 2px 3px color-mix(in oklab, var(--color-ink) 22%, transparent)); }
+
+/* Oldest → newest, so the last chip is the most recent battle: it gets a ring to mark "you are
+   here" and the strip fades toward the older end to give the row a direction. */
+.clash-overview .clash-form-strip { gap: 0.3rem; }
+.clash-overview .clash-form-strip li { flex: 1 1 0; width: auto; min-width: 0; height: 1.5rem; border-radius: 0.42rem; opacity: 0.62; }
+.clash-overview .clash-form-strip li:nth-last-child(-n + 5) { opacity: 0.82; }
+.clash-overview .clash-form-strip li:last-child { opacity: 1; box-shadow: 0 0 0 1.5px color-mix(in oklab, currentColor 45%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .clash-overview .clash-card, .clash-overview .clash-trophy-progress span { transition: none; }
+  .clash-overview .clash-card:hover { transform: none; }
+}
+
+@media (max-width: 480px) {
+  .clash-profile { grid-template-columns: minmax(0, 1fr); gap: 1rem 0; padding: 0.9rem 1rem; }
+  .clash-profile-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); align-self: auto; min-width: 0; }
+  .clash-path-panel { padding-top: 0; padding-left: 0.8rem; border-top: 0; border-left: 1px solid var(--color-card-border); }
+  .clash-trophy-value { font-size: 1.2rem; }
+  .clash-deck-grid--compact { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .clash-battle-row { grid-template-columns: auto minmax(0, 1fr); gap: 0.55rem; }
+}

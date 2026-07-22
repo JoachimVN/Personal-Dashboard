@@ -9,6 +9,7 @@ import { SpotifySnapshotStore } from '../spotifyCache.js';
 import { SpotifyHistoryStore } from '../spotifyHistory.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { SteamHistoryStore } from '../steamHistory.js';
+import { createActivityPushProvider } from './activityPush.js';
 import { createAiNewsProvider } from './aiNews.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
 import { createCalendarProvider } from './calendar.js';
@@ -21,6 +22,9 @@ import { createNewsProvider } from './news.js';
 import { createPowerProvider, type PowerProvider } from './power.js';
 import { createSpotifyProvider } from './spotify.js';
 import { createSteamProvider } from './steam.js';
+import { createClashRoyaleProvider } from './clashRoyale.js';
+import { createRobloxProvider } from './roblox.js';
+import { createSonarCloudProvider } from './sonarCloud.js';
 import { createSystemProvider } from './system.js';
 import { createTransitProvider, type TransitProvider } from './transit.js';
 import { createWeatherProvider, type WeatherProvider } from './weather.js';
@@ -98,6 +102,10 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
           maxFriends: config.steam.leaderboardMaxFriends,
           ttlMs: config.steam.leaderboardTtlHours * 60 * 60_000,
         }),
+        createRobloxProvider(env.roblox),
+        createClashRoyaleProvider(env.clashRoyale),
+        createSonarCloudProvider(env.sonarCloud),
+        createActivityPushProvider(env.dashboardPush),
       ] satisfies Provider[]
     ).map((provider) => withEnabledToggle(provider, config)),
   };

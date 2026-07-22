@@ -16,6 +16,7 @@ import { createIssue, issueErrorCode, parseIssueInput } from './issues.js';
 import { availableProjects, codeActionError, launchCodeAction } from './codeSession.js';
 import { createOwnedReposCache, listOwnedRepos } from './providers/github.js';
 import { todayInZone } from './providers/health.js';
+import { logClashRoyalePublicIp } from './providers/clashRoyale.js';
 
 const env = loadEnv();
 const config = loadConfig();
@@ -48,6 +49,9 @@ scheduler.onSettled((id) => {
   commandCenterSettleTimer.unref?.();
 });
 scheduler.start();
+// Clash Royale's API key is IP-locked; this is a quick copy-paste source for the allowlist at
+// developer.clashroyale.com when it drifts (dynamic IP, or a machine that moves networks).
+if (env.clashRoyale) void logClashRoyalePublicIp();
 
 const layoutStore = new LayoutStore(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.data/layout.json'),

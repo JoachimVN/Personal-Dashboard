@@ -44,17 +44,12 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
         <span className="section-icon grid h-10 w-10 place-items-center rounded-2xl text-(--accent)">
           <SectionIcon id={section.id} />
         </span>
-        <div className="min-w-0">
-          <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-faint">
-            {section.label}
-          </span>
-          <motion.h2
-            layoutId={`section-title-${section.id}`}
-            className="text-[1.05rem] font-semibold tracking-[-0.02em] text-ink"
-          >
-            {section.title}
-          </motion.h2>
-        </div>
+        <motion.h2
+          layoutId={`section-title-${section.id}`}
+          className="min-w-0 text-[1.05rem] font-semibold tracking-[-0.02em] text-ink"
+        >
+          {section.title}
+        </motion.h2>
         <span aria-hidden className="section-arrow ml-auto grid h-9 w-9 place-items-center rounded-full text-lg text-ink-muted">
           ↗
         </span>

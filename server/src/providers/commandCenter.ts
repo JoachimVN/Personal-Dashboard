@@ -10,6 +10,7 @@ import {
   type IMessageData,
   type NewsData,
   type PowerData,
+  type RobloxData,
   type SpotifyData,
   type SteamData,
   type SteamGame,
@@ -31,6 +32,7 @@ import {
   imessageCandidates,
   newsCandidates,
   powerCandidates,
+  robloxCandidates,
   spotifyCandidates,
   steamCandidates,
   transitCandidates,
@@ -212,6 +214,7 @@ export function createCommandCenterProvider(
         ...aiNewsCandidates(widgetData<AiNewsData>(envelopes, 'ai-news')),
         ...spotifyCandidates(spotify, spotifyFresh, config.commandCenter.spotifyRecentPlayedMaxAgeMs),
         ...steamCandidates(steam, config.commandCenter.steamAchievementFreshMs, steamMoments, config.commandCenter.steamRareAchievementPercent),
+        ...robloxCandidates(widgetData<RobloxData>(envelopes, 'roblox')),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),
           config.commandCenter.weatherHotC,

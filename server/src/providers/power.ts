@@ -6,6 +6,7 @@ import { enturReverseGeocode } from './entur.js';
 // Free, no-key day-ahead spot prices per Norwegian bidding area. Their API terms only ask for
 // attribution, which the client widget renders ("Strømpriser levert av Hva koster strømmen.no").
 const API_BASE = 'https://www.hvakosterstrommen.no/api/v1/prices';
+const TRANSIENT_RETRY_DELAYS_MS = [500, 1_000];
 
 const priceDaySchema = z.array(
   z.object({
@@ -73,6 +74,20 @@ async function resolveAreaFromCoords(coords: { lat: number; lon: number }, signa
   return area;
 }
 
+async function waitForRetry(signal: AbortSignal, delayMs: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, delayMs);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 export interface PowerProvider extends Provider<PowerData> {
   /** Overrides the env-configured location, e.g. with the client's device geolocation — ignored once `power.area` is set explicitly in config.json. */
   setCoords(next: { lat: number; lon: number }): void;
@@ -100,7 +115,20 @@ export function createPowerProvider(
   }
 
   async function fetchDay(date: Date, area: PowerArea, signal: AbortSignal): Promise<PowerHour[] | undefined> {
-    const res = await fetch(`${API_BASE}/${priceDayPath(date, dateFmt, area)}`, { signal });
+    const url = `${API_BASE}/${priceDayPath(date, dateFmt, area)}`;
+    let res: Response;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        res = await fetch(url, { signal });
+        break;
+      } catch (error) {
+        // This free endpoint sits behind Cloudflare. Undici can also surface a destroyed HTTP/2
+        // session while it replaces the connection, so give it two short, abort-aware retries.
+        const delayMs = TRANSIENT_RETRY_DELAYS_MS[attempt];
+        if (signal.aborted || !(error instanceof TypeError) || delayMs === undefined) throw error;
+        await waitForRetry(signal, delayMs);
+      }
+    }
     // Tomorrow's prices 404 until Nord Pool publishes them (~13:00) — absent, not broken.
     if (res.status === 404) return undefined;
     if (!res.ok) throw new Error(`hvakosterstrommen responded ${res.status}`);
@@ -112,7 +140,8 @@ export function createPowerProvider(
     schema: powerDataSchema,
     // Prices change once a day; the point of polling is catching tomorrow's ~13:00 publication promptly.
     refreshMs: 20 * 60_000,
-    timeoutMs: 10_000,
+    // Allow one retry after Undici's 10-second connect timeout.
+    timeoutMs: 25_000,
     isConfigured: () => configuredArea !== undefined || coords !== undefined,
     setCoords(next) {
       coords = next;

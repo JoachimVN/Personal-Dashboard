@@ -85,6 +85,45 @@ describe('Spotify provider', () => {
     }
   });
 
+  it('refreshes an unexpectedly rejected access token and retries the request once', async () => {
+    let stored = snapshot;
+    const snapshotStore = {
+      getRateLimitedUntil: vi.fn().mockResolvedValue(0),
+      getSnapshot: vi.fn().mockImplementation(async () => stored),
+      getTopDataFetchedAt: vi.fn().mockImplementation(async () => Date.now()),
+      setSnapshot: vi.fn().mockImplementation(async (next: SpotifyData) => {
+        stored = next;
+      }),
+    };
+    const historyStore = {
+      recordPlays: vi.fn().mockResolvedValue(undefined),
+      getAllTime: vi.fn().mockResolvedValue(snapshot.allTime),
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'refreshed-access-token', expires_in: 3600 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(jsonResponse({ items: [] }));
+
+    try {
+      const provider = createSpotifyProvider(
+        { clientId: 'test-client-id', clientSecret: 'test-client-secret' },
+        snapshotStore as never,
+        historyStore as never,
+      );
+
+      await expect(provider.fetch(new AbortController().signal)).resolves.toMatchObject({ nowPlaying: null });
+      expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+        expect.stringContaining('/me/player/currently-playing'),
+        expect.stringContaining('accounts.spotify.com/api/token'),
+        expect.stringContaining('/me/player/currently-playing'),
+        expect.stringContaining('/me/player/recently-played?limit=50'),
+      ]);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it('checks playback between 15-minute recent-history reconciliations', async () => {
     let stored = snapshot;
     const snapshotStore = {
