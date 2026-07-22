@@ -5,6 +5,30 @@ import { ValorantMatchLog, ValorantMatchPulse, ValorantProfile, ValorantStats } 
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 import './valorant.css';
 
+/* client/public/valorant_wordmark.png is solid black on a transparent ground, so it's applied as
+   a CSS mask (tinted via --detail-accent, set by DetailIntro) rather than rendered as-is. */
+function ValorantWordmark() {
+  return (
+    <span
+      role="img"
+      aria-label="Valorant"
+      className="block h-[0.62em]"
+      style={{
+        aspectRatio: '3984 / 595',
+        backgroundColor: 'var(--detail-accent)',
+        maskImage: 'url(/valorant_wordmark.png)',
+        maskRepeat: 'no-repeat',
+        maskPosition: 'left center',
+        maskSize: 'contain',
+        WebkitMaskImage: 'url(/valorant_wordmark.png)',
+        WebkitMaskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'left center',
+        WebkitMaskSize: 'contain',
+      }}
+    />
+  );
+}
+
 function ValorantSignals() {
   const { envelope, offline } = useWidget<ValorantData>('valorant');
   return (
@@ -30,7 +54,7 @@ export function ValorantDetail() {
   return (
     <div>
       <DetailIntro
-        title="Valorant"
+        title={<ValorantWordmark />}
         description="Your rank, RR, and recent match form."
         accent="var(--color-accent-valorant)"
       >

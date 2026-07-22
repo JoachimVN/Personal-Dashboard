@@ -259,15 +259,26 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
     );
   }
     case 'valorant': {
-    /* Abstract angular chevron rather than the trademarked logo mark — reads as a currentColor
-       glyph like the other hand-drawn icons in this set (ai/personal/weather), colored via
-       --accent in the overview header and left monochrome in the nav pill. */
-    const accent = monochrome ? 'currentColor' : 'var(--accent)';
+    /* The game's own mark (client/public/valorant.png) is solid black on a transparent ground,
+       so it's applied as a CSS mask rather than an <img> — that recolors it to the accent (or
+       currentColor when monochrome) instead of always rendering flat black. */
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill={accent}>
-        <path d="M3.4 5.2c0-.7.8-1.1 1.4-.7l8.9 6.4c.5.4.5 1.1 0 1.5L4.8 18.8c-.6.4-1.4 0-1.4-.7z" />
-        <path d="M13 5.2c0-.7.8-1.1 1.4-.7l6.2 4.5a.9.9 0 0 1 0 1.5l-6.2 4.5c-.6.4-1.4 0-1.4-.7z" opacity="0.55" />
-      </svg>
+      <span
+        aria-hidden
+        className="block h-5"
+        style={{
+          aspectRatio: '1841 / 1514',
+          backgroundColor: monochrome ? 'currentColor' : 'var(--accent)',
+          maskImage: 'url(/valorant.png)',
+          maskRepeat: 'no-repeat',
+          maskPosition: 'center',
+          maskSize: 'contain',
+          WebkitMaskImage: 'url(/valorant.png)',
+          WebkitMaskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center',
+          WebkitMaskSize: 'contain',
+        }}
+      />
     );
   }
   default:
