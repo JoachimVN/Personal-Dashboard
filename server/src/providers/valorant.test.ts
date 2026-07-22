@@ -90,4 +90,35 @@ describe('Valorant provider history', () => {
     expect(data.history.matches).toHaveLength(1);
     fetchMock.mockRestore();
   });
+
+  it('continues an unfinished archive even when its last sync is fresh', async () => {
+    const historyStore = {
+      get: vi.fn().mockResolvedValue({
+        matches: [],
+        totalMatchesAvailable: 10,
+        fetchedAt: new Date().toISOString(),
+        nextPage: 2,
+        sourceVersion: 2,
+      }),
+      set: vi.fn().mockImplementation(async (value) => ({ ...value, fetchedAt: new Date().toISOString() })),
+    };
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes('/account/')) return jsonResponse({ data: { puuid: 'player-1', region: 'eu', account_level: 100, name: 'Synthetic', tag: 'VAL' } });
+      if (url.includes('/valorant/v3/mmr/')) return jsonResponse({ data: {
+        current: { tier: { id: 18, name: 'Diamond 1' }, rr: 42, last_change: 18, leaderboard_placement: null },
+        peak: { tier: { id: 21, name: 'Ascendant 1' } },
+        seasonal: [],
+      } });
+      if (url.includes('/valorant/v4/matches/')) return jsonResponse({ data: [rawMatch] });
+      if (url.includes('/stored-mmr-history/')) return jsonResponse({ results: { total: 1 }, data: [{ match_id: 'match-1', season: { short: 'e10a2' } }] });
+      throw new Error(`Unexpected request: ${url}`);
+    });
+
+    const provider = createValorantProvider({ apiKey: 'key', name: 'Synthetic', tag: 'VAL', region: 'eu' }, historyStore as never);
+    await provider.fetch(new AbortController().signal, false);
+
+    expect(historyStore.set).toHaveBeenCalledWith(expect.objectContaining({ nextPage: 1 }));
+    fetchMock.mockRestore();
+  });
 });

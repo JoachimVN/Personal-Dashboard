@@ -6,8 +6,8 @@ const HD_API_BASE = 'https://api.henrikdev.xyz';
 const RECENT_MATCHES_COUNT = 10;
 const HISTORY_MATCHES_PER_PAGE = 10;
 const STORED_HISTORY_PAGE_SIZE = 100;
-/** 3 normal calls + at most 3 match and 3 MMR archive pages stays well below a 30-RPM key. */
-const MAX_STORED_HISTORY_PAGES_PER_SYNC = 3;
+/** 3 normal calls + at most 13 match and 13 MMR archive pages uses at most 29 requests of a 30-RPM key. */
+const MAX_STORED_HISTORY_PAGES_PER_SYNC = 13;
 const STORED_HISTORY_REFRESH_MS = 24 * 60 * 60_000;
 const MATCH_HISTORY_CACHE_VERSION = 2;
 /** The standard rank scheme UUID all current episodes share (Ascendant onward) — tier ids 0-27
@@ -247,8 +247,12 @@ function attachMmrActs(matches: ValorantMatch[], history: RawMmrHistoryEntry[]):
   return matches.map((match) => ({ ...match, actShort: match.actShort ?? acts.get(match.matchId) }));
 }
 
-function isHistoryFresh(history: { fetchedAt: string; sourceVersion: number }): boolean {
-  return history.sourceVersion === MATCH_HISTORY_CACHE_VERSION && Date.now() - Date.parse(history.fetchedAt) < STORED_HISTORY_REFRESH_MS;
+function isHistoryFresh(history: { fetchedAt: string; sourceVersion: number; nextPage?: number }): boolean {
+  /* An unfinished archive should advance with the provider's normal ten-minute refresh rather
+   * than idling for a day. Once a short page resets the cursor to one, a daily rescan is enough. */
+  return history.sourceVersion === MATCH_HISTORY_CACHE_VERSION
+    && (history.nextPage ?? 1) === 1
+    && Date.now() - Date.parse(history.fetchedAt) < STORED_HISTORY_REFRESH_MS;
 }
 
 export function createValorantProvider(auth: ValorantAuth | undefined, historyStore?: ValorantHistoryStore): Provider<ValorantData> {
