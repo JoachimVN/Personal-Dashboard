@@ -4,6 +4,8 @@
   --color-accent-clash-royale: light-dark(#aa6900, #f5bd31);
   --clash-win: light-dark(#137343, #55dc93);
   --clash-loss: light-dark(#b53a45, #ff8c98);
+  --clash-row-win: light-dark(#00a63e, #32ef7d);
+  --clash-row-loss: light-dark(#d71f34, #ff6474);
 }
 
 @media (min-width: 1024px) {
@@ -131,6 +133,8 @@
 
 .clash-battle-log { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
 .clash-battle-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-radius: 0.85rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-battle-row[data-result='win'] { background: linear-gradient(90deg, color-mix(in srgb, var(--clash-row-win) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-battle-row[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--clash-row-loss) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
 .clash-battle-main { min-width: 0; }
 .clash-battle-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
 .clash-battle-title-row p { overflow: hidden; margin: 0; color: var(--color-ink); font-size: 0.82rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }

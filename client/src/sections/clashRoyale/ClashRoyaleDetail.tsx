@@ -30,35 +30,35 @@ export function ClashRoyaleDetail() {
   return (
     <div>
       <DetailIntro
-        title="Clash Royale command center"
+        title="Clash Royale"
         description="Your Trophy Road, Ranked standing, deck lineup, and recent battle form."
         accent="var(--color-accent-clash-royale)"
       >
         <ClashRoyaleSignals />
       </DetailIntro>
 
-      <DetailSectionHeading label="Arena" title="Trophy Road & Ranked" detail="A precise read on the 14,000-trophy road, with your Path of Legends standing right beside it." />
+      <DetailSectionHeading label="Arena" title="Trophy Road & Ranked" />
       <WidgetShell title="Arena profile">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleProfile data={data} />}
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="Form" title="Recent battle pulse" detail="The latest ten battles give the current win-loss record, trophy swing, and streak at a glance." />
+      <DetailSectionHeading label="Form" title="Recent battle pulse" />
       <WidgetShell title="Battle pulse">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleBattlePulse data={data} />}
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="Deck" title="Your eight cards" detail="Rarity-coded frames and evolution/level detail, plus the tower troop backing them up. The missing special-slot card is restored from your matching latest battle." />
+      <DetailSectionHeading label="Deck" title="Your eight cards" />
       <WidgetShell title="Current deck">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleDeck data={data} />}
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="History" title="Latest battles" detail="Results, crowns, modes and trophy changes—without making you parse a dense game log." />
+      <DetailSectionHeading label="History" title="Latest battles" />
       <WidgetShell title="Battle history">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleBattleLog data={data} />}
