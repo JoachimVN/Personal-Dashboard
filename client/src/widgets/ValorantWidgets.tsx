@@ -239,36 +239,22 @@ export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange, se
         </div>
         <p>{coverage}</p>
       </div>
-      <div className="valorant-periods" role="tablist" aria-label="Valorant performance period">
-        {periodOptions.map((period) => (
-          <button
-            key={period.id}
-            type="button"
-            role="tab"
-            aria-selected={period.id === selectedPeriod.id}
-            className={period.id === selectedPeriod.id ? 'is-selected' : undefined}
-            onClick={() => selectPeriod(period.id)}
-          >
-            {period.label}
-          </button>
-        ))}
+      <div className="valorant-performance-filters" aria-label="Agent pool filters">
+        <label>
+          <span>Matches</span>
+          <select value={selectedPeriod.id} onChange={(event) => selectPeriod(event.target.value)}>
+            {periodOptions.map((period) => <option key={period.id} value={period.id}>{period.label}</option>)}
+          </select>
+        </label>
+        {modeOpts.length > 2 && (
+          <label>
+            <span>Game mode</span>
+            <select value={selectedMode.id} onChange={(event) => selectMode(event.target.value)}>
+              {modeOpts.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
+            </select>
+          </label>
+        )}
       </div>
-      {modeOpts.length > 2 && (
-        <div className="valorant-periods" role="tablist" aria-label="Valorant game mode">
-          {modeOpts.map((mode) => (
-            <button
-              key={mode.id}
-              type="button"
-              role="tab"
-              aria-selected={mode.id === selectedMode.id}
-              className={mode.id === selectedMode.id ? 'is-selected' : undefined}
-              onClick={() => selectMode(mode.id)}
-            >
-              {mode.label}
-            </button>
-          ))}
-        </div>
-      )}
       {matches.length === 0 ? (
         <p className="text-sm text-ink-faint">No matches are available for this period yet.</p>
       ) : (

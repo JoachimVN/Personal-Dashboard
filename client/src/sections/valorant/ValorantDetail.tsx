@@ -4,6 +4,7 @@ import type { ValorantData, ValorantMatch } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
+import { valorantMapArt } from '../../lib/valorant';
 import {
   RESULT_LABELS,
   ValorantMatchLog,
@@ -181,29 +182,38 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
             <p className="mt-2 text-sm text-ink-faint">Play a match to fill this in.</p>
           ) : (
             <ol className="valorant-hero-recent">
-              {spotlight.map((match: ValorantMatch) => (
-                <li key={match.matchId} className="valorant-hero-spotlight-card" data-result={match.result}>
-                  {match.isMatchMvp ? (
-                    <span className="valorant-hero-mvp-badge is-match">MVP</span>
-                  ) : match.isTeamMvp ? (
-                    <span className="valorant-hero-mvp-badge is-team">Team MVP</span>
-                  ) : null}
-                  {match.agentIconUrl && (
-                    <img src={match.agentIconUrl} alt={match.agentName} className="valorant-hero-spotlight-agent" loading="lazy" decoding="async" />
-                  )}
-                  <p className="valorant-hero-spotlight-map">{match.map}</p>
-                  <p className="valorant-hero-spotlight-score" aria-label={`${RESULT_LABELS[match.result]}, rounds ${match.roundsWon ?? '—'} to ${match.roundsLost ?? '—'}`}>
-                    {match.roundsWon !== undefined && match.roundsLost !== undefined ? `${match.roundsWon}–${match.roundsLost}` : RESULT_LABELS[match.result]}
-                  </p>
-                  <p className="valorant-hero-spotlight-kda">
-                    {kda(match)} <span>KDA</span>
-                  </p>
-                  <p className="valorant-hero-spotlight-meta">
-                    {match.mode !== 'Competitive' ? `${match.mode} · ` : ''}
-                    {relativeTime(match.startedAt)}
-                  </p>
-                </li>
-              ))}
+              {spotlight.map((match: ValorantMatch) => {
+                const mapArtUrl = valorantMapArt(match.map);
+                return (
+                  <li
+                    key={match.matchId}
+                    className="valorant-hero-spotlight-card"
+                    data-result={match.result}
+                    data-has-art={mapArtUrl ? 'true' : undefined}
+                    style={mapArtUrl ? { backgroundImage: `url("${mapArtUrl}")` } : undefined}
+                  >
+                    {match.isMatchMvp ? (
+                      <span className="valorant-hero-mvp-badge is-match">MVP</span>
+                    ) : match.isTeamMvp ? (
+                      <span className="valorant-hero-mvp-badge is-team">Team MVP</span>
+                    ) : null}
+                    {match.agentIconUrl && (
+                      <img src={match.agentIconUrl} alt={match.agentName} className="valorant-hero-spotlight-agent" loading="lazy" decoding="async" />
+                    )}
+                    <p className="valorant-hero-spotlight-map">{match.map}</p>
+                    <p className="valorant-hero-spotlight-score" aria-label={`${RESULT_LABELS[match.result]}, rounds ${match.roundsWon ?? '—'} to ${match.roundsLost ?? '—'}`}>
+                      {match.roundsWon !== undefined && match.roundsLost !== undefined ? `${match.roundsWon}–${match.roundsLost}` : RESULT_LABELS[match.result]}
+                    </p>
+                    <p className="valorant-hero-spotlight-kda">
+                      {kda(match)} <span>KDA</span>
+                    </p>
+                    <p className="valorant-hero-spotlight-meta">
+                      {match.mode !== 'Competitive' ? `${match.mode} · ` : ''}
+                      {relativeTime(match.startedAt)}
+                    </p>
+                  </li>
+                );
+              })}
             </ol>
           )}
         </div>
