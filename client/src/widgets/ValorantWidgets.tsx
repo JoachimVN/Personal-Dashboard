@@ -98,6 +98,27 @@ export function performancePeriods(data: ValorantData): ValorantPeriod[] {
   ].filter((period) => period.id === 'career' || period.matches.length > 0);
 }
 
+export interface ValorantModeOption {
+  id: string;
+  label: string;
+  matches: ValorantMatch[];
+}
+
+/** Sorted by frequency (most-played mode first) rather than alphabetically, so Competitive/Unrated
+ * naturally lead for most accounts without hardcoding a priority list of Riot's queue names. */
+export function modeOptions(matches: ValorantMatch[]): ValorantModeOption[] {
+  const byMode = new Map<string, ValorantMatch[]>();
+  for (const match of matches) {
+    const list = byMode.get(match.mode) ?? [];
+    list.push(match);
+    byMode.set(match.mode, list);
+  }
+  return [
+    { id: 'all', label: 'All modes', matches },
+    ...[...byMode.entries()].sort((a, b) => b[1].length - a[1].length).map(([mode, modeMatches]) => ({ id: mode, label: mode, matches: modeMatches })),
+  ];
+}
+
 interface AgentSummary {
   name: string;
   iconUrl?: string;
@@ -172,24 +193,36 @@ export function ValorantStats({ data }: Readonly<{ data: ValorantData }>) {
 
 /** A period selector deliberately works on the server-provided archive so switching scope is
  * instantaneous and never causes the browser to call HenrikDev or expose its API key. */
-export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange }: Readonly<{
+export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange, selectedModeId, onModeChange }: Readonly<{
   data: ValorantData;
   selectedPeriodId?: string;
   onPeriodChange?: (periodId: string) => void;
+  selectedModeId?: string;
+  onModeChange?: (modeId: string) => void;
 }>) {
   const { history } = data;
   const periodOptions = performancePeriods(data);
   const [uncontrolledPeriodId, setUncontrolledPeriodId] = useState('two-weeks');
   const activePeriodId = selectedPeriodId ?? uncontrolledPeriodId;
   const selectedPeriod = periodOptions.find((period) => period.id === activePeriodId) ?? periodOptions[0];
-  if (!selectedPeriod) return null;
+
+  const modeOpts = modeOptions(selectedPeriod?.matches ?? []);
+  const [uncontrolledModeId, setUncontrolledModeId] = useState('all');
+  const requestedModeId = selectedModeId ?? uncontrolledModeId;
+  const activeModeId = modeOpts.some((mode) => mode.id === requestedModeId) ? requestedModeId : 'all';
+  const selectedMode = modeOpts.find((mode) => mode.id === activeModeId) ?? modeOpts[0];
+  if (!selectedPeriod || !selectedMode) return null;
 
   const selectPeriod = (periodId: string) => {
     if (onPeriodChange) onPeriodChange(periodId);
     else setUncontrolledPeriodId(periodId);
   };
+  const selectMode = (modeId: string) => {
+    if (onModeChange) onModeChange(modeId);
+    else setUncontrolledModeId(modeId);
+  };
 
-  const matches = selectedPeriod.matches;
+  const matches = selectedMode.matches;
   const record = recentRecord(matches);
   const winRate = matches.length === 0 ? undefined : Math.round((record.wins / matches.length) * 100);
   const acs = averageCombatScore(matches);
@@ -220,6 +253,22 @@ export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange }: 
           </button>
         ))}
       </div>
+      {modeOpts.length > 2 && (
+        <div className="valorant-periods" role="tablist" aria-label="Valorant game mode">
+          {modeOpts.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              role="tab"
+              aria-selected={mode.id === selectedMode.id}
+              className={mode.id === selectedMode.id ? 'is-selected' : undefined}
+              onClick={() => selectMode(mode.id)}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+      )}
       {matches.length === 0 ? (
         <p className="text-sm text-ink-faint">No matches are available for this period yet.</p>
       ) : (
@@ -276,33 +325,71 @@ export function ValorantMatchPulse({ data }: Readonly<{ data: ValorantData }>) {
   );
 }
 
-export function ValorantMatchLog({ data, selectedPeriodId }: Readonly<{ data: ValorantData; selectedPeriodId?: string }>) {
+export function ValorantMatchLog({ data, selectedPeriodId, selectedModeId, onModeChange }: Readonly<{
+  data: ValorantData;
+  selectedPeriodId?: string;
+  selectedModeId?: string;
+  onModeChange?: (modeId: string) => void;
+}>) {
   const periodOptions = performancePeriods(data);
   const selectedPeriod = periodOptions.find((period) => period.id === selectedPeriodId) ?? periodOptions[0];
-  const matches = selectedPeriod?.matches ?? [];
-  if (matches.length === 0) return <p className="text-sm text-ink-faint">No matches captured yet.</p>;
+  const periodMatches = selectedPeriod?.matches ?? [];
+
+  const modeOpts = modeOptions(periodMatches);
+  const [uncontrolledModeId, setUncontrolledModeId] = useState('all');
+  const requestedModeId = selectedModeId ?? uncontrolledModeId;
+  const activeModeId = modeOpts.some((mode) => mode.id === requestedModeId) ? requestedModeId : 'all';
+  const selectedMode = modeOpts.find((mode) => mode.id === activeModeId) ?? modeOpts[0];
+  const selectMode = (modeId: string) => {
+    if (onModeChange) onModeChange(modeId);
+    else setUncontrolledModeId(modeId);
+  };
+  const matches = selectedMode?.matches ?? [];
+
+  if (periodMatches.length === 0) return <p className="text-sm text-ink-faint">No matches captured yet.</p>;
+
   return (
     <section className="valorant-match-history" aria-live="polite">
+      {modeOpts.length > 2 && (
+        <div className="valorant-periods" role="tablist" aria-label="Valorant game mode">
+          {modeOpts.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              role="tab"
+              aria-selected={mode.id === activeModeId}
+              className={mode.id === activeModeId ? 'is-selected' : undefined}
+              onClick={() => selectMode(mode.id)}
+            >
+              {mode.label}
+            </button>
+          ))}
+        </div>
+      )}
       <p className="valorant-match-history-summary">{selectedPeriod?.label} · {matches.length} {matches.length === 1 ? 'match' : 'matches'}</p>
-      <ol className="valorant-match-log">
-        {matches.map((match, index) => (
-          <li key={`${match.matchId}-${index}`} className="valorant-match-row" data-result={match.result}>
-            {match.agentIconUrl && <img src={match.agentIconUrl} alt={match.agentName} className="valorant-agent-icon" loading="lazy" decoding="async" />}
-            <div className="valorant-match-main">
-              <div className="valorant-match-title-row">
-                <p>{match.map}{match.roundsWon !== undefined && match.roundsLost !== undefined ? ` · ${match.roundsWon}-${match.roundsLost}` : ''}</p>
-                <time dateTime={match.startedAt}>{relativeTime(match.startedAt)}</time>
+      {matches.length === 0 ? (
+        <p className="text-sm text-ink-faint">No matches for this mode yet.</p>
+      ) : (
+        <ol className="valorant-match-log">
+          {matches.map((match, index) => (
+            <li key={`${match.matchId}-${index}`} className="valorant-match-row" data-result={match.result}>
+              {match.agentIconUrl && <img src={match.agentIconUrl} alt={match.agentName} className="valorant-agent-icon" loading="lazy" decoding="async" />}
+              <div className="valorant-match-main">
+                <div className="valorant-match-title-row">
+                  <p>{match.map}{match.roundsWon !== undefined && match.roundsLost !== undefined ? ` · ${match.roundsWon}-${match.roundsLost}` : ''}</p>
+                  <time dateTime={match.startedAt}>{relativeTime(match.startedAt)}</time>
+                </div>
+                <div className="valorant-match-meta">
+                  <span>{match.mode}</span>
+                  <span>{RESULT_LABELS[match.result]}</span>
+                  <span>{kda(match)} KDA</span>
+                  <span>{headshotRate(match)}% HS</span>
+                </div>
               </div>
-              <div className="valorant-match-meta">
-                <span>{match.mode}</span>
-                <span>{RESULT_LABELS[match.result]}</span>
-                <span>{kda(match)} KDA</span>
-                <span>{headshotRate(match)}% HS</span>
-              </div>
-            </div>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

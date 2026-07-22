@@ -7,7 +7,6 @@ import { relativeTime } from '../../lib/time';
 import {
   RESULT_LABELS,
   ValorantMatchLog,
-  ValorantMatchPulse,
   ValorantPerformance,
   actLabel,
   averageCombatScore,
@@ -227,13 +226,6 @@ export function ValorantDetail() {
       <WidgetShell title="Performance periods">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ValorantPerformance data={data} selectedPeriodId={selectedPeriodId} onPeriodChange={setSelectedPeriodId} />}
-        </WidgetBody>
-      </WidgetShell>
-
-      <DetailSectionHeading label="Form" title="Recent match pulse" />
-      <WidgetShell title="Match pulse">
-        <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <ValorantMatchPulse data={data} />}
         </WidgetBody>
       </WidgetShell>
 
