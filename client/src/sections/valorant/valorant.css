@@ -4,6 +4,10 @@
   --color-accent-valorant: light-dark(#c22a3a, #ff4655);
   --valorant-win: light-dark(#137343, #55dc93);
   --valorant-loss: light-dark(#b53a45, #ff8c98);
+  /* Fixed (not light-dark) — text in the hero banner always sits on a literal black scrim over a
+     photo, regardless of the app's own light/dark theme. */
+  --valorant-hero-win: #55dc93;
+  --valorant-hero-loss: #ff8c98;
 }
 
 @media (min-width: 1024px) {
@@ -161,7 +165,9 @@
 .valorant-form-strip li[data-result='win'] { background: color-mix(in oklab, var(--valorant-win) 24%, var(--color-card)); color: var(--valorant-win); }
 .valorant-form-strip li[data-result='loss'] { background: color-mix(in oklab, var(--valorant-loss) 19%, var(--color-card)); color: var(--valorant-loss); }
 
-.valorant-match-log { display: grid; gap: 0.45rem; margin: 0; padding: 0; list-style: none; }
+.valorant-match-history { min-width: 0; }
+.valorant-match-history-summary { margin: 0 0 0.55rem; color: var(--color-ink-faint); font-size: 0.67rem; font-variant-numeric: tabular-nums; }
+.valorant-match-log { display: grid; max-height: 31rem; gap: 0.45rem; overflow-y: auto; margin: 0; padding: 0 0.35rem 0 0; overscroll-behavior: contain; list-style: none; scrollbar-color: color-mix(in oklab, var(--color-ink) 22%, transparent) transparent; scrollbar-width: thin; }
 .valorant-match-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-radius: 0.85rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
 .valorant-match-row[data-result='win'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-win) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
 .valorant-match-row[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-loss) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
@@ -196,4 +202,143 @@
   .valorant-profile { grid-template-columns: minmax(0, 1fr); gap: 1rem 0; padding: 0.9rem 1rem; }
   .valorant-rank-panel { justify-content: flex-start; }
   .valorant-match-row { grid-template-columns: auto minmax(0, 1fr); gap: 0.55rem; }
+}
+
+/* Detail page hero — the equipped player card's tall "large art" render fills a portrait panel
+   on the left (name/level/rank/RR overlaid, bottom-anchored like a loadout screen), with a plain
+   side panel for the current act's quick stats and a spotlight on the most recent games. */
+.valorant-hero {
+  display: grid;
+  grid-template-columns: minmax(14rem, 19rem) minmax(0, 1fr);
+  background: var(--color-card);
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--color-ink) 6%, transparent) inset;
+}
+.valorant-hero-banner {
+  position: relative;
+  display: flex;
+  min-height: 26rem;
+  flex-direction: column;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--color-accent-valorant) 20%, var(--color-track));
+}
+.valorant-hero-banner-img { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 18%; }
+.valorant-hero-banner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.05) 22%, rgba(0, 0, 0, 0.15) 55%, rgba(0, 0, 0, 0.88) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.25), transparent 45%);
+}
+.valorant-hero-banner-top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1.15rem 1.25rem 0;
+  color: #fff;
+}
+.valorant-hero-region { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.72); }
+.valorant-hero-banner-bottom { position: relative; z-index: 2; margin-top: auto; padding: 0 1.25rem 1.4rem; }
+.valorant-hero-name { margin: 0; overflow: hidden; color: #fff; font-size: clamp(1.4rem, 2.6vw, 1.85rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.08; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-hero-name span { margin-left: 0.4rem; font-size: 0.8rem; font-weight: 600; color: rgba(255, 255, 255, 0.68); }
+.valorant-hero-level {
+  display: inline-flex;
+  margin-top: 0.65rem;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.valorant-hero-rank { display: flex; align-items: center; gap: 0.7rem; margin-top: 0.9rem; }
+.valorant-hero-rank-icon { width: 2.7rem; height: 2.7rem; flex-shrink: 0; }
+.valorant-hero-rank-name { margin: 0; overflow: hidden; color: #fff; font-size: 0.84rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-rr-track { position: relative; width: 100%; max-width: 11rem; height: 0.34rem; margin-top: 0.36rem; overflow: hidden; border-radius: 999px; background: rgba(255, 255, 255, 0.22); }
+.valorant-rr-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in oklab, var(--color-accent-valorant) 55%, white), var(--color-accent-valorant)); transition: width 400ms ease; }
+.valorant-hero-rr-value { margin: 0.32rem 0 0; color: rgba(255, 255, 255, 0.82); font-size: 0.66rem; font-variant-numeric: tabular-nums; }
+.valorant-hero-rr-value span { margin-left: 0.4rem; font-weight: 700; }
+.valorant-hero-rr-value span.is-up { color: var(--valorant-hero-win); }
+.valorant-hero-rr-value span.is-down { color: var(--valorant-hero-loss); }
+
+.valorant-hero-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.35rem 1.35rem 1.5rem;
+  background: color-mix(in oklab, var(--color-track) 18%, transparent);
+}
+.valorant-hero-act-card { padding: 1.05rem 1.1rem; border-radius: 1.15rem; background: color-mix(in oklab, var(--color-track) 32%, transparent); }
+.valorant-hero-act-heading { display: flex; align-items: center; gap: 0.5rem; }
+.valorant-hero-act-badge {
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-valorant) 14%, transparent);
+  color: color-mix(in oklab, var(--color-accent-valorant) 82%, var(--color-ink));
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.valorant-hero-act-summary { display: flex; align-items: center; gap: 1.2rem; margin-top: 0.9rem; }
+.valorant-hero-ring { flex: 0 0 auto; }
+.valorant-hero-ring-track { stroke: color-mix(in oklab, var(--color-ink) 10%, transparent); }
+.valorant-hero-ring-fill { stroke: var(--color-accent-valorant); transition: stroke-dashoffset 500ms ease; }
+.valorant-hero-ring-text { fill: var(--color-ink); font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.valorant-hero-act-metrics { display: grid; min-width: 0; flex: 1; gap: 0.5rem; margin: 0; }
+.valorant-hero-act-metric { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding-bottom: 0.42rem; border-bottom: 1px solid color-mix(in oklab, var(--color-ink) 8%, transparent); }
+.valorant-hero-act-metric:last-child { padding-bottom: 0; border-bottom: none; }
+.valorant-hero-act-metric dt { margin: 0; color: var(--color-ink-faint); font-size: 0.64rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.valorant-hero-act-metric dd { margin: 0; color: var(--color-ink); font-size: 0.88rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.valorant-hero-recent-wrap { display: flex; min-height: 0; flex: 1; flex-direction: column; }
+.valorant-hero-recent { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.55rem; margin: 0.65rem 0 0; padding: 0; list-style: none; }
+.valorant-hero-spotlight-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  padding: 0.9rem 0.55rem 0.8rem;
+  border-radius: 1.05rem;
+  background: color-mix(in oklab, var(--color-track) 30%, transparent);
+  text-align: center;
+}
+.valorant-hero-spotlight-card[data-result='win'] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--valorant-win) 28%, transparent); }
+.valorant-hero-spotlight-card[data-result='loss'] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--valorant-loss) 24%, transparent); }
+.valorant-hero-mvp-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.48rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.valorant-hero-mvp-badge.is-match { background: light-dark(#fde68a, rgba(217, 119, 6, 0.35)); color: light-dark(#7c5800, #fcd34d); }
+.valorant-hero-mvp-badge.is-team { background: light-dark(#bfdbfe, rgba(29, 78, 216, 0.35)); color: light-dark(#1e40af, #bfdbfe); }
+.valorant-hero-spotlight-agent { width: 2.5rem; height: 2.5rem; border-radius: 999px; background: var(--color-track); object-fit: cover; }
+.valorant-hero-spotlight-map { overflow: hidden; max-width: 100%; margin: 0.4rem 0 0; color: var(--color-ink); font-size: 0.7rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-hero-spotlight-score { margin: 0.2rem 0 0; color: var(--color-ink); font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.valorant-hero-spotlight-card[data-result='win'] .valorant-hero-spotlight-score { color: var(--valorant-win); }
+.valorant-hero-spotlight-card[data-result='loss'] .valorant-hero-spotlight-score { color: var(--valorant-loss); }
+.valorant-hero-spotlight-kda { margin: 0.3rem 0 0; color: var(--color-ink-muted); font-size: 0.66rem; font-variant-numeric: tabular-nums; }
+.valorant-hero-spotlight-kda span { margin-left: 0.22rem; color: var(--color-ink-faint); font-size: 0.54rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+.valorant-hero-spotlight-meta { overflow: hidden; max-width: 100%; margin: 0.4rem 0 0; color: var(--color-ink-faint); font-size: 0.56rem; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 760px) {
+  .valorant-hero { grid-template-columns: 1fr; }
+  .valorant-hero-banner { min-height: 19rem; }
+}
+
+@media (max-width: 420px) {
+  .valorant-hero-recent { grid-template-columns: 1fr; }
 }

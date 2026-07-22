@@ -100,6 +100,10 @@ function cardIconUrl(cardId: string): string {
   return `https://media.valorant-api.com/playercards/${cardId}/wideart.png`;
 }
 
+function cardBannerUrl(cardId: string): string {
+  return `https://media.valorant-api.com/playercards/${cardId}/largeart.png`;
+}
+
 /** Auth failures never include the response body — HenrikDev's 401/403 text has echoed the
  * request path (which encodes the Riot ID) in the past, personal enough to keep out of logs. */
 async function hdRequest<T>(signal: AbortSignal, apiKey: string, path: string, label: string): Promise<T> {
@@ -202,6 +206,8 @@ export function mapMatch(match: RawMatch, puuid: string): ValorantMatch | undefi
   if (!me) return undefined;
   const myTeam = match.teams.find((team) => team.team_id === me.team_id);
   const result: ValorantMatch['result'] = myTeam === undefined ? 'draw' : myTeam.won ? 'win' : 'loss';
+  const teammateScores = match.players.filter((player) => player.team_id === me.team_id).map((player) => player.stats.score);
+  const allScores = match.players.map((player) => player.stats.score);
   return {
     matchId: match.metadata.match_id,
     map: match.metadata.map.name,
@@ -222,6 +228,8 @@ export function mapMatch(match: RawMatch, puuid: string): ValorantMatch | undefi
     damageDealt: me.stats.damage.dealt,
     damageReceived: me.stats.damage.received,
     actShort: match.metadata.season?.short,
+    isMatchMvp: me.stats.score === Math.max(...allScores),
+    isTeamMvp: me.stats.score === Math.max(...teammateScores),
   };
 }
 
@@ -331,6 +339,7 @@ export function createValorantProvider(auth: ValorantAuth | undefined, historySt
           region: account.region,
           accountLevel: account.account_level,
           cardIconUrl: account.card ? cardIconUrl(account.card) : undefined,
+          cardBannerUrl: account.card ? cardBannerUrl(account.card) : undefined,
         },
         rank: {
           tierId: mmr.current.tier.id,

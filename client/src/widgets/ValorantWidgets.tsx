@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { ValorantData, ValorantMatch } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
-const RESULT_LABELS: Record<ValorantMatch['result'], string> = {
+export const RESULT_LABELS: Record<ValorantMatch['result'], string> = {
   win: 'Victory',
   loss: 'Defeat',
   draw: 'Draw',
@@ -13,11 +13,11 @@ const STREAK_RESULT_LABELS: Record<ValorantMatch['result'], string> = {
   draw: 'D',
 };
 
-function formatNumber(value: number): string {
+export function formatNumber(value: number): string {
   return value.toLocaleString('en-GB');
 }
 
-function kda(match: ValorantMatch): string {
+export function kda(match: ValorantMatch): string {
   return `${match.kills}/${match.deaths}/${match.assists}`;
 }
 
@@ -26,7 +26,7 @@ function headshotRate(match: ValorantMatch): number {
   return totalShots === 0 ? 0 : Math.round((match.headshots / totalShots) * 100);
 }
 
-function recentRecord(matches: ValorantMatch[]) {
+export function recentRecord(matches: ValorantMatch[]) {
   return matches.reduce((record, match) => {
     if (match.result === 'win') record.wins += 1;
     else if (match.result === 'loss') record.losses += 1;
@@ -46,21 +46,56 @@ function currentStreak(matches: ValorantMatch[]): { result: ValorantMatch['resul
   return { result: latest.result, length };
 }
 
+/** Ranked games are the meaningful "recent form" signal, but a fresh account or an off week can
+ * leave fewer than `count` of them among the last fetch — pad with whatever else is recent so the
+ * hero never shows an empty slot, then restore chronological order for display. */
+export function recentSpotlightMatches(matches: ValorantMatch[], count: number): ValorantMatch[] {
+  const ranked = matches.filter((match) => match.mode === 'Competitive').slice(0, count);
+  if (ranked.length >= count) return ranked;
+  const rankedIds = new Set(ranked.map((match) => match.matchId));
+  const filler = matches.filter((match) => !rankedIds.has(match.matchId));
+  return [...ranked, ...filler]
+    .slice(0, count)
+    .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+}
+
 function streakModifier(result: ValorantMatch['result'] | undefined): string {
   if (result === 'win') return ' is-up';
   if (result === 'loss') return ' is-down';
   return '';
 }
 
-function averageCombatScore(matches: ValorantMatch[]): number | undefined {
+export function averageCombatScore(matches: ValorantMatch[]): number | undefined {
   const totalRounds = matches.reduce((total, match) => total + (match.roundsWon ?? 0) + (match.roundsLost ?? 0), 0);
   if (totalRounds === 0) return undefined;
   return Math.round(matches.reduce((total, match) => total + match.score, 0) / totalRounds);
 }
 
-function actLabel(short: string): string {
+export function actLabel(short: string): string {
   const match = /^e(\d+)a(\d+)$/i.exec(short);
   return match ? `E${match[1]} · A${match[2]}` : short.toUpperCase();
+}
+
+interface ValorantPeriod {
+  id: string;
+  label: string;
+  matches: ValorantMatch[];
+}
+
+export function performancePeriods(data: ValorantData): ValorantPeriod[] {
+  const { history } = data;
+  const now = Date.now();
+  const twoWeekMatches = history.matches.filter((match) => Date.parse(match.startedAt) >= now - 14 * 24 * 60 * 60_000);
+  const actCodes = [...new Set(history.matches.map((match) => match.actShort).filter((act): act is string => Boolean(act)))];
+
+  return [
+    { id: 'two-weeks', label: '2 weeks', matches: twoWeekMatches },
+    ...(history.currentActShort ? [{ id: `act:${history.currentActShort}`, label: 'Current act', matches: history.matches.filter((match) => match.actShort === history.currentActShort) }] : []),
+    ...actCodes
+      .filter((act) => act !== history.currentActShort)
+      .map((act) => ({ id: `act:${act}`, label: actLabel(act), matches: history.matches.filter((match) => match.actShort === act) })),
+    { id: 'career', label: 'Career', matches: history.matches },
+  ].filter((period) => period.id === 'career' || period.matches.length > 0);
 }
 
 interface AgentSummary {
@@ -79,7 +114,7 @@ function agentSummaries(matches: ValorantMatch[]): AgentSummary[] {
   return [...agents.values()].sort((a, b) => b.matches.length - a.matches.length || b.matches.filter((match) => match.result === 'win').length - a.matches.filter((match) => match.result === 'win').length);
 }
 
-function Stat({ value, label, detail }: Readonly<{ value: string | number; label: string; detail?: string }>) {
+export function Stat({ value, label, detail }: Readonly<{ value: string | number; label: string; detail?: string }>) {
   return (
     <div className="valorant-stat">
       <p className="valorant-stat-value">{value}</p>
@@ -124,7 +159,7 @@ export function ValorantStats({ data }: Readonly<{ data: ValorantData }>) {
   const seasonWinRate = data.currentSeason && data.currentSeason.games > 0 ? Math.round((data.currentSeason.wins / data.currentSeason.games) * 100) : undefined;
   return (
     <div className="valorant-stats-grid">
-      <Stat value={data.peak.tierName} label="peak rank" detail={data.peak.seasonShort ? `season ${data.peak.seasonShort}` : undefined} />
+      <Stat value={data.peak.tierName} label="peak rank" detail={data.peak.seasonShort ? `Season ${actLabel(data.peak.seasonShort)}` : undefined} />
       <Stat
         value={seasonWinRate !== undefined ? `${seasonWinRate}%` : '—'}
         label="season win rate"
@@ -137,22 +172,22 @@ export function ValorantStats({ data }: Readonly<{ data: ValorantData }>) {
 
 /** A period selector deliberately works on the server-provided archive so switching scope is
  * instantaneous and never causes the browser to call HenrikDev or expose its API key. */
-export function ValorantPerformance({ data }: Readonly<{ data: ValorantData }>) {
+export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange }: Readonly<{
+  data: ValorantData;
+  selectedPeriodId?: string;
+  onPeriodChange?: (periodId: string) => void;
+}>) {
   const { history } = data;
-  const now = Date.now();
-  const twoWeekMatches = history.matches.filter((match) => Date.parse(match.startedAt) >= now - 14 * 24 * 60 * 60_000);
-  const actCodes = [...new Set(history.matches.map((match) => match.actShort).filter((act): act is string => Boolean(act)))];
-  const periodOptions = [
-    { id: 'two-weeks', label: '2 weeks', matches: twoWeekMatches },
-    ...(history.currentActShort ? [{ id: `act:${history.currentActShort}`, label: 'Current act', matches: history.matches.filter((match) => match.actShort === history.currentActShort) }] : []),
-    ...actCodes
-      .filter((act) => act !== history.currentActShort)
-      .map((act) => ({ id: `act:${act}`, label: actLabel(act), matches: history.matches.filter((match) => match.actShort === act) })),
-    { id: 'career', label: 'Career', matches: history.matches },
-  ].filter((period) => period.id === 'career' || period.matches.length > 0);
-  const [selectedPeriodId, setSelectedPeriodId] = useState('two-weeks');
-  const selectedPeriod = periodOptions.find((period) => period.id === selectedPeriodId) ?? periodOptions[0];
+  const periodOptions = performancePeriods(data);
+  const [uncontrolledPeriodId, setUncontrolledPeriodId] = useState('two-weeks');
+  const activePeriodId = selectedPeriodId ?? uncontrolledPeriodId;
+  const selectedPeriod = periodOptions.find((period) => period.id === activePeriodId) ?? periodOptions[0];
   if (!selectedPeriod) return null;
+
+  const selectPeriod = (periodId: string) => {
+    if (onPeriodChange) onPeriodChange(periodId);
+    else setUncontrolledPeriodId(periodId);
+  };
 
   const matches = selectedPeriod.matches;
   const record = recentRecord(matches);
@@ -179,7 +214,7 @@ export function ValorantPerformance({ data }: Readonly<{ data: ValorantData }>) 
             role="tab"
             aria-selected={period.id === selectedPeriod.id}
             className={period.id === selectedPeriod.id ? 'is-selected' : undefined}
-            onClick={() => setSelectedPeriodId(period.id)}
+            onClick={() => selectPeriod(period.id)}
           >
             {period.label}
           </button>
@@ -241,28 +276,33 @@ export function ValorantMatchPulse({ data }: Readonly<{ data: ValorantData }>) {
   );
 }
 
-export function ValorantMatchLog({ data }: Readonly<{ data: ValorantData }>) {
-  const matches = data.history.matches;
+export function ValorantMatchLog({ data, selectedPeriodId }: Readonly<{ data: ValorantData; selectedPeriodId?: string }>) {
+  const periodOptions = performancePeriods(data);
+  const selectedPeriod = periodOptions.find((period) => period.id === selectedPeriodId) ?? periodOptions[0];
+  const matches = selectedPeriod?.matches ?? [];
   if (matches.length === 0) return <p className="text-sm text-ink-faint">No matches captured yet.</p>;
   return (
-    <ol className="valorant-match-log">
-      {matches.map((match, index) => (
-        <li key={`${match.matchId}-${index}`} className="valorant-match-row" data-result={match.result}>
-          {match.agentIconUrl && <img src={match.agentIconUrl} alt={match.agentName} className="valorant-agent-icon" loading="lazy" decoding="async" />}
-          <div className="valorant-match-main">
-            <div className="valorant-match-title-row">
-              <p>{match.map}{match.roundsWon !== undefined && match.roundsLost !== undefined ? ` · ${match.roundsWon}-${match.roundsLost}` : ''}</p>
-              <time dateTime={match.startedAt}>{relativeTime(match.startedAt)}</time>
+    <section className="valorant-match-history" aria-live="polite">
+      <p className="valorant-match-history-summary">{selectedPeriod?.label} · {matches.length} {matches.length === 1 ? 'match' : 'matches'}</p>
+      <ol className="valorant-match-log">
+        {matches.map((match, index) => (
+          <li key={`${match.matchId}-${index}`} className="valorant-match-row" data-result={match.result}>
+            {match.agentIconUrl && <img src={match.agentIconUrl} alt={match.agentName} className="valorant-agent-icon" loading="lazy" decoding="async" />}
+            <div className="valorant-match-main">
+              <div className="valorant-match-title-row">
+                <p>{match.map}{match.roundsWon !== undefined && match.roundsLost !== undefined ? ` · ${match.roundsWon}-${match.roundsLost}` : ''}</p>
+                <time dateTime={match.startedAt}>{relativeTime(match.startedAt)}</time>
+              </div>
+              <div className="valorant-match-meta">
+                <span>{match.mode}</span>
+                <span>{RESULT_LABELS[match.result]}</span>
+                <span>{kda(match)} KDA</span>
+                <span>{headshotRate(match)}% HS</span>
+              </div>
             </div>
-            <div className="valorant-match-meta">
-              <span>{match.mode}</span>
-              <span>{RESULT_LABELS[match.result]}</span>
-              <span>{kda(match)} KDA</span>
-              <span>{headshotRate(match)}% HS</span>
-            </div>
-          </div>
-        </li>
-      ))}
-    </ol>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }

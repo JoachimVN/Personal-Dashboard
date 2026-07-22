@@ -21,6 +21,10 @@ export const valorantMatchSchema = z.object({
   damageReceived: z.number(),
   /** Ranked act code when HenrikDev can associate the match with an MMR entry (e.g. "e10a2"). */
   actShort: z.string().optional(),
+  /** Riot doesn't expose an official MVP flag; these are derived from having the highest combat
+   * score in the match/on the team, the same convention third-party trackers use. */
+  isMatchMvp: z.boolean(),
+  isTeamMvp: z.boolean(),
 });
 
 export type ValorantMatch = z.infer<typeof valorantMatchSchema>;
@@ -32,6 +36,9 @@ export const valorantSchema = z.object({
     region: z.string(),
     accountLevel: z.number(),
     cardIconUrl: z.string().optional(),
+    /** The tall "large art" render of the equipped player card, for hero-style vertical banners
+     * (as opposed to cardIconUrl's wide art, sized for horizontal background treatments). */
+    cardBannerUrl: z.string().optional(),
   }),
   rank: z.object({
     tierId: z.number(),
