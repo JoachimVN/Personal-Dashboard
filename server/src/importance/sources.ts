@@ -899,6 +899,7 @@ export function clashRoyaleCandidates(
   winStreakMin: number,
   sessionGapMs: number,
   momentFreshMs: number,
+  winStreakFreshMs: number,
   now = Date.now(),
 ): Candidate[] {
   if (!data) return [];
@@ -906,7 +907,7 @@ export function clashRoyaleCandidates(
     clashRoyaleArenaCandidate(moments, data),
     clashRoyaleLeagueCandidate(moments),
     clashRoyaleBestTrophiesCandidate(moments),
-    clashRoyaleWinStreakCandidate(data, winStreakMin, momentFreshMs, now),
+    clashRoyaleWinStreakCandidate(data, winStreakMin, winStreakFreshMs, now),
     clashRoyaleSessionCandidate(data, sessionGapMs, momentFreshMs, now),
   ].filter((candidate): candidate is Candidate => candidate !== undefined);
 }
