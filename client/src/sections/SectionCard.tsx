@@ -18,6 +18,8 @@ function openSection(section: SectionDef): void {
 
 /** Overview block for one section — the whole card is a link into the section's full view. */
 export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
+  const isValorant = section.id === 'valorant';
+
   return (
     <motion.div
       role="link"
@@ -40,16 +42,36 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
       style={accentStyle(section)}
     >
       <div aria-hidden className="section-card-aura" />
-      <header className="relative mb-5 flex items-center gap-3">
-        <span className="section-icon grid h-10 w-10 place-items-center rounded-2xl text-(--accent)">
-          <SectionIcon id={section.id} />
-        </span>
-        <motion.h2
-          layoutId={`section-title-${section.id}`}
-          className="min-w-0 text-[1.05rem] font-semibold tracking-[-0.02em] text-ink"
-        >
-          {section.title}
-        </motion.h2>
+      <header className={`section-card-header section-card-header--${section.id} relative mb-5 flex items-center gap-3`}>
+        {isValorant ? (
+          <>
+            <span className="valorant-overview-mark" aria-hidden>
+              <SectionIcon id={section.id} />
+            </span>
+            <motion.h2 layoutId={`section-title-${section.id}`} className="sr-only">
+              {section.title}
+            </motion.h2>
+            <img
+              src="/valorant_wordmark.png"
+              alt="Valorant"
+              className="valorant-overview-wordmark"
+              style={{ aspectRatio: '3633 / 533' }}
+            />
+            <span className="valorant-overview-header-label">Competitive</span>
+          </>
+        ) : (
+          <>
+            <span className="section-icon grid h-10 w-10 place-items-center rounded-2xl text-(--accent)">
+              <SectionIcon id={section.id} />
+            </span>
+            <motion.h2
+              layoutId={`section-title-${section.id}`}
+              className="min-w-0 text-[1.05rem] font-semibold tracking-[-0.02em] text-ink"
+            >
+              {section.title}
+            </motion.h2>
+          </>
+        )}
         <span aria-hidden className="section-arrow ml-auto grid h-9 w-9 place-items-center rounded-full text-lg text-ink-muted">
           ↗
         </span>

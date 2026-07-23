@@ -21,9 +21,11 @@
    overall atmosphere rather than competing with the profile summary as a second mini-card. */
 .dashboard-section-card--valorant:has(.valorant-overview) {
   isolation: isolate;
+  display: flex;
+  flex-direction: column;
   background:
-    linear-gradient(112deg, color-mix(in oklab, var(--color-card) 91%, transparent), color-mix(in oklab, var(--color-card) 57%, transparent)),
-    linear-gradient(135deg, color-mix(in oklab, var(--color-accent-valorant) 14%, transparent), transparent 62%),
+    linear-gradient(108deg, color-mix(in oklab, var(--color-card) 96%, transparent) 0%, color-mix(in oklab, var(--color-card) 78%, transparent) 47%, color-mix(in oklab, var(--color-card) 42%, transparent) 100%),
+    linear-gradient(135deg, color-mix(in oklab, var(--color-accent-valorant) 20%, transparent), transparent 58%),
     var(--color-card);
 }
 .dashboard-section-card--valorant:has(.valorant-overview)::before {
@@ -34,7 +36,9 @@
   pointer-events: none;
   border-radius: inherit;
   background: var(--valorant-card-art, none) center / cover no-repeat;
-  opacity: 0.4;
+  opacity: 0.5;
+  filter: blur(18px) saturate(0.88);
+  transform: scale(1.07);
 }
 .dashboard-section-card--valorant:has(.valorant-overview)::after {
   content: '';
@@ -43,15 +47,133 @@
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  background: linear-gradient(108deg, color-mix(in oklab, var(--color-card) 94%, transparent), color-mix(in oklab, var(--color-card) 47%, transparent));
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--color-card) 97%, transparent) 0%, color-mix(in oklab, var(--color-card) 81%, transparent) 44%, color-mix(in oklab, var(--color-card) 20%, transparent) 100%),
+    linear-gradient(180deg, color-mix(in oklab, var(--color-accent-valorant) 9%, transparent), transparent 36%);
 }
 .dashboard-section-card--valorant:has(.valorant-overview) > header,
 .dashboard-section-card--valorant:has(.valorant-overview) > .section-card-content,
 .dashboard-section-card--valorant:has(.valorant-overview) > p { z-index: 1; }
 .dashboard-section-card--valorant:has(.valorant-overview) > .section-card-aura { z-index: 0; }
+.dashboard-section-card--valorant:has(.valorant-overview) > .section-card-content { display: flex; min-height: 0; flex: 1; }
 
-.valorant-overview { display: grid; gap: 0.85rem; }
-.valorant-overview .valorant-card-art { display: none; }
+.section-card-header--valorant { min-height: 2.5rem; gap: 0.72rem; }
+.valorant-overview-mark {
+  display: grid;
+  width: 2.45rem;
+  height: 2.45rem;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #fff;
+}
+.valorant-overview-mark svg { width: 1.72rem; height: 1.72rem; }
+.valorant-overview-wordmark {
+  display: block;
+  width: auto;
+  height: 0.88rem;
+  max-width: min(9.4rem, 34vw);
+  object-fit: contain;
+  object-position: left center;
+  filter: brightness(0) invert(1);
+}
+.valorant-overview-header-label {
+  margin-left: 0.1rem;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.58rem;
+  font-weight: 750;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.dashboard-section-card--valorant:has(.valorant-overview) .section-arrow {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(12, 12, 14, 0.42);
+  color: #fff;
+  box-shadow: none;
+}
+.valorant-overview { display: grid; min-height: 0; width: 100%; flex: 1; grid-template-rows: auto auto minmax(0, 1fr); gap: 0.85rem; }
+.valorant-overview-briefing {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.9rem 1.25rem;
+  min-height: 6.4rem;
+  padding: 0.9rem 1.1rem 0.85rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, #fff 13%, transparent);
+  border-radius: 0.2rem 1.1rem 0.2rem 1.1rem;
+  background: linear-gradient(100deg, rgba(10, 10, 12, 0.86), rgba(20, 16, 18, 0.54));
+  color: #fff;
+}
+.valorant-overview-briefing::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 3.1rem;
+  height: 0.24rem;
+  background: var(--color-accent-valorant);
+}
+.valorant-overview-briefing::after {
+  content: '';
+  position: absolute;
+  right: -1.3rem;
+  bottom: -1.3rem;
+  width: 5.4rem;
+  height: 5.4rem;
+  border: 1px solid color-mix(in oklab, #fff 24%, transparent);
+  transform: rotate(45deg);
+}
+.valorant-overview-identity, .valorant-overview-rank { position: relative; z-index: 1; min-width: 0; }
+.valorant-overview-kicker { margin: 0; color: rgba(255, 255, 255, 0.62); font-size: 0.56rem; font-weight: 750; letter-spacing: 0.13em; line-height: 1.2; text-transform: uppercase; }
+.valorant-overview-name { overflow: hidden; margin: 0.42rem 0 0; color: #fff; font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-name span { margin-left: 0.32rem; color: rgba(255, 255, 255, 0.64); font-size: 0.68em; font-weight: 600; letter-spacing: -0.02em; }
+.valorant-overview-level { margin: 0.43rem 0 0; color: rgba(255, 255, 255, 0.62); font-size: 0.62rem; }
+.valorant-overview-level strong { margin-left: 0.2rem; color: #fff; font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+.valorant-overview-rank { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.55rem; min-width: 8.7rem; }
+.valorant-overview-rank img { width: 2.85rem; height: 2.85rem; object-fit: contain; filter: drop-shadow(0 0.25rem 0.7rem rgba(0, 0, 0, 0.35)); }
+.valorant-overview-rank p, .valorant-overview-rank strong, .valorant-overview-rank span { display: block; margin: 0; }
+.valorant-overview-rank p { color: rgba(255, 255, 255, 0.56); font-size: 0.52rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
+.valorant-overview-rank strong { overflow: hidden; margin-top: 0.2rem; color: #fff; font-size: 0.8rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-rank span { margin-top: 0.18rem; color: rgba(255, 255, 255, 0.72); font-size: 0.62rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.valorant-overview-readout {
+  display: grid;
+  gap: 0.68rem;
+  padding: 0.7rem 0.8rem 0.75rem;
+  border-top: 1px solid color-mix(in oklab, var(--color-accent-valorant) 24%, var(--color-card-border));
+  border-bottom: 1px solid color-mix(in oklab, var(--color-ink) 8%, var(--color-card-border));
+  background: color-mix(in oklab, var(--color-card) 44%, transparent);
+}
+.valorant-overview-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
+.valorant-overview-metrics > div { position: relative; min-width: 0; padding: 0 0.65rem; }
+.valorant-overview-metrics > div:first-child { padding-left: 0; }
+.valorant-overview-metrics > div + div::before { content: ''; position: absolute; top: 0.05rem; bottom: 0.05rem; left: 0; width: 1px; background: color-mix(in oklab, var(--color-ink) 10%, transparent); }
+.valorant-overview-metrics dt { margin: 0; color: var(--color-ink-faint); font-size: 0.53rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
+.valorant-overview-metrics dd { overflow: hidden; margin: 0.32rem 0 0; color: var(--color-ink); font-size: 0.85rem; font-weight: 760; letter-spacing: -0.025em; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.valorant-overview-metrics small { display: block; overflow: hidden; margin-top: 0.22rem; color: var(--color-ink-muted); font-size: 0.55rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-form { display: flex; gap: 0.28rem; margin: 0; padding: 0; list-style: none; }
+.valorant-overview-form li { display: grid; width: 1.2rem; height: 0.32rem; place-content: center; overflow: hidden; border-radius: 999px; background: color-mix(in oklab, var(--color-ink) 12%, transparent); color: transparent; font-size: 0; }
+.valorant-overview-form li[data-result='win'] { background: var(--valorant-win); }
+.valorant-overview-form li[data-result='loss'] { background: var(--valorant-loss); }
+.valorant-overview-matches { display: grid; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 0.45rem; padding: 0.68rem 0.75rem 0.75rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 82%, transparent); border-radius: 0.85rem; background: color-mix(in oklab, var(--color-card) 56%, transparent); }
+.valorant-overview-matches-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.valorant-overview-matches-heading p, .valorant-overview-matches-heading span { margin: 0; }
+.valorant-overview-matches-heading p { color: var(--color-ink-muted); font-size: 0.56rem; font-weight: 750; letter-spacing: 0.11em; text-transform: uppercase; }
+.valorant-overview-matches-heading span { color: var(--color-ink-faint); font-size: 0.56rem; }
+.valorant-overview-matches ol { display: grid; min-height: 0; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
+.valorant-overview-matches li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem; min-height: 0; padding: 0.42rem 0.48rem; border-radius: 0.58rem; background: color-mix(in oklab, var(--color-track) 34%, transparent); }
+.valorant-overview-matches li[data-result='win'] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--valorant-win) 19%, transparent); }
+.valorant-overview-matches li[data-result='loss'] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--valorant-loss) 17%, transparent); }
+.valorant-overview-matches img { width: 1.8rem; height: 1.8rem; border-radius: 0.45rem; background: var(--color-track); object-fit: cover; }
+.valorant-overview-match-main { min-width: 0; }
+.valorant-overview-match-main p, .valorant-overview-match-main span, .valorant-overview-match-result strong, .valorant-overview-match-result span { display: block; margin: 0; }
+.valorant-overview-match-main p { overflow: hidden; color: var(--color-ink); font-size: 0.7rem; font-weight: 730; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-match-main span { overflow: hidden; margin-top: 0.15rem; color: var(--color-ink-faint); font-size: 0.55rem; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-match-result { min-width: 3rem; text-align: right; }
+.valorant-overview-match-result strong { color: var(--color-ink); font-size: 0.75rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.valorant-overview-matches li[data-result='win'] .valorant-overview-match-result strong { color: var(--valorant-win); }
+.valorant-overview-matches li[data-result='loss'] .valorant-overview-match-result strong { color: var(--valorant-loss); }
+.valorant-overview-match-result span { margin-top: 0.15rem; color: var(--color-ink-faint); font-size: 0.51rem; font-variant-numeric: tabular-nums; }
 .valorant-eyebrow {
   margin: 0;
   color: var(--color-ink-muted);

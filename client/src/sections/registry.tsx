@@ -117,7 +117,9 @@ export const SECTIONS: SectionDef[] = [
     id: 'valorant',
     title: 'Valorant',
     label: 'Ranked',
-    description: 'Rank, RR and recent matches',
+    // The homepage card now has a full recent-match list, so an extra generic footer would just
+    // spend the space that list needs.
+    description: '',
     accentVar: '--color-accent-valorant',
     Overview: ValorantOverview,
     Detail: ValorantDetail,
