@@ -24,8 +24,7 @@ function RatingBadge({ rating, label, value }: Readonly<{ rating?: SonarRating; 
   );
 }
 
-function formatDate(iso: string | undefined): string {
-  if (!iso) return 'No analysis yet';
+function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
@@ -36,8 +35,14 @@ function formatLoc(loc: number | undefined): string {
 }
 
 export function SonarProjectCard({ project }: Readonly<{ project: SonarProject }>) {
+  const { lastAnalysis } = project;
   return (
-    <article className="rounded-2xl border border-(--color-card-border) bg-track/15 p-4 sm:p-5">
+    <a
+      href={`https://sonarcloud.io/project/overview?id=${encodeURIComponent(project.key)}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-2xl border border-(--color-card-border) bg-track/15 p-4 transition-colors hover:bg-track/25 sm:p-5"
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-base font-semibold text-ink">{project.name}</p>
@@ -57,18 +62,24 @@ export function SonarProjectCard({ project }: Readonly<{ project: SonarProject }
           </span>
         )}
       </div>
-      <p className="mt-2 text-xs text-ink-faint">
-        Last analysis: {formatDate(project.lastAnalysis)} · <span className="font-semibold text-ink-muted">{formatLoc(project.linesOfCode)}</span> Lines of Code
-        {project.languages.length > 0 && ` · ${project.languages.join(', ')}`}
-      </p>
-      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-(--color-card-border) pt-4 sm:grid-cols-6">
-        <RatingBadge rating={project.security} label="Security" />
-        <RatingBadge rating={project.reliability} label="Reliability" />
-        <RatingBadge rating={project.maintainability} label="Maintainability" />
-        <RatingBadge label="Hotspots Reviewed" value={project.hotspotsReviewedPercent !== undefined ? `${project.hotspotsReviewedPercent.toFixed(0)}%` : undefined} />
-        <RatingBadge label="Coverage" value={project.coveragePercent !== undefined ? `${project.coveragePercent.toFixed(1)}%` : '–'} />
-        <RatingBadge label="Duplications" value={project.duplicationsPercent !== undefined ? `${project.duplicationsPercent.toFixed(1)}%` : '0.0%'} />
-      </div>
-    </article>
+      {lastAnalysis ? (
+        <>
+          <p className="mt-2 text-xs text-ink-faint">
+            Last analysis: {formatDate(lastAnalysis)} · <span className="font-semibold text-ink-muted">{formatLoc(project.linesOfCode)}</span> Lines of Code
+            {project.languages.length > 0 && ` · ${project.languages.join(', ')}`}
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-(--color-card-border) pt-4 sm:grid-cols-6">
+            <RatingBadge rating={project.security} label="Security" />
+            <RatingBadge rating={project.reliability} label="Reliability" />
+            <RatingBadge rating={project.maintainability} label="Maintainability" />
+            <RatingBadge label="Hotspots Reviewed" value={project.hotspotsReviewedPercent !== undefined ? `${project.hotspotsReviewedPercent.toFixed(0)}%` : undefined} />
+            <RatingBadge label="Coverage" value={project.coveragePercent !== undefined ? `${project.coveragePercent.toFixed(1)}%` : '–'} />
+            <RatingBadge label="Duplications" value={project.duplicationsPercent !== undefined ? `${project.duplicationsPercent.toFixed(1)}%` : '0.0%'} />
+          </div>
+        </>
+      ) : (
+        <p className="mt-2 text-xs text-ink-faint">No analysis yet</p>
+      )}
+    </a>
   );
 }

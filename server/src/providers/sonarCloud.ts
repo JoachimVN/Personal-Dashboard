@@ -8,7 +8,7 @@ const MEASURE_KEYS = [
   'security_rating',
   'reliability_rating',
   'sqale_rating',
-  'security_hotspots_reviewed_percent',
+  'security_hotspots_reviewed',
   'coverage',
   'duplicated_lines_density',
 ].join(',');
@@ -47,7 +47,7 @@ interface RawComponent {
   key: string;
   name: string;
   visibility: 'public' | 'private';
-  lastAnalysisDate?: string;
+  analysisDateAllBranches?: string;
 }
 
 interface RawMeasure {
@@ -119,14 +119,14 @@ async function fetchProjectDetails(signal: AbortSignal, token: string, component
     key: component.key,
     name: component.name,
     visibility: component.visibility,
-    lastAnalysis: component.lastAnalysisDate,
+    lastAnalysis: component.analysisDateAllBranches,
     qualityGateStatus: qualityGateStatus(status),
     linesOfCode: byMetric.has('ncloc') ? Number(byMetric.get('ncloc')) : undefined,
     languages: parseLanguages(byMetric.get('ncloc_language_distribution')),
     security: toRating(byMetric.get('security_rating')),
     reliability: toRating(byMetric.get('reliability_rating')),
     maintainability: toRating(byMetric.get('sqale_rating')),
-    hotspotsReviewedPercent: byMetric.has('security_hotspots_reviewed_percent') ? Number(byMetric.get('security_hotspots_reviewed_percent')) : undefined,
+    hotspotsReviewedPercent: byMetric.has('security_hotspots_reviewed') ? Number(byMetric.get('security_hotspots_reviewed')) : undefined,
     coveragePercent: byMetric.has('coverage') ? Number(byMetric.get('coverage')) : undefined,
     duplicationsPercent: byMetric.has('duplicated_lines_density') ? Number(byMetric.get('duplicated_lines_density')) : undefined,
   };
