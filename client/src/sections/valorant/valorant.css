@@ -151,10 +151,9 @@
 .valorant-overview-metrics dt { margin: 0; color: var(--color-ink-faint); font-size: 0.53rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
 .valorant-overview-metrics dd { overflow: hidden; margin: 0.32rem 0 0; color: var(--color-ink); font-size: 0.85rem; font-weight: 760; letter-spacing: -0.025em; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .valorant-overview-metrics small { display: block; overflow: hidden; margin-top: 0.22rem; color: var(--color-ink-muted); font-size: 0.55rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-overview-form { display: flex; gap: 0.28rem; margin: 0; padding: 0; list-style: none; }
-.valorant-overview-form li { display: grid; width: 1.2rem; height: 0.32rem; place-content: center; overflow: hidden; border-radius: 999px; background: color-mix(in oklab, var(--color-ink) 12%, transparent); color: transparent; font-size: 0; }
-.valorant-overview-form li[data-result='win'] { background: var(--valorant-win); }
-.valorant-overview-form li[data-result='loss'] { background: var(--valorant-loss); }
+.valorant-overview-peak-rank { display: flex; align-items: center; gap: 0.34rem; }
+.valorant-overview-peak-rank img { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; object-fit: contain; filter: drop-shadow(0 0.12rem 0.25rem color-mix(in oklab, var(--color-accent-valorant) 25%, transparent)); }
+.valorant-overview-peak-rank span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .valorant-overview-matches { display: grid; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 0.45rem; padding: 0.68rem 0.75rem 0.75rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 82%, transparent); border-radius: 0.85rem; background: color-mix(in oklab, var(--color-card) 56%, transparent); }
 .valorant-overview-matches-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
 .valorant-overview-matches-heading p, .valorant-overview-matches-heading span { margin: 0; }

@@ -3,7 +3,7 @@ import type { ValorantData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
-import { actLabel, formatNumber, kda, recentRecord, RESULT_LABELS } from '../../widgets/ValorantWidgets';
+import { actLabel, formatNumber, kda, killDeathRatio, RESULT_LABELS } from '../../widgets/ValorantWidgets';
 import './valorant.css';
 
 /* The whole overview card is one link (see SectionCard), same convention as ClashRoyaleOverview. */
@@ -23,11 +23,14 @@ export function ValorantOverview() {
 function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
   const overviewRef = useRef<HTMLDivElement>(null);
   const cardArtUrl = data.profile.cardIconUrl;
-  const { profile, rank, peak, recentMatches, currentSeason } = data;
-  const record = recentRecord(recentMatches);
+  const { profile, rank, peak, recentMatches, currentSeason, history } = data;
   const seasonWinRate = currentSeason && currentSeason.games > 0
     ? Math.round((currentSeason.wins / currentSeason.games) * 100)
     : undefined;
+  const actMatches = history.currentActShort
+    ? history.matches.filter((match) => match.actShort === history.currentActShort)
+    : recentMatches;
+  const actKd = killDeathRatio(actMatches);
 
   useEffect(() => {
     const card = overviewRef.current?.closest<HTMLElement>('.dashboard-section-card--valorant');
@@ -68,7 +71,10 @@ function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
         <dl className="valorant-overview-metrics">
           <div>
             <dt>Peak rank</dt>
-            <dd>{peak.tierName}</dd>
+            <dd className="valorant-overview-peak-rank">
+              {peak.tierIconUrl && <img src={peak.tierIconUrl} alt="" aria-hidden loading="lazy" decoding="async" />}
+              <span>{peak.tierName}</span>
+            </dd>
             {peak.seasonShort && <small>{actLabel(peak.seasonShort)}</small>}
           </div>
           <div>
@@ -77,20 +83,11 @@ function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
             {currentSeason && <small>{currentSeason.wins}W / {currentSeason.games} played</small>}
           </div>
           <div>
-            <dt>Recent record</dt>
-            <dd>{recentMatches.length === 0 ? '—' : `${record.wins}–${record.losses}${record.draws ? `–${record.draws}` : ''}`}</dd>
-            <small>{recentMatches.length === 0 ? 'No matches yet' : `${recentMatches.length} latest matches`}</small>
+            <dt>Act K/D</dt>
+            <dd>{actKd === undefined ? '—' : actKd.toFixed(2)}</dd>
+            <small>{actMatches.length === 0 ? 'No act matches yet' : `${actMatches.length} act matches`}</small>
           </div>
         </dl>
-        {recentMatches.length > 0 && (
-          <ol className="valorant-overview-form" aria-label="Results of recent matches">
-            {recentMatches.slice(0, 8).reverse().map((match, index) => (
-              <li key={`${match.matchId}-${index}`} data-result={match.result} aria-label={match.result}>
-                {match.result.charAt(0).toUpperCase()}
-              </li>
-            ))}
-          </ol>
-        )}
       </div>
 
       {recentMatches.length > 0 && (
