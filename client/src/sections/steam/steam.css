@@ -171,14 +171,26 @@
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
-.steam-pulse-ring { position: relative; width: 2.9rem; height: 2.9rem; flex: 0 0 auto; }
+/* Icon size is derived from the ring's own geometry (viewBox 0 0 36 36, r=15, strokeWidth=3 in
+   AchievementRing), not a guessed rem value — it lands exactly on the stroke's inner edge, so the
+   icon fills the hollow center precisely, with the ring reading as a bar wrapped around it. */
+.steam-pulse-ring {
+  position: relative;
+  flex: 0 0 auto;
+  --ring-size: 2.9rem;
+  --ring-viewbox: 36;
+  --ring-radius: 15;
+  --ring-stroke: 3;
+  width: var(--ring-size);
+  height: var(--ring-size);
+}
 .steam-pulse-ring-svg { width: 100%; height: 100%; }
 .steam-pulse-ring-icon {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 2.15rem;
-  height: 2.15rem;
+  width: calc(var(--ring-size) * (2 * var(--ring-radius) - var(--ring-stroke)) / var(--ring-viewbox));
+  height: calc(var(--ring-size) * (2 * var(--ring-radius) - var(--ring-stroke)) / var(--ring-viewbox));
   border-radius: 50%;
   transform: translate(-50%, -50%);
   background: var(--color-track);
