@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { WeatherData } from '@personal-dashboard/shared';
 import { motion } from 'motion/react';
@@ -114,6 +114,7 @@ const RAIN_COLOR = 'light-dark(#0d7fc4, #5ec2ff)';
  * both out directly so nothing is hover-only. */
 function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
   const gradientId = `${useId().replaceAll(':', '')}-spark`;
+  const [active, setActive] = useState<number | null>(null);
   if (hours.length < 2) return null;
   const W = 100;
   const H = 46;
@@ -139,13 +140,39 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
         ? `${rainHours[0].hourLabel}:00`
         : null;
 
+  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const i = Math.min(
+      hours.length - 1,
+      Math.max(0, Math.round(((event.clientX - rect.left) / rect.width) * (hours.length - 1))),
+    );
+    setActive(i);
+  };
+  const activeHour = active == null ? null : hours[active];
+  const readout = activeHour
+    ? `${deg(activeHour.temperature)}${activeHour.precipitationMm > 0 ? ` · ${activeHour.precipitationMm.toFixed(1)}mm rain` : ''} · ${activeHour.hourLabel}:00`
+    : rainRange
+      ? `rain ${rainRange} · ${totalPrecip.toFixed(1)}mm`
+      : null;
+  const readoutColor = activeHour ? (activeHour.precipitationMm > 0 ? RAIN_COLOR : 'var(--color-accent-weather)') : RAIN_COLOR;
+
   return (
     <div className="flex h-full min-w-0 flex-col justify-center">
       <div className="mb-2 flex items-baseline justify-between text-xs text-ink-faint">
         <span className="uppercase tracking-[0.12em]">Next {hours.length} hours</span>
         <span className="tabular-nums">peak {deg(max)} · {hours[peakIndex].hourLabel}:00</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-28 w-full" aria-label="Temperature over the next hours">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        className="h-28 w-full touch-none"
+        aria-label="Temperature and rain over the next hours"
+        onPointerMove={readNearest}
+        onPointerDown={readNearest}
+        onPointerLeave={(e) => {
+          if (e.pointerType === 'mouse') setActive(null);
+        }}
+      >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="var(--color-accent-weather)" stopOpacity="0.22" />
@@ -198,10 +225,40 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
                   height={barH}
                   rx={0.6}
                   fill={RAIN_COLOR}
+                  opacity={active === i ? 1 : 0.75}
                   aria-label={`${hour.hourLabel}:00: ${hour.precipitationMm.toFixed(1)}mm rain`}
                 />
               );
             })}
+          {active != null && (
+            <line
+              x1={xAt(active)}
+              y1={0}
+              x2={xAt(active)}
+              y2={H}
+              stroke="var(--color-card-border)"
+              strokeWidth={1}
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
+          {activeHour && (
+            <>
+              <path
+                d={`M${xAt(active!)},${yAt(activeHour.temperature)} l0.01,0`}
+                stroke="var(--color-canvas)"
+                strokeWidth={7}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+              <path
+                d={`M${xAt(active!)},${yAt(activeHour.temperature)} l0.01,0`}
+                stroke="var(--color-accent-weather)"
+                strokeWidth={4}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </>
+          )}
         </g>
       </svg>
       <div className="mt-1 flex justify-between text-[11px] tabular-nums text-ink-faint">
@@ -209,10 +266,10 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
         <span>{hours[Math.floor((hours.length - 1) / 2)].hourLabel}:00</span>
         <span>{hours.at(-1)!.hourLabel}:00</span>
       </div>
-      {rainRange && (
+      {readout && (
         <p className="mt-1 flex items-center gap-1.5 text-[11px] tabular-nums text-ink-faint">
-          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: RAIN_COLOR }} />
-          rain {rainRange} · {totalPrecip.toFixed(1)}mm
+          <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: readoutColor }} />
+          {readout}
         </p>
       )}
     </div>
