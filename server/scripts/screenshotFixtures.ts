@@ -21,7 +21,6 @@ import {
   healthDayFor,
   hhmm,
   iso,
-  isoDaysAgo,
   mulberry32,
   usageHistoryFor,
   MANUAL_ARTIST_IMAGES,
