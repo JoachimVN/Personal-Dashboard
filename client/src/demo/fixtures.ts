@@ -569,7 +569,7 @@ function valorant(now: Date): ValorantData {
   const wins = currentActMatches.filter((match) => match.result === 'win').length;
   return {
     profile: {
-      name: 'yourname', tag: 'NA1', region: 'eu', accountLevel: 187,
+      name: 'yourname', tag: 'EUW', region: 'eu', accountLevel: 433,
       cardIconUrl: VALORANT_DEMO_CARD_WIDE_ART, cardBannerUrl: VALORANT_DEMO_CARD_LARGE_ART,
     },
     rank: { tierId: 22, tierName: 'Ascendant 2', tierIconUrl: valorantTierIconUrl(22), rr: 62, lastChange: 18, leaderboardRank: null },
@@ -578,7 +578,7 @@ function valorant(now: Date): ValorantData {
     recentMatches: currentActMatches,
     history: {
       matches: [...currentActMatches, ...previousActMatches],
-      totalMatchesAvailable: 412, fetchedAt: iso(now, 0), currentActShort: 'e10a2',
+      totalMatchesAvailable: 18, fetchedAt: iso(now, 0), currentActShort: 'e10a2',
     },
   };
 }
