@@ -496,7 +496,8 @@ function hue(): HueData {
 function transit(now: Date): TransitData {
   const departure = (minutesFromNow: number, realtime: boolean) => {
     const aimed = new Date(now.getTime() + minutesFromNow * 60_000);
-    const expected = realtime ? new Date(aimed.getTime() + (minutesFromNow % 2 === 0 ? 60_000 : 0)) : aimed;
+    const delayMs = minutesFromNow % 2 === 0 ? 60_000 : 0;
+    const expected = realtime ? new Date(aimed.getTime() + delayMs) : aimed;
     return { aimedTime: aimed.toISOString(), expectedTime: expected.toISOString(), realtime };
   };
   return {
@@ -522,12 +523,19 @@ function transit(now: Date): TransitData {
 
 // ── Power ────────────────────────────────────────────────────────────────────────────────────
 
+function powerPriceBase(hour: number): number {
+  if (hour >= 7 && hour <= 9) return 1.4;
+  if (hour >= 17 && hour <= 20) return 1.6;
+  if (hour >= 0 && hour <= 5) return 0.4;
+  return 0.8;
+}
+
 function powerHours(now: Date, dayOffset: number, rng: () => number) {
   return Array.from({ length: 24 }, (_, hour) => {
     const time = new Date(now);
     time.setDate(time.getDate() + dayOffset);
     time.setHours(hour, 0, 0, 0);
-    const base = hour >= 7 && hour <= 9 ? 1.4 : hour >= 17 && hour <= 20 ? 1.6 : hour >= 0 && hour <= 5 ? 0.4 : 0.8;
+    const base = powerPriceBase(hour);
     return { time: time.toISOString(), hourLabel: String(hour).padStart(2, '0'), priceNokPerKwh: Math.max(0.05, Math.round((base + (rng() - 0.5) * 0.3) * 100) / 100) };
   });
 }
