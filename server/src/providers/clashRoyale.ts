@@ -1,5 +1,5 @@
 import { clashRoyaleSchema, type ClashRoyaleBattle, type ClashRoyaleCard, type ClashRoyaleData } from '@personal-dashboard/shared';
-import { createHash } from 'node:crypto';
+import { md5Hex } from '../md5.js';
 import type { Provider } from '../scheduler.js';
 
 const CR_API_BASE = 'https://api.clashroyale.com/v1';
@@ -149,9 +149,7 @@ export async function logClashRoyalePublicIp(): Promise<void> {
 export function clashRoyaleWikiCardImageUrl(name: string, evolutionLevel?: number): string {
   const fileStem = name.replaceAll(/[^a-z0-9]/gi, '');
   const fileName = `${fileStem}Card${evolutionLevel !== undefined && evolutionLevel > 0 ? 'Evolution' : ''}.png`;
-  // MD5 here only reproduces Fandom's own CDN path-sharding scheme (not a security boundary — no
-  // secret or user-supplied data is hashed), so the weak-algorithm warning doesn't apply.
-  const hash = createHash('md5').update(fileName).digest('hex'); // NOSONAR
+  const hash = md5Hex(fileName);
   return `${CLASH_ROYALE_WIKI_ASSET_URL}/${hash[0]}/${hash.slice(0, 2)}/${fileName}`;
 }
 
