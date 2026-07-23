@@ -1,5 +1,6 @@
 export * from './widget.js';
 export * from './pathOfLegends.js';
+export * from './fixtureHelpers.js';
 export * from './schemas/system.js';
 export * from './schemas/weather.js';
 export * from './schemas/github.js';
