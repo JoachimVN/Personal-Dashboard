@@ -85,7 +85,7 @@ export const MANUAL_ALBUM_IMAGES: Record<string, string> = {
   SOUR: 'https://i.scdn.co/image/ab67616d0000b273a91c10fe9472d9bd89802e5a',
   '24K Magic': 'https://i.scdn.co/image/ab67616d0000b273232711f7d66a1e19e89e28c5',
   'When We All Fall Asleep, Where Do We Go?': 'https://i.scdn.co/image/ab67616d0000b27350a3147b4edd7701a876c6ce',
-  "I'm Breathless": 'https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02e275f1fbda1c7bc82f9c386b',
+  "I'm Breathless": 'https://i.scdn.co/image/ab67616d0000b2736b44fa8f5415cc4c945117be',
   'Endless Summer Vacation': 'https://i.scdn.co/image/ab67616d0000b273f429549123dbe8552764ba1d',
   Lover: 'https://i.scdn.co/image/ab67616d0000b273e787cffec20aa2a396a61647',
   'Fine Line': 'https://i.scdn.co/image/ab67616d0000b2737cf2b9825bb43083d123ac22',
@@ -100,9 +100,30 @@ export const ONE_OFFS = [
 ];
 
 export const ALBUMS = [
-  { id: 'al1', name: 'After Hours', artist: 'The Weeknd', releaseDate: '2020-03-20', totalTracks: 14, totalDurationMs: 3_400_000, playCount: 256, topTrack: TRACKS[0] },
-  { id: 'al2', name: 'Future Nostalgia', artist: 'Dua Lipa', releaseDate: '2020-03-27', totalTracks: 11, totalDurationMs: 2_300_000, playCount: 214, topTrack: TRACKS[1] },
-  { id: 'al3', name: 'SOUR', artist: 'Olivia Rodrigo', releaseDate: '2021-05-21', totalTracks: 11, totalDurationMs: 2_050_000, playCount: 176, topTrack: TRACKS[4] },
+  {
+    id: 'al1', name: 'After Hours', artist: 'The Weeknd', releaseDate: '2020-03-20', totalTracks: 14, totalDurationMs: 3_400_000, playCount: 256,
+    topTracks: [
+      { id: 'at1-1', track: 'Blinding Lights', playCount: 128 },
+      { id: 'at1-2', track: 'Save Your Tears', playCount: 94 },
+      { id: 'at1-3', track: 'Alone Again', playCount: 61 },
+    ],
+  },
+  {
+    id: 'al2', name: 'Future Nostalgia', artist: 'Dua Lipa', releaseDate: '2020-03-27', totalTracks: 11, totalDurationMs: 2_300_000, playCount: 214,
+    topTracks: [
+      { id: 'at2-1', track: 'Levitating', playCount: 107 },
+      { id: 'at2-2', track: "Don't Start Now", playCount: 78 },
+      { id: 'at2-3', track: 'Physical', playCount: 52 },
+    ],
+  },
+  {
+    id: 'al3', name: 'SOUR', artist: 'Olivia Rodrigo', releaseDate: '2021-05-21', totalTracks: 11, totalDurationMs: 2_050_000, playCount: 176,
+    topTracks: [
+      { id: 'at3-1', track: 'good 4 u', playCount: 88 },
+      { id: 'at3-2', track: 'deja vu', playCount: 63 },
+      { id: 'at3-3', track: 'drivers license', playCount: 41 },
+    ],
+  },
 ];
 
 /** The fake persona's full "detail"-shaped rotation (now playing, recently played, top
@@ -131,16 +152,27 @@ export function buildSpotifyRotation(
   const artists = ARTIST_NAMES.map((name, i) => ({ id: `a${i + 1}`, name, imageUrl: artistImages[name], url: '#', genres: [] as string[] }));
   const tracks = TRACKS.map((t) => ({ ...t, imageUrl: albumImages.get(t.album)!, url: '#' }));
   const oneOffs = ONE_OFFS.map((t) => ({ ...t, imageUrl: albumImages.get(t.album)!, url: '#' }));
+  // Extra album cuts beyond each album's #1 track — reuses that album's already-resolved cover
+  // art (no new lookup needed) so they can double up in "Recently played" too.
+  const bonusTracks = ALBUMS.flatMap((album) =>
+    album.topTracks.slice(1).map((t) => ({ id: t.id, track: t.track, artist: album.artist, album: album.name, imageUrl: albumImages.get(album.name)!, url: '#' })),
+  );
 
   return {
     nowPlaying: { track: 'Levitating', artist: 'Dua Lipa', album: 'Future Nostalgia', imageUrl: tracks[1].imageUrl, isPlaying: true, progressMs: 112_000, durationMs: 203_000 },
     recentlyPlayed: [
       { ...tracks[2], playedAt: isoDaysAgo(now, 0, -0.1) },
       { ...oneOffs[0], playedAt: isoDaysAgo(now, 0, -0.6) },
+      { ...bonusTracks[0], playedAt: isoDaysAgo(now, 0, -1.1) },
       { ...tracks[6], playedAt: isoDaysAgo(now, 0, -1.4) },
+      { ...bonusTracks[4], playedAt: isoDaysAgo(now, 0, -1.8) },
       { ...oneOffs[1], playedAt: isoDaysAgo(now, 0, -2.9) },
+      { ...tracks[7], playedAt: isoDaysAgo(now, 0, -3.3) },
       { ...tracks[0], playedAt: isoDaysAgo(now, 0, -4.1) },
+      { ...bonusTracks[2], playedAt: isoDaysAgo(now, 0, -4.6) },
+      { ...tracks[5], playedAt: isoDaysAgo(now, 0, -5.4) },
       { ...oneOffs[2], playedAt: isoDaysAgo(now, 0, -6.3) },
+      { ...tracks[3], playedAt: isoDaysAgo(now, 0, -7.0) },
     ],
     topArtists: { shortTerm: artists, mediumTerm: reorder(artists, MEDIUM_TERM_ORDER), longTerm: reorder(artists, LONG_TERM_ORDER) },
     topTracks: { shortTerm: tracks, mediumTerm: reorder(tracks, MEDIUM_TERM_ORDER), longTerm: reorder(tracks, LONG_TERM_ORDER) },
@@ -155,7 +187,7 @@ export function buildSpotifyRotation(
         id: album.id, name: album.name, artist: album.artist, imageUrl: albumImages.get(album.name)!,
         url: '#', releaseDate: album.releaseDate, releaseDatePrecision: 'day' as const, totalTracks: album.totalTracks,
         totalDurationMs: album.totalDurationMs, playCount: album.playCount,
-        topTracks: [{ id: album.topTrack.id, track: album.topTrack.track, playCount: Math.round(album.playCount * 0.5), url: '#' }],
+        topTracks: album.topTracks.map((t) => ({ ...t, url: '#' })),
       })),
     },
   };
