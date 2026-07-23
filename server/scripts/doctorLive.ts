@@ -134,13 +134,10 @@ async function checkHealthEndpoint(): Promise<Check> {
 
 async function main(): Promise<void> {
   const checks: Check[] = [];
-  checks.push(await checkPort());
-  checks.push(await checkLaunchAgent());
+  checks.push(await checkPort(), await checkLaunchAgent());
 
   const { check: servingCheck, serviceHead } = await checkServingCheckout();
-  checks.push(servingCheck);
-  checks.push(await checkClientBuild());
-  checks.push(await checkDatabaseUrl());
+  checks.push(servingCheck, await checkClientBuild(), await checkDatabaseUrl());
 
   const healthCheck = await checkHealthEndpoint();
   checks.push(healthCheck);
