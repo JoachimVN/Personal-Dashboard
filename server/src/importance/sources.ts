@@ -20,7 +20,7 @@ import type {
   WeatherData,
   WidgetStatus,
 } from '@personal-dashboard/shared';
-import { pathOfLegendsDisplayLeagueNumber } from '@personal-dashboard/shared';
+import { pathOfLegendsDisplayLeagueNumber, pathOfLegendsLeagueName } from '@personal-dashboard/shared';
 import { computeDeviation } from '../deviation.js';
 
 import type { Candidate, ClashRoyaleMoments, SteamMoments } from './types.js';
@@ -836,7 +836,7 @@ function clashRoyaleWinStreakCandidate(data: ClashRoyaleData, winStreakMin: numb
   // Path of Legends trophies reset every season, so restating them as a raw count reads as
   // meaningless noise — the league (its trophy-equivalent standing) is the stable, legible number.
   const detail = latest.type === 'pathOfLegend' && data.profile.pathOfLegends
-    ? `Currently League ${pathOfLegendsDisplayLeagueNumber(data.profile.pathOfLegends.leagueNumber)}`
+    ? `Currently ${pathOfLegendsLeagueName(data.profile.pathOfLegends.leagueNumber)}`
     : `Currently ${data.profile.trophies.toLocaleString()} trophies`;
   // A short streak is common enough that it doesn't earn a whole secondary-carousel slide —
   // only a truly long run gets the richer secondary treatment; anything shorter is tile-only.

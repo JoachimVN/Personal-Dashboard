@@ -1,11 +1,7 @@
-import { pathOfLegendsDisplayLeagueNumber, type ClashRoyaleBattle, type ClashRoyaleData } from '@personal-dashboard/shared';
+import { pathOfLegendsDisplayLeagueNumber, pathOfLegendsLeagueName, type ClashRoyaleBattle, type ClashRoyaleData } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 import { clashRoyaleLeagueArt } from '../lib/clashRoyale';
 
-const PATH_OF_LEGENDS_LEAGUES = [
-  'Challenger I', 'Challenger II', 'Challenger III', 'Master I', 'Master II',
-  'Master III', 'Champion', 'Grand Champion', 'Royal Champion', 'Ultimate Champion',
-] as const;
 const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
   win: 'Victory',
   loss: 'Defeat',
@@ -54,9 +50,7 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
   const { profile } = data;
   const path = profile.pathOfLegends;
   const displayLeagueNumber = path ? pathOfLegendsDisplayLeagueNumber(path.leagueNumber) : undefined;
-  const leagueName = displayLeagueNumber
-    ? PATH_OF_LEGENDS_LEAGUES[displayLeagueNumber - 1] ?? `League ${displayLeagueNumber}`
-    : undefined;
+  const leagueName = path ? pathOfLegendsLeagueName(path.leagueNumber) : undefined;
 
   return (
     <section className={`clash-profile${compact ? ' clash-profile--compact' : ''}`}>
