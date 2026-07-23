@@ -49,6 +49,24 @@ async function gitDirectory(): Promise<string | undefined> {
   }
 }
 
+function describeCodexHost(
+  expectedHostAvailable: boolean,
+  standaloneHostAvailable: boolean,
+  expectedHost: string,
+): string {
+  if (expectedHostAvailable) return `available at ${expectedHost}`;
+  return standaloneHostAvailable
+    ? `standalone host exists, but the expected alias is unavailable (${expectedHost})`
+    : 'not available at the expected or standalone path';
+}
+
+function describeGitDirectory(gitDir: string | undefined, gitDirectoryWritable: boolean): string {
+  if (!gitDir) return 'could not resolve the Git metadata directory';
+  return gitDirectoryWritable
+    ? `${gitDir} appears writable`
+    : `${gitDir} is not writable in this session`;
+}
+
 async function main(): Promise<void> {
   const home = homedir();
   const expectedHost = join(home, '.local/bin/codex-code-mode-host');
@@ -61,20 +79,12 @@ async function main(): Promise<void> {
   const checks: Check[] = [
     {
       label: 'Codex code-mode host',
-      detail: expectedHostAvailable
-        ? `available at ${expectedHost}`
-        : standaloneHostAvailable
-          ? `standalone host exists, but the expected alias is unavailable (${expectedHost})`
-          : 'not available at the expected or standalone path',
+      detail: describeCodexHost(expectedHostAvailable, standaloneHostAvailable, expectedHost),
       ok: expectedHostAvailable,
     },
     {
       label: 'Git metadata directory',
-      detail: gitDir
-        ? gitDirectoryWritable
-          ? `${gitDir} appears writable`
-          : `${gitDir} is not writable in this session`
-        : 'could not resolve the Git metadata directory',
+      detail: describeGitDirectory(gitDir, gitDirectoryWritable),
       ok: gitDirectoryWritable,
     },
     {

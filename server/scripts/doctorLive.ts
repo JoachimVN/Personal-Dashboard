@@ -55,77 +55,104 @@ async function readDatabaseUrlPresence(): Promise<boolean | undefined> {
   }
 }
 
-async function main(): Promise<void> {
-  const checks: Check[] = [];
+async function checkPort(): Promise<Check> {
   const listener = await command(['lsof', '-nP', `-iTCP:${port}`, '-sTCP:LISTEN']);
-  checks.push({
+  return {
     label: `Port ${port}`,
     detail: listener.ok ? 'a process is listening' : 'no listener found',
     ok: listener.ok,
-  });
+  };
+}
 
+function describeLaunchAgent(ok: boolean, pointsAtServiceRoot: boolean): string {
+  if (!ok) return 'not registered or unavailable';
+  return pointsAtServiceRoot
+    ? `registered and points at ${serviceRoot}`
+    : 'registered, but its working directory needs inspection';
+}
+
+async function checkLaunchAgent(): Promise<Check> {
   const launchAgent = await command(['launchctl', 'print', `gui/${uid}/${serviceLabel}`]);
   const pointsAtServiceRoot = launchAgent.output.includes(serviceRoot);
-  checks.push({
+  return {
     label: 'LaunchAgent',
-    detail: launchAgent.ok
-      ? pointsAtServiceRoot
-        ? `registered and points at ${serviceRoot}`
-        : 'registered, but its working directory needs inspection'
-      : 'not registered or unavailable',
+    detail: describeLaunchAgent(launchAgent.ok, pointsAtServiceRoot),
     ok: launchAgent.ok && pointsAtServiceRoot,
-  });
+  };
+}
 
+async function checkServingCheckout(): Promise<{ check: Check; serviceHead: string | undefined }> {
   const serviceExists = await exists(serviceRoot);
   const serviceHead = serviceExists ? await gitHead(serviceRoot) : undefined;
-  checks.push({
-    label: 'Serving checkout',
-    detail: serviceHead ? `${serviceRoot} at ${serviceHead}` : 'not available or not a Git checkout',
-    ok: Boolean(serviceHead),
-  });
+  return {
+    check: {
+      label: 'Serving checkout',
+      detail: serviceHead ? `${serviceRoot} at ${serviceHead}` : 'not available or not a Git checkout',
+      ok: Boolean(serviceHead),
+    },
+    serviceHead,
+  };
+}
 
+async function checkClientBuild(): Promise<Check> {
   try {
     const build = await stat(`${serviceRoot}/client/dist/index.html`);
-    checks.push({
+    return {
       label: 'Serving client build',
       detail: `index.html modified ${build.mtime.toISOString()}`,
       ok: true,
-    });
+    };
   } catch {
-    checks.push({ label: 'Serving client build', detail: 'client/dist/index.html is missing', ok: false });
+    return { label: 'Serving client build', detail: 'client/dist/index.html is missing', ok: false };
   }
+}
 
+function describeDatabaseUrl(present: boolean | undefined): string {
+  if (present === undefined) return 'runtime env file could not be read';
+  return present ? 'DATABASE_URL is present (value withheld)' : 'DATABASE_URL is missing or empty';
+}
+
+async function checkDatabaseUrl(): Promise<Check> {
   const databaseUrlPresent = await readDatabaseUrlPresence();
-  checks.push({
+  return {
     label: 'Runtime database configuration',
-    detail: databaseUrlPresent === undefined
-      ? 'runtime env file could not be read'
-      : databaseUrlPresent
-        ? 'DATABASE_URL is present (value withheld)'
-        : 'DATABASE_URL is missing or empty',
+    detail: describeDatabaseUrl(databaseUrlPresent),
     ok: databaseUrlPresent === true,
-  });
+  };
+}
 
+async function checkHealthEndpoint(): Promise<Check> {
   const healthUrl = `http://127.0.0.1:${port}/api/health`;
-  let healthDetail = 'request failed';
-  let healthOk = false;
   try {
     const response = await fetch(healthUrl, { signal: AbortSignal.timeout(1_500) });
-    healthOk = response.ok;
-    healthDetail = `${response.status} ${response.statusText}`;
+    return { label: 'Health endpoint', detail: `${response.status} ${response.statusText}`, ok: response.ok };
   } catch {
     // Sandboxed environments can block localhost networking; retain the other evidence.
+    return { label: 'Health endpoint', detail: 'request failed', ok: false };
   }
-  checks.push({ label: 'Health endpoint', detail: healthDetail, ok: healthOk });
+}
+
+async function main(): Promise<void> {
+  const checks: Check[] = [];
+  checks.push(await checkPort());
+  checks.push(await checkLaunchAgent());
+
+  const { check: servingCheck, serviceHead } = await checkServingCheckout();
+  checks.push(servingCheck);
+  checks.push(await checkClientBuild());
+  checks.push(await checkDatabaseUrl());
+
+  const healthCheck = await checkHealthEndpoint();
+  checks.push(healthCheck);
 
   console.log('Personal Dashboard live-runtime report');
   for (const check of checks) {
     console.log(`${check.ok ? 'PASS' : 'CHECK'}  ${check.label}: ${check.detail}`);
   }
 
-  if (serviceHead && !healthOk) {
+  if (serviceHead && !healthCheck.ok) {
     console.log('\nNext: inspect the LaunchAgent startup log before changing provider or UI code.');
-  } else if (serviceHead && healthOk) {
+  } else if (serviceHead && healthCheck.ok) {
     console.log('\nNext: compare this serving revision with the expected change. If it matches, check PWA/service-worker cache.');
   }
 }
