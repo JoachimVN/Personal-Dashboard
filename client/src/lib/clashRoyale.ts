@@ -85,3 +85,30 @@ const LEAGUE_ART: Record<number, string> = {
 export function clashRoyaleLeagueArt(leagueNumber: number): string | undefined {
   return LEAGUE_ART[leagueNumber];
 }
+
+/**
+ * Wiki card art for the demo's fixed 8-card deck plus its tower troop, resolved with the same
+ * MD5-sharded Fandom filename scheme as `clashRoyaleWikiCardImageUrl` in
+ * server/src/providers/clashRoyale.ts (verified against the live wiki CDN, not re-derived from the
+ * live Clash Royale API, which the offline demo has no account to call).
+ */
+const CARD_ART: Record<string, string> = {
+  Knight: 'https://static.wikia.nocookie.net/clashroyale/images/5/54/KnightCard.png',
+  Musketeer: 'https://static.wikia.nocookie.net/clashroyale/images/e/ee/MusketeerCard.png',
+  'Baby Dragon': 'https://static.wikia.nocookie.net/clashroyale/images/3/35/BabyDragonCard.png',
+  'Mini P.E.K.K.A': 'https://static.wikia.nocookie.net/clashroyale/images/7/7b/MiniPEKKACard.png',
+  Fireball: 'https://static.wikia.nocookie.net/clashroyale/images/f/f4/FireballCard.png',
+  Zap: 'https://static.wikia.nocookie.net/clashroyale/images/5/52/ZapCard.png',
+  Tesla: 'https://static.wikia.nocookie.net/clashroyale/images/2/27/TeslaCard.png',
+  'Hog Rider': 'https://static.wikia.nocookie.net/clashroyale/images/3/30/HogRiderCard.png',
+  Cannoneer: 'https://static.wikia.nocookie.net/clashroyale/images/a/a2/CannoneerCard.png',
+};
+
+export function clashRoyaleCardArt(name: string): string | undefined {
+  return CARD_ART[name];
+}
+
+/** A fixed, real clan badge asset (RoyaleAPI's public badge manifest/CDN — same source the server
+ * provider resolves from the player's actual `clan.badgeId`) — the demo has no real clan to look
+ * one up for, so this just picks one badge rather than leaving the crest blank. */
+export const CLASH_ROYALE_DEMO_CLAN_BADGE_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-assets/master/badges/Flame_01.png';

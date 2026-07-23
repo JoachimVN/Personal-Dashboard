@@ -38,10 +38,13 @@ import {
   mulberry32,
   usageHistoryFor,
   MANUAL_ARTIST_IMAGES,
+  MANUAL_ALBUM_IMAGES,
   ARTIST_NAMES,
   TRACKS,
   ONE_OFFS,
 } from '@personal-dashboard/shared';
+import { clashRoyaleCardArt, CLASH_ROYALE_DEMO_CLAN_BADGE_URL } from '../lib/clashRoyale';
+import { valorantAgentIconUrl, valorantTierIconUrl, VALORANT_DEMO_CARD_WIDE_ART, VALORANT_DEMO_CARD_LARGE_ART } from '../lib/valorant';
 
 const fallbackArt = (seed: string) => `https://picsum.photos/seed/${seed}/300/300`;
 
@@ -57,26 +60,46 @@ function weather(now: Date): WeatherData {
   const weekday = (offset: number) => day(offset).toLocaleDateString('en-GB', { weekday: 'short' });
   const sunrise = daysFromNowAt(now, 0, 5, 42);
   const sunset = daysFromNowAt(now, 0, 21, 8);
+
+  // Each hour's condition, independent of what real clock hour it happens to land on — the
+  // hourLabel and day/night symbol suffix below are derived from the real timestamp instead of
+  // hardcoded, so the sky-preview slider (which scrubs by real time, not by this label) never
+  // shows a label that disagrees with whether the sun is actually supposed to be up then.
+  const hourConditions: { base: string; precipitationMm: number; uvIndex: number; windSpeed: number; humidity: number; tempDelta: number }[] = [
+    { base: 'partlycloudy', precipitationMm: 0, uvIndex: 4.2, windSpeed: 2.4, humidity: 57, tempDelta: 0 },
+    { base: 'clearsky', precipitationMm: 0, uvIndex: 4.6, windSpeed: 2.6, humidity: 55, tempDelta: 1 },
+    { base: 'clearsky', precipitationMm: 0, uvIndex: 3.8, windSpeed: 2.9, humidity: 55, tempDelta: 1 },
+    { base: 'fair', precipitationMm: 0.1, uvIndex: 2.4, windSpeed: 3.1, humidity: 60, tempDelta: -1 },
+    { base: 'lightrain', precipitationMm: 0.3, uvIndex: 1.5, windSpeed: 3.4, humidity: 64, tempDelta: -2 },
+    { base: 'rain', precipitationMm: 0.8, uvIndex: 0.7, windSpeed: 3.8, humidity: 70, tempDelta: -3 },
+    { base: 'lightrain', precipitationMm: 0.4, uvIndex: 0.2, windSpeed: 3.2, humidity: 72, tempDelta: -4 },
+    { base: 'partlycloudy', precipitationMm: 0, uvIndex: 0, windSpeed: 2.4, humidity: 71, tempDelta: -4 },
+    { base: 'fair', precipitationMm: 0, uvIndex: 0, windSpeed: 2.0, humidity: 73, tempDelta: -5 },
+    { base: 'clearsky', precipitationMm: 0, uvIndex: 0, windSpeed: 1.8, humidity: 75, tempDelta: -5 },
+    { base: 'clearsky', precipitationMm: 0, uvIndex: 0, windSpeed: 1.6, humidity: 76, tempDelta: -6 },
+    { base: 'clearsky', precipitationMm: 0, uvIndex: 0, windSpeed: 1.5, humidity: 77, tempDelta: -6 },
+  ];
+  const hours = hourConditions.map((condition, index) => {
+    const at = new Date(now.getTime() + (index + 1) * 3_600_000);
+    const isDay = at.getTime() >= sunrise.getTime() && at.getTime() <= sunset.getTime();
+    return {
+      time: at.toISOString(),
+      hourLabel: String(at.getHours()).padStart(2, '0'),
+      temperature: 18 + condition.tempDelta,
+      precipitationMm: condition.precipitationMm,
+      uvIndex: isDay ? condition.uvIndex : 0,
+      windSpeed: condition.windSpeed,
+      humidity: condition.humidity,
+      symbol: `${condition.base}_${isDay ? 'day' : 'night'}`,
+    };
+  });
   return {
     location: { lat: 59.91, lon: 10.75, name: 'Oslo' },
     current: {
       temperature: 18, windSpeed: 2.6, windDirectionDeg: 224, humidity: 58, uvIndex: 4.2,
       precipitationMm: 0, symbol: 'partlycloudy_day',
     },
-    hours: [
-      { time: iso(now, 1), hourLabel: '14', temperature: 18, precipitationMm: 0, uvIndex: 4.2, windSpeed: 2.4, humidity: 57, symbol: 'partlycloudy_day' },
-      { time: iso(now, 2), hourLabel: '15', temperature: 19, precipitationMm: 0, uvIndex: 4.6, windSpeed: 2.6, humidity: 55, symbol: 'clearsky_day' },
-      { time: iso(now, 3), hourLabel: '16', temperature: 19, precipitationMm: 0, uvIndex: 3.8, windSpeed: 2.9, humidity: 55, symbol: 'clearsky_day' },
-      { time: iso(now, 4), hourLabel: '17', temperature: 17, precipitationMm: 0.1, uvIndex: 2.4, windSpeed: 3.1, humidity: 60, symbol: 'fair_day' },
-      { time: iso(now, 5), hourLabel: '18', temperature: 16, precipitationMm: 0.3, uvIndex: 1.5, windSpeed: 3.4, humidity: 64, symbol: 'lightrain' },
-      { time: iso(now, 6), hourLabel: '19', temperature: 15, precipitationMm: 0.8, uvIndex: 0.7, windSpeed: 3.8, humidity: 70, symbol: 'rain' },
-      { time: iso(now, 7), hourLabel: '20', temperature: 14, precipitationMm: 0.4, uvIndex: 0.2, windSpeed: 3.2, humidity: 72, symbol: 'lightrain' },
-      { time: iso(now, 8), hourLabel: '21', temperature: 14, precipitationMm: 0, uvIndex: 0, windSpeed: 2.4, humidity: 71, symbol: 'partlycloudy_night' },
-      { time: iso(now, 9), hourLabel: '22', temperature: 13, precipitationMm: 0, uvIndex: 0, windSpeed: 2.0, humidity: 73, symbol: 'fair_night' },
-      { time: iso(now, 10), hourLabel: '23', temperature: 13, precipitationMm: 0, uvIndex: 0, windSpeed: 1.8, humidity: 75, symbol: 'clearsky_night' },
-      { time: iso(now, 11), hourLabel: '00', temperature: 12, precipitationMm: 0, uvIndex: 0, windSpeed: 1.6, humidity: 76, symbol: 'clearsky_night' },
-      { time: iso(now, 12), hourLabel: '01', temperature: 12, precipitationMm: 0, uvIndex: 0, windSpeed: 1.5, humidity: 77, symbol: 'clearsky_night' },
-    ],
+    hours,
     days: [
       { date: dateDaysAgo(now, 0), dayLabel: weekday(0), minTemperature: 14, maxTemperature: 20, precipitationMm: 0.4, maxUvIndex: 4.6, maxWindSpeed: 3.8, humidity: 58, symbol: 'partlycloudy_day' },
       { date: dateDaysAgo(now, -1), dayLabel: weekday(1), minTemperature: 13, maxTemperature: 22, precipitationMm: 0, maxUvIndex: 5.1, maxWindSpeed: 2.9, humidity: 52, symbol: 'clearsky_day' },
@@ -224,6 +247,10 @@ function imessage(now: Date): IMessageData {
       { id: 'c3', label: 'Alex', lastMessage: 'Sent you the photos from the hike', isFromMe: true, timestamp: iso(now, -5), unreadCount: 0 },
       { id: 'c4', label: '+1 555 0142', lastMessage: '[attachment]', isFromMe: false, timestamp: iso(now, -9), unreadCount: 0 },
       { id: 'c5', label: 'Work friends', lastMessage: 'lol did you see the standup notes', isFromMe: false, timestamp: iso(now, -22), unreadCount: 0 },
+      { id: 'c6', label: 'Jordan', lastMessage: 'Are we still on for the gym tomorrow?', isFromMe: false, timestamp: iso(now, -27), unreadCount: 1 },
+      { id: 'c7', label: 'Casey', lastMessage: 'Thanks for the recommendation, loved it', isFromMe: false, timestamp: iso(now, -35), unreadCount: 0 },
+      { id: 'c8', label: 'Landlord', lastMessage: 'Reminder: maintenance visit on Thursday', isFromMe: false, timestamp: iso(now, -48), unreadCount: 0 },
+      { id: 'c9', label: 'Mom', lastMessage: 'Call me when you get a chance ❤️', isFromMe: false, timestamp: iso(now, -60), unreadCount: 1 },
     ],
   };
 }
@@ -238,6 +265,13 @@ function news(now: Date): NewsData {
       { title: 'Why local-first software is having a moment', source: 'Hacker News', url: '#', publishedAt: iso(now, -9) },
       { title: 'A deep dive into React 19’s concurrent rendering', source: 'Hacker News', url: '#', publishedAt: iso(now, -14) },
       { title: 'Norway’s power grid in 2026: what changed', source: 'Hacker News', url: '#', publishedAt: iso(now, -20) },
+      { title: 'Ask HN: What self-hosted tools have replaced a SaaS subscription for you?', source: 'Hacker News', url: '#', publishedAt: iso(now, -26) },
+      { title: 'The case against infinite scroll', source: 'Hacker News', url: '#', publishedAt: iso(now, -33) },
+      { title: 'Tailscale raises new funding round to expand mesh networking', source: 'Hacker News', url: '#', publishedAt: iso(now, -40) },
+      { title: 'Why we moved off Kubernetes for a three-person team', source: 'Hacker News', url: '#', publishedAt: iso(now, -48) },
+      { title: 'A weekend rebuilding my home network from scratch', source: 'Hacker News', url: '#', publishedAt: iso(now, -55) },
+      { title: 'SQLite is probably the database you should have started with', source: 'Hacker News', url: '#', publishedAt: iso(now, -63) },
+      { title: 'The quiet resurgence of desktop apps', source: 'Hacker News', url: '#', publishedAt: iso(now, -70) },
     ],
   };
 }
@@ -249,6 +283,10 @@ function aiNews(now: Date): AiNewsData {
       { title: 'New context caching improvements for long-running agents', source: 'Anthropic', url: '#', publishedAt: iso(now, -30), provider: 'anthropic' },
       { title: 'GPT-5.1 Codex update improves tool-use reliability', source: 'OpenAI', url: '#', publishedAt: iso(now, -12), provider: 'openai' },
       { title: 'OpenAI announces expanded rate limits for Plus subscribers', source: 'OpenAI', url: '#', publishedAt: iso(now, -40), provider: 'openai' },
+      { title: 'Claude Agent SDK adds durable subagent scheduling', source: 'Anthropic', url: '#', publishedAt: iso(now, -54), provider: 'anthropic' },
+      { title: 'OpenAI details new evals for long-horizon agent tasks', source: 'OpenAI', url: '#', publishedAt: iso(now, -18), provider: 'openai' },
+      { title: 'Anthropic publishes new interpretability research on agentic planning', source: 'Anthropic', url: '#', publishedAt: iso(now, -66), provider: 'anthropic' },
+      { title: 'OpenAI opens up fine-tuning for the latest Codex models', source: 'OpenAI', url: '#', publishedAt: iso(now, -78), provider: 'openai' },
     ],
   };
 }
@@ -310,17 +348,55 @@ function spotify(now: Date): SpotifyData {
   const artistImages = Object.fromEntries(ARTIST_NAMES.map((name) => [name, MANUAL_ARTIST_IMAGES[name]]));
   const albumImages = new Map<string, string>();
   for (const t of [...TRACKS, ...ONE_OFFS]) {
-    if (!albumImages.has(t.album)) albumImages.set(t.album, fallbackArt(t.album));
+    if (!albumImages.has(t.album)) albumImages.set(t.album, MANUAL_ALBUM_IMAGES[t.album] ?? fallbackArt(t.album));
   }
   return buildSpotifyRotation(now, artistImages, albumImages);
+}
+
+/** The three tracks the command-center "now playing" secondary cycles through, with real track
+ * lengths so the rotation timing looks plausible. Kept small and separate from the full
+ * TRACKS/ONE_OFFS rotation above — this only needs to answer "what's playing right now", computed
+ * fresh on every poll from the real clock (see api.ts), not baked into the fixture snapshot once
+ * at page load, which is what let the old static nowPlaying freeze at 100% once the track "ended"
+ * and never advance. */
+const NOW_PLAYING_ROTATION = [
+  { track: 'Blinding Lights', artist: 'The Weeknd', album: 'After Hours', durationMs: 200_040 },
+  { track: 'Levitating', artist: 'Dua Lipa', album: 'Future Nostalgia', durationMs: 203_064 },
+  { track: 'HUMBLE.', artist: 'Kendrick Lamar', album: 'DAMN.', durationMs: 177_000 },
+];
+
+export function spotifyNowPlayingAt(now: Date): SpotifyData['nowPlaying'] {
+  const totalMs = NOW_PLAYING_ROTATION.reduce((sum, track) => sum + track.durationMs, 0);
+  let elapsed = now.getTime() % totalMs;
+  for (const track of NOW_PLAYING_ROTATION) {
+    if (elapsed < track.durationMs) {
+      return {
+        track: track.track, artist: track.artist, album: track.album,
+        imageUrl: MANUAL_ALBUM_IMAGES[track.album] ?? fallbackArt(track.album),
+        isPlaying: true, progressMs: Math.round(elapsed), durationMs: track.durationMs,
+      };
+    }
+    elapsed -= track.durationMs;
+  }
+  const [first] = NOW_PLAYING_ROTATION;
+  return {
+    track: first.track, artist: first.artist, album: first.album,
+    imageUrl: MANUAL_ALBUM_IMAGES[first.album] ?? fallbackArt(first.album),
+    isPlaying: true, progressMs: 0, durationMs: first.durationMs,
+  };
 }
 
 // ── Steam ────────────────────────────────────────────────────────────────────────────────────
 
 const steamHeaderUrl = (appId: number) => `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
+// The real iconUrl Steam's API returns is derived from appid + an account-specific img_icon_url
+// hash that doesn't exist for a fake account — the library cover art is a real, hash-free asset
+// keyed only by appId, so it stands in for the per-account icon everywhere iconUrl is used
+// (achievement progress ring, library grid tiles) instead of leaving those spots blank.
+const steamIconUrl = (appId: number) => `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`;
 
 function steamGame(appId: number, name: string, foreverMin: number, recentMin: number) {
-  return { appId, name, headerUrl: steamHeaderUrl(appId), playtimeForeverMinutes: foreverMin, playtimeRecentMinutes: recentMin };
+  return { appId, name, headerUrl: steamHeaderUrl(appId), iconUrl: steamIconUrl(appId), playtimeForeverMinutes: foreverMin, playtimeRecentMinutes: recentMin };
 }
 
 function steam(now: Date): SteamData {
@@ -353,17 +429,17 @@ function steam(now: Date): SteamData {
     achievements: {
       appId: 1245620, gameName: 'ELDEN RING', unlockedCount: 28, totalCount: 42,
       recentUnlocks: [
-        { apiName: 'ACH_MALENIA', displayName: 'Maiden of Ashen Ruin', description: 'Defeated Malenia, Blade of Miquella.', unlockedAt: iso(now, -20), globalUnlockedPercent: 8.4 },
-        { apiName: 'ACH_RADAHN', displayName: "Starscourge Radahn", description: 'Defeated Starscourge Radahn.', unlockedAt: iso(now, -70), globalUnlockedPercent: 22.1 },
-        { apiName: 'ACH_GODRICK', displayName: 'Godrick the Grafted', description: 'Defeated Godrick the Grafted.', unlockedAt: iso(now, -200), globalUnlockedPercent: 61.3 },
+        { apiName: 'ACH_MALENIA', displayName: 'Shardbearer Malenia', description: 'Defeated Malenia, Blade of Miquella.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/f704fcd82daf933dd3ce81c4d8ffea3ec65f26f4.jpg', unlockedAt: iso(now, -20), globalUnlockedPercent: 8.4 },
+        { apiName: 'ACH_RADAHN', displayName: 'Shardbearer Radahn', description: 'Defeated Starscourge Radahn.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/f5f1f41ef749459d9ac45750cd1f069d05fe1dd8.jpg', unlockedAt: iso(now, -70), globalUnlockedPercent: 22.1 },
+        { apiName: 'ACH_GODRICK', displayName: 'Shardbearer Godrick', description: 'Defeated Godrick the Grafted.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/1e230f1a87d7139e854c47e52337f9d50856ac64.jpg', unlockedAt: iso(now, -200), globalUnlockedPercent: 61.3 },
       ],
       rarest: [
-        { apiName: 'ACH_MALENIA', displayName: 'Maiden of Ashen Ruin', description: 'Defeated Malenia, Blade of Miquella.', unlockedAt: iso(now, -20), globalUnlockedPercent: 8.4 },
-        { apiName: 'ACH_RADAHN', displayName: "Starscourge Radahn", description: 'Defeated Starscourge Radahn.', unlockedAt: iso(now, -70), globalUnlockedPercent: 22.1 },
+        { apiName: 'ACH_MALENIA', displayName: 'Shardbearer Malenia', description: 'Defeated Malenia, Blade of Miquella.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/f704fcd82daf933dd3ce81c4d8ffea3ec65f26f4.jpg', unlockedAt: iso(now, -20), globalUnlockedPercent: 8.4 },
+        { apiName: 'ACH_RADAHN', displayName: 'Shardbearer Radahn', description: 'Defeated Starscourge Radahn.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/f5f1f41ef749459d9ac45750cd1f069d05fe1dd8.jpg', unlockedAt: iso(now, -70), globalUnlockedPercent: 22.1 },
       ],
       nextEasiest: [
-        { apiName: 'ACH_LANDS_BETWEEN', displayName: 'Lands Between', description: 'Reached the Lands Between.', globalUnlockedPercent: 94.2 },
-        { apiName: 'ACH_FLASK', displayName: 'Flask of Wondrous Physick', description: 'Acquired the Flask of Wondrous Physick.', globalUnlockedPercent: 88.7 },
+        { apiName: 'ACH_ROUNDTABLE', displayName: 'Roundtable Hold', description: 'Arrived at the Roundtable Hold.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/f4e5fd19d3410470709632cd02b3136b5baca33d.jpg', globalUnlockedPercent: 94.2 },
+        { apiName: 'ACH_GREATRUNE', displayName: 'Great Rune', description: 'Acquired a Great Rune.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/3881b1c355ffcc122655c134f988d6c1265cd8c9.jpg', globalUnlockedPercent: 88.7 },
       ],
     },
     friendsInGame: [
@@ -387,7 +463,10 @@ function steam(now: Date): SteamData {
 
 function roblox(now: Date): RobloxData {
   return {
-    presence: { status: 'offline', lastOnline: iso(now, -14) },
+    presence: {
+      status: 'in-game', gameName: 'Blox Fruits', lastOnline: iso(now, 0),
+      playing: 214_000, visits: 42_800_000_000,
+    },
     availability: 'available',
   };
 }
@@ -395,7 +474,7 @@ function roblox(now: Date): RobloxData {
 // ── Clash Royale ─────────────────────────────────────────────────────────────────────────────
 
 function clashRoyaleCard(id: number, name: string, level: number, maxLevel: number, rarity: string) {
-  return { id, name, level, maxLevel, rarity };
+  return { id, name, level, maxLevel, rarity, iconUrl: clashRoyaleCardArt(name) };
 }
 
 function clashRoyale(now: Date): ClashRoyaleData {
@@ -413,21 +492,28 @@ function clashRoyale(now: Date): ClashRoyaleData {
   const rng = mulberry32(4242);
   for (let i = 0; i < 12; i++) {
     const won = rng() > 0.42;
+    // A battle's crown score is never a draw in Clash Royale ladder play — keep crownsFor/
+    // crownsAgainst strictly on the winning side's side of the result, or a "win" can roll a
+    // scoreline like 1-1 that reads as a tie even though the result field says otherwise.
+    let crownsFor = won ? 1 + Math.round(rng() * 2) : Math.round(rng() * 1);
+    let crownsAgainst = won ? Math.round(rng() * 1) : 1 + Math.round(rng() * 2);
+    if (won) crownsAgainst = Math.min(crownsAgainst, crownsFor - 1);
+    else crownsFor = Math.min(crownsFor, crownsAgainst - 1);
     battles.push({
       battleTime: isoDaysAgo(now, i * 0.6),
       type: 'PvP', result: won ? 'win' : 'loss',
-      crownsFor: won ? 1 + Math.round(rng() * 2) : Math.round(rng() * 1),
-      crownsAgainst: won ? Math.round(rng() * 1) : 1 + Math.round(rng() * 2),
+      crownsFor, crownsAgainst,
       opponentName: ['Ragnar', 'Freya', 'Bjorn', 'Astrid', 'Leif'][i % 5],
       trophyChange: won ? 24 + Math.round(rng() * 8) : -(24 + Math.round(rng() * 8)),
     });
   }
   return {
     profile: {
-      tag: '#YOURTAG', name: 'yourname', expLevel: 47, trophies: 6842, bestTrophies: 7010,
+      tag: '#YOURTAG', name: 'yourname', expLevel: 47, trophies: 9127, bestTrophies: 9127,
       wins: 3420, losses: 3180, threeCrownWins: 890, battleCount: 6600,
       arenaName: 'Legendary Arena', clanName: 'Northern Lights', clanTag: '#CLANTAG', clanScore: 52_300,
-      pathOfLegends: { leagueNumber: 7, trophies: 4820, rank: 1240 },
+      clanBadgeUrl: CLASH_ROYALE_DEMO_CLAN_BADGE_URL,
+      pathOfLegends: { leagueNumber: 1, trophies: 4820, rank: 1240 },
     },
     currentDeck: deck,
     towerTroop: clashRoyaleCard(26000050, 'Cannoneer', 6, 9, 'common'),
@@ -437,35 +523,61 @@ function clashRoyale(now: Date): ClashRoyaleData {
 
 // ── Valorant ─────────────────────────────────────────────────────────────────────────────────
 
-function valorant(now: Date): ValorantData {
-  const rng = mulberry32(777);
+function valorantMatchesFor(
+  now: Date,
+  rng: () => number,
+  count: number,
+  daysAgoStart: number,
+  daysAgoStep: number,
+  actShort: string,
+  idPrefix: string,
+): ValorantData['recentMatches'] {
   const agents = ['Jett', 'Omen', 'Sova', 'Reyna', 'Killjoy'];
   const maps = ['Ascent', 'Bind', 'Haven', 'Lotus', 'Pearl', 'Sunset'];
-  const recentMatches: ValorantData['recentMatches'] = [];
-  for (let i = 0; i < 10; i++) {
+  const matches: ValorantData['recentMatches'] = [];
+  for (let i = 0; i < count; i++) {
     const won = rng() > 0.45;
     const kills = 12 + Math.round(rng() * 16);
-    recentMatches.push({
-      matchId: `match-${i}`, map: maps[i % maps.length], mode: 'Competitive',
-      startedAt: isoDaysAgo(now, i * 0.9),
+    matches.push({
+      matchId: `${idPrefix}-${i}`, map: maps[i % maps.length], mode: 'Competitive',
+      startedAt: isoDaysAgo(now, daysAgoStart + i * daysAgoStep),
       result: won ? 'win' : 'loss',
       roundsWon: won ? 13 : 8 + Math.round(rng() * 4),
       roundsLost: won ? 8 + Math.round(rng() * 4) : 13,
       agentName: agents[i % agents.length],
+      agentIconUrl: valorantAgentIconUrl(agents[i % agents.length]),
       score: kills * 27 + Math.round(rng() * 40),
       kills, deaths: 10 + Math.round(rng() * 8), assists: 3 + Math.round(rng() * 6),
       headshots: Math.round(kills * 0.3), bodyshots: Math.round(kills * 0.6), legshots: Math.round(kills * 0.1),
       damageDealt: kills * 145 + Math.round(rng() * 800), damageReceived: 1800 + Math.round(rng() * 900),
-      actShort: 'e10a2', isMatchMvp: i === 0, isTeamMvp: i === 0 || i === 3,
+      actShort, isMatchMvp: i === 0, isTeamMvp: i === 0 || i === 3,
     });
   }
+  return matches;
+}
+
+function valorant(now: Date): ValorantData {
+  const rng = mulberry32(777);
+  // Current-act matches stay inside the last two weeks so the "2 weeks" / "Current act" period
+  // options genuinely differ from "Career" once the previous act's matches are added below —
+  // with everything crammed into one act inside 14 days, every period showed the same matches
+  // and the period dropdown looked broken even though it was working correctly.
+  const currentActMatches = valorantMatchesFor(now, rng, 10, 0.5, 0.9, 'e10a2', 'match');
+  const previousActMatches = valorantMatchesFor(now, rng, 8, 26, 2.1, 'e9a3', 'archive');
+  const wins = currentActMatches.filter((match) => match.result === 'win').length;
   return {
-    profile: { name: 'yourname', tag: 'NA1', region: 'eu', accountLevel: 187 },
-    rank: { tierId: 21, tierName: 'Ascendant 2', rr: 62, lastChange: 18, leaderboardRank: null },
-    peak: { tierName: 'Immortal 1', seasonShort: 'e8a1' },
-    currentSeason: { wins: 34, games: 61 },
-    recentMatches,
-    history: { matches: recentMatches, totalMatchesAvailable: 412, fetchedAt: iso(now, 0), currentActShort: 'e10a2' },
+    profile: {
+      name: 'yourname', tag: 'NA1', region: 'eu', accountLevel: 187,
+      cardIconUrl: VALORANT_DEMO_CARD_WIDE_ART, cardBannerUrl: VALORANT_DEMO_CARD_LARGE_ART,
+    },
+    rank: { tierId: 22, tierName: 'Ascendant 2', tierIconUrl: valorantTierIconUrl(22), rr: 62, lastChange: 18, leaderboardRank: null },
+    peak: { tierName: 'Immortal 1', tierIconUrl: valorantTierIconUrl(24), seasonShort: 'e8a1' },
+    currentSeason: { wins, games: currentActMatches.length },
+    recentMatches: currentActMatches,
+    history: {
+      matches: [...currentActMatches, ...previousActMatches],
+      totalMatchesAvailable: 412, fetchedAt: iso(now, 0), currentActShort: 'e10a2',
+    },
   };
 }
 
@@ -571,9 +683,9 @@ function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): CommandC
         detail: 'Dua Lipa', href: '#/spotify', score: 90, render: { type: 'spotify-now-playing' },
       },
       {
-        id: 'weather:signal', source: 'weather', kind: 'weather', kicker: 'Weather', title: '18°C, partly cloudy',
-        detail: 'Light rain expected this evening', href: '#/weather', score: 70,
-        render: { type: 'weather-signal', kind: 'rain' },
+        id: 'roblox:now-playing', source: 'roblox', kind: 'roblox', kicker: 'Roblox', title: 'Blox Fruits',
+        detail: 'In game right now', href: 'https://www.roblox.com/home', score: 70,
+        render: { type: 'roblox-now-playing' },
       },
       {
         id: 'gmail:threads', source: 'gmail', kind: 'gmail', kicker: 'Inbox', title: '5 unread',

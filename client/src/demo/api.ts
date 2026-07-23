@@ -3,8 +3,8 @@
 // makes has to be answered locally instead. A single window.fetch wrapper is the smallest way to
 // do that: every widget, button and drag interaction keeps calling the same real endpoints it
 // always does, completely unaware it's talking to fixtures instead of a server.
-import type { HueData, WidgetEnvelope } from '@personal-dashboard/shared';
-import { buildDemoEnvelopes } from './fixtures';
+import type { HueData, SpotifyData, WidgetEnvelope } from '@personal-dashboard/shared';
+import { buildDemoEnvelopes, spotifyNowPlayingAt } from './fixtures';
 
 const LAYOUT_STORAGE_KEY = 'demo-layout';
 
@@ -59,6 +59,18 @@ const LAYOUT_ITEM_ROUTE = /^\/api\/layout\/([^/]+)$/;
 
 type Envelopes = Record<string, WidgetEnvelope>;
 
+/** Every other widget is a static snapshot taken once at install time — fine, since nothing else
+ * in the demo depends on wall-clock progress. Spotify's now-playing does: the client estimates
+ * playback position locally from `progressMs` + time-since-`fetchedAt`, so a snapshot that never
+ * changes eventually reads as "finished" and stays stuck there forever. Recomputing it fresh on
+ * every poll (not just `/refresh`) is what makes the rotation actually advance. */
+function refreshSpotifyNowPlaying(envelope: WidgetEnvelope): WidgetEnvelope {
+  const now = new Date();
+  const data = envelope.data as SpotifyData;
+  const at = now.toISOString();
+  return { ...envelope, fetchedAt: at, lastAttemptAt: at, data: { ...data, nowPlaying: spotifyNowPlayingAt(now) } };
+}
+
 // GET/POST /api/widgets/:id[/refresh]
 function handleWidgetRoute(path: string, envelopes: Envelopes): Response | undefined {
   const match = WIDGET_ROUTE.exec(path);
@@ -66,7 +78,9 @@ function handleWidgetRoute(path: string, envelopes: Envelopes): Response | undef
   const id = match[1];
   const envelope = envelopes[id];
   if (!envelope) return jsonResponse({ id, status: 'loading', refreshMs: 60_000 } satisfies WidgetEnvelope);
-  if (match[2]) {
+  if (id === 'spotify') {
+    envelopes[id] = refreshSpotifyNowPlaying(envelope);
+  } else if (match[2]) {
     const at = new Date().toISOString();
     envelopes[id] = { ...envelope, fetchedAt: at, lastAttemptAt: at };
   }
