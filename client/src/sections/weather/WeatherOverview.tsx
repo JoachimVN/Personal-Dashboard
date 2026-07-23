@@ -114,7 +114,7 @@ const RAIN_COLOR = 'light-dark(#0d7fc4, #5ec2ff)';
  * both out directly so nothing is hover-only. */
 function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
   const gradientId = `${useId().replaceAll(':', '')}-spark`;
-  const [active, setActive] = useState<number | null>(null);
+  const [active, setActive] = useState<{ index: number; zone: 'temp' | 'rain' } | null>(null);
   if (hours.length < 2) return null;
   const W = 100;
   const H = 46;
@@ -140,21 +140,33 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
         ? `${rainHours[0].hourLabel}:00`
         : null;
 
+  // Temp and rain are separate hover zones (split at the gap between the two bands) so
+  // hovering the temperature line for a rainy hour doesn't also surface the rain readout —
+  // rain only shows up when you're actually pointing at the rain band.
+  const zoneBoundary = TEMP_H + RAIN_GAP / 2;
   const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const i = Math.min(
       hours.length - 1,
       Math.max(0, Math.round(((event.clientX - rect.left) / rect.width) * (hours.length - 1))),
     );
-    setActive(i);
+    const ySvg = ((event.clientY - rect.top) / rect.height) * H;
+    if (ySvg <= zoneBoundary) {
+      setActive({ index: i, zone: 'temp' });
+    } else {
+      setActive(hours[i].precipitationMm > 0 ? { index: i, zone: 'rain' } : null);
+    }
   };
-  const activeHour = active == null ? null : hours[active];
-  const readout = activeHour
-    ? `${deg(activeHour.temperature)}${activeHour.precipitationMm > 0 ? ` · ${activeHour.precipitationMm.toFixed(1)}mm rain` : ''} · ${activeHour.hourLabel}:00`
-    : rainRange
-      ? `rain ${rainRange} · ${totalPrecip.toFixed(1)}mm`
-      : null;
-  const readoutColor = activeHour ? (activeHour.precipitationMm > 0 ? RAIN_COLOR : 'var(--color-accent-weather)') : RAIN_COLOR;
+  const activeTempHour = active?.zone === 'temp' ? hours[active.index] : null;
+  const activeRainHour = active?.zone === 'rain' ? hours[active.index] : null;
+  const readout = activeTempHour
+    ? `${deg(activeTempHour.temperature)} · ${activeTempHour.hourLabel}:00`
+    : activeRainHour
+      ? `${activeRainHour.precipitationMm.toFixed(1)}mm rain · ${activeRainHour.hourLabel}:00`
+      : rainRange
+        ? `rain ${rainRange} · ${totalPrecip.toFixed(1)}mm`
+        : null;
+  const readoutColor = activeTempHour ? 'var(--color-accent-weather)' : RAIN_COLOR;
 
   return (
     <div className="flex h-full min-w-0 flex-col justify-center">
@@ -225,33 +237,33 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
                   height={barH}
                   rx={0.6}
                   fill={RAIN_COLOR}
-                  opacity={active === i ? 1 : 0.75}
+                  opacity={active?.zone === 'rain' && active.index === i ? 1 : 0.75}
                   aria-label={`${hour.hourLabel}:00: ${hour.precipitationMm.toFixed(1)}mm rain`}
                 />
               );
             })}
           {active != null && (
             <line
-              x1={xAt(active)}
+              x1={xAt(active.index)}
               y1={0}
-              x2={xAt(active)}
+              x2={xAt(active.index)}
               y2={H}
               stroke="var(--color-card-border)"
               strokeWidth={1}
               vectorEffect="non-scaling-stroke"
             />
           )}
-          {activeHour && (
+          {activeTempHour && (
             <>
               <path
-                d={`M${xAt(active!)},${yAt(activeHour.temperature)} l0.01,0`}
+                d={`M${xAt(active!.index)},${yAt(activeTempHour.temperature)} l0.01,0`}
                 stroke="var(--color-canvas)"
                 strokeWidth={7}
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
               />
               <path
-                d={`M${xAt(active!)},${yAt(activeHour.temperature)} l0.01,0`}
+                d={`M${xAt(active!.index)},${yAt(activeTempHour.temperature)} l0.01,0`}
                 stroke="var(--color-accent-weather)"
                 strokeWidth={4}
                 strokeLinecap="round"
