@@ -45,7 +45,8 @@ try {
 
   const unexpected = staged.filter((file) => !matchesRequestedPath(file));
   if (unexpected.length > 0) {
-    throw new Error(`Unexpected staged files:\n${unexpected.map((file) => `  - ${file}`).join('\n')}`);
+    const unexpectedList = unexpected.map((file) => `  - ${file}`).join('\n');
+    throw new Error(`Unexpected staged files:\n${unexpectedList}`);
   }
 
   await git(['diff', '--cached', '--check']);
