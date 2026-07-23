@@ -124,7 +124,7 @@
 .clash-recent-games-record { margin: 0.36rem 0 0; color: var(--color-ink-muted); font-size: 0.78rem; }
 .clash-recent-games-record strong { color: var(--color-ink); font-size: 1rem; }
 .clash-recent-games-record span { margin: 0 0.18rem; color: var(--color-ink-faint); }
-.clash-recent-games-rate { display: grid; justify-items: end; margin: 0; color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; line-height: 1.1; text-transform: uppercase; }
+.clash-recent-games-rate { display: grid; justify-items: end; margin: 0; color: var(--color-ink-muted); font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; line-height: 1.1; text-transform: uppercase; }
 .clash-recent-games-rate strong { color: var(--color-ink); font-size: 1.2rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
 .clash-battle-heading-art { display: block; width: 0.92rem; height: 0.92rem; overflow: hidden; }
 .clash-battle-heading-art img { display: block; width: 1.18rem; height: 1.18rem; max-width: none; margin: -0.13rem; }
@@ -164,6 +164,9 @@
     radial-gradient(115% 130% at 100% 0%, color-mix(in oklab, var(--color-accent-clash-royale) 12%, transparent), transparent 62%),
     color-mix(in oklab, var(--color-track) 25%, transparent);
 }
+.clash-overview .clash-trophy-label,
+.clash-overview .clash-eyebrow { color: color-mix(in oklab, var(--color-ink) 50%, var(--color-ink-muted)); }
+.clash-overview .clash-battle-heading { color: color-mix(in oklab, var(--color-ink) 30%, var(--color-ink-muted)); }
 /* Deck art stays unboxed so the cards read as the familiar in-game artwork. */
 .clash-overview .clash-card {
   transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
