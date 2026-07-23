@@ -32,18 +32,17 @@ if (!csvPathArg) {
   console.error('Pass the path to the tab-separated Spotify export as the first argument.');
   process.exit(1);
 }
-const csvPath = realpathSync(resolve(serverRoot, csvPathArg));
-if (csvPath !== serverRoot && !csvPath.startsWith(serverRoot + sep)) {
-  console.error(`CSV path must be inside ${serverRoot}.`);
-  process.exit(1);
-}
 
 interface CsvRow {
   trackId: string;
   streams: number;
 }
 
-function parseCsv(filePath: string): CsvRow[] {
+function parseCsv(pathArg: string, allowedRoot: string): CsvRow[] {
+  const filePath = realpathSync(resolve(allowedRoot, pathArg));
+  if (filePath !== allowedRoot && !filePath.startsWith(allowedRoot + sep)) {
+    throw new Error(`CSV path must be inside ${allowedRoot}.`);
+  }
   const text = readFileSync(filePath, 'utf8');
   const lines = text.split('\n').filter((line) => line.trim().length > 0);
   const [header, ...rows] = lines;
@@ -72,8 +71,8 @@ async function fetchTrack(id: string, bearer: string): Promise<RawTrack | undefi
 }
 
 async function main() {
-  const rows = parseCsv(csvPath);
-  console.log(`Parsed ${rows.length} rows from ${csvPath}\n`);
+  const rows = parseCsv(csvPathArg, serverRoot);
+  console.log(`Parsed ${rows.length} rows from ${resolve(serverRoot, csvPathArg)}\n`);
 
   const database = createDatabase(databaseUrl!);
   const historyStore = new SpotifyHistoryStore(database);

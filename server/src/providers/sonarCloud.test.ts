@@ -67,8 +67,8 @@ describe('createSonarCloudProvider', () => {
         () =>
           jsonResponse({
             components: [
-              { key: 'old-repo', name: 'Old Repo', visibility: 'public', lastAnalysisDate: '2026-01-01T00:00:00Z' },
-              { key: 'new-repo', name: 'New Repo', visibility: 'private', lastAnalysisDate: '2026-07-21T00:00:00Z' },
+              { key: 'old-repo', name: 'Old Repo', visibility: 'public', analysisDateAllBranches: '2026-01-01T00:00:00Z' },
+              { key: 'new-repo', name: 'New Repo', visibility: 'private', analysisDateAllBranches: '2026-07-21T00:00:00Z' },
             ],
           }),
       ],
@@ -98,7 +98,7 @@ describe('createSonarCloudProvider', () => {
                 { metric: 'security_rating', value: '1' },
                 { metric: 'reliability_rating', value: '1' },
                 { metric: 'sqale_rating', value: '1' },
-                { metric: 'security_hotspots_reviewed_percent', value: '100' },
+                { metric: 'security_hotspots_reviewed', value: '100' },
                 { metric: 'coverage', value: '0' },
                 { metric: 'duplicated_lines_density', value: '0.4' },
               ],

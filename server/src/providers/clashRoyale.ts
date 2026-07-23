@@ -1,10 +1,11 @@
 import { clashRoyaleSchema, type ClashRoyaleBattle, type ClashRoyaleCard, type ClashRoyaleData } from '@personal-dashboard/shared';
+import { md5Hex } from '../md5.js';
 import type { Provider } from '../scheduler.js';
 
 const CR_API_BASE = 'https://api.clashroyale.com/v1';
-const RECENT_BATTLES_COUNT = 10;
 const CLAN_BADGE_MANIFEST_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-data/master/docs/json/alliance_badges.json';
 const CLAN_BADGE_ASSET_BASE_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-assets/master/badges';
+const CLASH_ROYALE_WIKI_ASSET_URL = 'https://static.wikia.nocookie.net/clashroyale/images';
 
 interface ClanBadge {
   id: number;
@@ -139,14 +140,34 @@ export async function logClashRoyalePublicIp(): Promise<void> {
   }
 }
 
-export function mapCard(card: RawCard, rarityById: Map<number, string> = new Map()): ClashRoyaleCard {
+/** Wiki card files consistently use the card name without punctuation, followed by `Card`.
+ * A card in an Evolution-capable deck slot with `evolutionLevel` uses its Evolution asset, which
+ * follows the same convention with an `Evolution` suffix (for example,
+ * `CannonCardEvolution.png`). Fandom's static CDN files live under the first one and two
+ * characters of the MD5 filename hash, so we can construct the stable asset URL without a
+ * Cloudflare-protected wiki page request or revision-specific URL. */
+export function clashRoyaleWikiCardImageUrl(name: string, evolutionLevel?: number): string {
+  const fileStem = name.replaceAll(/[^a-z0-9]/gi, '');
+  const fileName = `${fileStem}Card${evolutionLevel !== undefined && evolutionLevel > 0 ? 'Evolution' : ''}.png`;
+  const hash = md5Hex(fileName);
+  return `${CLASH_ROYALE_WIKI_ASSET_URL}/${hash[0]}/${hash.slice(0, 2)}/${fileName}`;
+}
+
+/** The game's first special deck position is Evolution-only; its third can hold an Evolution or
+ * Hero. All other cards may report an unlocked `evolutionLevel`, but must keep their normal art. */
+export function isEvolutionDeckSlot(deckIndex: number): boolean {
+  return deckIndex === 0 || deckIndex === 2;
+}
+
+export function mapCard(card: RawCard, rarityById: Map<number, string> = new Map(), showEvolutionArtwork = false): ClashRoyaleCard {
   return {
     id: card.id,
     name: card.name,
     level: card.level,
     maxLevel: card.maxLevel,
     evolutionLevel: card.evolutionLevel,
-    iconUrl: card.iconUrls?.medium,
+    iconUrl: clashRoyaleWikiCardImageUrl(card.name, showEvolutionArtwork ? card.evolutionLevel : undefined),
+    fallbackIconUrl: card.iconUrls?.medium,
     rarity: (card.rarity ?? rarityById.get(card.id))?.toLowerCase(),
   };
 }
@@ -234,11 +255,18 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
           clanBadgeUrl,
           pathOfLegends: player.currentPathOfLegendSeasonResult,
         },
-        currentDeck: (player.currentDeck ?? []).map((card) => mapCard(card, rarityById)),
+        currentDeck: (player.currentDeck ?? []).map((card, index) => {
+          // `currentDeck` omits the Hero, so account for its recovered battle position before
+          // checking whether this card occupies an Evolution-capable slot in the full eight-card deck.
+          const deckIndex = deckHero?.index !== undefined && index >= deckHero.index ? index + 1 : index;
+          const hasUnlockedEvolution = (card.evolutionLevel ?? 0) > 0;
+          return mapCard(card, rarityById, isEvolutionDeckSlot(deckIndex) && hasUnlockedEvolution);
+        }),
         deckHero: deckHero ? mapCard(deckHero.card, rarityById) : undefined,
         deckHeroIndex: deckHero?.index,
         towerTroop: player.currentDeckSupportCards?.[0] ? mapCard(player.currentDeckSupportCards[0], rarityById) : undefined,
-        recentBattles: battleLog.slice(0, RECENT_BATTLES_COUNT).map(mapBattle),
+        // Supercell's battlelog endpoint already caps this at its own last-25 window; no local slice needed.
+        recentBattles: battleLog.map(mapBattle),
       };
 
       return clashRoyaleSchema.parse(data);

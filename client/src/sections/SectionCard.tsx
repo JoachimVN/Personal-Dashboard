@@ -1,11 +1,29 @@
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { motion } from 'motion/react';
-import { accentStyle, SectionIcon, type SectionDef } from './registry';
+import { accentStyle, SectionIcon, type SectionDef, type SectionId } from './registry';
 import { sectionHref } from '../router';
 
 export const sectionCardVariants = {
   hidden: { opacity: 0, y: 12 },
   visible: { opacity: 1, y: 0 },
+};
+
+/** A couple of sections show a brand wordmark instead of the generic icon + title header. */
+const SECTION_WORDMARKS: Partial<Record<SectionId, { markClassName: string; src: string; alt: string; className: string; aspectRatio: string }>> = {
+  valorant: {
+    markClassName: 'valorant-overview-mark',
+    src: '/valorant_wordmark.png',
+    alt: 'Valorant',
+    className: 'valorant-overview-wordmark',
+    aspectRatio: '3633 / 533',
+  },
+  'clash-royale': {
+    markClassName: 'clash-royale-overview-mark',
+    src: '/clash-royale-wordmark.png',
+    alt: 'Clash Royale',
+    className: 'clash-royale-overview-wordmark',
+    aspectRatio: '1500 / 650',
+  },
 };
 
 function interactiveTarget(target: EventTarget | null): boolean {
@@ -18,6 +36,8 @@ function openSection(section: SectionDef): void {
 
 /** Overview block for one section — the whole card is a link into the section's full view. */
 export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
+  const wordmark = SECTION_WORDMARKS[section.id];
+
   return (
     <motion.div
       role="link"
@@ -40,16 +60,35 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
       style={accentStyle(section)}
     >
       <div aria-hidden className="section-card-aura" />
-      <header className="relative mb-5 flex items-center gap-3">
-        <span className="section-icon grid h-10 w-10 place-items-center rounded-2xl text-(--accent)">
-          <SectionIcon id={section.id} />
-        </span>
-        <motion.h2
-          layoutId={`section-title-${section.id}`}
-          className="min-w-0 text-[1.05rem] font-semibold tracking-[-0.02em] text-ink"
-        >
-          {section.title}
-        </motion.h2>
+      <header className={`section-card-header section-card-header--${section.id} relative mb-5 flex items-center gap-3`}>
+        {wordmark ? (
+          <>
+            <span className={wordmark.markClassName} aria-hidden>
+              <SectionIcon id={section.id} />
+            </span>
+            <motion.h2 layoutId={`section-title-${section.id}`} className="sr-only">
+              {section.title}
+            </motion.h2>
+            <img
+              src={wordmark.src}
+              alt={wordmark.alt}
+              className={wordmark.className}
+              style={{ aspectRatio: wordmark.aspectRatio }}
+            />
+          </>
+        ) : (
+          <>
+            <span className="section-icon grid h-10 w-10 place-items-center rounded-2xl text-(--accent)">
+              <SectionIcon id={section.id} />
+            </span>
+            <motion.h2
+              layoutId={`section-title-${section.id}`}
+              className="min-w-0 text-[1.05rem] font-semibold tracking-[-0.02em] text-ink"
+            >
+              {section.title}
+            </motion.h2>
+          </>
+        )}
         <span aria-hidden className="section-arrow ml-auto grid h-9 w-9 place-items-center rounded-full text-lg text-ink-muted">
           ↗
         </span>
@@ -57,9 +96,11 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
       <div className="relative section-card-content">
         <section.Overview />
       </div>
-      <p className="relative mt-5 border-t border-card-border pt-4 text-xs text-ink-faint">
-        {section.description}
-      </p>
+      {section.description && (
+        <p className="relative mt-5 border-t border-card-border pt-4 text-xs text-ink-faint">
+          {section.description}
+        </p>
+      )}
     </motion.div>
   );
 }

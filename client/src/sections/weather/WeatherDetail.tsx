@@ -245,7 +245,7 @@ const CHART_H = 34;
  * switching tabs never changes the card's height and hovering any chart dims the same strip. */
 function HourGlyphStrip({ hours, active }: Readonly<{ hours: WeatherData['hours']; active: number | null }>) {
   return (
-    <div className="mb-2 flex text-[clamp(0.55rem,3.2vw,1rem)]" aria-hidden>
+    <div className="mb-2 flex gap-x-0.5 text-[clamp(0.5rem,2vw,1rem)]" aria-hidden>
       {hours.map((hour, i) => (
         <span
           key={hour.time}
@@ -765,7 +765,7 @@ export function WeatherDetail() {
         </WidgetBody>
       </DetailIntro>
 
-      <DetailSectionHeading label="Hourly" title="The next 24 hours" detail="Switch stats to see when today's rain, UV, wind or humidity peaks — not just temperature." />
+      <DetailSectionHeading title="The next 24 hours" detail="Switch stats to see when today's rain, UV, wind or humidity peaks — not just temperature." />
       <WidgetShell title="Hour by hour">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <HourlySection data={data} />}
@@ -773,7 +773,7 @@ export function WeatherDetail() {
       </WidgetShell>
 
       <div className="mt-6">
-        <DetailSectionHeading label="Outlook" title="The week ahead" detail="Switch stats to compare temperature, rain, UV, wind or humidity across the week." />
+        <DetailSectionHeading title="The week ahead" detail="Switch stats to compare temperature, rain, UV, wind or humidity across the week." />
         <WidgetShell title="7-day forecast">
           <WidgetBody envelope={envelope} offline={offline}>
             {(data) => <WeekAheadSection data={data} />}
@@ -782,7 +782,7 @@ export function WeatherDetail() {
       </div>
 
       <div className="mt-6">
-        <DetailSectionHeading label="Now" title="Current conditions" detail="Wind, humidity, UV and rain, as of the latest forecast." />
+        <DetailSectionHeading title="Current conditions" detail="Wind, humidity, UV and rain, as of the latest forecast." />
         <WidgetShell title="Conditions">
           <WidgetBody envelope={envelope} offline={offline}>
             {(data) => <ConditionTiles data={data} />}
@@ -791,7 +791,7 @@ export function WeatherDetail() {
       </div>
 
       <div className="mt-6">
-        <DetailSectionHeading label="Sky" title="Sun and moon" detail="Where the sun sits in today's arc, and tonight's moon phase." />
+        <DetailSectionHeading title="Sun and moon" detail="Where the sun sits in today's arc, and tonight's moon phase." />
         <WidgetShell title="Sun & moon">
           <WidgetBody envelope={envelope} offline={offline}>
             {(data) => <SkySection data={data} />}

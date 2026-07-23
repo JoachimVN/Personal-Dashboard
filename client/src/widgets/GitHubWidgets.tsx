@@ -283,7 +283,7 @@ export function RepoHealthWidget() {
 }
 
 // Status colors reserved for state, shipped with icon + label, never color alone.
-function CiBadge({ status, url }: Readonly<{ status: string; url?: string }>) {
+export function CiBadge({ status, url }: Readonly<{ status: string; url?: string }>) {
   if (status === 'none') {
     return <span className="text-ink-faint">no CI</span>;
   }

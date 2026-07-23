@@ -52,7 +52,9 @@ export const SECTIONS: SectionDef[] = [
     id: 'github',
     title: 'GitHub',
     label: 'Build',
-    description: 'Momentum across your work',
+    // GitHubOverview renders its own data-driven footer (latest activity + repo health) instead
+    // of a static description — see the border-t block at the end of that component.
+    description: '',
     accentVar: '--color-accent-github',
     Overview: GitHubOverview,
     Detail: GitHubDetail,
@@ -70,7 +72,7 @@ export const SECTIONS: SectionDef[] = [
     id: 'personal',
     title: 'Personal',
     label: 'Today',
-    description: 'The shape of your day',
+    description: 'Calendar, inbox and the rest of your day',
     accentVar: '--color-accent-personal',
     Overview: PersonalOverview,
     Detail: PersonalDetail,
@@ -106,7 +108,7 @@ export const SECTIONS: SectionDef[] = [
     id: 'clash-royale',
     title: 'Clash Royale',
     label: 'Arena',
-    description: 'Trophy push, deck and battle form',
+    description: '',
     accentVar: '--color-accent-clash-royale',
     Overview: ClashRoyaleOverview,
     Detail: ClashRoyaleDetail,
@@ -115,7 +117,9 @@ export const SECTIONS: SectionDef[] = [
     id: 'valorant',
     title: 'Valorant',
     label: 'Ranked',
-    description: 'Rank, RR and recent match form',
+    // The homepage card now has a full recent-match list, so an extra generic footer would just
+    // spend the space that list needs.
+    description: '',
     accentVar: '--color-accent-valorant',
     Overview: ValorantOverview,
     Detail: ValorantDetail,

@@ -10,3 +10,15 @@ export const PATH_OF_LEGENDS_LEAGUE_OFFSET = 3;
 export function pathOfLegendsDisplayLeagueNumber(apiLeagueNumber: number): number {
   return apiLeagueNumber + PATH_OF_LEGENDS_LEAGUE_OFFSET;
 }
+
+const PATH_OF_LEGENDS_LEAGUE_NAMES = [
+  'Challenger I', 'Challenger II', 'Challenger III', 'Master I', 'Master II',
+  'Master III', 'Champion', 'Grand Champion', 'Royal Champion', 'Ultimate Champion',
+] as const;
+
+/** Falls back to "League N" for a display number outside the named 10-tier scheme (e.g. a future
+ * Supercell addition this table hasn't been updated for yet). */
+export function pathOfLegendsLeagueName(apiLeagueNumber: number): string {
+  const displayNumber = pathOfLegendsDisplayLeagueNumber(apiLeagueNumber);
+  return PATH_OF_LEGENDS_LEAGUE_NAMES[displayNumber - 1] ?? `League ${displayNumber}`;
+}

@@ -1,0 +1,162 @@
+/* Hero split (identity/streak vs. the contribution graph), a chip row and a live activity line —
+   same panel/eyebrow/divider language as clashRoyale.css/valorant.css, just without key art since
+   there's no equivalent asset for a GitHub profile. */
+
+.github-overview {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.github-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: 1.15rem;
+  background: color-mix(in oklab, var(--color-track) 25%, transparent);
+}
+
+.github-eyebrow {
+  display: block;
+  color: var(--color-ink-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.github-hero-figure {
+  margin-top: 0.25rem;
+  color: var(--color-ink);
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.github-hero-substats {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  color: var(--color-ink-muted);
+  font-size: 0.78rem;
+}
+
+.github-hero-substats strong {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.github-hero-dot {
+  color: var(--color-ink-faint);
+}
+
+.github-hero-graph {
+  padding-left: 1.4rem;
+  border-left: 1px solid var(--color-card-border);
+}
+
+.github-heat-grid {
+  display: flex;
+  gap: 0.22rem;
+}
+
+.github-heat-week {
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+}
+
+.github-heat-cell {
+  display: block;
+  width: 0.62rem;
+  height: 0.62rem;
+  border-radius: 0.15rem;
+}
+
+.github-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.github-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-track) 22%, transparent);
+  color: var(--color-ink-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.github-chip strong {
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.github-chip-repo-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-chip-repo-name:hover {
+  color: var(--color-ink);
+  text-decoration: underline;
+}
+
+.github-chip-release {
+  color: var(--color-ink-faint);
+}
+
+.github-activity {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--color-card-border);
+  color: var(--color-ink-faint);
+  font-size: 0.75rem;
+}
+
+.github-activity-summary {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-activity-summary a {
+  color: var(--color-ink-muted);
+}
+
+.github-activity-summary a:hover {
+  color: var(--color-ink);
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .github-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .github-hero-graph {
+    padding-left: 0;
+    border-left: none;
+    border-top: 1px solid var(--color-card-border);
+    padding-top: 0.9rem;
+  }
+}

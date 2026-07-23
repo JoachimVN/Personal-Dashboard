@@ -280,6 +280,7 @@ export function createCommandCenterProvider(
           config.commandCenter.clashRoyaleWinStreakMin,
           config.commandCenter.clashRoyaleSessionGapMs,
           config.commandCenter.clashRoyaleMomentFreshMs,
+          config.commandCenter.clashRoyaleWinStreakFreshMs,
         ),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),

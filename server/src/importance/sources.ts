@@ -20,7 +20,7 @@ import type {
   WeatherData,
   WidgetStatus,
 } from '@personal-dashboard/shared';
-import { pathOfLegendsDisplayLeagueNumber } from '@personal-dashboard/shared';
+import { pathOfLegendsDisplayLeagueNumber, pathOfLegendsLeagueName } from '@personal-dashboard/shared';
 import { computeDeviation } from '../deviation.js';
 
 import type { Candidate, ClashRoyaleMoments, SteamMoments } from './types.js';
@@ -831,11 +831,21 @@ function clashRoyaleWinStreakCandidate(data: ClashRoyaleData, winStreakMin: numb
   }
   const latest = ladder[0];
   if (streak < winStreakMin || !latest || now - Date.parse(latest.battleTime) >= freshMs) return undefined;
+  const streakCrowns = ladder.slice(0, streak).reverse()
+    .map((battle) => ({ crownsFor: battle.crownsFor, crownsAgainst: battle.crownsAgainst, battleTime: battle.battleTime }));
+  // Path of Legends trophies reset every season, so restating them as a raw count reads as
+  // meaningless noise — the league (its trophy-equivalent standing) is the stable, legible number.
+  const detail = latest.type === 'pathOfLegend' && data.profile.pathOfLegends
+    ? `Currently ${pathOfLegendsLeagueName(data.profile.pathOfLegends.leagueNumber)}`
+    : `Currently ${data.profile.trophies.toLocaleString()} trophies`;
+  // A short streak is common enough that it doesn't earn a whole secondary-carousel slide —
+  // only a truly long run gets the richer secondary treatment; anything shorter is tile-only.
+  const shapes: Candidate['shapes'] = streak > 10 ? [...allShapes] : ['tile'];
   return {
-    id: `clash-royale:win-streak:${streak}:${latest.battleTime}`, source: 'clash-royale', kind: 'clash-royale', score: 70, shapes: [...allShapes],
+    id: `clash-royale:win-streak:${streak}:${latest.battleTime}`, source: 'clash-royale', kind: 'clash-royale', score: 70, shapes,
     kicker: 'Win streak', title: `${streak} wins in a row`,
-    detail: `Currently ${data.profile.trophies.toLocaleString()} trophies`,
-    href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'win-streak' },
+    detail,
+    href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'win-streak', streakCrowns },
   };
 }
 
@@ -889,6 +899,7 @@ export function clashRoyaleCandidates(
   winStreakMin: number,
   sessionGapMs: number,
   momentFreshMs: number,
+  winStreakFreshMs: number,
   now = Date.now(),
 ): Candidate[] {
   if (!data) return [];
@@ -896,7 +907,7 @@ export function clashRoyaleCandidates(
     clashRoyaleArenaCandidate(moments, data),
     clashRoyaleLeagueCandidate(moments),
     clashRoyaleBestTrophiesCandidate(moments),
-    clashRoyaleWinStreakCandidate(data, winStreakMin, momentFreshMs, now),
+    clashRoyaleWinStreakCandidate(data, winStreakMin, winStreakFreshMs, now),
     clashRoyaleSessionCandidate(data, sessionGapMs, momentFreshMs, now),
   ].filter((candidate): candidate is Candidate => candidate !== undefined);
 }

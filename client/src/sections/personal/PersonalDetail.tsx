@@ -122,7 +122,7 @@ export function PersonalDetail({ anchor }: Readonly<{ anchor?: string }>) {
       >
         <PersonalSignals />
       </DetailIntro>
-      <DetailSectionHeading label="Your day" title="The complete picture" detail="Arrange the cards into the order that best matches how you move through the day." />
+      <DetailSectionHeading title="The complete picture" detail="Arrange the cards into the order that best matches how you move through the day." />
       <ArrangeableWidgetGrid sectionId="personal" items={items} />
       <SystemFooter />
     </div>

@@ -690,6 +690,7 @@ describe('clashRoyaleCandidates', () => {
   const FRESH_MS = 24 * 60 * 60_000;
   const SESSION_GAP_MS = 30 * 60_000;
   const WIN_STREAK_MIN = 3;
+  const WIN_STREAK_FRESH_MS = 6 * 60 * 60_000;
   const NO_MOMENTS = {};
 
   function battle(overrides: Partial<ClashRoyaleBattle>): ClashRoyaleBattle {
@@ -709,12 +710,12 @@ describe('clashRoyaleCandidates', () => {
   };
 
   it('returns nothing when there is no data', () => {
-    expect(clashRoyaleCandidates(undefined, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW)).toEqual([]);
+    expect(clashRoyaleCandidates(undefined, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW)).toEqual([]);
   });
 
   it('surfaces a new arena milestone', () => {
     const moments: ClashRoyaleMoments = { newArena: 'Legendary Arena' };
-    expect(clashRoyaleCandidates(baseline, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW)).toContainEqual(
+    expect(clashRoyaleCandidates(baseline, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW)).toContainEqual(
       expect.objectContaining({
         id: 'clash-royale:arena:Legendary Arena', score: 88, kicker: 'New arena', title: 'Legendary Arena',
         detail: '5,432 trophies', shapes: ['hero', 'secondary', 'tile'],
@@ -724,7 +725,7 @@ describe('clashRoyaleCandidates', () => {
 
   it('surfaces a new Path of Legends league', () => {
     const moments: ClashRoyaleMoments = { newLeague: { leagueNumber: 8, trophies: 3120 } };
-    expect(clashRoyaleCandidates(baseline, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW)).toContainEqual(
+    expect(clashRoyaleCandidates(baseline, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW)).toContainEqual(
       expect.objectContaining({
         id: 'clash-royale:league:8', score: 85, kicker: 'Path of Legends', title: 'League 11',
         detail: '3,120 Path of Legends trophies',
@@ -734,7 +735,7 @@ describe('clashRoyaleCandidates', () => {
 
   it('surfaces a new personal best', () => {
     const moments: ClashRoyaleMoments = { newBestTrophies: 5600 };
-    expect(clashRoyaleCandidates(baseline, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW)).toContainEqual(
+    expect(clashRoyaleCandidates(baseline, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW)).toContainEqual(
       expect.objectContaining({
         id: 'clash-royale:best-trophies:5600', score: 80, kicker: 'New personal best', title: '5,600 trophies',
       }),
@@ -753,9 +754,23 @@ describe('clashRoyaleCandidates', () => {
       ],
     };
 
-    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW)).toContainEqual(
+    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW)).toContainEqual(
       expect.objectContaining({ id: expect.stringContaining('clash-royale:win-streak:3:'), score: 70, title: '3 wins in a row' }),
     );
+  });
+
+  it('drops a win streak once it ages past its own (shorter) freshness window, even while still inside the general moment window', () => {
+    const data: ClashRoyaleData = {
+      ...baseline,
+      recentBattles: [
+        battle({ battleTime: new Date(NOW - WIN_STREAK_FRESH_MS - 60_000).toISOString(), result: 'win' }),
+        battle({ battleTime: new Date(NOW - WIN_STREAK_FRESH_MS - 65_000).toISOString(), result: 'win' }),
+        battle({ battleTime: new Date(NOW - WIN_STREAK_FRESH_MS - 70_000).toISOString(), result: 'win' }),
+      ],
+    };
+
+    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW).map((c) => c.id))
+      .not.toContainEqual(expect.stringContaining('win-streak'));
   });
 
   it('does not surface a streak below the configured minimum', () => {
@@ -768,7 +783,7 @@ describe('clashRoyaleCandidates', () => {
       ],
     };
 
-    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW).map((c) => c.id))
+    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW).map((c) => c.id))
       .not.toContainEqual(expect.stringContaining('win-streak'));
   });
 
@@ -784,7 +799,7 @@ describe('clashRoyaleCandidates', () => {
       ],
     };
 
-    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW)).toContainEqual(
+    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW)).toContainEqual(
       expect.objectContaining({
         kicker: 'Clash Royale', title: '2W–1L last session', detail: '3 battles · Legendary Arena',
         score: 26, shapes: ['tile'],
@@ -798,7 +813,7 @@ describe('clashRoyaleCandidates', () => {
       recentBattles: [battle({ battleTime: new Date(NOW - FRESH_MS - 60_000).toISOString(), result: 'win' })],
     };
 
-    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW).map((c) => c.id))
+    expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW).map((c) => c.id))
       .not.toContainEqual(expect.stringContaining('session'));
   });
 
@@ -813,7 +828,7 @@ describe('clashRoyaleCandidates', () => {
     };
     const moments: ClashRoyaleMoments = { newArena: 'Legendary Arena' };
 
-    const ids = clashRoyaleCandidates(data, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, NOW).map((c) => c.id);
+    const ids = clashRoyaleCandidates(data, moments, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW).map((c) => c.id);
     expect(ids).toContainEqual(expect.stringContaining('clash-royale:arena:'));
     expect(ids).toContainEqual(expect.stringContaining('clash-royale:win-streak:'));
   });

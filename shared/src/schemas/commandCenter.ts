@@ -33,6 +33,9 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
     arenaName: z.string().optional(),
     /** Only present for kind 'league' — looked up against a local league-number->badge table client-side. */
     leagueNumber: z.number().optional(),
+    /** Only present for kind 'win-streak' — crown score for each win in the streak, oldest first,
+     * so the card can show the run rather than just a bare count. */
+    streakCrowns: z.array(z.object({ crownsFor: z.number(), crownsAgainst: z.number(), battleTime: z.string() })).optional(),
   }),
 ]);
 

@@ -18,7 +18,7 @@ function SonarSection() {
   if (envelope?.status === 'disabled') return null;
   return (
     <>
-      <DetailSectionHeading label="Quality" title="Code quality" detail="Quality gate status, ratings and coverage across your SonarCloud org." />
+      <DetailSectionHeading title="Code quality" detail="Quality gate status, ratings and coverage across your SonarCloud org." />
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) =>
           data.projects.length === 0 ? (
@@ -68,7 +68,7 @@ export function GitHubDetail() {
       >
         <GitHubSignals />
       </DetailIntro>
-      <DetailSectionHeading label="Start here" title="From thought to working session" detail="Capture quickly or open the full development workspace in one move." />
+      <DetailSectionHeading title="From thought to working session" detail="Capture quickly or open the full development workspace in one move." />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         <div className="lg:col-span-3">
           <IssueCapture />
@@ -77,7 +77,7 @@ export function GitHubDetail() {
           <CodeLauncher />
         </div>
       </div>
-      <DetailSectionHeading label="Workstream" title="What is moving now" />
+      <DetailSectionHeading title="What is moving now" />
       <div className="github-work-grid grid grid-cols-1 gap-4 lg:grid-cols-2">
         <GitHubActivityWidget />
         <GitHubWorkWidget />

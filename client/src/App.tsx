@@ -195,11 +195,8 @@ function Overview({ now }: Readonly<{ now: Date }>) {
         <DailyCommandCenter />
       </motion.div>
       <div className="dashboard-section-heading">
-        <div>
-          <p className="command-eyebrow">Sections</p>
-          <h2>More detail</h2>
-        </div>
-        <p>Open a section for the full view.</p>
+        <h2>Sections</h2>
+        <p>Open one for the full view.</p>
       </div>
       <motion.div
         className="dashboard-grid grid grid-cols-1 gap-4 lg:grid-cols-12"

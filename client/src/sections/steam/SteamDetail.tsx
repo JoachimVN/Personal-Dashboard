@@ -61,7 +61,7 @@ export function SteamDetail() {
         <SteamSignals />
       </DetailIntro>
 
-      <DetailSectionHeading label="Now" title="Current game" />
+      <DetailSectionHeading title="Current game" />
       {/* Neutral title — SteamNowPlaying's own kicker ("Playing now"/"Last played"/"Most played") states the actual status. */}
       <WidgetShell title="Game">
         <WidgetBody envelope={envelope} offline={offline}>
@@ -70,7 +70,6 @@ export function SteamDetail() {
       </WidgetShell>
 
       <DetailSectionHeading
-        label="Trends"
         title="Playtime over time"
         detail="Daily deltas between library snapshots — Steam only reports a cumulative all-time total, not a native day-by-day breakdown."
       />
@@ -81,7 +80,6 @@ export function SteamDetail() {
       </WidgetShell>
 
       <DetailSectionHeading
-        label="Library"
         title="Recently played and achievements"
         detail="Achievement progress tracks the current game, or the most recently played one when you're not in-game."
       />
@@ -99,7 +97,6 @@ export function SteamDetail() {
       </div>
 
       <DetailSectionHeading
-        label="Achievements"
         title="Tracked game highlights"
         detail="Rarest unlocks and the achievements you're closest to in your current or most recently played game, ranked by Steam's global unlock rate."
       />
@@ -110,7 +107,6 @@ export function SteamDetail() {
       </WidgetShell>
 
       <DetailSectionHeading
-        label="Friends"
         title="Playtime leaderboard"
         detail="Ranked by all-time playtime across your Steam friends; private libraries stay listed, just unranked."
       />
@@ -128,7 +124,6 @@ export function SteamDetail() {
       </div>
 
       <DetailSectionHeading
-        label="Library"
         title="All your games"
         detail="Sorted by all-time or last-2-weeks playtime — the only two windows Steam's API tracks."
       />

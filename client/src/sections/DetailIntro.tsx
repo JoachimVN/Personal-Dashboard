@@ -36,20 +36,15 @@ export function DetailIntro({ title, description, accent, children }: Readonly<D
 }
 
 export function DetailSectionHeading({
-  label,
   title,
   detail,
 }: Readonly<{
-  label: string;
   title: string;
   detail?: string;
 }>) {
   return (
     <div className="mb-4 mt-8 flex flex-col gap-1 px-1 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ink-faint">{label}</p>
-        <h2 className="mt-1 text-xl font-semibold tracking-[-0.035em]">{title}</h2>
-      </div>
+      <h2 className="text-xl font-semibold tracking-[-0.035em]">{title}</h2>
       {detail && <p className="max-w-md text-xs leading-5 text-ink-faint sm:text-right">{detail}</p>}
     </div>
   );
