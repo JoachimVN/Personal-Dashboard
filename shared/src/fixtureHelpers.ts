@@ -73,6 +73,24 @@ export const TRACKS = [
   { id: 't8', track: 'Vogue', artist: 'Madonna', album: "I'm Breathless" },
 ];
 
+/** Real cover art for every album TRACKS/ONE_OFFS reference, keyed by album name — same manual
+ * override the README screenshot generator's own MANUAL_ALBUM_IMAGES supports for "the automatic
+ * result is wrong", except the demo build has no network access at build time to attempt an
+ * automatic lookup in the first place, so this is the only source of album art it has. */
+export const MANUAL_ALBUM_IMAGES: Record<string, string> = {
+  'After Hours': 'https://i.scdn.co/image/ab67616d0000b2738863bc11d2aa12b54f5aeb36',
+  'Future Nostalgia': 'https://i.scdn.co/image/ab67616d0000b273c88bae7846e62a8ba59ee0bd',
+  'DAMN.': 'https://i.scdn.co/image/ab67616d0000b2738b52c6b9bc4e43d873869699',
+  'Viva la Vida or Death and All His Friends': 'https://i.scdn.co/image/ab67616d0000b273e21cc1db05580b6f2d2a3b6e',
+  SOUR: 'https://i.scdn.co/image/ab67616d0000b273a91c10fe9472d9bd89802e5a',
+  '24K Magic': 'https://i.scdn.co/image/ab67616d0000b273232711f7d66a1e19e89e28c5',
+  'When We All Fall Asleep, Where Do We Go?': 'https://i.scdn.co/image/ab67616d0000b27350a3147b4edd7701a876c6ce',
+  "I'm Breathless": 'https://image-cdn-fa.spotifycdn.com/image/ab67616d00001e02e275f1fbda1c7bc82f9c386b',
+  'Endless Summer Vacation': 'https://i.scdn.co/image/ab67616d0000b273f429549123dbe8552764ba1d',
+  Lover: 'https://i.scdn.co/image/ab67616d0000b273e787cffec20aa2a396a61647',
+  'Fine Line': 'https://i.scdn.co/image/ab67616d0000b2737cf2b9825bb43083d123ac22',
+};
+
 // A handful of one-off plays outside the top-8 rotation, so "Recently played" reads like actual
 // listening history instead of being a reordered copy of "Top tracks".
 export const ONE_OFFS = [
@@ -92,6 +110,19 @@ export const ALBUMS = [
  * detail page and the public demo's Spotify widget, so it's built once here from whatever
  * artist/album art the caller already resolved (network-fetched for screenshots, static
  * fallback art for the demo — resolution strategy is the only thing that differs). */
+// Distinct orderings for the "6 months" / "12 months" / "all time" tabs — a real listening
+// history's rankings shift across timeframes, someone you've been obsessed with this month
+// wasn't necessarily a top artist a year ago. Reordering by a fixed permutation (rather than,
+// say, reversing the short-term list, or reusing it outright for long-term) is what makes
+// switching tabs actually show something different instead of looking like the tab did nothing.
+const MEDIUM_TERM_ORDER = [2, 5, 0, 6, 3, 7, 1, 4];
+const LONG_TERM_ORDER = [4, 1, 6, 2, 7, 0, 5, 3];
+const ALL_TIME_ORDER = [6, 3, 1, 5, 0, 4, 2, 7];
+
+function reorder<T>(items: T[], order: number[]): T[] {
+  return order.map((i) => items[i]);
+}
+
 export function buildSpotifyRotation(
   now: Date,
   artistImages: Record<string, string>,
@@ -111,12 +142,15 @@ export function buildSpotifyRotation(
       { ...tracks[0], playedAt: isoDaysAgo(now, 0, -4.1) },
       { ...oneOffs[2], playedAt: isoDaysAgo(now, 0, -6.3) },
     ],
-    topArtists: { shortTerm: artists, mediumTerm: artists.slice().reverse(), longTerm: artists },
-    topTracks: { shortTerm: tracks, mediumTerm: tracks.slice().reverse(), longTerm: tracks },
+    topArtists: { shortTerm: artists, mediumTerm: reorder(artists, MEDIUM_TERM_ORDER), longTerm: reorder(artists, LONG_TERM_ORDER) },
+    topTracks: { shortTerm: tracks, mediumTerm: reorder(tracks, MEDIUM_TERM_ORDER), longTerm: reorder(tracks, LONG_TERM_ORDER) },
     allTime: {
       trackedSince: dateDaysAgo(now, 280),
-      artists: artists.map((artist, i) => ({ ...artist, playCount: 410 - i * 38 })),
-      tracks: tracks.map((track, i) => ({ ...track, playCount: 128 - i * 11, verified: i < 2 })),
+      artists: reorder(artists, ALL_TIME_ORDER).map((artist, i) => ({ ...artist, playCount: 410 - i * 38 })),
+      // Not real, externally-verified play counts (see the `verified` field's own doc comment) —
+      // leaving every entry unverified keeps the "×" stream-count badge off the All time tab
+      // instead of showing a number that reads as authoritative but isn't.
+      tracks: reorder(tracks, ALL_TIME_ORDER).map((track, i) => ({ ...track, playCount: 128 - i * 11, verified: false })),
       albums: ALBUMS.map((album) => ({
         id: album.id, name: album.name, artist: album.artist, imageUrl: albumImages.get(album.name)!,
         url: '#', releaseDate: album.releaseDate, releaseDatePrecision: 'day' as const, totalTracks: album.totalTracks,

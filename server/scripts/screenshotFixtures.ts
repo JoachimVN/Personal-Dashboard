@@ -24,6 +24,7 @@ import {
   mulberry32,
   usageHistoryFor,
   MANUAL_ARTIST_IMAGES,
+  MANUAL_ALBUM_IMAGES,
   ARTIST_NAMES,
   TRACKS,
   ONE_OFFS,
@@ -192,11 +193,8 @@ export function overviewAiCodex(now: Date): AiUsageToolData {
 
 // ── Spotify page — real, broadly-recognizable artists/tracks, not an obscure curated list ──────
 
-// Manual overrides, checked before the automatic Wikipedia/iTunes lookups — fill in when the
-// automatic result is wrong (mismatched photo, low-res crop, etc.). Same keys as ARTIST_NAMES /
-// track names / album names (shared/src/fixtureHelpers.ts) above.
-const MANUAL_ALBUM_IMAGES: Record<string, string> = {};
-
+// MANUAL_ARTIST_IMAGES/MANUAL_ALBUM_IMAGES (shared/src/fixtureHelpers.ts) are checked before the
+// automatic Wikipedia/iTunes lookups below — fill those in when the automatic result is wrong.
 async function loadSpotify(now: Date): Promise<{ overview: SpotifyData; detail: SpotifyData }> {
   const artistImages = Object.fromEntries(await Promise.all(
     ARTIST_NAMES.map(async (name) => [name, MANUAL_ARTIST_IMAGES[name] ?? await resolvedArtistPhoto(name, `artist-${name}`)] as const),
