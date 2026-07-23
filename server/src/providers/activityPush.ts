@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readFile, stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { activityPushSchema, type ActivityPushData } from '@personal-dashboard/shared';
+import { activityPushSchema, clashRoyaleSchema, type ActivityPushData, type ClashRoyaleData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 import { jsonlFiles } from './aiUsage.js';
 
@@ -76,7 +76,31 @@ async function codexLastActiveAt(): Promise<string | null> {
   return mtime?.toISOString() ?? null;
 }
 
-export function createActivityPushProvider(push: { url: string; secret: string } | undefined): Provider<ActivityPushData> {
+export interface PushedClashRoyaleActivity {
+  result: 'win' | 'loss' | 'draw';
+  crownsFor: number;
+  crownsAgainst: number;
+  timestamp: string;
+}
+
+/** The dashboard scheduler has already fetched and validated this data using the home machine's
+ * IP-allowlisted Supercell key. Batabiboing receives only the display-safe latest battle summary. */
+export function latestClashRoyaleActivity(data: Pick<ClashRoyaleData, 'recentBattles'> | undefined): PushedClashRoyaleActivity | null {
+  const battle = data?.recentBattles[0];
+  return battle
+    ? {
+        result: battle.result,
+        crownsFor: battle.crownsFor,
+        crownsAgainst: battle.crownsAgainst,
+        timestamp: battle.battleTime,
+      }
+    : null;
+}
+
+export function createActivityPushProvider(
+  push: { url: string; secret: string } | undefined,
+  getClashRoyaleData: () => unknown = () => undefined,
+): Provider<ActivityPushData> {
   return {
     id: 'activity-push',
     schema: activityPushSchema,
@@ -90,6 +114,7 @@ export function createActivityPushProvider(push: { url: string; secret: string }
         claudeLastActiveAt(),
         codexLastActiveAt(),
       ]);
+      const clashRoyale = clashRoyaleSchema.safeParse(getClashRoyaleData());
 
       const res = await fetch(push.url, {
         method: 'POST',
@@ -98,7 +123,12 @@ export function createActivityPushProvider(push: { url: string; secret: string }
           'Content-Type': 'application/json',
           Authorization: `Bearer ${push.secret}`,
         },
-        body: JSON.stringify({ epicRunning, claudeActiveAt, codexActiveAt }),
+        body: JSON.stringify({
+          epicRunning,
+          claudeActiveAt,
+          codexActiveAt,
+          clashRoyale: latestClashRoyaleActivity(clashRoyale.success ? clashRoyale.data : undefined),
+        }),
       });
       if (!res.ok) throw new Error(`activity push failed: HTTP ${res.status}`);
 

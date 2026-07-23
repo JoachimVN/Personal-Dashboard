@@ -27,7 +27,7 @@ app.disable('x-powered-by');
 app.use(express.json());
 
 const scheduler = new ProviderScheduler();
-const providers = createProviders(env, config, database);
+const providers = createProviders(env, config, database, () => scheduler.getEnvelope('clash-royale')?.data);
 for (const provider of providers.all) {
   scheduler.register(provider);
 }
