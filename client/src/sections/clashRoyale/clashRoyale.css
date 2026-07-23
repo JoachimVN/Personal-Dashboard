@@ -36,7 +36,10 @@
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  background: var(--clash-royale-card-art, none) right center / contain no-repeat;
+  /* The renders all carry a chunk of empty "sky" padding above the platform itself, so a plain
+     `contain` centers the bounding box but leaves the actual art looking bottom-heavy. Scaling
+     past 100% and anchoring to the bottom crops that padding off instead of centering around it. */
+  background: var(--clash-royale-card-art, none) right bottom / auto 130% no-repeat;
   opacity: 0.6;
   filter: blur(18px);
   -webkit-mask-image: linear-gradient(to left, black 35%, transparent 85%);
