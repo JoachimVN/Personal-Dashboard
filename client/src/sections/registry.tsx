@@ -108,7 +108,7 @@ export const SECTIONS: SectionDef[] = [
     id: 'clash-royale',
     title: 'Clash Royale',
     label: 'Arena',
-    description: 'Trophies, deck and recent battles',
+    description: '',
     accentVar: '--color-accent-clash-royale',
     Overview: ClashRoyaleOverview,
     Detail: ClashRoyaleDetail,

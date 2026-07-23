@@ -19,6 +19,7 @@ function openSection(section: SectionDef): void {
 /** Overview block for one section — the whole card is a link into the section's full view. */
 export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
   const isValorant = section.id === 'valorant';
+  const isClashRoyale = section.id === 'clash-royale';
 
   return (
     <motion.div
@@ -57,7 +58,21 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
               className="valorant-overview-wordmark"
               style={{ aspectRatio: '3633 / 533' }}
             />
-            <span className="valorant-overview-header-label">Competitive</span>
+          </>
+        ) : isClashRoyale ? (
+          <>
+            <span className="clash-royale-overview-mark" aria-hidden>
+              <SectionIcon id={section.id} />
+            </span>
+            <motion.h2 layoutId={`section-title-${section.id}`} className="sr-only">
+              {section.title}
+            </motion.h2>
+            <img
+              src="/clash-royale-wordmark.png"
+              alt="Clash Royale"
+              className="clash-royale-overview-wordmark"
+              style={{ aspectRatio: '1500 / 650' }}
+            />
           </>
         ) : (
           <>

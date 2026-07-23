@@ -76,14 +76,6 @@
   object-position: left center;
   filter: brightness(0) invert(1);
 }
-.valorant-overview-header-label {
-  margin-left: 0.1rem;
-  color: rgba(255, 255, 255, 0.66);
-  font-size: 0.58rem;
-  font-weight: 750;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-}
 .dashboard-section-card--valorant:has(.valorant-overview) .section-arrow {
   border-color: rgba(255, 255, 255, 0.16);
   background: rgba(12, 12, 14, 0.42);
