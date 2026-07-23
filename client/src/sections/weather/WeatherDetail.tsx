@@ -245,7 +245,7 @@ const CHART_H = 34;
  * switching tabs never changes the card's height and hovering any chart dims the same strip. */
 function HourGlyphStrip({ hours, active }: Readonly<{ hours: WeatherData['hours']; active: number | null }>) {
   return (
-    <div className="mb-2 flex text-[clamp(0.55rem,3.2vw,1rem)]" aria-hidden>
+    <div className="mb-2 flex gap-x-0.5 text-[clamp(0.5rem,2vw,1rem)]" aria-hidden>
       {hours.map((hour, i) => (
         <span
           key={hour.time}
