@@ -52,7 +52,9 @@ export const SECTIONS: SectionDef[] = [
     id: 'github',
     title: 'GitHub',
     label: 'Build',
-    description: 'Momentum across your work',
+    // GitHubOverview renders its own data-driven footer (latest activity + repo health) instead
+    // of a static description — see the border-t block at the end of that component.
+    description: '',
     accentVar: '--color-accent-github',
     Overview: GitHubOverview,
     Detail: GitHubDetail,

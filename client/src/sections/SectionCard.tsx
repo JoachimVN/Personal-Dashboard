@@ -57,9 +57,11 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
       <div className="relative section-card-content">
         <section.Overview />
       </div>
-      <p className="relative mt-5 border-t border-card-border pt-4 text-xs text-ink-faint">
-        {section.description}
-      </p>
+      {section.description && (
+        <p className="relative mt-5 border-t border-card-border pt-4 text-xs text-ink-faint">
+          {section.description}
+        </p>
+      )}
     </motion.div>
   );
 }
