@@ -49,7 +49,12 @@ function withEnabledToggle(provider: Provider, config: AppConfig): Provider {
   };
 }
 
-export function createProviders(env: ServerEnv, config: AppConfig, database: Database): Providers {
+export function createProviders(
+  env: ServerEnv,
+  config: AppConfig,
+  database: Database,
+  getClashRoyaleData: () => unknown = () => undefined,
+): Providers {
   const weather = createWeatherProvider(env.weather, env.timezone);
   // Transit and power share the weather coordinates: "near the dashboard's location".
   const transit = createTransitProvider(env.weather, config.transit);
@@ -109,7 +114,7 @@ export function createProviders(env: ServerEnv, config: AppConfig, database: Dat
         createClashRoyaleProvider(env.clashRoyale),
         createValorantProvider(env.valorant, valorantHistory),
         createSonarCloudProvider(env.sonarCloud),
-        createActivityPushProvider(env.dashboardPush),
+        createActivityPushProvider(env.dashboardPush, getClashRoyaleData),
       ] satisfies Provider[]
     ).map((provider) => withEnabledToggle(provider, config)),
   };
