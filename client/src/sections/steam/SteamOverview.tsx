@@ -11,25 +11,29 @@ function formatHours(minutes: number): string {
 }
 
 /** Same ring language as the weather overview's humidity gauge — a stroke-dasharray circle
- * reads faster at this size than the flat progress bar it replaces. */
-function AchievementRing({ pct }: Readonly<{ pct: number }>) {
+ * reads faster at this size than the flat progress bar it replaces. The tracked game's own
+ * square icon sits in the ring's hollow center, so the ring reads as "this game" at a glance. */
+function AchievementRing({ pct, iconUrl }: Readonly<{ pct: number; iconUrl?: string }>) {
   const r = 15;
   const circumference = 2 * Math.PI * r;
   return (
-    <svg viewBox="0 0 36 36" className="steam-pulse-ring-svg -rotate-90" aria-hidden>
-      <circle cx="18" cy="18" r={r} fill="none" stroke="var(--color-track)" strokeWidth="3" />
-      <circle
-        cx="18"
-        cy="18"
-        r={r}
-        fill="none"
-        stroke="var(--color-accent-steam)"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={circumference * (1 - pct / 100)}
-      />
-    </svg>
+    <div className="steam-pulse-ring">
+      <svg viewBox="0 0 36 36" className="steam-pulse-ring-svg -rotate-90" aria-hidden>
+        <circle cx="18" cy="18" r={r} fill="none" stroke="var(--color-track)" strokeWidth="3" />
+        <circle
+          cx="18"
+          cy="18"
+          r={r}
+          fill="none"
+          stroke="var(--color-accent-steam)"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - pct / 100)}
+        />
+      </svg>
+      {iconUrl && <img src={iconUrl} alt="" aria-hidden loading="lazy" className="steam-pulse-ring-icon" />}
+    </div>
   );
 }
 
@@ -43,10 +47,29 @@ function AchievementBadge({ achievement }: Readonly<{ achievement: SteamAchievem
       )}
       <div className="min-w-0">
         <p className="steam-pulse-badge-name">{achievement.displayName}</p>
-        <p className="steam-pulse-badge-date">{relativeTime(achievement.unlockedAt)}</p>
+        <p className="steam-pulse-badge-date">
+          {relativeTime(achievement.unlockedAt)}
+          {achievement.globalUnlockedPercent !== undefined && ` · ${achievement.globalUnlockedPercent.toFixed(1)}% have it`}
+        </p>
       </div>
     </li>
   );
+}
+
+/** Looks up the tracked achievement game's square icon across every game list the overview
+ * already has in hand, rather than growing the achievements payload with a duplicate field. */
+function findTrackedGameIcon(data: SteamData, appId: number): string | undefined {
+  const pools: SteamGame[][] = [
+    data.currentGame ? [data.currentGame] : [],
+    data.recentlyPlayed,
+    data.library?.mostPlayed ?? [],
+    data.library?.allGames ?? [],
+  ];
+  for (const pool of pools) {
+    const match = pool.find((game) => game.appId === appId)?.iconUrl;
+    if (match) return match;
+  }
+  return undefined;
 }
 
 type ShelfEntry = { game: SteamGame; source: 'recent' | 'all-time' };
@@ -85,19 +108,26 @@ function SteamHomeDashboard({ data }: Readonly<{ data: SteamData }>) {
     ? Math.round((data.achievements.unlockedCount / data.achievements.totalCount) * 100)
     : undefined;
   const recentUnlocks = data.achievements?.recentUnlocks.slice(0, 3) ?? [];
+  const trackedGameIcon = data.achievements ? findTrackedGameIcon(data, data.achievements.appId) : undefined;
 
   return (
     <div className="steam-home-dashboard">
       <section className="steam-pulse" aria-label="Steam library summary">
         {data.achievements && achievementPct !== undefined && (
           <div className="steam-pulse-top">
-            <AchievementRing pct={achievementPct} />
+            <AchievementRing pct={achievementPct} iconUrl={trackedGameIcon} />
             <div className="steam-pulse-top-copy">
               <span className="steam-eyebrow">Achievement progress</span>
               <p className="steam-pulse-game">{data.achievements.gameName}</p>
             </div>
             <p className="steam-pulse-pct">{achievementPct}%</p>
           </div>
+        )}
+
+        {recentUnlocks.length > 0 && (
+          <ul className="steam-pulse-badges" aria-label="Latest achievements">
+            {recentUnlocks.map((achievement) => <AchievementBadge key={achievement.apiName} achievement={achievement} />)}
+          </ul>
         )}
 
         <div className="steam-pulse-stats">
@@ -114,12 +144,6 @@ function SteamHomeDashboard({ data }: Readonly<{ data: SteamData }>) {
             <p className="steam-pulse-stat-label">past 2 weeks</p>
           </div>
         </div>
-
-        {recentUnlocks.length > 0 && (
-          <ul className="steam-pulse-badges" aria-label="Latest achievements">
-            {recentUnlocks.map((achievement) => <AchievementBadge key={achievement.apiName} achievement={achievement} />)}
-          </ul>
-        )}
       </section>
 
       {shelf.length > 0 && (
