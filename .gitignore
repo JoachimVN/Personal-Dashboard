@@ -9,6 +9,8 @@ server/dist/
 .env
 .env.*
 !.env.example
+# Not a secret — just a build flag for the public demo build (see client/src/demo/).
+!client/.env.demo
 # No trailing slash: install-launchd.sh replaces these with symlinks into the shared
 # state dir, and a trailing-slash pattern matches only real directories — so `foo/`
 # would silently stop ignoring them the moment they become links.

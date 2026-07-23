@@ -54,6 +54,9 @@ export function useDeviceLocation(): void {
   const lastSent = useRef<Coordinates | null>(null);
 
   useEffect(() => {
+    // The public demo has no server to report a location to, and prompting visitors for their
+    // real location on a page full of fake data would be actively misleading.
+    if (import.meta.env.VITE_DEMO === 'true') return;
     if (!('geolocation' in navigator)) return;
 
     const report = () => { reportLocation(lastSent).catch(() => undefined); };
