@@ -12,25 +12,25 @@ export function ClashRoyaleDetail() {
     <div>
       <DetailIntro
         title="Clash Royale"
-        description="Your Trophy Road, Ranked standing, deck lineup, and recent battle form."
+        description="Your Trophy Road, Ranked standing, deck lineup, and recent battles."
         accent="var(--color-accent-clash-royale)"
       />
 
-      <DetailSectionHeading label="Arena" title="Trophy Road & Ranked" />
+      <DetailSectionHeading title="Trophy Road & Ranked" />
       <WidgetShell title="Arena profile">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleProfile data={data} />}
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="Deck" title="Your eight cards" />
+      <DetailSectionHeading title="Your eight cards" />
       <WidgetShell title="Current deck">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleDeck data={data} />}
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="History" title="Recent battles" />
+      <DetailSectionHeading title="Recent battles" />
       <WidgetShell title="Battle history">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleBattleLog data={data} />}

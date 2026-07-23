@@ -282,14 +282,14 @@ export function ValorantDetail() {
         {(data) => <ValorantHero data={data} />}
       </WidgetBody>
 
-      <DetailSectionHeading label="Performance" title="Agent pool" />
+      <DetailSectionHeading title="Agent pool" />
       <WidgetShell title="Performance periods">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ValorantPerformance data={data} selectedPeriodId={selectedPeriodId} onPeriodChange={setSelectedPeriodId} />}
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="History" title="Captured matches" />
+      <DetailSectionHeading title="Captured matches" />
       <WidgetShell title="Match history">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ValorantMatchLog data={data} selectedPeriodId={selectedPeriodId} />}

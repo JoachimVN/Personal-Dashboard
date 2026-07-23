@@ -171,11 +171,11 @@ export function AiDetail() {
         description="How much of your AI usage allowance is left, and how fast you're using it."
         accent="var(--color-accent-ai)"
       />
-      <DetailSectionHeading label="Allowance" title="Usage by tool" detail="Context usage is read locally. Account quota updates on a slower cadence." />
+      <DetailSectionHeading title="Usage by tool" detail="Context usage is read locally. Account quota updates on a slower cadence." />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {AI_TOOLS.map((tool) => <ToolCard key={tool.id} {...tool} />)}
       </div>
-      <DetailSectionHeading label="Headlines" title="AI news" detail="Official OpenAI and Anthropic announcements, polled every 30 minutes." />
+      <DetailSectionHeading title="AI news" detail="Official OpenAI and Anthropic announcements, polled every 30 minutes." />
       <AiNews scrollable />
     </div>
   );

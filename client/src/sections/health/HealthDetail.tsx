@@ -88,11 +88,11 @@ export function HealthDetail() {
         </WidgetBody>
       </DetailIntro>
 
-      <DetailSectionHeading label="Today" title="Today's numbers" detail="Live values from your Apple Health Shortcut." />
+      <DetailSectionHeading title="Today's numbers" detail="Live values from your Apple Health Shortcut." />
       <HealthWidget />
 
       <div className="mt-6">
-        <DetailSectionHeading label="Trends" title="Your last 30 days, charted" detail="Daily activity totals against their goals, plus heart-rate and blood-oxygen trends. Tap a day to read its exact values." />
+        <DetailSectionHeading title="The last 30 days, charted" detail="Daily activity totals against their goals, plus heart-rate and blood-oxygen trends. Tap a day to read its exact values." />
         <WidgetShell title="Health trends">
           <WidgetBody envelope={envelope} offline={offline}>
             {(data) => <HealthTrendCharts history={data.history} goals={data.goals} />}
@@ -101,7 +101,7 @@ export function HealthDetail() {
       </div>
 
       <div className="mt-6">
-        <DetailSectionHeading label="History" title="Your last 30 days" detail="Each row is a daily rollup, so activity totals and recovery readings stay in context." />
+        <DetailSectionHeading title="The last 30 days, day by day" detail="Each row is a daily rollup, so activity totals and recovery readings stay in context." />
         <WidgetShell title="Health history">
           <WidgetBody envelope={envelope} offline={offline}>
             {(data) => <HistoryTable days={data.history} />}
