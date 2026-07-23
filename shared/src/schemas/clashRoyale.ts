@@ -7,7 +7,10 @@ export const clashRoyaleCardSchema = z.object({
   maxLevel: z.number(),
   /** Present when the player has unlocked an Evolution for this card. */
   evolutionLevel: z.number().optional(),
+  /** Clash Royale Wiki card art, including evolution-specific art when equipped. */
   iconUrl: z.string().optional(),
+  /** Official API art used only when a wiki file has not been uploaded or renamed yet. */
+  fallbackIconUrl: z.string().optional(),
   /** common / rare / epic / legendary / champion, lower-cased. Drives the rarity-colored card
    * frame; absent (rather than validated against a fixed enum) so a new rarity Supercell ships
    * doesn't fail schema validation — it just falls back to the default frame color client-side. */

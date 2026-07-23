@@ -1,4 +1,5 @@
 import { pathOfLegendsDisplayLeagueNumber, pathOfLegendsLeagueName, type ClashRoyaleBattle, type ClashRoyaleData } from '@personal-dashboard/shared';
+import { useEffect, useState } from 'react';
 import { relativeTime } from '../lib/time';
 import { clashRoyaleLeagueArt } from '../lib/clashRoyale';
 
@@ -12,6 +13,114 @@ const CLASH_ART = {
   playerCrown: 'https://media.ffycdn.net/eu/supercell/m1xRh8chWGRUyA5BcuWA.png?width=64',
   opponentCrown: 'https://media.ffycdn.net/eu/supercell/QTQoZZ8e18aR8d3ZtvEK.png?width=64',
 } as const;
+const REGULAR_CARD_ART_WIDTH = 277;
+const REGULAR_CARD_ART_HEIGHT = 330;
+const EVOLUTION_CARD_ART_WIDTH = 302;
+const EVOLUTION_CARD_ART_HEIGHT = 363;
+type FramedCardArtType = 'regular' | 'evolution';
+type DeckCardArtType = FramedCardArtType | 'hero';
+const framedCardArtUrls = new Map<string, Promise<string>>();
+
+/** Wiki files have uneven fully-transparent padding. Crop only alpha-zero pixels, then fit the
+ * complete visible image into a shared regular or Evolution frame. No visible pixel is removed. */
+function framedCardArtUrl(url: string, artType: FramedCardArtType): Promise<string> {
+  const cacheKey = `${artType}:${url}`;
+  const cached = framedCardArtUrls.get(cacheKey);
+  if (cached) return cached;
+
+  const request = new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      try {
+        const source = document.createElement('canvas');
+        source.width = image.naturalWidth;
+        source.height = image.naturalHeight;
+        const sourceContext = source.getContext('2d', { willReadFrequently: true });
+        if (!sourceContext) throw new Error('Could not read wiki card art');
+        sourceContext.drawImage(image, 0, 0);
+        const pixels = sourceContext.getImageData(0, 0, source.width, source.height).data;
+        let left = source.width;
+        let top = source.height;
+        let right = -1;
+        let bottom = -1;
+        const alphaThreshold = 0;
+        for (let y = 0; y < source.height; y += 1) {
+          for (let x = 0; x < source.width; x += 1) {
+            if (pixels[(y * source.width + x) * 4 + 3] <= alphaThreshold) continue;
+            left = Math.min(left, x);
+            top = Math.min(top, y);
+            right = Math.max(right, x);
+            bottom = Math.max(bottom, y);
+          }
+        }
+        if (right < left || bottom < top) throw new Error('Wiki card art is fully transparent');
+
+        const sourceWidth = right - left + 1;
+        const sourceHeight = bottom - top + 1;
+        const scale = Math.min(window.devicePixelRatio || 1, 2);
+        const target = document.createElement('canvas');
+        target.width = (artType === 'regular' ? REGULAR_CARD_ART_WIDTH : EVOLUTION_CARD_ART_WIDTH) * scale;
+        target.height = (artType === 'regular' ? REGULAR_CARD_ART_HEIGHT : EVOLUTION_CARD_ART_HEIGHT) * scale;
+        const targetContext = target.getContext('2d');
+        if (!targetContext) throw new Error('Could not draw wiki card art');
+        const sourceAspectRatio = sourceWidth / sourceHeight;
+        const targetAspectRatio = target.width / target.height;
+        const drawWidth = sourceAspectRatio <= targetAspectRatio ? target.height * sourceAspectRatio : target.width;
+        const drawHeight = sourceAspectRatio > targetAspectRatio ? target.width / sourceAspectRatio : target.height;
+        targetContext.drawImage(
+          image,
+          left,
+          top,
+          sourceWidth,
+          sourceHeight,
+          (target.width - drawWidth) / 2,
+          (target.height - drawHeight) / 2,
+          drawWidth,
+          drawHeight,
+        );
+        resolve(target.toDataURL('image/png'));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    image.onerror = () => reject(new Error('Could not load wiki card art'));
+    image.src = url;
+  });
+  framedCardArtUrls.set(cacheKey, request);
+  return request;
+}
+
+function FramedClashRoyaleCardImage({ card, artType }: Readonly<{ card: ClashRoyaleData['currentDeck'][number]; artType: FramedCardArtType }>) {
+  const [src, setSrc] = useState(card.iconUrl);
+
+  useEffect(() => {
+    let disposed = false;
+    setSrc(card.iconUrl);
+    if (!card.iconUrl) return () => { disposed = true; };
+    framedCardArtUrl(card.iconUrl, artType)
+      .then((framedUrl) => {
+        if (!disposed) setSrc(framedUrl);
+      })
+      .catch(() => {
+        // Keep the original source visible if it cannot be framed locally.
+      });
+    return () => { disposed = true; };
+  }, [artType, card.iconUrl]);
+
+  if (!src) return <span aria-hidden>{card.name.charAt(0)}</span>;
+  return (
+    <img
+      src={src}
+      alt={card.name}
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        if (card.fallbackIconUrl && src !== card.fallbackIconUrl) setSrc(card.fallbackIconUrl);
+      }}
+    />
+  );
+}
 function formatNumber(value: number): string {
   return value.toLocaleString('en-GB');
 }
@@ -112,14 +221,29 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
 }
 
 export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
-  const deck = [...data.currentDeck];
-  if (data.deckHero) deck.splice(Math.min(data.deckHeroIndex ?? deck.length, deck.length), 0, data.deckHero);
+  const deck: { card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }[] = data.currentDeck.map((card) => ({
+    card,
+    artType: card.iconUrl?.endsWith('CardEvolution.png') ? 'evolution' as const : 'regular' as const,
+  }));
+  if (data.deckHero) deck.splice(Math.min(data.deckHeroIndex ?? deck.length, deck.length), 0, { card: data.deckHero, artType: 'hero' as const });
   if (deck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;
   return (
     <ul className={`clash-deck-grid${compact ? ' clash-deck-grid--compact' : ''}`}>
-      {deck.map((card) => (
-        <li key={card.id} className="clash-card">
-          {card.iconUrl ? <img src={card.iconUrl} alt={card.name} loading="lazy" decoding="async" /> : <span aria-hidden>{card.name.charAt(0)}</span>}
+      {deck.map(({ card, artType }) => (
+        <li key={card.id} className={`clash-card clash-card--${artType}${artType === 'regular' && card.rarity === 'legendary' ? ' clash-card--legendary' : ''}`}>
+          {artType === 'hero' ? (card.iconUrl ? (
+            <img
+              src={card.iconUrl}
+              alt={card.name}
+              loading="lazy"
+              decoding="async"
+              onError={(event) => {
+                if (card.fallbackIconUrl && event.currentTarget.src !== card.fallbackIconUrl) {
+                  event.currentTarget.src = card.fallbackIconUrl;
+                }
+              }}
+            />
+          ) : <span aria-hidden>{card.name.charAt(0)}</span>) : <FramedClashRoyaleCardImage card={card} artType={artType} />}
         </li>
       ))}
     </ul>
