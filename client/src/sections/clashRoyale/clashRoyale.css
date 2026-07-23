@@ -128,10 +128,10 @@
 .clash-trophy-label { margin: 0; color: var(--color-ink-faint); font-size: 0.6rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
 .clash-trophy-value { margin: 0.18rem 0 0; color: var(--color-ink); font-size: 1.4rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
 
-.clash-path-panel { padding-left: 1rem; border-left: 1px solid var(--color-card-border); }
-.clash-path-league { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.35rem; }
+.clash-path-panel { min-width: 0; padding-left: 1rem; border-left: 1px solid var(--color-card-border); }
+.clash-path-league { display: flex; align-items: center; gap: 0.6rem; min-width: 0; margin-top: 0.35rem; }
 .clash-path-league-badge { flex-shrink: 0; width: 3.4rem; height: 3.4rem; object-fit: contain; filter: drop-shadow(0 3px 6px color-mix(in oklab, var(--color-accent-clash-royale) 35%, transparent)); }
-.clash-path-league-name { margin: 0; color: var(--color-ink); font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+.clash-path-league-name { overflow: hidden; margin: 0; color: var(--color-ink); font-size: 1.02rem; font-weight: 700; letter-spacing: -0.01em; text-overflow: ellipsis; white-space: nowrap; }
 .clash-path-figures { display: flex; align-items: baseline; gap: 0.4rem; margin-top: 0.15rem; }
 .clash-path-figures strong { color: var(--color-ink); font-size: 0.88rem; font-variant-numeric: tabular-nums; }
 .clash-path-figures span { color: var(--color-ink-faint); font-size: 0.58rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
