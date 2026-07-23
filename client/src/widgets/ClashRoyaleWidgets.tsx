@@ -110,7 +110,9 @@ export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: Clas
 
 export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">Play a battle to start a fresh activity readout.</p>;
-  const battles = data.recentBattles;
+  // The API supplies up to 25 battles, while this compact pulse explicitly represents ten.
+  // Use one bounded list for both the result strip and its aggregate figures.
+  const battles = data.recentBattles.slice(0, 10);
   const record = recentRecord(battles);
   const battleCount = battles.length;
   const winRate = Math.round((record.wins / battleCount) * 100);
@@ -124,7 +126,7 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
         <p className="clash-recent-games-rate"><strong>{winRate}%</strong><span>win rate</span></p>
       </header>
       <ol className="clash-recent-games-grid" aria-label="Results of recent battles, oldest to newest">
-        {battles.slice(0, 10).reverse().map((battle, index) => (
+        {battles.reverse().map((battle, index) => (
           <li key={`${battle.battleTime}-${index}`} data-result={battle.result} aria-label={`${BATTLE_RESULT_LABELS[battle.result]}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
             <span className="clash-recent-games-result">{STREAK_RESULT_LABELS[battle.result]}</span>
             <span className="clash-recent-games-score">{battle.crownsFor}–{battle.crownsAgainst}</span>
