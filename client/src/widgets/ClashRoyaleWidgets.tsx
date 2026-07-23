@@ -21,8 +21,11 @@ type FramedCardArtType = 'regular' | 'evolution';
 type DeckCardArtType = FramedCardArtType | 'hero';
 const framedCardArtUrls = new Map<string, Promise<string>>();
 
-/** Wiki files have uneven fully-transparent padding. Crop only alpha-zero pixels, then fit the
- * complete visible image into a shared regular or Evolution frame. No visible pixel is removed. */
+/** Wiki files have uneven padding. Most Evolution art has an outer glow that fades to a
+ * near-invisible haze without ever reaching true alpha-zero before the canvas edge, so a
+ * zero threshold crops nothing; a few files (e.g. Royal Hogs) have a hard-cut margin and get
+ * cropped tight. Trimming at a mid alpha instead treats that haze as background for every file,
+ * so all cards crop to the same visible extent and land at the same size in the shared frame. */
 function framedCardArtUrl(url: string, artType: FramedCardArtType): Promise<string> {
   const cacheKey = `${artType}:${url}`;
   const cached = framedCardArtUrls.get(cacheKey);
@@ -44,7 +47,7 @@ function framedCardArtUrl(url: string, artType: FramedCardArtType): Promise<stri
         let top = source.height;
         let right = -1;
         let bottom = -1;
-        const alphaThreshold = 0;
+        const alphaThreshold = 32;
         for (let y = 0; y < source.height; y += 1) {
           for (let x = 0; x < source.width; x += 1) {
             if (pixels[(y * source.width + x) * 4 + 3] <= alphaThreshold) continue;
