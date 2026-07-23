@@ -142,34 +142,46 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
 }
 
 export function ClashRoyaleBattleLog({ data }: Readonly<{ data: ClashRoyaleData }>) {
-  if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">No recent battles.</p>;
+  const battles = data.recentBattles;
+  if (battles.length === 0) return <p className="text-sm text-ink-faint">No recent battles.</p>;
+  const record = recentRecord(battles);
+  const winRate = Math.round((record.wins / battles.length) * 100);
   return (
-    <ol className="clash-battle-log">
-      {data.recentBattles.map((battle, index) => (
-        <li key={`${battle.battleTime}-${index}`} className="clash-battle-row" data-result={battle.result}>
-          <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
-            <div className="clash-crown-count">
-              <strong>{battle.crownsFor}</strong>
-              <Crown filled={battle.crownsFor > 0} />
+    <div className="clash-battle-log-section">
+      <header className="clash-recent-games-header">
+        <div>
+          <p className="clash-eyebrow">Last {battles.length} battles</p>
+          <p className="clash-recent-games-record"><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
+        </div>
+        <p className="clash-recent-games-rate"><strong>{winRate}%</strong><span>win rate</span></p>
+      </header>
+      <ol className="clash-battle-log">
+        {battles.map((battle, index) => (
+          <li key={`${battle.battleTime}-${index}`} className="clash-battle-row" data-result={battle.result}>
+            <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
+              <div className="clash-crown-count">
+                <strong>{battle.crownsFor}</strong>
+                <Crown filled={battle.crownsFor > 0} />
+              </div>
+              <span aria-hidden className="clash-score-versus">vs</span>
+              <div className="clash-crown-count">
+                <Crown filled={battle.crownsAgainst > 0} />
+                <strong>{battle.crownsAgainst}</strong>
+              </div>
             </div>
-            <span aria-hidden className="clash-score-versus">vs</span>
-            <div className="clash-crown-count">
-              <Crown filled={battle.crownsAgainst > 0} />
-              <strong>{battle.crownsAgainst}</strong>
+            <div className="clash-battle-main">
+              <div className="clash-battle-title-row">
+                <p>{battle.opponentName ?? 'Unknown opponent'}</p>
+                <time dateTime={battle.battleTime}>{relativeTime(battle.battleTime)}</time>
+              </div>
+              <div className="clash-battle-meta">
+                <span>{formatBattleType(battle.type)}</span>
+                <span>{BATTLE_RESULT_LABELS[battle.result]}</span>
+              </div>
             </div>
-          </div>
-          <div className="clash-battle-main">
-            <div className="clash-battle-title-row">
-              <p>{battle.opponentName ?? 'Unknown opponent'}</p>
-              <time dateTime={battle.battleTime}>{relativeTime(battle.battleTime)}</time>
-            </div>
-            <div className="clash-battle-meta">
-              <span>{formatBattleType(battle.type)}</span>
-              <span>{BATTLE_RESULT_LABELS[battle.result]}</span>
-            </div>
-          </div>
-        </li>
-      ))}
-    </ol>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }

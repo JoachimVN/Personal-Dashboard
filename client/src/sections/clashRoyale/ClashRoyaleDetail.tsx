@@ -1,7 +1,7 @@
 import type { ClashRoyaleData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
-import { ClashRoyaleBattleLog, ClashRoyaleBattlePulse, ClashRoyaleDeck, ClashRoyaleProfile } from '../../widgets/ClashRoyaleWidgets';
+import { ClashRoyaleBattleLog, ClashRoyaleDeck, ClashRoyaleProfile } from '../../widgets/ClashRoyaleWidgets';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 import './clashRoyale.css';
 
@@ -30,14 +30,7 @@ export function ClashRoyaleDetail() {
         </WidgetBody>
       </WidgetShell>
 
-      <DetailSectionHeading label="Form" title="Recent games" />
-      <WidgetShell title="Recent games">
-        <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <ClashRoyaleBattlePulse data={data} />}
-        </WidgetBody>
-      </WidgetShell>
-
-      <DetailSectionHeading label="History" title="Latest battles" />
+      <DetailSectionHeading label="History" title="Recent battles" />
       <WidgetShell title="Battle history">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <ClashRoyaleBattleLog data={data} />}

@@ -2,7 +2,6 @@ import { clashRoyaleSchema, type ClashRoyaleBattle, type ClashRoyaleCard, type C
 import type { Provider } from '../scheduler.js';
 
 const CR_API_BASE = 'https://api.clashroyale.com/v1';
-const RECENT_BATTLES_COUNT = 10;
 const CLAN_BADGE_MANIFEST_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-data/master/docs/json/alliance_badges.json';
 const CLAN_BADGE_ASSET_BASE_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-assets/master/badges';
 
@@ -238,7 +237,8 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
         deckHero: deckHero ? mapCard(deckHero.card, rarityById) : undefined,
         deckHeroIndex: deckHero?.index,
         towerTroop: player.currentDeckSupportCards?.[0] ? mapCard(player.currentDeckSupportCards[0], rarityById) : undefined,
-        recentBattles: battleLog.slice(0, RECENT_BATTLES_COUNT).map(mapBattle),
+        // Supercell's battlelog endpoint already caps this at its own last-25 window; no local slice needed.
+        recentBattles: battleLog.map(mapBattle),
       };
 
       return clashRoyaleSchema.parse(data);
