@@ -133,12 +133,11 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
   const rainHours = hours.filter((h) => h.precipitationMm > 0);
   const precipMax = Math.max(...hours.map((h) => h.precipitationMm), 0.1);
   const totalPrecip = rainHours.reduce((sum, h) => sum + h.precipitationMm, 0);
-  const rainRange =
-    rainHours.length > 1
-      ? `${rainHours[0].hourLabel}–${rainHours.at(-1)!.hourLabel}:00`
-      : rainHours.length === 1
-        ? `${rainHours[0].hourLabel}:00`
-        : null;
+  const rainRange = (() => {
+    if (rainHours.length > 1) return `${rainHours[0].hourLabel}–${rainHours.at(-1)!.hourLabel}:00`;
+    if (rainHours.length === 1) return `${rainHours[0].hourLabel}:00`;
+    return null;
+  })();
 
   // Temp and rain are separate hover zones (split at the gap between the two bands) so
   // hovering the temperature line for a rainy hour doesn't also surface the rain readout —
@@ -159,13 +158,12 @@ function HourSparkline({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
   };
   const activeTempHour = active?.zone === 'temp' ? hours[active.index] : null;
   const activeRainHour = active?.zone === 'rain' ? hours[active.index] : null;
-  const readout = activeTempHour
-    ? `${deg(activeTempHour.temperature)} · ${activeTempHour.hourLabel}:00`
-    : activeRainHour
-      ? `${activeRainHour.precipitationMm.toFixed(1)}mm rain · ${activeRainHour.hourLabel}:00`
-      : rainRange
-        ? `rain ${rainRange} · ${totalPrecip.toFixed(1)}mm`
-        : null;
+  const readout = (() => {
+    if (activeTempHour) return `${deg(activeTempHour.temperature)} · ${activeTempHour.hourLabel}:00`;
+    if (activeRainHour) return `${activeRainHour.precipitationMm.toFixed(1)}mm rain · ${activeRainHour.hourLabel}:00`;
+    if (rainRange) return `rain ${rainRange} · ${totalPrecip.toFixed(1)}mm`;
+    return null;
+  })();
   const readoutColor = activeTempHour ? 'var(--color-accent-weather)' : RAIN_COLOR;
 
   return (

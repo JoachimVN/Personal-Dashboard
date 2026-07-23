@@ -124,6 +124,24 @@ function FramedClashRoyaleCardImage({ card, artType }: Readonly<{ card: ClashRoy
     />
   );
 }
+function ClashDeckCardArt({ card, artType }: Readonly<{ card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }>) {
+  if (artType !== 'hero') return <FramedClashRoyaleCardImage card={card} artType={artType} />;
+  if (!card.iconUrl) return <span aria-hidden>{card.name.charAt(0)}</span>;
+  return (
+    <img
+      src={card.iconUrl}
+      alt={card.name}
+      loading="lazy"
+      decoding="async"
+      onError={(event) => {
+        if (card.fallbackIconUrl && event.currentTarget.src !== card.fallbackIconUrl) {
+          event.currentTarget.src = card.fallbackIconUrl;
+        }
+      }}
+    />
+  );
+}
+
 function formatNumber(value: number): string {
   return value.toLocaleString('en-GB');
 }
@@ -158,8 +176,9 @@ export function Crown({ filled }: Readonly<{ filled: boolean }>) {
 }
 
 function ClashCrownScore({ crownsFor, crownsAgainst, className = '' }: Readonly<{ crownsFor: number; crownsAgainst: number; className?: string }>) {
+  const rootClassName = className ? `clash-crown-score ${className}` : 'clash-crown-score';
   return (
-    <span className={`clash-crown-score${className ? ` ${className}` : ''}`} aria-hidden>
+    <span className={rootClassName} aria-hidden>
       <span className="clash-crown-score-art-frame"><img src={CLASH_ART.playerCrown} alt="" width="64" height="48" className="clash-crown-score-art" /></span>
       <strong>{crownsFor}–{crownsAgainst}</strong>
       <span className="clash-crown-score-art-frame"><img src={CLASH_ART.opponentCrown} alt="" width="64" height="48" className="clash-crown-score-art" /></span>
@@ -234,19 +253,7 @@ export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: Clas
     <ul className={`clash-deck-grid${compact ? ' clash-deck-grid--compact' : ''}`}>
       {deck.map(({ card, artType }) => (
         <li key={card.id} className={`clash-card clash-card--${artType}${artType === 'regular' && card.rarity === 'legendary' ? ' clash-card--legendary' : ''}`}>
-          {artType === 'hero' ? (card.iconUrl ? (
-            <img
-              src={card.iconUrl}
-              alt={card.name}
-              loading="lazy"
-              decoding="async"
-              onError={(event) => {
-                if (card.fallbackIconUrl && event.currentTarget.src !== card.fallbackIconUrl) {
-                  event.currentTarget.src = card.fallbackIconUrl;
-                }
-              }}
-            />
-          ) : <span aria-hidden>{card.name.charAt(0)}</span>) : <FramedClashRoyaleCardImage card={card} artType={artType} />}
+          <ClashDeckCardArt card={card} artType={artType} />
         </li>
       ))}
     </ul>

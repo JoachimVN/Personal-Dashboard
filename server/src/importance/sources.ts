@@ -832,7 +832,7 @@ function clashRoyaleWinStreakCandidate(data: ClashRoyaleData, winStreakMin: numb
   const latest = ladder[0];
   if (streak < winStreakMin || !latest || now - Date.parse(latest.battleTime) >= freshMs) return undefined;
   const streakCrowns = ladder.slice(0, streak).reverse()
-    .map((battle) => ({ crownsFor: battle.crownsFor, crownsAgainst: battle.crownsAgainst }));
+    .map((battle) => ({ crownsFor: battle.crownsFor, crownsAgainst: battle.crownsAgainst, battleTime: battle.battleTime }));
   // Path of Legends trophies reset every season, so restating them as a raw count reads as
   // meaningless noise — the league (its trophy-equivalent standing) is the stable, legible number.
   const detail = latest.type === 'pathOfLegend' && data.profile.pathOfLegends

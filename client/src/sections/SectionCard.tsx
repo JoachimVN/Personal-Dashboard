@@ -1,11 +1,29 @@
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { motion } from 'motion/react';
-import { accentStyle, SectionIcon, type SectionDef } from './registry';
+import { accentStyle, SectionIcon, type SectionDef, type SectionId } from './registry';
 import { sectionHref } from '../router';
 
 export const sectionCardVariants = {
   hidden: { opacity: 0, y: 12 },
   visible: { opacity: 1, y: 0 },
+};
+
+/** A couple of sections show a brand wordmark instead of the generic icon + title header. */
+const SECTION_WORDMARKS: Partial<Record<SectionId, { markClassName: string; src: string; alt: string; className: string; aspectRatio: string }>> = {
+  valorant: {
+    markClassName: 'valorant-overview-mark',
+    src: '/valorant_wordmark.png',
+    alt: 'Valorant',
+    className: 'valorant-overview-wordmark',
+    aspectRatio: '3633 / 533',
+  },
+  'clash-royale': {
+    markClassName: 'clash-royale-overview-mark',
+    src: '/clash-royale-wordmark.png',
+    alt: 'Clash Royale',
+    className: 'clash-royale-overview-wordmark',
+    aspectRatio: '1500 / 650',
+  },
 };
 
 function interactiveTarget(target: EventTarget | null): boolean {
@@ -18,8 +36,7 @@ function openSection(section: SectionDef): void {
 
 /** Overview block for one section — the whole card is a link into the section's full view. */
 export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
-  const isValorant = section.id === 'valorant';
-  const isClashRoyale = section.id === 'clash-royale';
+  const wordmark = SECTION_WORDMARKS[section.id];
 
   return (
     <motion.div
@@ -44,34 +61,19 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
     >
       <div aria-hidden className="section-card-aura" />
       <header className={`section-card-header section-card-header--${section.id} relative mb-5 flex items-center gap-3`}>
-        {isValorant ? (
+        {wordmark ? (
           <>
-            <span className="valorant-overview-mark" aria-hidden>
+            <span className={wordmark.markClassName} aria-hidden>
               <SectionIcon id={section.id} />
             </span>
             <motion.h2 layoutId={`section-title-${section.id}`} className="sr-only">
               {section.title}
             </motion.h2>
             <img
-              src="/valorant_wordmark.png"
-              alt="Valorant"
-              className="valorant-overview-wordmark"
-              style={{ aspectRatio: '3633 / 533' }}
-            />
-          </>
-        ) : isClashRoyale ? (
-          <>
-            <span className="clash-royale-overview-mark" aria-hidden>
-              <SectionIcon id={section.id} />
-            </span>
-            <motion.h2 layoutId={`section-title-${section.id}`} className="sr-only">
-              {section.title}
-            </motion.h2>
-            <img
-              src="/clash-royale-wordmark.png"
-              alt="Clash Royale"
-              className="clash-royale-overview-wordmark"
-              style={{ aspectRatio: '1500 / 650' }}
+              src={wordmark.src}
+              alt={wordmark.alt}
+              className={wordmark.className}
+              style={{ aspectRatio: wordmark.aspectRatio }}
             />
           </>
         ) : (

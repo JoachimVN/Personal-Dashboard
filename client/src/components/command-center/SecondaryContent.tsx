@@ -483,7 +483,7 @@ function ClashRoyaleWinStreakSecondary({ slot }: Readonly<{ slot: CommandCenterS
       <p className="text-sm font-semibold text-ink">{slot.title}</p>
       <ol className="command-clash-streak-crowns" aria-label="Crown score for each win in the streak">
         {streakCrowns.slice(-8).map((battle, index) => (
-          <li key={index}>
+          <li key={`${battle.battleTime}-${index}`}>
             <Crown filled={battle.crownsFor > 0} />
             <span>{battle.crownsFor}–{battle.crownsAgainst}</span>
           </li>
