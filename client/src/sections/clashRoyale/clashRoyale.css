@@ -146,12 +146,12 @@
 /* Evolution cards deliberately sit larger than regular art, while their lower edge remains on
    the same baseline. The modest scale fits within both the four- and eight-card grid gaps. */
 .clash-card--evolution { justify-content: center; }
-.clash-card--evolution img { width: 116%; max-width: none; }
+.clash-card--evolution img { width: 115%; max-width: none; }
 .clash-card--hero,
 .clash-card--legendary { justify-content: center; }
 .clash-card--legendary img { width: 106%; max-width: none; }
 /* Heroes have a pointed lower frame; let that point extend below the regular card baseline. */
-.clash-card--hero img { width: 106%; max-width: none; transform: translateY(8%); }
+.clash-card--hero img { width: 116%; max-width: none; transform: translateY(8%); }
 .clash-card--evolution,
 .clash-card--hero,
 .clash-card--legendary { z-index: 1; }
