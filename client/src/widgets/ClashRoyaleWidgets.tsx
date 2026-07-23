@@ -128,9 +128,9 @@ export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: Clas
 
 export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">Play a battle to start a fresh activity readout.</p>;
-  // The API supplies up to 25 battles, while this compact pulse explicitly represents ten.
+  // The API supplies up to 25 battles, while this compact pulse explicitly represents twelve.
   // Use one bounded list for both the result strip and its aggregate figures.
-  const battles = data.recentBattles.slice(0, 10);
+  const battles = data.recentBattles.slice(0, 12);
   const chronologicalBattles = battles.slice().reverse();
   const record = recentRecord(battles);
   const battleCount = battles.length;

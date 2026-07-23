@@ -6,6 +6,8 @@
   --clash-loss: light-dark(#b53a45, #ff8c98);
   --clash-row-win: light-dark(#00a63e, #32ef7d);
   --clash-row-loss: light-dark(#d71f34, #ff6474);
+  --clash-chip-win: light-dark(#2979ff, #63a7ff);
+  --clash-chip-loss: light-dark(#e7475d, #ff7a8a);
 }
 
 @media (min-width: 1024px) {
@@ -126,13 +128,14 @@
 .clash-recent-games-rate strong { color: var(--color-ink); font-size: 1.2rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
 .clash-battle-heading-art { display: block; width: 0.92rem; height: 0.92rem; overflow: hidden; }
 .clash-battle-heading-art img { display: block; width: 1.18rem; height: 1.18rem; max-width: none; margin: -0.13rem; }
-.clash-recent-games-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.38rem; margin: 0; padding: 0; list-style: none; }
-.clash-recent-games-grid li { display: grid; min-width: 0; min-height: 2.55rem; place-items: center; padding: 0.35rem 0.28rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 75%, transparent); border-radius: 0.58rem; background: color-mix(in oklab, var(--color-card) 88%, transparent); font-variant-numeric: tabular-nums; }
-.clash-crown-score { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.12rem; color: var(--color-ink-muted); }
+.clash-recent-games-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.38rem; margin: 0; padding: 0; list-style: none; }
+.clash-recent-games-grid li { display: grid; width: max-content; max-width: 100%; min-width: 0; min-height: 2.55rem; place-items: center; justify-self: center; padding: 0.35rem 0.28rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 75%, transparent); border-radius: 0.58rem; background: color-mix(in oklab, var(--color-card) 88%, transparent); font-variant-numeric: tabular-nums; }
+.clash-recent-games-grid li[data-result='win'] { background: color-mix(in srgb, var(--clash-chip-win) 5%, var(--color-card)); }
+.clash-recent-games-grid li[data-result='loss'] { background: color-mix(in srgb, var(--clash-chip-loss) 5%, var(--color-card)); }
+.clash-crown-score { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.14rem; color: var(--color-ink-muted); }
 .clash-crown-score strong { min-width: 0; color: var(--color-ink); font-size: 0.76rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1; text-align: center; white-space: nowrap; }
 .clash-crown-score-art-frame { display: block; width: 1.05rem; height: 0.82rem; overflow: hidden; }
 .clash-crown-score-art { display: block; width: 1.28rem; height: auto; max-width: none; margin: -0.08rem -0.12rem; filter: drop-shadow(0 1px 1px color-mix(in oklab, var(--color-ink) 16%, transparent)); }
-.clash-recent-games-score { width: 100%; }
 
 .clash-battle-log-section { display: grid; gap: 0.85rem; }
 .clash-battle-log { display: grid; gap: 0.45rem; overflow-y: auto; max-height: 34rem; margin: 0; padding: 0 0.15rem 0 0; list-style: none; overscroll-behavior: contain; }
@@ -146,7 +149,6 @@
 .clash-battle-meta { display: flex; gap: 0.38rem; overflow: hidden; margin-top: 0.2rem; color: var(--color-ink-faint); font-size: 0.62rem; white-space: nowrap; }
 .clash-battle-meta span + span::before { content: '·'; margin-right: 0.38rem; }
 .clash-battle-score { display: flex; align-items: center; gap: 0.22rem; padding: 0.22rem 0.3rem; border: 1px solid color-mix(in oklab, var(--color-accent-clash-royale) 20%, var(--color-card-border)); border-radius: 999px; background: color-mix(in oklab, var(--color-accent-clash-royale) 7%, var(--color-card)); color: var(--color-ink-muted); font-variant-numeric: tabular-nums; }
-.clash-battle-score .clash-crown-score { gap: 0.16rem; }
 .clash-battle-score .clash-crown-score-art { width: 1.22rem; }
 
 /* ---------------------------------------------------------------------------
