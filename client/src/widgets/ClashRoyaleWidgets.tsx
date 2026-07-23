@@ -7,12 +7,11 @@ const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
   loss: 'Defeat',
   draw: 'Draw',
 };
-const STREAK_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
-  win: 'W',
-  loss: 'L',
-  draw: 'D',
-};
-
+const CLASH_ART = {
+  battle: 'https://media.ffycdn.net/eu/supercell/jRQrei1MNcyVLey6oS3p.png?width=64',
+  playerCrown: 'https://media.ffycdn.net/eu/supercell/m1xRh8chWGRUyA5BcuWA.png?width=64',
+  opponentCrown: 'https://media.ffycdn.net/eu/supercell/QTQoZZ8e18aR8d3ZtvEK.png?width=64',
+} as const;
 function formatNumber(value: number): string {
   return value.toLocaleString('en-GB');
 }
@@ -43,6 +42,25 @@ export function Crown({ filled }: Readonly<{ filled: boolean }>) {
       <path d="M2 15.5h20l-1.1-8.9-5.4 4.3L12 2.5 8.5 10.9 3.1 6.6 2 15.5Z" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
       <path d="M4 17h16" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function ClashCrownScore({ crownsFor, crownsAgainst, className = '' }: Readonly<{ crownsFor: number; crownsAgainst: number; className?: string }>) {
+  return (
+    <span className={`clash-crown-score${className ? ` ${className}` : ''}`} aria-hidden>
+      <span className="clash-crown-score-art-frame"><img src={CLASH_ART.playerCrown} alt="" width="64" height="48" className="clash-crown-score-art" /></span>
+      <strong>{crownsFor}–{crownsAgainst}</strong>
+      <span className="clash-crown-score-art-frame"><img src={CLASH_ART.opponentCrown} alt="" width="64" height="48" className="clash-crown-score-art" /></span>
+    </span>
+  );
+}
+
+function ClashBattleHeading({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <p className="clash-eyebrow clash-battle-heading">
+      <span className="clash-battle-heading-art"><img src={CLASH_ART.battle} alt="" width="64" height="64" /></span>
+      {children}
+    </p>
   );
 }
 
@@ -113,23 +131,24 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
   // The API supplies up to 25 battles, while this compact pulse explicitly represents ten.
   // Use one bounded list for both the result strip and its aggregate figures.
   const battles = data.recentBattles.slice(0, 10);
+  const chronologicalBattles = battles.slice().reverse();
   const record = recentRecord(battles);
   const battleCount = battles.length;
   const winRate = Math.round((record.wins / battleCount) * 100);
+  const gamesLabel = `Last ${battleCount} ${battleCount === 1 ? 'game' : 'games'}`;
   return (
     <section className="clash-recent-games">
       <header className="clash-recent-games-header">
         <div>
-          <p className="clash-eyebrow">Last 10 games</p>
+          <ClashBattleHeading>{gamesLabel}</ClashBattleHeading>
           <p className="clash-recent-games-record"><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
         </div>
         <p className="clash-recent-games-rate"><strong>{winRate}%</strong><span>win rate</span></p>
       </header>
-      <ol className="clash-recent-games-grid" aria-label="Results of recent battles, oldest to newest">
-        {battles.reverse().map((battle, index) => (
-          <li key={`${battle.battleTime}-${index}`} data-result={battle.result} aria-label={`${BATTLE_RESULT_LABELS[battle.result]}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
-            <span className="clash-recent-games-result">{STREAK_RESULT_LABELS[battle.result]}</span>
-            <span className="clash-recent-games-score">{battle.crownsFor}–{battle.crownsAgainst}</span>
+      <ol className="clash-recent-games-grid" aria-label={`Results of ${gamesLabel.toLowerCase()}, oldest to newest`}>
+        {chronologicalBattles.map((battle, index) => (
+          <li key={`${battle.battleTime}-${index}`} data-result={battle.result} aria-label={`Game ${index + 1} of ${battleCount}: ${BATTLE_RESULT_LABELS[battle.result]}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns, ${relativeTime(battle.battleTime)}`}>
+            <ClashCrownScore crownsFor={battle.crownsFor} crownsAgainst={battle.crownsAgainst} className="clash-recent-games-score" />
           </li>
         ))}
       </ol>
@@ -146,7 +165,7 @@ export function ClashRoyaleBattleLog({ data }: Readonly<{ data: ClashRoyaleData 
     <div className="clash-battle-log-section">
       <header className="clash-recent-games-header">
         <div>
-          <p className="clash-eyebrow">Last {battles.length} battles</p>
+          <ClashBattleHeading>Last {battles.length} battles</ClashBattleHeading>
           <p className="clash-recent-games-record"><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
         </div>
         <p className="clash-recent-games-rate"><strong>{winRate}%</strong><span>win rate</span></p>
@@ -155,15 +174,7 @@ export function ClashRoyaleBattleLog({ data }: Readonly<{ data: ClashRoyaleData 
         {battles.map((battle, index) => (
           <li key={`${battle.battleTime}-${index}`} className="clash-battle-row" data-result={battle.result}>
             <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
-              <div className="clash-crown-count">
-                <strong>{battle.crownsFor}</strong>
-                <Crown filled={battle.crownsFor > 0} />
-              </div>
-              <span aria-hidden className="clash-score-versus">vs</span>
-              <div className="clash-crown-count">
-                <Crown filled={battle.crownsAgainst > 0} />
-                <strong>{battle.crownsAgainst}</strong>
-              </div>
+              <ClashCrownScore crownsFor={battle.crownsFor} crownsAgainst={battle.crownsAgainst} />
             </div>
             <div className="clash-battle-main">
               <div className="clash-battle-title-row">
