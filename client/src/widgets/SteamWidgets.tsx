@@ -398,49 +398,80 @@ function buildPlaytimeSlots(history: SteamData['playtimeHistory'], windowDays: n
 const trendDateFmt = (date: string) =>
   new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
-/** Daily playtime bars over the trailing month, derived from cumulative history samples. */
+/** Daily playtime bars over the trailing month, derived from cumulative history samples. Same
+ * header/chart/axis/readout structure as the weather overview sparkline (hover crosshair aside —
+ * bars already carry position, so a redundant vertical line would just clutter a discrete chart). */
 export function SteamPlaytimeTrend({ data }: Readonly<{ data: SteamData }>) {
   const [active, setActive] = useState<number | null>(null);
   const slots = buildPlaytimeSlots(data.playtimeHistory, PLAYTIME_TREND_WINDOW_DAYS);
   if (slots.length === 0) {
     return <p className="text-sm text-ink-faint">Trends unlock once a couple of days have synced.</p>;
   }
-  const max = Math.max(...slots.map((s) => s.hours), 1);
+  const W = 100;
+  const H = 40;
   const totalHours = slots.reduce((sum, s) => sum + s.hours, 0);
-  const readout =
-    active != null ? `${slots[active].hours.toFixed(1)}h · ${trendDateFmt(slots[active].date)}` : `${totalHours.toFixed(1)}h total · last ${slots.length} days`;
+  const max = Math.max(...slots.map((s) => s.hours), 0.001);
+  const peakIndex = totalHours > 0 ? slots.reduce((best, s, i) => (s.hours > slots[best].hours ? i : best), 0) : null;
+  const midIndex = Math.floor((slots.length - 1) / 2);
+  const barW = Math.min(2.6, (W / slots.length) * 0.62);
+  const xAt = (i: number) => (i + 0.5) * (W / slots.length);
+
+  const activeSlot = active != null ? slots[active] : null;
+  const readout = activeSlot
+    ? `${activeSlot.hours.toFixed(1)}h · ${trendDateFmt(activeSlot.date)}`
+    : `${totalHours.toFixed(1)}h total · last ${slots.length} days`;
+
+  const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const i = Math.min(slots.length - 1, Math.max(0, Math.floor(((event.clientX - rect.left) / rect.width) * slots.length)));
+    setActive(i);
+  };
 
   return (
-    <div>
-      <div
-        className="flex h-24 items-end gap-0.5"
+    <div className="steam-trend-panel">
+      <div className="steam-trend-header">
+        <span>Last {slots.length} days</span>
+        <span>{peakIndex != null ? `peak ${slots[peakIndex].hours.toFixed(1)}h · ${trendDateFmt(slots[peakIndex].date)}` : 'No activity yet'}</span>
+      </div>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        className="steam-trend-chart"
+        aria-label="Daily playtime over the last month"
+        onPointerMove={readNearest}
+        onPointerDown={readNearest}
         onPointerLeave={(e) => {
           if (e.pointerType === 'mouse') setActive(null);
         }}
       >
-        {slots.map((slot, i) => (
-          <div
-            key={slot.date}
-            className="flex h-full flex-1 cursor-pointer items-end"
-            onPointerEnter={() => setActive(i)}
-            onPointerDown={() => setActive(i)}
-          >
-            {slot.hours > 0 && (
-              <div
-                className="w-full rounded-t-[2px] transition-opacity"
-                style={{ height: `${Math.max((slot.hours / max) * 100, 3)}%`, background: accent, opacity: active === i ? 1 : 0.7 }}
-                aria-label={`${slot.date}: ${slot.hours.toFixed(1)}h`}
-              />
-            )}
-          </div>
-        ))}
+        <line x1={0} y1={H - 0.5} x2={W} y2={H - 0.5} stroke="var(--color-card-border)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        {slots.map((slot, i) => {
+          if (slot.hours <= 0) return null;
+          const height = Math.max((slot.hours / max) * (H - 6), 2);
+          return (
+            <rect
+              key={slot.date}
+              x={xAt(i) - barW / 2}
+              y={H - height}
+              width={barW}
+              height={height}
+              rx={0.8}
+              fill={accent}
+              opacity={active === i ? 1 : 0.62}
+              aria-label={`${slot.date}: ${slot.hours.toFixed(1)}h`}
+            />
+          );
+        })}
+      </svg>
+      <div className="steam-trend-axis">
+        <span>{trendDateFmt(slots[0].date)}</span>
+        <span>{trendDateFmt(slots[midIndex].date)}</span>
+        <span>{trendDateFmt(slots.at(-1)!.date)}</span>
       </div>
-      <div className="mt-1.5 flex items-baseline justify-between gap-2">
-        <p className="min-w-0 truncate text-[11px] tabular-nums text-ink-muted">{readout}</p>
-        <p className="shrink-0 text-[9px] text-ink-faint">
-          {trendDateFmt(slots[0].date)} – {trendDateFmt(slots.at(-1)!.date)}
-        </p>
-      </div>
+      <p className="steam-trend-readout">
+        <span aria-hidden className="steam-trend-readout-dot" />
+        <span>{readout}</span>
+      </p>
     </div>
   );
 }

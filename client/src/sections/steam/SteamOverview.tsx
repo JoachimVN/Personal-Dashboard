@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { SteamAchievement, SteamData, SteamGame } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
-import { SteamPlaytimeTrend } from '../../widgets/SteamWidgets';
+import { relativeTime } from '../../lib/time';
 import './steam.css';
 
 function formatHours(minutes: number): string {
@@ -10,13 +10,42 @@ function formatHours(minutes: number): string {
   return hours < 10 ? `${hours.toFixed(1)}h` : `${Math.round(hours)}h`;
 }
 
-function Metric({ value, label, detail }: Readonly<{ value: string | number; label: string; detail?: string }>) {
+/** Same ring language as the weather overview's humidity gauge — a stroke-dasharray circle
+ * reads faster at this size than the flat progress bar it replaces. */
+function AchievementRing({ pct }: Readonly<{ pct: number }>) {
+  const r = 15;
+  const circumference = 2 * Math.PI * r;
   return (
-    <div className="steam-home-metric">
-      <p className="steam-home-metric-value">{value}</p>
-      <p className="steam-home-metric-label">{label}</p>
-      {detail && <p className="steam-home-metric-detail">{detail}</p>}
-    </div>
+    <svg viewBox="0 0 36 36" className="steam-pulse-ring-svg -rotate-90" aria-hidden>
+      <circle cx="18" cy="18" r={r} fill="none" stroke="var(--color-track)" strokeWidth="3" />
+      <circle
+        cx="18"
+        cy="18"
+        r={r}
+        fill="none"
+        stroke="var(--color-accent-steam)"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference * (1 - pct / 100)}
+      />
+    </svg>
+  );
+}
+
+function AchievementBadge({ achievement }: Readonly<{ achievement: SteamAchievement }>) {
+  return (
+    <li className="steam-pulse-badge">
+      {achievement.iconUrl ? (
+        <img src={achievement.iconUrl} alt="" loading="lazy" />
+      ) : (
+        <span aria-hidden className="steam-pulse-badge-fallback">★</span>
+      )}
+      <div className="min-w-0">
+        <p className="steam-pulse-badge-name">{achievement.displayName}</p>
+        <p className="steam-pulse-badge-date">{relativeTime(achievement.unlockedAt)}</p>
+      </div>
+    </li>
   );
 }
 
@@ -42,17 +71,6 @@ function ShelfGame({ entry }: Readonly<{ entry: ShelfEntry }>) {
   );
 }
 
-function AchievementUnlock({ achievement }: Readonly<{ achievement: SteamAchievement }>) {
-  const unlockedOn = new Date(achievement.unlockedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  return (
-    <li className="steam-home-unlock">
-      {achievement.iconUrl ? <img src={achievement.iconUrl} alt="" loading="lazy" /> : <span aria-hidden className="steam-home-unlock-fallback">★</span>}
-      <span className="min-w-0 flex-1 truncate">{achievement.displayName}</span>
-      <time dateTime={achievement.unlockedAt}>{unlockedOn}</time>
-    </li>
-  );
-}
-
 function SteamHomeDashboard({ data }: Readonly<{ data: SteamData }>) {
   if (data.availability.library !== 'available' || !data.library) return null;
 
@@ -66,37 +84,41 @@ function SteamHomeDashboard({ data }: Readonly<{ data: SteamData }>) {
   const achievementPct = data.achievements && data.achievements.totalCount > 0
     ? Math.round((data.achievements.unlockedCount / data.achievements.totalCount) * 100)
     : undefined;
+  const recentUnlocks = data.achievements?.recentUnlocks.slice(0, 3) ?? [];
 
   return (
     <div className="steam-home-dashboard">
-      <section className="steam-home-pulse" aria-label="Steam library summary">
-        <div className="steam-home-section-heading">
-          <p>Library pulse</p>
-          <span>{recentPlaytimeMinutes > 0 ? `${formatHours(recentPlaytimeMinutes)} this fortnight` : 'Quiet lately'}</span>
-        </div>
-        <div className="steam-home-metrics">
-          <Metric value={totalGames} label="games owned" />
-          <Metric value={formatHours(totalPlaytimeMinutes)} label="hours played" />
-          <Metric value={recentPlaytimeMinutes > 0 ? formatHours(recentPlaytimeMinutes) : '—'} label="past 2 weeks" detail={recentPlaytimeMinutes > 0 ? 'Steam activity' : 'No recent sessions'} />
-        </div>
+      <section className="steam-pulse" aria-label="Steam library summary">
         {data.achievements && achievementPct !== undefined && (
-          <div className="steam-home-achievement-panel">
-            <div className="steam-home-achievement">
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Achievement progress</p>
-                <p className="mt-1 truncate text-sm font-semibold text-ink">{data.achievements.gameName}</p>
-              </div>
-              <p className="shrink-0 text-sm font-semibold tabular-nums text-ink">{achievementPct}%</p>
-              <div className="steam-home-achievement-track" aria-hidden>
-                <span style={{ width: `${achievementPct}%` }} />
-              </div>
+          <div className="steam-pulse-top">
+            <AchievementRing pct={achievementPct} />
+            <div className="steam-pulse-top-copy">
+              <span className="steam-eyebrow">Achievement progress</span>
+              <p className="steam-pulse-game">{data.achievements.gameName}</p>
             </div>
-            {data.achievements.recentUnlocks.length > 0 && (
-              <ul className="steam-home-unlocks" aria-label="Latest achievements">
-                {data.achievements.recentUnlocks.slice(0, 3).map((achievement) => <AchievementUnlock key={achievement.apiName} achievement={achievement} />)}
-              </ul>
-            )}
+            <p className="steam-pulse-pct">{achievementPct}%</p>
           </div>
+        )}
+
+        <div className="steam-pulse-stats">
+          <div className="steam-pulse-stat">
+            <p className="steam-pulse-stat-value">{totalGames}</p>
+            <p className="steam-pulse-stat-label">games owned</p>
+          </div>
+          <div className="steam-pulse-stat">
+            <p className="steam-pulse-stat-value">{formatHours(totalPlaytimeMinutes)}</p>
+            <p className="steam-pulse-stat-label">hours played</p>
+          </div>
+          <div className="steam-pulse-stat">
+            <p className="steam-pulse-stat-value">{recentPlaytimeMinutes > 0 ? formatHours(recentPlaytimeMinutes) : '—'}</p>
+            <p className="steam-pulse-stat-label">past 2 weeks</p>
+          </div>
+        </div>
+
+        {recentUnlocks.length > 0 && (
+          <ul className="steam-pulse-badges" aria-label="Latest achievements">
+            {recentUnlocks.map((achievement) => <AchievementBadge key={achievement.apiName} achievement={achievement} />)}
+          </ul>
         )}
       </section>
 
@@ -152,7 +174,6 @@ function SteamOverviewContent({ data }: Readonly<{ data: SteamData }>) {
   return (
     <div ref={overviewRef} className="steam-overview space-y-4">
       <SteamHomeDashboard data={data} />
-      {data.playtimeHistory.length > 1 && <SteamPlaytimeTrend data={data} />}
     </div>
   );
 }
