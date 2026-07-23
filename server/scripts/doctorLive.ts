@@ -1,13 +1,17 @@
 import { execFile } from 'node:child_process';
 import { access, readFile, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const port = Number(process.env.PORT ?? 4821);
 const uid = process.getuid?.() ?? 501;
 const serviceLabel = 'local.personal-dashboard';
-const serviceRoot = '/Users/joachimvnilsen/.local/share/personal-dashboard/repo';
-const runtimeEnvPath = '/Users/joachimvnilsen/.local/share/personal-dashboard/state/.env';
+const serviceRoot =
+  process.env.PERSONAL_DASHBOARD_SERVICE_ROOT ?? `${homedir()}/.local/share/personal-dashboard/repo`;
+const runtimeEnvPath =
+  process.env.PERSONAL_DASHBOARD_RUNTIME_ENV_PATH ??
+  `${homedir()}/.local/share/personal-dashboard/state/.env`;
 
 type Check = {
   label: string;
