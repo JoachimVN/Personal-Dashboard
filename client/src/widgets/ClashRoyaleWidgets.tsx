@@ -227,7 +227,7 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
               )}
               <div className="min-w-0">
                 <p className="clash-path-league-name">{leagueName}</p>
-                {(path.trophies > 0 || (path.rank ?? 0) > 0) && (
+                {!compact && (path.trophies > 0 || (path.rank ?? 0) > 0) && (
                   <div className="clash-path-figures">
                     {path.trophies > 0 && <strong>{formatNumber(path.trophies)}</strong>}
                     {path.rank !== undefined && path.rank !== null && path.rank > 0 && <span>#{formatNumber(path.rank)}</span>}
