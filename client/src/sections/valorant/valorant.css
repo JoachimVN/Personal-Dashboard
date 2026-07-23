@@ -92,10 +92,14 @@
   min-height: 6.4rem;
   padding: 0.9rem 1.1rem 0.85rem;
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, #fff 13%, transparent);
+  border: 1px solid var(--color-card-border);
   border-radius: 0.2rem 1.1rem 0.2rem 1.1rem;
-  background: linear-gradient(100deg, rgba(10, 10, 12, 0.86), rgba(20, 16, 18, 0.54));
-  color: #fff;
+  background: linear-gradient(
+    100deg,
+    light-dark(rgba(255, 255, 255, 0.92), rgba(10, 10, 12, 0.86)),
+    light-dark(rgba(255, 255, 255, 0.62), rgba(20, 16, 18, 0.54))
+  );
+  color: light-dark(var(--color-ink), #fff);
 }
 .valorant-overview-briefing::before {
   content: '';
@@ -113,21 +117,21 @@
   bottom: -1.3rem;
   width: 5.4rem;
   height: 5.4rem;
-  border: 1px solid color-mix(in oklab, #fff 24%, transparent);
+  border: 1px solid color-mix(in oklab, var(--color-ink) 24%, transparent);
   transform: rotate(45deg);
 }
 .valorant-overview-identity, .valorant-overview-rank { position: relative; z-index: 1; min-width: 0; }
-.valorant-overview-kicker { margin: 0; color: rgba(255, 255, 255, 0.62); font-size: 0.56rem; font-weight: 750; letter-spacing: 0.13em; line-height: 1.2; text-transform: uppercase; }
-.valorant-overview-name { overflow: hidden; margin: 0.42rem 0 0; color: #fff; font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-overview-name span { margin-left: 0.32rem; color: rgba(255, 255, 255, 0.64); font-size: 0.68em; font-weight: 600; letter-spacing: -0.02em; }
-.valorant-overview-level { margin: 0.43rem 0 0; color: rgba(255, 255, 255, 0.62); font-size: 0.62rem; }
-.valorant-overview-level strong { margin-left: 0.2rem; color: #fff; font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+.valorant-overview-kicker { margin: 0; color: light-dark(var(--color-ink-muted), rgba(255, 255, 255, 0.62)); font-size: 0.56rem; font-weight: 750; letter-spacing: 0.13em; line-height: 1.2; text-transform: uppercase; }
+.valorant-overview-name { overflow: hidden; margin: 0.42rem 0 0; color: light-dark(var(--color-ink), #fff); font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-name span { margin-left: 0.32rem; color: light-dark(var(--color-ink-faint), rgba(255, 255, 255, 0.64)); font-size: 0.68em; font-weight: 600; letter-spacing: -0.02em; }
+.valorant-overview-level { margin: 0.43rem 0 0; color: light-dark(var(--color-ink-muted), rgba(255, 255, 255, 0.62)); font-size: 0.62rem; }
+.valorant-overview-level strong { margin-left: 0.2rem; color: light-dark(var(--color-ink), #fff); font-size: 0.7rem; font-variant-numeric: tabular-nums; }
 .valorant-overview-rank { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.55rem; min-width: 8.7rem; }
 .valorant-overview-rank img { width: 2.85rem; height: 2.85rem; object-fit: contain; filter: drop-shadow(0 0.25rem 0.7rem rgba(0, 0, 0, 0.35)); }
 .valorant-overview-rank p, .valorant-overview-rank strong, .valorant-overview-rank span { display: block; margin: 0; }
-.valorant-overview-rank p { color: rgba(255, 255, 255, 0.56); font-size: 0.52rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
-.valorant-overview-rank strong { overflow: hidden; margin-top: 0.2rem; color: #fff; font-size: 0.8rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-overview-rank span { margin-top: 0.18rem; color: rgba(255, 255, 255, 0.72); font-size: 0.62rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.valorant-overview-rank p { color: light-dark(var(--color-ink-muted), rgba(255, 255, 255, 0.56)); font-size: 0.52rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
+.valorant-overview-rank strong { overflow: hidden; margin-top: 0.2rem; color: light-dark(var(--color-ink), #fff); font-size: 0.8rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-rank span { margin-top: 0.18rem; color: light-dark(var(--color-ink-muted), rgba(255, 255, 255, 0.72)); font-size: 0.62rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .valorant-overview-readout {
   display: grid;
   gap: 0.68rem;
