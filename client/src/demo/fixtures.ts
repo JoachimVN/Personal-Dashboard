@@ -464,7 +464,9 @@ function steam(now: Date): SteamData {
 function roblox(now: Date): RobloxData {
   return {
     presence: {
-      status: 'in-game', gameName: 'Blox Fruits', lastOnline: iso(now, 0),
+      status: 'in-game', gameName: 'Jailbreak', lastOnline: iso(now, 0),
+      iconUrl: 'https://pbs.twimg.com/media/GClJFhnWIAAoJek.jpg',
+      thumbnailUrl: 'https://pbs.twimg.com/media/GClJFhnWIAAoJek.jpg',
       playing: 214_000, visits: 42_800_000_000,
     },
     availability: 'available',
@@ -683,7 +685,7 @@ function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): CommandC
         detail: 'Dua Lipa', href: '#/spotify', score: 90, render: { type: 'spotify-now-playing' },
       },
       {
-        id: 'roblox:now-playing', source: 'roblox', kind: 'roblox', kicker: 'Roblox', title: 'Blox Fruits',
+        id: 'roblox:now-playing', source: 'roblox', kind: 'roblox', kicker: 'Roblox', title: 'Jailbreak',
         detail: 'In game right now', href: 'https://www.roblox.com/home', score: 70,
         render: { type: 'roblox-now-playing' },
       },
