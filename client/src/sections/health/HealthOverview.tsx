@@ -208,15 +208,6 @@ function VitalSparkline({ history, metric, color }: Readonly<{ history: HealthDa
           vectorEffect="non-scaling-stroke"
           opacity={0.55}
         />
-        {/* A stroked zero-length segment stays a true circle under the non-uniform
-            stretch from preserveAspectRatio="none"; an actual <circle> would smear into an ellipse. */}
-        <path
-          d={`M${xAt(values.length - 1)},${yAt(values.at(-1)!)} l0.01,0`}
-          stroke={color}
-          strokeWidth={4}
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
       </g>
     </svg>
   );
