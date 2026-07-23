@@ -132,7 +132,7 @@
 .clash-recent-games-grid li[data-result='loss'] .clash-recent-games-result { background: color-mix(in oklab, var(--clash-loss) 17%, var(--color-card)); color: var(--clash-loss); }
 
 .clash-battle-log-section { display: grid; gap: 0.85rem; }
-.clash-battle-log { display: grid; gap: 0.45rem; overflow-y: auto; max-height: 26rem; margin: 0; padding: 0 0.15rem 0 0; list-style: none; overscroll-behavior: contain; }
+.clash-battle-log { display: grid; gap: 0.45rem; overflow-y: auto; max-height: 34rem; margin: 0; padding: 0 0.15rem 0 0; list-style: none; overscroll-behavior: contain; }
 .clash-battle-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.75rem; padding: 0.65rem 0.8rem; border-radius: 0.85rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
 .clash-battle-row[data-result='win'] { background: linear-gradient(90deg, color-mix(in srgb, var(--clash-row-win) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
 .clash-battle-row[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--clash-row-loss) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
