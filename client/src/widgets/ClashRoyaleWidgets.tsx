@@ -41,7 +41,7 @@ function formatBattleType(type: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function Crown({ filled }: Readonly<{ filled: boolean }>) {
+export function Crown({ filled }: Readonly<{ filled: boolean }>) {
   return (
     <svg viewBox="0 0 24 18" aria-hidden className="clash-crown">
       <path d="M2 15.5h20l-1.1-8.9-5.4 4.3L12 2.5 8.5 10.9 3.1 6.6 2 15.5Z" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
