@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "npm run predev -w server && concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run wait-ready -w server && npm run dev -w client\"",
     "build": "npm run build -w client",
+    "build:demo": "npm run build:demo -w client",
     "start": "npm run start -w server",
     "test": "npm test -w server",
     "typecheck": "npm run typecheck --workspaces --if-present",

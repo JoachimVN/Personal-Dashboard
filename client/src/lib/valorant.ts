@@ -27,3 +27,31 @@ const MAP_ART: Record<string, string> = {
 export function valorantMapArt(mapName: string): string | undefined {
   return MAP_ART[mapName];
 }
+
+/** Riot's public valorant-api.com asset mirror, keyed by agent UUID — same source the server
+ * provider resolves from the live match payload's `character.id` (see agentIconUrl in
+ * server/src/providers/valorant.ts). The demo has no live match payload to read an id from, so
+ * these are the fixed UUIDs for the fixture's five-agent rotation. */
+const AGENT_ICON_URLS: Record<string, string> = {
+  Jett: 'https://media.valorant-api.com/agents/add6443a-41bd-e414-f6ad-e58d267f4e95/displayicon.png',
+  Omen: 'https://media.valorant-api.com/agents/8e253930-4c05-31dd-1b6c-968525494517/displayicon.png',
+  Sova: 'https://media.valorant-api.com/agents/320b2a48-4d9b-a075-30f1-1f93a9b638fa/displayicon.png',
+  Reyna: 'https://media.valorant-api.com/agents/a3bfb853-43b2-7238-a4f1-ad90e9e46bcc/displayicon.png',
+  Killjoy: 'https://media.valorant-api.com/agents/1e58de9c-4950-5125-93e9-a0aee9f98746/displayicon.png',
+};
+
+export function valorantAgentIconUrl(agentName: string): string | undefined {
+  return AGENT_ICON_URLS[agentName];
+}
+
+/** competitivetiers UUID is fixed across the whole game — same constant the server provider uses. */
+const COMPETITIVE_TIERS_UUID = '03621f52-342b-cf4e-4f86-9350a49c6d04';
+
+export function valorantTierIconUrl(tierId: number): string | undefined {
+  return tierId > 0 ? `https://media.valorant-api.com/competitivetiers/${COMPETITIVE_TIERS_UUID}/${tierId}/smallicon.png` : undefined;
+}
+
+/** A single fixed player card ("Firestarter") for the demo's wide/large art — the server provider
+ * resolves this per-account from the real equipped card id, which the demo has no account to read. */
+export const VALORANT_DEMO_CARD_WIDE_ART = 'https://media.valorant-api.com/playercards/7c7becb5-a6b4-4b48-ad20-5a816fbc5750/wideart.png';
+export const VALORANT_DEMO_CARD_LARGE_ART = 'https://media.valorant-api.com/playercards/7c7becb5-a6b4-4b48-ad20-5a816fbc5750/largeart.png';

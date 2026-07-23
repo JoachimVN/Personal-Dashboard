@@ -45,27 +45,29 @@ function Panel({
   );
 }
 
-function AgendaPanel({ calendar }: Readonly<{ calendar: ReturnType<typeof useWidget<CalendarData>> }>) {
+/** Featured hero panel — was the calendar's "Up next", now leads with Mail so the inbox gets the
+ * prominent spot; calendar moved into the CommunicationsPanel row below (see there). */
+function MailHeroPanel({ gmail }: Readonly<{ gmail: ReturnType<typeof useWidget<GmailData>> }>) {
   return (
-    <Panel className="personal-overview-agenda" eyebrow="Schedule" title="Up next">
-      <WidgetBody envelope={calendar.envelope} offline={calendar.offline}>
+    <Panel className="personal-overview-agenda" eyebrow="Inbox" title="Mail">
+      <WidgetBody envelope={gmail.envelope} offline={gmail.offline}>
         {(data) => {
-          const next = data.events.find((event) => new Date(event.end).getTime() >= Date.now());
-          const following = next ? data.events.filter((event) => event.id !== next.id).slice(0, 2) : data.events.slice(0, 2);
+          const [featured, ...rest] = data.threads;
+          const following = rest.slice(0, 2);
 
-          return next ? (
+          return featured ? (
             <div className="personal-overview-agenda-body">
               <div className="personal-overview-featured-event">
-                <p className="personal-overview-event-time">{eventMoment(next)}</p>
-                <p className="personal-overview-event-title">{next.title}</p>
-                {next.location && <p className="personal-overview-event-location">📍 {next.location}</p>}
+                <p className="personal-overview-event-time">{featured.unread ? 'Unread' : 'Read'} · {relativeTime(featured.date)}</p>
+                <p className="personal-overview-event-title">{featured.subject}</p>
+                <p className="personal-overview-event-location">{featured.from}</p>
               </div>
               {following.length > 0 && (
                 <ul className="personal-overview-following-events">
-                  {following.map((event) => (
-                    <li key={event.id}>
-                      <span>{eventMoment(event)}</span>
-                      <strong>{event.title}</strong>
+                  {following.map((thread) => (
+                    <li key={thread.id}>
+                      <span>{relativeTime(thread.date)}</span>
+                      <strong>{thread.subject}</strong>
                     </li>
                   ))}
                 </ul>
@@ -74,7 +76,7 @@ function AgendaPanel({ calendar }: Readonly<{ calendar: ReturnType<typeof useWid
           ) : (
             <div className="personal-overview-empty-state">
               <span aria-hidden>✦</span>
-              <p>No commitments ahead. Keep the space for what matters.</p>
+              <p>No mail right now. Enjoy the quiet.</p>
             </div>
           );
         }}
@@ -84,38 +86,42 @@ function AgendaPanel({ calendar }: Readonly<{ calendar: ReturnType<typeof useWid
 }
 
 function CommunicationsPanel({
-  gmail,
+  calendar,
   imessage,
 }: Readonly<{
-  gmail: ReturnType<typeof useWidget<GmailData>>;
+  calendar: ReturnType<typeof useWidget<CalendarData>>;
   imessage: ReturnType<typeof useWidget<IMessageData>>;
 }>) {
-  if (isWidgetDisabled(gmail.envelope) && isWidgetDisabled(imessage.envelope)) return null;
+  if (isWidgetDisabled(calendar.envelope) && isWidgetDisabled(imessage.envelope)) return null;
   return (
-    <Panel className="personal-overview-communications" eyebrow="Stay in touch" title="Inbox & messages">
+    <Panel className="personal-overview-communications" eyebrow="Coming up" title="Schedule & messages">
       <div className="personal-overview-communication-list">
-        {!isWidgetDisabled(gmail.envelope) && (
-          <WidgetBody envelope={gmail.envelope} offline={gmail.offline}>
-            {(data) => (
-              <section className="personal-overview-channel">
-                <div className="personal-overview-channel-heading">
-                  <span>Mail</span>
-                  <strong>{data.unreadThreads > 0 ? `${data.unreadThreads} unread` : 'Clear'}</strong>
-                </div>
-                {data.threads.length > 0 ? (
-                  <ul>
-                    {data.threads.slice(0, 2).map((thread) => (
-                      <li key={thread.id}>
-                        <a href={thread.url} target="_blank" rel="noreferrer">
-                          <span className={thread.unread ? 'font-semibold' : undefined}>{thread.from}</span>
-                          <small>{thread.subject}</small>
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : <p className="personal-overview-quiet">No recent mail.</p>}
-              </section>
-            )}
+        {!isWidgetDisabled(calendar.envelope) && (
+          <WidgetBody envelope={calendar.envelope} offline={calendar.offline}>
+            {(data) => {
+              const next = data.events.find((event) => new Date(event.end).getTime() >= Date.now());
+              const upcoming = next ? [next, ...data.events.filter((event) => event.id !== next.id)].slice(0, 2) : data.events.slice(0, 2);
+              return (
+                <section className="personal-overview-channel">
+                  <div className="personal-overview-channel-heading">
+                    <span>Schedule</span>
+                    <strong>{next ? eventMoment(next) : 'Clear'}</strong>
+                  </div>
+                  {upcoming.length > 0 ? (
+                    <ul>
+                      {upcoming.map((event) => (
+                        <li key={event.id}>
+                          <p className="personal-overview-message">
+                            <span className={event.id === next?.id ? 'font-semibold' : undefined}>{event.title}</span>
+                            <small>{eventMoment(event)}{event.location ? ` · ${event.location}` : ''}</small>
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : <p className="personal-overview-quiet">No commitments ahead.</p>}
+                </section>
+              );
+            }}
           </WidgetBody>
         )}
         {!isWidgetDisabled(imessage.envelope) && (
@@ -197,8 +203,8 @@ export function PersonalOverview() {
 
   return (
     <div className="personal-overview">
-      {!isWidgetDisabled(calendar.envelope) && <AgendaPanel calendar={calendar} />}
-      <CommunicationsPanel gmail={gmail} imessage={imessage} />
+      {!isWidgetDisabled(gmail.envelope) && <MailHeroPanel gmail={gmail} />}
+      <CommunicationsPanel calendar={calendar} imessage={imessage} />
       <HomePanel hue={hue} />
       <NewsPanel news={news} />
     </div>

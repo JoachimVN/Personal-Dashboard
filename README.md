@@ -10,6 +10,11 @@ Everything beyond that is optional. [Tailscale](https://tailscale.com) is only n
 have their own requirements (iMessage is macOS-only, Health needs an iPhone Shortcut), and any
 widget you don't configure simply shows as "not configured" rather than breaking the page.
 
+## Demo
+
+**[joavn-dashboard-demo.vercel.app](https://joavn-dashboard-demo.vercel.app)** — a fully interactive
+build running entirely on fake, anonymized data (`client/src/demo/`), no backend involved.
+
 ## Screenshots
 
 <p align="center">
