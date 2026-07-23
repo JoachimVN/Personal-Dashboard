@@ -187,7 +187,7 @@ async function buildPages(): Promise<Page[]> {
       widgets: { spotify: envelope(fixtures.spotifyDetail, spotifyNow) },
     },
     {
-      slug: 'health', file: '03-health.png', hash: '#/health', scrollToText: 'Your last 30 days, charted',
+      slug: 'health', file: '03-health.png', hash: '#/health', scrollToText: 'The last 30 days, charted',
       daypart: 'day', frozenAt: healthNow.getTime(), theme: 'light',
       widgets: { health: envelope(healthPageFixture, healthNow) },
     },
