@@ -142,7 +142,7 @@ function calendar(now: Date): CalendarData {
   add('1:1 with manager', 'Work', 6, 15, 30, 30, { location: 'Video call' });
   add('Weekend hike', 'Personal', 6, 9, 0, 240, { location: 'Nordmarka trailhead' });
   add('Code review', 'Work', 1, 13, 0, 45, {});
-  add('Grocery run', 'Personal', 0, 17, 30, 30, {});
+  add('Grocery run', 'Personal', 0, 17, 30, 30, { location: 'Meny Grünerløkka', description: 'Restock the week — fridge, produce, coffee' });
   add('Design sync', 'Work', -3, 11, 0, 45, {});
   add('Coffee with old coworker', 'Personal', -5, 10, 0, 60, { location: 'Fuglen' });
   add('Deploy freeze starts', 'Work', 14, 0, 0, 0, { allDay: true });
