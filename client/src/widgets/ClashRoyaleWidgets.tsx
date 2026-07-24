@@ -165,6 +165,11 @@ function formatBattleType(type: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function deckCardArtType(card: ClashRoyaleData['currentDeck'][number]): DeckCardArtType {
+  if (card.rarity === 'champion') return 'hero';
+  return card.iconUrl?.endsWith('CardEvolution.png') ? 'evolution' : 'regular';
+}
+
 export function Crown({ filled }: Readonly<{ filled: boolean }>) {
   return (
     <svg viewBox="0 0 24 18" aria-hidden className="clash-crown">
@@ -244,9 +249,7 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
 export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
   const deck: { card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }[] = data.currentDeck.map((card) => ({
     card,
-    artType: card.rarity === 'champion'
-      ? 'hero' as const
-      : card.iconUrl?.endsWith('CardEvolution.png') ? 'evolution' as const : 'regular' as const,
+    artType: deckCardArtType(card),
   }));
   if (data.deckHero) deck.splice(Math.min(data.deckHeroIndex ?? deck.length, deck.length), 0, { card: data.deckHero, artType: 'hero' as const });
   if (deck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;
