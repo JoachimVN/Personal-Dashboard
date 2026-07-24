@@ -32,7 +32,7 @@ describeDatabase('Postgres stores', () => {
   afterAll(async () => database.client.end({ timeout: 5 }));
 
   it('merges health device readings without double-counting', async () => {
-    const store = new HealthStore(database, 30);
+    const store = new HealthStore(database);
     await store.ingest({ phoneSteps: 6_500 }, '2026-07-13');
     await store.ingest({ watchSteps: 8_200 }, '2026-07-13');
     expect((await store.snapshot('2026-07-13')).today).toMatchObject({
@@ -41,7 +41,7 @@ describeDatabase('Postgres stores', () => {
   });
 
   it('deduplicates usage samples and retains the last good snapshot', async () => {
-    const store = new UsageHistoryStore(database, 15 * 60_000, 7 * 24 * 60 * 60_000);
+    const store = new UsageHistoryStore(database, 15 * 60_000);
     const asOf = new Date(Date.now() - 60_000).toISOString();
     const snapshot = { available: true, asOf, fiveHour: { usedPercent: 12, resetsAt: '2026-07-13T14:00:00.000Z' } };
     expect(await store.record('codex', snapshot)).toHaveLength(1);

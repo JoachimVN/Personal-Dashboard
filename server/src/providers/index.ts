@@ -60,20 +60,13 @@ export function createProviders(
   const transit = createTransitProvider(env.weather, config.transit);
   const power = createPowerProvider(config.power.area, env.weather, env.timezone);
   const hue = createHueProvider(env.hue);
-  const health = new HealthStore(
-    database,
-    config.health.historyRetentionDays,
-  );
-  const usageHistory = new UsageHistoryStore(
-    database,
-    config.aiUsage.historySampleMs,
-    config.aiUsage.historyRetentionDays * 24 * 60 * 60_000,
-  );
+  const health = new HealthStore(database);
+  const usageHistory = new UsageHistoryStore(database, config.aiUsage.historySampleMs);
   const spotifySnapshot = new SpotifySnapshotStore(database);
   const githubSnapshot = new GitHubSnapshotStore(database);
   const spotifyHistory = new SpotifyHistoryStore(database);
   const steamSnapshot = new SteamSnapshotStore(database);
-  const steamHistory = new SteamHistoryStore(database, config.steam.historyRetentionDays);
+  const steamHistory = new SteamHistoryStore(database);
   const valorantHistory = new ValorantHistoryStore(database);
   return {
     weather,

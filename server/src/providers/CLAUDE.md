@@ -2,8 +2,9 @@
 
 The AI usage providers additionally record trend points through `../usageHistory.ts`
 (`UsageHistoryStore`): a shared store that samples each genuinely-new snapshot (deduped by `asOf`,
-throttled by `aiUsage.historySampleMs`, pruned after `aiUsage.historyRetentionDays`) into the
-gitignored `server/.data/ai-usage-history.json` and embeds the history in the provider payload.
+throttled by `aiUsage.historySampleMs`) into Postgres and embeds the history in the provider
+payload. Kept permanently — same as Health, Steam playtime, and every other history table; nothing
+in this codebase prunes on a retention window.
 
 ## Why some providers look more complex than others
 

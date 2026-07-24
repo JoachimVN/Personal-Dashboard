@@ -38,7 +38,6 @@ export class UsageHistoryStore {
   constructor(
     private readonly database: Database,
     private readonly sampleMs: number,
-    private readonly retentionMs: number,
   ) {}
 
   async record(toolId: string, snapshot: UsageSnapshot): Promise<UsageHistoryPoint[]> {
@@ -69,8 +68,6 @@ export class UsageHistoryStore {
           on conflict (tool_id) do update set snapshot = excluded.snapshot, updated_at = now()
         `;
       }
-      const cutoff = new Date(Date.now() - this.retentionMs).toISOString();
-      await transaction`delete from ai_usage_history_points where tool_id = ${toolId} and at < ${cutoff}`;
       const points = await transaction<UsagePointRow[]>`
         select at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, model_weekly_used_percent
         from ai_usage_history_points where tool_id = ${toolId} order by at asc
