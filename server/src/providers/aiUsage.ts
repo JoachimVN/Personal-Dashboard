@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import { spawn as spawnPty } from 'node-pty';
-import { aiUsageToolSchema, type AiUsageToolData } from '@personal-dashboard/shared';
+import { aiUsageToolSchema, type AiUsageToolData, type UsageHistoryPoint } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 import type { UsageHistoryStore } from '../usageHistory.js';
 
@@ -372,6 +372,23 @@ async function claudeTokenTotals(): Promise<{ fiveHour: number; weekly: number }
   return { fiveHour, weekly };
 }
 
+/** A transient DB hiccup writing the trend point must not blank a fetch that already has good live
+ * data (see the Postgres connectivity issues that froze both AI usage widgets for days) — fall back
+ * to the last successfully recorded series instead of failing the whole provider over it. */
+async function recordHistorySafely(
+  historyStore: UsageHistoryStore,
+  toolId: string,
+  snapshot: UsageSnapshot,
+  remembered: { points: UsageHistoryPoint[] },
+): Promise<UsageHistoryPoint[]> {
+  try {
+    remembered.points = await historyStore.record(toolId, snapshot);
+  } catch {
+    // Keep serving the last known-good series; a history-write failure isn't a live-data failure.
+  }
+  return remembered.points;
+}
+
 export type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'modelWeekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>;
 
 /**
@@ -645,6 +662,7 @@ export function claudeNextRefreshMs(data: UsageSnapshot | undefined, refreshMs: 
 export function createClaudeUsageProvider(refreshMs: number, history: UsageHistoryStore): Provider<AiUsageToolData> {
   let rememberedQuota: ClaudeQuota | undefined;
   let loadedRememberedQuota = false;
+  const rememberedHistory: { points: UsageHistoryPoint[] } = { points: [] };
 
   const loadRememberedQuota = async (): Promise<ClaudeQuota | undefined> => {
     if (loadedRememberedQuota) return rememberedQuota;
@@ -691,7 +709,7 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
         tokens: tokenTotals,
         asOf: quota.asOf ?? new Date().toISOString(),
       };
-      return { ...snapshot, history: await history.record('ai-usage-claude', snapshot) };
+      return { ...snapshot, history: await recordHistorySafely(history, 'ai-usage-claude', snapshot, rememberedHistory) };
     },
     nextRefreshMs: (data) => claudeNextRefreshMs(data, refreshMs),
   };
@@ -730,6 +748,7 @@ export function createCodexUsageProvider(
 ): Provider<AiUsageToolData> {
   let fallback: CodexFallback = { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
   let lastFallbackAttemptAt = 0;
+  const rememberedHistory: { points: UsageHistoryPoint[] } = { points: [] };
 
   return {
     id: 'ai-usage-codex',
@@ -749,7 +768,7 @@ export function createCodexUsageProvider(
       }
       applyCodexFallbackWindow('fiveHour', snapshot, fallback);
       applyCodexFallbackWindow('weekly', snapshot, fallback);
-      return { ...snapshot, history: await history.record('ai-usage-codex', snapshot) };
+      return { ...snapshot, history: await recordHistorySafely(history, 'ai-usage-codex', snapshot, rememberedHistory) };
     },
   };
 }

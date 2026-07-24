@@ -323,7 +323,8 @@ export function createGitHubProvider(
         },
         repoHealth: health,
       };
-      await snapshotStore?.setSnapshot(data);
+      // Best-effort: a dropped snapshot write must not blank data the GitHub API already gave us.
+      await snapshotStore?.setSnapshot(data).catch(() => undefined);
       return data;
     },
   };
