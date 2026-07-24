@@ -187,7 +187,7 @@ describe('parseClaudeUsageScreen', () => {
     expect(quota.weeklyStatus).toBe('unknown');
   });
 
-  it('reads unlimited from a redraw whose headers rendered before its digits did', () => {
+  it('keeps a redraw with headers but no quota values unknown', () => {
     // The interactive screen redraws in place as data streams in. If a capture is cut off right
     // after a fresh redraw's headers land but before their percentage/reset lines do, both windows
     // read as an explicit "no limit" even though an earlier, complete redraw in the same buffer had
@@ -212,8 +212,30 @@ describe('parseClaudeUsageScreen', () => {
       new Date(2026, 6, 21, 16, 26),
     );
 
-    expect(quota.fiveHourStatus).toBe('unlimited');
-    expect(quota.weeklyStatus).toBe('unlimited');
+    expect(quota.fiveHourStatus).toBe('unknown');
+    expect(quota.weeklyStatus).toBe('unknown');
+  });
+
+  it('parses the current Usage screen layout', () => {
+    const quota = parseClaudeUsageScreen(
+      `Settings  Status   Config   Usage   Stats
+
+      Session
+
+      Current session
+      ████████████▌                                      25% used
+      Resets 2:29am (Europe/Oslo)
+
+      Current week (all models)
+      ██████████████████████████████████████▌            77% used
+      Resets Jul 25 at 11:59pm (Europe/Oslo)`,
+      new Date(2026, 6, 24, 0, 30),
+    );
+
+    expect(quota.fiveHour?.usedPercent).toBe(25);
+    expect(quota.weekly?.usedPercent).toBe(77);
+    expect(quota.fiveHourStatus).toBe('limited');
+    expect(quota.weeklyStatus).toBe('limited');
   });
 
   it('backdates asOf when the screen reports rate-limited last-known usage instead of a live read', () => {

@@ -538,8 +538,11 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
     // that lands fine would mark a weekly window that simply failed to capture this tick as an
     // explicit "unlimited" instead of "unknown" — see retainKnownClaudeQuota, which relies on this
     // distinction to know when it's safe to backfill from the last known-good weekly reading.
-    fiveHourStatus: limitStatus(Boolean(fiveHour), Boolean(sessionMatch)),
-    weeklyStatus: limitStatus(Boolean(week), Boolean(weeklyMatch)),
+    // A header without its percentage and reset time is a partial terminal redraw, not proof that
+    // Claude removed a limit. Reporting it as unlimited replaces a valid cached quota with a
+    // misleading green label; retain the known reading until a complete screen arrives instead.
+    fiveHourStatus: fiveHour ? 'limited' : 'unknown',
+    weeklyStatus: week ? 'limited' : 'unknown',
     asOf,
   };
 }
@@ -595,8 +598,10 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
           if (quota.fiveHour && quota.weekly) finish(terminal);
         }, 750);
       });
-      pty.onExit(({ exitCode }) => {
-        if (!settled) finish(undefined, new Error(`Claude exited before Usage rendered (${exitCode})`));
+      pty.onExit(() => {
+        // Claude can close immediately after the final screen paint. Use the bytes already
+        // delivered rather than discarding a complete report solely because the PTY closed first.
+        if (!settled) finish(terminal);
       });
     });
     return parseClaudeUsageScreen(output);
