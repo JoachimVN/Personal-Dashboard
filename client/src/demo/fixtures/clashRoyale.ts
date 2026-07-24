@@ -20,12 +20,18 @@ export function clashRoyale(now: Date): ClashRoyaleData {
     clashRoyaleCard(26000037, 'Hog Rider', 13, 13, 'rare'),
   ];
   const battles: ClashRoyaleData['recentBattles'] = [];
+  const ladder = { type: 'PvP', modeName: 'Ladder' };
+  const pathOfLegends = { type: 'pathOfLegend', modeName: 'Path of Legend' };
+  const twoVTwo = { type: '2v2', modeName: '2v2' };
+  const clanWar = { type: 'riverRacePvP', modeName: 'CW_Battle_1v1' };
+  const mergeTactics = { type: 'mergeTactics', modeName: 'Merge Tactics', arenaName: 'Bronze III' };
+  // This is deliberately not round-robin: a real recent history leans toward Trophy Road, with
+  // occasional Path, party, Clan War, and Merge Tactics games mixed in. Path battles omit their
+  // historic arena so the overview reuses the player's current Path of Legends badge.
   const battleModes = [
-    { type: 'PvP', modeName: 'Ladder' },
-    { type: 'pathOfLegend', modeName: 'Path of Legend', arenaName: 'Master II' },
-    { type: '2v2', modeName: '2v2' },
-    { type: 'riverRacePvP', modeName: 'CW_Battle_1v1' },
-    { type: 'mergeTactics', modeName: 'Merge Tactics', arenaName: 'Bronze III' },
+    ladder, twoVTwo, pathOfLegends, ladder, mergeTactics,
+    ladder, clanWar, pathOfLegends, ladder, twoVTwo,
+    ladder, mergeTactics, ladder, pathOfLegends, ladder,
   ];
   const rng = mulberry32(4242);
   for (let i = 0; i < 15; i++) {
@@ -37,7 +43,7 @@ export function clashRoyale(now: Date): ClashRoyaleData {
     let crownsAgainst = won ? Math.round(rng() * 1) : 1 + Math.round(rng() * 2);
     if (won) crownsAgainst = Math.min(crownsAgainst, crownsFor - 1);
     else crownsFor = Math.min(crownsFor, crownsAgainst - 1);
-    const mode = battleModes[i % battleModes.length];
+    const mode = battleModes[i];
     battles.push({
       battleTime: isoDaysAgo(now, i * 0.6),
       ...mode,
