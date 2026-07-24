@@ -11,7 +11,7 @@ import {
   SteamNowPlaying,
   SteamPlaytimeTrend,
   SteamRecentGames,
-} from '../../widgets/SteamWidgets';
+} from '../../widgets/steam';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 import './steam.css';
 
