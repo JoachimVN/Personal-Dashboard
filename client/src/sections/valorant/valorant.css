@@ -17,8 +17,9 @@
   }
 }
 
-/* The equipped player card belongs to the homepage section card, where it can establish the
-   overall atmosphere rather than competing with the profile summary as a second mini-card. */
+/* The equipped player card gets two treatments on the homepage card: a heavily blurred copy that
+   tints the whole surface (::before below) and a sharp copy inside the hero band, the same
+   split the detail page uses between its ambient wash and its portrait banner. */
 .dashboard-section-card--valorant:has(.valorant-overview) {
   isolation: isolate;
   display: flex;
@@ -36,9 +37,9 @@
   pointer-events: none;
   border-radius: inherit;
   background: var(--valorant-card-art, none) center / cover no-repeat;
-  opacity: 0.5;
-  filter: blur(18px) saturate(0.88);
-  transform: scale(1.07);
+  opacity: 0.24;
+  filter: blur(32px) saturate(0.8);
+  transform: scale(1.12);
 }
 .dashboard-section-card--valorant:has(.valorant-overview)::after {
   content: '';
@@ -82,93 +83,127 @@
   color: #fff;
   box-shadow: none;
 }
-.valorant-overview { display: grid; min-height: 0; width: 100%; flex: 1; grid-template-rows: auto auto minmax(0, 1fr); gap: 0.85rem; }
-.valorant-overview-briefing {
+.valorant-overview { display: grid; min-height: 0; width: 100%; flex: 1; grid-template-rows: auto auto minmax(0, 1fr); gap: 0.75rem; }
+
+/* Hero band — identity, live rank and peak over the equipped card's wide art. Its text colors are
+   fixed rather than light-dark(): the band commits to a dark treatment in both themes because it
+   always sits on a photo (and on the same dark gradient fallback when the account has no card). */
+.valorant-overview-hero {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 0.9rem 1.25rem;
-  min-height: 6.4rem;
-  padding: 0.9rem 1.1rem 0.85rem;
+  isolation: isolate;
+  display: flex;
+  min-height: 9.6rem;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
-  border: 1px solid var(--color-card-border);
+  padding: 1rem 1.15rem 1.05rem;
+  border: 1px solid color-mix(in oklab, var(--color-card-border) 70%, transparent);
   border-radius: 0.2rem 1.1rem 0.2rem 1.1rem;
-  background: linear-gradient(
-    100deg,
-    light-dark(rgba(255, 255, 255, 0.92), rgba(10, 10, 12, 0.86)),
-    light-dark(rgba(255, 255, 255, 0.62), rgba(20, 16, 18, 0.54))
-  );
-  color: light-dark(var(--color-ink), #fff);
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--color-accent-valorant) 26%, transparent), transparent 62%),
+    linear-gradient(100deg, #101014, #1b1418);
 }
-.valorant-overview-briefing::before {
+.valorant-overview-hero::after {
   content: '';
   position: absolute;
+  z-index: 3;
   top: 0;
   left: 0;
-  width: 3.1rem;
-  height: 0.24rem;
+  width: 3.4rem;
+  height: 0.22rem;
   background: var(--color-accent-valorant);
 }
-.valorant-overview-briefing::after {
-  content: '';
+.valorant-overview-hero-art { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: right center; }
+.valorant-overview-hero-scrim {
   position: absolute;
-  right: -1.3rem;
-  bottom: -1.3rem;
-  width: 5.4rem;
-  height: 5.4rem;
-  border: 1px solid color-mix(in oklab, var(--color-ink) 24%, transparent);
-  transform: rotate(45deg);
+  z-index: 1;
+  inset: 0;
+  background:
+    linear-gradient(96deg, rgba(8, 8, 10, 0.95) 0%, rgba(8, 8, 10, 0.88) 34%, rgba(8, 8, 10, 0.5) 74%, rgba(8, 8, 10, 0.3) 100%),
+    linear-gradient(180deg, rgba(8, 8, 10, 0.5), transparent 45%, rgba(8, 8, 10, 0.55));
 }
-.valorant-overview-identity, .valorant-overview-rank { position: relative; z-index: 1; min-width: 0; }
-.valorant-overview-kicker { margin: 0; color: light-dark(var(--color-ink-muted), rgba(255, 255, 255, 0.62)); font-size: 0.56rem; font-weight: 750; letter-spacing: 0.13em; line-height: 1.2; text-transform: uppercase; }
-.valorant-overview-name { overflow: hidden; margin: 0.42rem 0 0; color: light-dark(var(--color-ink), #fff); font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-overview-name span { margin-left: 0.32rem; color: light-dark(var(--color-ink-faint), rgba(255, 255, 255, 0.64)); font-size: 0.68em; font-weight: 600; letter-spacing: -0.02em; }
-.valorant-overview-level { margin: 0.43rem 0 0; color: light-dark(var(--color-ink-muted), rgba(255, 255, 255, 0.62)); font-size: 0.62rem; }
-.valorant-overview-level strong { margin-left: 0.2rem; color: light-dark(var(--color-ink), #fff); font-size: 0.7rem; font-variant-numeric: tabular-nums; }
-.valorant-overview-rank { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.55rem; min-width: 8.7rem; }
-.valorant-overview-rank img { width: 2.85rem; height: 2.85rem; object-fit: contain; filter: drop-shadow(0 0.25rem 0.7rem rgba(0, 0, 0, 0.35)); }
-.valorant-overview-rank p, .valorant-overview-rank strong, .valorant-overview-rank span { display: block; margin: 0; }
-.valorant-overview-rank p { color: light-dark(var(--color-ink-muted), rgba(255, 255, 255, 0.56)); font-size: 0.52rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
-.valorant-overview-rank strong { overflow: hidden; margin-top: 0.2rem; color: light-dark(var(--color-ink), #fff); font-size: 0.8rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-overview-rank span { margin-top: 0.18rem; color: light-dark(var(--color-ink-muted), rgba(255, 255, 255, 0.72)); font-size: 0.62rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.valorant-overview-readout {
+.valorant-overview-hero-body { position: relative; z-index: 2; min-width: 0; }
+.valorant-overview-kicker { display: flex; align-items: center; gap: 0.4rem; margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 0.55rem; font-weight: 750; letter-spacing: 0.13em; line-height: 1.2; text-transform: uppercase; }
+.valorant-overview-name { overflow: hidden; margin: 0.34rem 0 0; color: #fff; font-size: clamp(1.4rem, 3.1vw, 1.95rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-name span { margin-left: 0.32rem; color: rgba(255, 255, 255, 0.58); font-size: 0.62em; font-weight: 600; letter-spacing: -0.02em; }
+.valorant-overview-rank { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem 0.72rem; margin-top: 0.9rem; }
+.valorant-overview-rank-icon { width: 3.1rem; height: 3.1rem; flex: 0 0 auto; object-fit: contain; filter: drop-shadow(0 0.3rem 0.8rem rgba(0, 0, 0, 0.55)); }
+.valorant-overview-rank-body { min-width: 0; }
+.valorant-overview-rank-name { overflow: hidden; margin: 0; color: #fff; font-size: 0.92rem; font-weight: 800; letter-spacing: -0.02em; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-rr { display: flex; align-items: center; gap: 0.55rem; margin-top: 0.34rem; }
+/* `.valorant-rr-track` is declared further down for the detail hero, where the bar sits on its own
+   line; the extra specificity here wins the later-rule tiebreak and re-fits it into this flex row. */
+.valorant-overview-rr .valorant-overview-rr-track { flex: 1 1 auto; min-width: 3.5rem; max-width: 8.5rem; margin-top: 0; }
+.valorant-overview-rr-value { margin: 0; color: rgba(255, 255, 255, 0.82); font-size: 0.62rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.valorant-overview-rr-delta { margin-left: 0.35rem; font-weight: 800; }
+.valorant-overview-rr-delta.is-up { color: var(--valorant-hero-win); }
+.valorant-overview-rr-delta.is-down { color: var(--valorant-hero-loss); }
+.valorant-overview-peak { display: flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.6rem 0.35rem 0.42rem; border-radius: 0.62rem; background: rgba(0, 0, 0, 0.46); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
+.valorant-overview-peak img { width: 1.5rem; height: 1.5rem; flex: 0 0 auto; object-fit: contain; }
+.valorant-overview-peak div { min-width: 0; }
+.valorant-overview-peak p { margin: 0; color: rgba(255, 255, 255, 0.5); font-size: 0.47rem; font-weight: 750; letter-spacing: 0.12em; line-height: 1; text-transform: uppercase; }
+.valorant-overview-peak strong { display: block; overflow: hidden; margin-top: 0.16rem; color: #fff; font-size: 0.68rem; font-weight: 750; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-peak span { display: block; margin-top: 0.14rem; color: rgba(255, 255, 255, 0.48); font-size: 0.5rem; line-height: 1; }
+
+/* Act panel — the four ranked averages plus the form strip that puts them in sequence. */
+.valorant-overview-act {
   display: grid;
-  gap: 0.68rem;
-  padding: 0.7rem 0.8rem 0.75rem;
-  border-top: 1px solid color-mix(in oklab, var(--color-accent-valorant) 24%, var(--color-card-border));
-  border-bottom: 1px solid color-mix(in oklab, var(--color-ink) 8%, var(--color-card-border));
-  background: color-mix(in oklab, var(--color-card) 44%, transparent);
+  gap: 0.62rem;
+  padding: 0.72rem 0.8rem 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--color-card-border) 82%, transparent);
+  border-radius: 0.85rem;
+  background: color-mix(in oklab, var(--color-card) 52%, transparent);
 }
-.valorant-overview-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; }
-.valorant-overview-metrics > div { position: relative; min-width: 0; padding: 0 0.65rem; }
+.valorant-overview-act-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
+.valorant-overview-act-head p { overflow: hidden; margin: 0; color: var(--color-ink-muted); font-size: 0.56rem; font-weight: 750; letter-spacing: 0.11em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.valorant-overview-act-head span { flex: 0 0 auto; color: var(--color-ink-faint); font-size: 0.56rem; font-variant-numeric: tabular-nums; }
+.valorant-overview-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; }
+.valorant-overview-metrics > div { position: relative; display: flex; min-width: 0; flex-direction: column; padding: 0 0.6rem; }
 .valorant-overview-metrics > div:first-child { padding-left: 0; }
 .valorant-overview-metrics > div + div::before { content: ''; position: absolute; top: 0.05rem; bottom: 0.05rem; left: 0; width: 1px; background: color-mix(in oklab, var(--color-ink) 10%, transparent); }
-.valorant-overview-metrics dt { margin: 0; color: var(--color-ink-faint); font-size: 0.53rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
-.valorant-overview-metrics dd { overflow: hidden; margin: 0.32rem 0 0; color: var(--color-ink); font-size: 0.85rem; font-weight: 760; letter-spacing: -0.025em; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.valorant-overview-metrics small { display: block; overflow: hidden; margin-top: 0.22rem; color: var(--color-ink-muted); font-size: 0.55rem; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-overview-peak-rank { display: flex; align-items: center; gap: 0.34rem; }
-.valorant-overview-peak-rank img { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; object-fit: contain; filter: drop-shadow(0 0.12rem 0.25rem color-mix(in oklab, var(--color-accent-valorant) 25%, transparent)); }
-.valorant-overview-peak-rank span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-metrics dd { order: 1; overflow: hidden; margin: 0; color: var(--color-ink); font-size: 1.02rem; font-weight: 780; letter-spacing: -0.03em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.valorant-overview-metrics dt { order: 2; margin: 0.34rem 0 0; color: var(--color-ink-faint); font-size: 0.52rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
+.valorant-overview-form { display: flex; align-items: center; gap: 0.5rem; padding-top: 0.6rem; border-top: 1px solid color-mix(in oklab, var(--color-ink) 8%, transparent); }
+.valorant-overview-form > p { flex: 0 0 auto; margin: 0; color: var(--color-ink-faint); font-size: 0.52rem; font-weight: 750; letter-spacing: 0.1em; text-transform: uppercase; }
+.valorant-overview-form ol { display: flex; min-width: 0; flex-wrap: wrap; gap: 0.22rem; margin: 0; padding: 0; list-style: none; }
+.valorant-overview-form li { display: grid; width: 1.05rem; height: 1.05rem; place-content: center; border-radius: 0.28rem; background: color-mix(in oklab, var(--color-track) 55%, transparent); color: var(--color-ink-faint); font-size: 0.5rem; font-weight: 800; }
+.valorant-overview-form li[data-result='win'] { background: color-mix(in oklab, var(--valorant-win) 24%, var(--color-card)); color: var(--valorant-win); }
+.valorant-overview-form li[data-result='loss'] { background: color-mix(in oklab, var(--valorant-loss) 20%, var(--color-card)); color: var(--valorant-loss); }
+.valorant-overview-streak { flex: 0 0 auto; margin-left: auto; padding: 0.16rem 0.5rem; border-radius: 999px; background: var(--color-track); color: var(--color-ink-muted); font-size: 0.55rem; font-weight: 800; white-space: nowrap; }
+.valorant-overview-streak.is-up { background: color-mix(in oklab, var(--valorant-win) 16%, transparent); color: var(--valorant-win); }
+.valorant-overview-streak.is-down { background: color-mix(in oklab, var(--valorant-loss) 16%, transparent); color: var(--valorant-loss); }
+
 .valorant-overview-matches { display: grid; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 0.45rem; padding: 0.68rem 0.75rem 0.75rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 82%, transparent); border-radius: 0.85rem; background: color-mix(in oklab, var(--color-card) 56%, transparent); }
 .valorant-overview-matches-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; }
 .valorant-overview-matches-heading p, .valorant-overview-matches-heading span { margin: 0; }
 .valorant-overview-matches-heading p { color: var(--color-ink-muted); font-size: 0.56rem; font-weight: 750; letter-spacing: 0.11em; text-transform: uppercase; }
-.valorant-overview-matches-heading span { color: var(--color-ink-faint); font-size: 0.56rem; }
+.valorant-overview-matches-heading span { color: var(--color-ink-faint); font-size: 0.56rem; font-variant-numeric: tabular-nums; }
 .valorant-overview-matches ol { display: grid; min-height: 0; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
-.valorant-overview-matches li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem; min-height: 0; padding: 0.42rem 0.48rem; border-radius: 0.58rem; background: color-mix(in oklab, var(--color-track) 34%, transparent); }
-.valorant-overview-matches li[data-result='win'] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--valorant-win) 19%, transparent); }
-.valorant-overview-matches li[data-result='loss'] { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--valorant-loss) 17%, transparent); }
-.valorant-overview-matches img { width: 1.8rem; height: 1.8rem; border-radius: 0.45rem; background: var(--color-track); object-fit: cover; }
+.valorant-overview-matches li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem; min-height: 0; padding: 0.45rem 0.5rem; border-radius: 0.58rem; background: color-mix(in oklab, var(--color-track) 34%, transparent); }
+.valorant-overview-matches li[data-result='win'] { box-shadow: inset 0.18rem 0 0 0 color-mix(in oklab, var(--valorant-win) 62%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--valorant-win) 19%, transparent); }
+.valorant-overview-matches li[data-result='loss'] { box-shadow: inset 0.18rem 0 0 0 color-mix(in oklab, var(--valorant-loss) 52%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--valorant-loss) 17%, transparent); }
+.valorant-overview-matches img { width: 1.9rem; height: 1.9rem; margin-left: 0.15rem; border-radius: 0.45rem; background: var(--color-track); object-fit: cover; }
 .valorant-overview-match-main { min-width: 0; }
-.valorant-overview-match-main p, .valorant-overview-match-main span, .valorant-overview-match-result strong, .valorant-overview-match-result span { display: block; margin: 0; }
-.valorant-overview-match-main p { overflow: hidden; color: var(--color-ink); font-size: 0.7rem; font-weight: 730; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-match-main span, .valorant-overview-match-result strong, .valorant-overview-match-result span { display: block; margin: 0; }
+.valorant-overview-match-title { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.valorant-overview-match-title p { overflow: hidden; margin: 0; color: var(--color-ink); font-size: 0.72rem; font-weight: 730; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-mvp { flex: 0 0 auto; padding: 0.06rem 0.32rem; border-radius: 0.3rem; font-size: 0.46rem; font-weight: 800; letter-spacing: 0.05em; line-height: 1.4; text-transform: uppercase; }
+.valorant-overview-mvp.is-match { background: light-dark(#fde68a, rgba(217, 119, 6, 0.35)); color: light-dark(#7c5800, #fcd34d); }
+.valorant-overview-mvp.is-team { background: light-dark(#bfdbfe, rgba(29, 78, 216, 0.35)); color: light-dark(#1e40af, #bfdbfe); }
 .valorant-overview-match-main span { overflow: hidden; margin-top: 0.15rem; color: var(--color-ink-faint); font-size: 0.55rem; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-overview-match-result { min-width: 3rem; text-align: right; }
-.valorant-overview-match-result strong { color: var(--color-ink); font-size: 0.75rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.valorant-overview-match-result { min-width: 5.6rem; text-align: right; }
+.valorant-overview-match-result strong { color: var(--color-ink); font-size: 0.78rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .valorant-overview-matches li[data-result='win'] .valorant-overview-match-result strong { color: var(--valorant-win); }
 .valorant-overview-matches li[data-result='loss'] .valorant-overview-match-result strong { color: var(--valorant-loss); }
-.valorant-overview-match-result span { margin-top: 0.15rem; color: var(--color-ink-faint); font-size: 0.51rem; font-variant-numeric: tabular-nums; }
+.valorant-overview-match-result span { margin-top: 0.15rem; color: var(--color-ink-faint); font-size: 0.51rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The rank row's three columns stop fitting well before the card itself gets narrow, so peak drops
+   to its own line rather than squeezing the tier name and RR bar. */
+@media (max-width: 560px) {
+  .valorant-overview-rank { grid-template-columns: auto minmax(0, 1fr); }
+  .valorant-overview-peak { grid-column: 1 / -1; justify-self: start; }
+  .valorant-overview-match-result { min-width: 4.6rem; }
+}
 .valorant-eyebrow {
   margin: 0;
   color: var(--color-ink-muted);

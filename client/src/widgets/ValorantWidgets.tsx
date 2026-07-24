@@ -21,7 +21,7 @@ export function kda(match: ValorantMatch): string {
   return `${match.kills}/${match.deaths}/${match.assists}`;
 }
 
-function headshotRate(match: ValorantMatch): number {
+export function headshotRate(match: ValorantMatch): number {
   const totalShots = match.headshots + match.bodyshots + match.legshots;
   return totalShots === 0 ? 0 : Math.round((match.headshots / totalShots) * 100);
 }
@@ -35,7 +35,7 @@ export function recentRecord(matches: ValorantMatch[]) {
   }, { wins: 0, losses: 0, draws: 0 });
 }
 
-function currentStreak(matches: ValorantMatch[]): { result: ValorantMatch['result']; length: number } | undefined {
+export function currentStreak(matches: ValorantMatch[]): { result: ValorantMatch['result']; length: number } | undefined {
   const latest = matches[0];
   if (!latest) return undefined;
   let length = 0;
