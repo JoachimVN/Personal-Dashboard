@@ -22,6 +22,10 @@ export type ClashRoyaleCard = z.infer<typeof clashRoyaleCardSchema>;
 export const clashRoyaleBattleSchema = z.object({
   battleTime: z.string(),
   type: z.string(),
+  /** Supercell's human-readable game-mode label, when the battle-log response provides one. */
+  modeName: z.string().optional(),
+  /** The arena or ranked league recorded with this specific battle, never the player's current one. */
+  arenaName: z.string().optional(),
   result: z.enum(['win', 'loss', 'draw']),
   crownsFor: z.number(),
   crownsAgainst: z.number(),

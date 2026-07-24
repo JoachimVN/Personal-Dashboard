@@ -20,8 +20,15 @@ export function clashRoyale(now: Date): ClashRoyaleData {
     clashRoyaleCard(26000037, 'Hog Rider', 13, 13, 'rare'),
   ];
   const battles: ClashRoyaleData['recentBattles'] = [];
+  const battleModes = [
+    { type: 'PvP', modeName: 'Ladder' },
+    { type: 'pathOfLegend', modeName: 'Path of Legend', arenaName: 'Master II' },
+    { type: '2v2', modeName: '2v2' },
+    { type: 'riverRacePvP', modeName: 'CW_Battle_1v1' },
+    { type: 'mergeTactics', modeName: 'Merge Tactics', arenaName: 'Bronze III' },
+  ];
   const rng = mulberry32(4242);
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 15; i++) {
     const won = rng() > 0.42;
     // A battle's crown score is never a draw in Clash Royale ladder play — keep crownsFor/
     // crownsAgainst strictly on the winning side's side of the result, or a "win" can roll a
@@ -30,9 +37,11 @@ export function clashRoyale(now: Date): ClashRoyaleData {
     let crownsAgainst = won ? Math.round(rng() * 1) : 1 + Math.round(rng() * 2);
     if (won) crownsAgainst = Math.min(crownsAgainst, crownsFor - 1);
     else crownsFor = Math.min(crownsFor, crownsAgainst - 1);
+    const mode = battleModes[i % battleModes.length];
     battles.push({
       battleTime: isoDaysAgo(now, i * 0.6),
-      type: 'PvP', result: won ? 'win' : 'loss',
+      ...mode,
+      result: won ? 'win' : 'loss',
       crownsFor, crownsAgainst,
       opponentName: ['Ragnar', 'Freya', 'Bjorn', 'Astrid', 'Leif'][i % 5],
       trophyChange: won ? 24 + Math.round(rng() * 8) : -(24 + Math.round(rng() * 8)),
@@ -51,4 +60,3 @@ export function clashRoyale(now: Date): ClashRoyaleData {
     recentBattles: battles,
   };
 }
-

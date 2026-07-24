@@ -141,17 +141,21 @@ describe('battleResult', () => {
 });
 
 describe('mapBattle', () => {
-  it('derives result, crown totals, opponent name and trophy change', () => {
+  it('retains battle-specific mode and arena metadata with the result details', () => {
     expect(
       mapBattle({
         battleTime: '20260721T120000.000Z',
         type: 'PvP',
+        gameMode: { name: 'Ladder' },
+        arena: { name: 'Legendary Arena' },
         team: [{ crowns: 2, name: 'Me', trophyChange: 28 }],
         opponent: [{ crowns: 1, name: 'Rival' }],
       }),
     ).toEqual({
       battleTime: '2026-07-21T12:00:00.000Z',
       type: 'PvP',
+      modeName: 'Ladder',
+      arenaName: 'Legendary Arena',
       result: 'win',
       crownsFor: 2,
       crownsAgainst: 1,

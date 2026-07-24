@@ -65,6 +65,8 @@ interface RawBattleTeamMember {
 interface RawBattle {
   battleTime: string;
   type: string;
+  gameMode?: { name?: string };
+  arena?: { name?: string };
   team: RawBattleTeamMember[];
   opponent: RawBattleTeamMember[];
 }
@@ -225,6 +227,8 @@ export function mapBattle(battle: RawBattle): ClashRoyaleBattle {
   return {
     battleTime: toIsoTimestamp(battle.battleTime),
     type: battle.type,
+    modeName: battle.gameMode?.name,
+    arenaName: battle.arena?.name,
     result: battleResult(battle.team, battle.opponent),
     crownsFor: battle.team.reduce((sum, m) => sum + m.crowns, 0),
     crownsAgainst: battle.opponent.reduce((sum, m) => sum + m.crowns, 0),

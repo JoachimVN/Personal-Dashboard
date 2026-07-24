@@ -1,7 +1,7 @@
 import { pathOfLegendsDisplayLeagueNumber, pathOfLegendsLeagueName, type ClashRoyaleBattle, type ClashRoyaleData } from '@personal-dashboard/shared';
 import { useEffect, useState } from 'react';
 import { relativeTime } from '../lib/time';
-import { clashRoyaleLeagueArt } from '../lib/clashRoyale';
+import { CLASH_ROYALE_BATTLE_ART, clashRoyaleBattleIcon, clashRoyaleLeagueArt } from '../lib/clashRoyale';
 
 const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
   win: 'Victory',
@@ -9,7 +9,6 @@ const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
   draw: 'Draw',
 };
 const CLASH_ART = {
-  battle: 'https://media.ffycdn.net/eu/supercell/jRQrei1MNcyVLey6oS3p.png?width=64',
   playerCrown: 'https://media.ffycdn.net/eu/supercell/m1xRh8chWGRUyA5BcuWA.png?width=64',
   opponentCrown: 'https://media.ffycdn.net/eu/supercell/QTQoZZ8e18aR8d3ZtvEK.png?width=64',
 } as const;
@@ -189,7 +188,7 @@ function ClashCrownScore({ crownsFor, crownsAgainst, className = '' }: Readonly<
 function ClashBattleHeading({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <p className="clash-eyebrow clash-battle-heading">
-      <span className="clash-battle-heading-art"><img src={CLASH_ART.battle} alt="" width="64" height="64" /></span>
+      <span className="clash-battle-heading-art"><img src={CLASH_ROYALE_BATTLE_ART.trophyRoad} alt="" width="64" height="64" /></span>
       {children}
     </p>
   );
@@ -264,14 +263,17 @@ export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: Clas
 
 export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">Play a battle to start a fresh activity readout.</p>;
-  // The API supplies up to 25 battles, while this compact pulse explicitly represents twelve.
+  // The API supplies up to 25 battles, while this compact pulse explicitly represents fifteen.
   // Use one bounded list for both the result strip and its aggregate figures.
-  const battles = data.recentBattles.slice(0, 12);
+  const battles = data.recentBattles.slice(0, 15);
   const chronologicalBattles = battles.slice().reverse();
   const record = recentRecord(battles);
   const battleCount = battles.length;
   const winRate = Math.round((record.wins / battleCount) * 100);
   const gamesLabel = `Last ${battleCount} ${battleCount === 1 ? 'game' : 'games'}`;
+  const currentPathLeagueNumber = data.profile.pathOfLegends
+    ? pathOfLegendsDisplayLeagueNumber(data.profile.pathOfLegends.leagueNumber)
+    : undefined;
   return (
     <section className="clash-recent-games">
       <header className="clash-recent-games-header">
@@ -283,12 +285,22 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
       </header>
       <ol className="clash-recent-games-grid" aria-label={`Results of ${gamesLabel.toLowerCase()}, oldest to newest`}>
         {chronologicalBattles.map((battle, index) => (
-          <li key={`${battle.battleTime}-${index}`} data-result={battle.result} aria-label={`Game ${index + 1} of ${battleCount}: ${BATTLE_RESULT_LABELS[battle.result]}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns, ${relativeTime(battle.battleTime)}`}>
-            <ClashCrownScore crownsFor={battle.crownsFor} crownsAgainst={battle.crownsAgainst} className="clash-recent-games-score" />
-          </li>
+          <BattleModeTile key={`${battle.battleTime}-${index}`} battle={battle} index={index} battleCount={battleCount} fallbackPathLeagueNumber={currentPathLeagueNumber} />
         ))}
       </ol>
     </section>
+  );
+}
+
+function BattleModeTile({ battle, index, battleCount, fallbackPathLeagueNumber }: Readonly<{ battle: ClashRoyaleBattle; index: number; battleCount: number; fallbackPathLeagueNumber?: number }>) {
+  const icon = clashRoyaleBattleIcon(battle, fallbackPathLeagueNumber);
+  return (
+    <li
+      data-result={battle.result}
+      aria-label={`Game ${index + 1} of ${battleCount}: ${BATTLE_RESULT_LABELS[battle.result]} in ${icon.label}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns, ${relativeTime(battle.battleTime)}`}
+    >
+      <img src={icon.src} alt="" aria-hidden className="clash-recent-games-mode-icon" loading="lazy" decoding="async" />
+    </li>
   );
 }
 
