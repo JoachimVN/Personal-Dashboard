@@ -8,7 +8,6 @@ import {
   actLabel,
   aggregateHeadshotRate,
   averageCombatScore,
-  currentStreak,
   formatNumber,
   headshotRate,
   kda,
@@ -18,9 +17,7 @@ import './valorant.css';
 
 /* The whole overview card is one link (see SectionCard), same convention as ClashRoyaleOverview. */
 
-const FORM_LENGTH = 10;
 const MATCH_LENGTH = 3;
-const STREAK_LETTERS = { win: 'W', loss: 'L', draw: 'D' } as const;
 
 export function ValorantOverview() {
   const { envelope, offline } = useWidget<ValorantData>('valorant');
@@ -54,8 +51,6 @@ function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
   const actHs = aggregateHeadshotRate(statMatches);
   const actAcs = averageCombatScore(statMatches);
 
-  const form = recentMatches.slice(0, FORM_LENGTH);
-  const streak = currentStreak(recentMatches);
   /* RR is the 0–100 progress inside the current tier; Immortal+ keeps counting past it. */
   const rrPercent = Math.max(0, Math.min(100, rank.rr));
 
@@ -133,21 +128,6 @@ function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
           <ActMetric label="HS %" value={actHs === undefined ? '—' : `${actHs}%`} />
           <ActMetric label="ACS" value={actAcs === undefined ? '—' : formatNumber(actAcs)} />
         </dl>
-        {form.length > 0 && (
-          <div className="valorant-overview-form">
-            <p>Form</p>
-            <ol aria-label="Results of recent matches, oldest first">
-              {form.slice().reverse().map((match, index) => (
-                <li key={`${match.matchId}-${index}`} data-result={match.result}>{STREAK_LETTERS[match.result]}</li>
-              ))}
-            </ol>
-            {streak && (
-              <span className={`valorant-overview-streak${streakModifier(streak.result)}`}>
-                {streak.length}{STREAK_LETTERS[streak.result]} streak
-              </span>
-            )}
-          </div>
-        )}
       </section>
 
       {recentMatches.length > 0 && (
@@ -195,10 +175,4 @@ function ActMetric({ label, value }: Readonly<{ label: string; value: string }>)
       <dd>{value}</dd>
     </div>
   );
-}
-
-function streakModifier(result: 'win' | 'loss' | 'draw'): string {
-  if (result === 'win') return ' is-up';
-  if (result === 'loss') return ' is-down';
-  return '';
 }
