@@ -61,7 +61,7 @@ export function clashRoyale(now: Date): ClashRoyaleData {
     profile: {
       tag: '#YOURTAG', name: 'yourname', expLevel: 47, trophies: 9127, bestTrophies: 9127,
       wins: 3420, losses: 3180, threeCrownWins: 890, battleCount: 6600,
-      arenaName: 'Legendary Arena', clanName: 'Northern Lights', clanTag: '#CLANTAG', clanScore: 52_300,
+      arenaName: 'Legendary Arena', clanName: 'Northern Lights', clanTag: '#CLANTAG',
       clanBadgeUrl: CLASH_ROYALE_DEMO_CLAN_BADGE_URL,
       pathOfLegends: { leagueNumber: 1, trophies: 4820, rank: 1240 },
     },
