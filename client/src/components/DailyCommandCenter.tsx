@@ -20,7 +20,9 @@ import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { Thumb } from '../widgets/SpotifyWidget';
 import { GitHubMark } from './GitHubMark';
-import { AiToolMark, heroExtraFor, SecondaryContent, useRobloxArtPalette } from './command-center/SecondaryContent';
+import { heroExtraFor, SecondaryContent } from './command-center/SecondaryContent';
+import { AiToolMark } from './command-center/secondary/fallback';
+import { useRobloxArtPalette } from './command-center/useRobloxArtPalette';
 import { useCommandCenterData } from './command-center/useCommandCenterData';
 import '../sections/spotify/spotify.css';
 
