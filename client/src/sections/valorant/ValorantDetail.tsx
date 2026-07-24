@@ -5,6 +5,7 @@ import { useWidget } from '../../useWidget';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
 import { valorantMapArt } from '../../lib/valorant';
+import { publicAsset } from '../../lib/publicAsset';
 import {
   RESULT_LABELS,
   ValorantMatchLog,
@@ -26,7 +27,7 @@ import './valorant.css';
 function ValorantWordmark() {
   return (
     <img
-      src="/valorant_wordmark.png"
+      src={publicAsset('valorant_wordmark.png')}
       alt="Valorant"
       className="block h-[0.9rem]"
       style={{

@@ -14,6 +14,7 @@ import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
 import { CLASH_ROYALE_APP_ICON_URL, clashRoyaleArenaArt, clashRoyaleLeagueArt } from '../lib/clashRoyale';
+import { publicAsset } from '../lib/publicAsset';
 import { accentStyle, SECTIONS, SectionIcon } from '../sections/registry';
 import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
@@ -152,7 +153,7 @@ function signalMark(
   if (slot.render.type === 'roblox-now-playing') {
     const iconUrl = roblox?.presence?.iconUrl;
     if (iconUrl) return <img src={iconUrl} alt="" className="command-roblox-tile-icon" />;
-    return <span className="command-roblox-tile-mark" aria-hidden><img src="/roblox.svg" alt="" /></span>;
+    return <span className="command-roblox-tile-mark" aria-hidden><img src={publicAsset('roblox.svg')} alt="" /></span>;
   }
   return <span className="command-signal-dot" aria-hidden />;
 }

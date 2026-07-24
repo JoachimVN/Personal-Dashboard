@@ -18,6 +18,7 @@ import { ClaudeIcon, OpenAiIcon } from '../../sections/ai/ToolIcons';
 import { Crown } from '../../widgets/ClashRoyaleWidgets';
 import { UvGauge, WindGauge } from '../../sections/weather/WeatherOverview';
 import { deg, glyph } from '../../lib/weather';
+import { publicAsset } from '../../lib/publicAsset';
 import { activitySyncContext, latestActivityDay } from '../../lib/health';
 import { ActivityRings } from '../ActivityRings';
 import { ContributionGrid } from '../../widgets/GitHubWidgets';
@@ -253,13 +254,13 @@ function RobloxNowPlayingSecondary({ slot, roblox }: Readonly<{ slot: CommandCen
   const gameIcon = presence.iconUrl ? (
     <img src={presence.iconUrl} alt="" className="command-roblox-icon" />
   ) : (
-    <span className="command-roblox-icon command-roblox-icon--fallback" aria-hidden><img src="/roblox.svg" alt="" /></span>
+    <span className="command-roblox-icon command-roblox-icon--fallback" aria-hidden><img src={publicAsset('roblox.svg')} alt="" /></span>
   );
   return <div className="command-roblox-now">
     {gameIcon}
     <div className="command-roblox-details">
       <div className="command-roblox-brand" aria-label="Roblox">
-        <img src="/roblox_wordmark.svg" alt="Roblox" />
+        <img src={publicAsset('roblox_wordmark.svg')} alt="Roblox" />
         <span>In game</span>
       </div>
       <div className="command-roblox-game">

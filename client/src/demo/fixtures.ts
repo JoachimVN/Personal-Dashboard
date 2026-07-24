@@ -539,7 +539,9 @@ function valorantMatchesFor(
   const matches: ValorantData['recentMatches'] = [];
   for (let i = 0; i < count; i++) {
     const won = rng() > 0.45;
-    const kills = 12 + Math.round(rng() * 16);
+    // i === 0 is always the match MVP (see isMatchMvp below) on Jett (agents[0]) - fixed at
+    // 27 so the showcased MVP performance reads as a standout, not an average game.
+    const kills = i === 0 ? 27 : 12 + Math.round(rng() * 16);
     matches.push({
       matchId: `${idPrefix}-${i}`, map: maps[i % maps.length], mode: 'Competitive',
       startedAt: isoDaysAgo(now, daysAgoStart + i * daysAgoStep),
