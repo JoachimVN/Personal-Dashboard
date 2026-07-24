@@ -120,7 +120,7 @@ function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
       <section className="valorant-overview-act">
         <div className="valorant-overview-act-head">
           <p>Current act{actShort ? ` · ${actLabel(actShort)}` : ''}</p>
-          {currentSeason && <span>{currentSeason.wins}W / {currentSeason.games} played</span>}
+          {currentSeason && <span>{currentSeason.games} played</span>}
         </div>
         <dl className="valorant-overview-metrics">
           <ActMetric label="Win rate" value={seasonWinRate === undefined ? '—' : `${seasonWinRate}%`} />
