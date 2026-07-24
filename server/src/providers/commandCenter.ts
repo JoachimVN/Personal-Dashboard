@@ -40,7 +40,7 @@ import {
   transitCandidates,
   weatherCandidates,
   type SpotifyFreshness,
-} from '../importance/sources.js';
+} from '../importance/sources/index.js';
 import type { ProviderScheduler, Provider } from '../scheduler.js';
 import { SignalHistoryStore } from '../signalHistory.js';
 import type { ClashRoyaleMoments, SteamMoments } from '../importance/types.js';

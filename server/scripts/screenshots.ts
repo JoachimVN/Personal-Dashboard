@@ -28,7 +28,7 @@ import {
   imessageCandidates,
   spotifyCandidates,
   weatherCandidates,
-} from '../src/importance/sources.js';
+} from '../src/importance/sources/index.js';
 import {
   buildAiFixtures,
   githubFixture,
