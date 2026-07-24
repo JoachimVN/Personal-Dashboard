@@ -1,0 +1,56 @@
+name: Sync to Portfolio
+
+# Builds the demo client and publishes it to the portfolio repo (Vercel-deployed at
+# joavn.dev), serving it at joavn.dev/dashboard. Mirrors the pattern Versed,
+# CHORIDOR-web, Dart-Scores, and Music-Popularity-Index use.
+# Requires a repo secret PORTFOLIO_TOKEN: a PAT with write access to JoachimVN/Portfolio.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'client/**'
+      - 'shared/**'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build demo client
+        # No backend for the demo (fake, anonymized data from client/src/demo/) - just a
+        # static build, served under /dashboard/.
+        run: npm run build:demo -w client -- --base=/dashboard/
+
+      - name: Clone portfolio repo
+        env:
+          PORTFOLIO_TOKEN: ${{ secrets.PORTFOLIO_TOKEN }}
+        run: git clone "https://x-access-token:${PORTFOLIO_TOKEN}@github.com/JoachimVN/Portfolio.git" portfolio
+
+      - name: Sync built app -> projects/dashboard/
+        run: |
+          rm -rf portfolio/projects/dashboard
+          mkdir -p portfolio/projects
+          cp -r client/dist portfolio/projects/dashboard
+
+      - name: Commit and push
+        run: |
+          cd portfolio
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add projects/dashboard/
+          git diff --staged --quiet || git commit -m "chore: sync Personal Dashboard from Personal-Dashboard@${{ github.sha }}"
+          git push

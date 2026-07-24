@@ -12,8 +12,12 @@ widget you don't configure simply shows as "not configured" rather than breaking
 
 ## Demo
 
-**[joavn-dashboard-demo.vercel.app](https://joavn-dashboard-demo.vercel.app)** — a fully interactive
-build running entirely on fake, anonymized data (`client/src/demo/`), no backend involved.
+**[joavn.dev/dashboard](https://joavn.dev/dashboard)** — a fully interactive build running entirely
+on fake, anonymized data (`client/src/demo/`), no backend involved. Published as a static build,
+embedded in a separate `Portfolio` repo. `.github/workflows/sync-portfolio.yml` builds with
+`--base=/dashboard/` on every push to `main` (when client/shared sources or build config change) and
+pushes the built `client/dist` into the `Portfolio` repo. `sync-portfolio.sh` does the same thing
+locally/manually.
 
 ## Screenshots
 
