@@ -2,6 +2,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { motion } from 'motion/react';
 import { accentStyle, SectionIcon, type SectionDef, type SectionId } from './registry';
 import { sectionHref } from '../router';
+import { publicAsset } from '../lib/publicAsset';
 
 export const sectionCardVariants = {
   hidden: { opacity: 0, y: 12 },
@@ -12,14 +13,14 @@ export const sectionCardVariants = {
 const SECTION_WORDMARKS: Partial<Record<SectionId, { markClassName: string; src: string; alt: string; className: string; aspectRatio: string }>> = {
   valorant: {
     markClassName: 'valorant-overview-mark',
-    src: '/valorant_wordmark.png',
+    src: publicAsset('valorant_wordmark.png'),
     alt: 'Valorant',
     className: 'valorant-overview-wordmark',
     aspectRatio: '3633 / 533',
   },
   'clash-royale': {
     markClassName: 'clash-royale-overview-mark',
-    src: '/clash-royale-wordmark.png',
+    src: publicAsset('clash-royale-wordmark.png'),
     alt: 'Clash Royale',
     className: 'clash-royale-overview-wordmark',
     aspectRatio: '1500 / 650',

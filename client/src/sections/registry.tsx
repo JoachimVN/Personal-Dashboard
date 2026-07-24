@@ -1,6 +1,7 @@
 import { useId, type ComponentType, type CSSProperties } from 'react';
 import { GitHubMark } from '../components/GitHubMark';
 import { CLASH_ROYALE_APP_ICON_URL } from '../lib/clashRoyale';
+import { publicAsset } from '../lib/publicAsset';
 import { AiOverview } from './ai/AiOverview';
 import { AiDetail } from './ai/AiDetail';
 import { GitHubOverview } from './github/GitHubOverview';
@@ -185,7 +186,7 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
       );
     }
     return (
-      <img src="/spotify.svg" alt="" aria-hidden className="h-5 w-5" />
+      <img src={publicAsset('spotify.svg')} alt="" aria-hidden className="h-5 w-5" />
     );
   }
     case 'weather': {
@@ -274,11 +275,11 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
         style={{
           aspectRatio: '1841 / 1514',
           backgroundColor: monochrome ? 'currentColor' : 'var(--accent)',
-          maskImage: 'url(/valorant.png)',
+          maskImage: `url(${publicAsset('valorant.png')})`,
           maskRepeat: 'no-repeat',
           maskPosition: 'center',
           maskSize: 'contain',
-          WebkitMaskImage: 'url(/valorant.png)',
+          WebkitMaskImage: `url(${publicAsset('valorant.png')})`,
           WebkitMaskRepeat: 'no-repeat',
           WebkitMaskPosition: 'center',
           WebkitMaskSize: 'contain',
