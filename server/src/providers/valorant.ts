@@ -289,6 +289,7 @@ export function createValorantProvider(auth: ValorantAuth | undefined, historySt
     refreshMs: 10 * 60_000,
     timeoutMs: 20_000,
     isConfigured: () => auth !== undefined,
+    loadCached: () => historyStore?.getSnapshot() ?? Promise.resolve(undefined),
     async fetch(signal) {
       if (!auth) throw new Error('valorant is not configured');
       const { apiKey, name, tag, region } = auth;
@@ -395,7 +396,10 @@ export function createValorantProvider(auth: ValorantAuth | undefined, historySt
         },
       };
 
-      return valorantSchema.parse(data);
+      const parsed = valorantSchema.parse(data);
+      // Best-effort: a dropped snapshot write must not blank data that HenrikDev already gave us.
+      await historyStore?.setSnapshot(parsed).catch(() => undefined);
+      return parsed;
     },
   };
 }

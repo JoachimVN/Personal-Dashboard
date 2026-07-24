@@ -62,6 +62,7 @@ describe('Valorant provider history', () => {
     const historyStore = {
       get: vi.fn().mockResolvedValue(undefined),
       set: vi.fn().mockImplementation(async (value) => ({ ...value, fetchedAt: '2026-07-22T00:00:00.000Z' })),
+      setSnapshot: vi.fn().mockResolvedValue(undefined),
     };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
@@ -102,6 +103,7 @@ describe('Valorant provider history', () => {
         sourceVersion: 3,
       }),
       set: vi.fn(),
+      setSnapshot: vi.fn().mockResolvedValue(undefined),
     };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
@@ -128,6 +130,7 @@ describe('Valorant provider history', () => {
     const historyStore = {
       get: vi.fn().mockResolvedValue(undefined),
       set: vi.fn().mockImplementation(async (value) => ({ ...value, fetchedAt: '2026-07-22T00:00:00.000Z' })),
+      setSnapshot: vi.fn().mockResolvedValue(undefined),
     };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);
@@ -167,6 +170,7 @@ describe('Valorant provider history', () => {
         sourceVersion: 3,
       }),
       set: vi.fn().mockImplementation(async (value) => ({ ...value, fetchedAt: new Date().toISOString() })),
+      setSnapshot: vi.fn().mockResolvedValue(undefined),
     };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = String(input);

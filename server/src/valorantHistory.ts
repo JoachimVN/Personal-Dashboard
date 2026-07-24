@@ -1,4 +1,4 @@
-import { valorantMatchSchema } from '@personal-dashboard/shared';
+import { valorantMatchSchema, valorantSchema, type ValorantData } from '@personal-dashboard/shared';
 import { z } from 'zod';
 import type { Database } from './db/client.js';
 
@@ -40,5 +40,22 @@ export class ValorantHistoryStore {
       on conflict (source, metric) do update set value = excluded.value, changed_at = now()
     `;
     return value;
+  }
+
+  /** Cross-server last-good Valorant snapshot, so a fresh dev server can degrade gracefully. */
+  async getSnapshot(): Promise<{ data: ValorantData; fetchedAt: Date } | undefined> {
+    const [row] = await this.database.client<{ value: unknown; changed_at: string }[]>`
+      select value, changed_at from signal_current where source = 'valorant' and metric = 'snapshot'
+    `;
+    if (!row) return undefined;
+    return { data: valorantSchema.parse(row.value), fetchedAt: new Date(row.changed_at) };
+  }
+
+  async setSnapshot(data: ValorantData): Promise<void> {
+    await this.database.client`
+      insert into signal_current (source, metric, value, changed_at)
+      values ('valorant', 'snapshot', ${JSON.stringify(data)}::jsonb, now())
+      on conflict (source, metric) do update set value = excluded.value, changed_at = now()
+    `;
   }
 }

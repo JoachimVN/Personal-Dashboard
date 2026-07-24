@@ -355,6 +355,7 @@ export function createSpotifyProvider(
     refreshMs: 60_000,
     timeoutMs: 20_000,
     isConfigured: () => oauth !== undefined && readSpotifyToken() !== undefined,
+    loadCached: () => snapshotStore.getSnapshotWithFetchedAt(),
     nextRefreshMs,
     async fetch(signal) {
       if (!oauth) throw new Error('spotify is not configured');
@@ -426,7 +427,9 @@ export function createSpotifyProvider(
           },
           allTime: await historyStore.getAllTime(),
         };
-        await snapshotStore.setSnapshot(snapshot, topDataRefreshed ? topDataFetchedAt : undefined);
+        // Best-effort: a dropped snapshot write must not discard the live data already in hand
+        // (and must not be mistaken for a rate-limit failure by the catch block below).
+        await snapshotStore.setSnapshot(snapshot, topDataRefreshed ? topDataFetchedAt : undefined).catch(() => undefined);
         nextAttemptNotBefore = 0;
         return snapshot;
       } catch (error) {

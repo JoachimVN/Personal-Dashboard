@@ -12,6 +12,14 @@ export class SpotifySnapshotStore {
     return row?.snapshot ? spotifySchema.parse(row.snapshot) : undefined;
   }
 
+  /** Same row as getSnapshot, plus when it was written — for the scheduler's cross-restart cache. */
+  async getSnapshotWithFetchedAt(): Promise<{ data: SpotifyData; fetchedAt: Date } | undefined> {
+    const [row] = await this.database.client<{ snapshot: unknown; updated_at: string }[]>`
+      select snapshot, updated_at from spotify_snapshot where id = 1
+    `;
+    return row?.snapshot ? { data: spotifySchema.parse(row.snapshot), fetchedAt: new Date(row.updated_at) } : undefined;
+  }
+
   async getRateLimitedUntil(): Promise<number> {
     const [row] = await this.database.client<{ rate_limited_until: number }[]>`
       select rate_limited_until from spotify_snapshot where id = 1
