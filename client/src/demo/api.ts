@@ -3,8 +3,9 @@
 // makes has to be answered locally instead. A single window.fetch wrapper is the smallest way to
 // do that: every widget, button and drag interaction keeps calling the same real endpoints it
 // always does, completely unaware it's talking to fixtures instead of a server.
-import type { HueData, SpotifyData, WidgetEnvelope } from '@personal-dashboard/shared';
+import type { CalendarData, HueData, SpotifyData, WidgetEnvelope } from '@personal-dashboard/shared';
 import { buildDemoEnvelopes, spotifyNowPlayingAt } from './fixtures';
+import { calendar } from './fixtures/calendar';
 
 const LAYOUT_STORAGE_KEY = 'demo-layout';
 
@@ -71,6 +72,15 @@ function refreshSpotifyNowPlaying(envelope: WidgetEnvelope): WidgetEnvelope {
   return { ...envelope, fetchedAt: at, lastAttemptAt: at, data: { ...data, nowPlaying: spotifyNowPlayingAt(now) } };
 }
 
+/** Keep the made-up agenda anchored to the visitor's current date. Unlike a production calendar,
+ * the demo cannot fetch a new event feed; rebuilding this relative fixture on every poll keeps a
+ * long-lived tab from eventually treating every event as history. */
+function refreshCalendar(envelope: WidgetEnvelope): WidgetEnvelope {
+  const now = new Date();
+  const at = now.toISOString();
+  return { ...envelope, fetchedAt: at, lastAttemptAt: at, data: calendar(now) satisfies CalendarData };
+}
+
 // GET/POST /api/widgets/:id[/refresh]
 function handleWidgetRoute(path: string, envelopes: Envelopes): Response | undefined {
   const match = WIDGET_ROUTE.exec(path);
@@ -78,7 +88,9 @@ function handleWidgetRoute(path: string, envelopes: Envelopes): Response | undef
   const id = match[1];
   const envelope = envelopes[id];
   if (!envelope) return jsonResponse({ id, status: 'loading', refreshMs: 60_000 } satisfies WidgetEnvelope);
-  if (id === 'spotify') {
+  if (id === 'calendar') {
+    envelopes[id] = refreshCalendar(envelope);
+  } else if (id === 'spotify') {
     envelopes[id] = refreshSpotifyNowPlaying(envelope);
   } else if (match[2]) {
     const at = new Date().toISOString();
@@ -200,10 +212,11 @@ async function handleApiRoute(
 }
 
 /** Wraps window.fetch, answering every `/api/*` route the app calls from static, in-memory
- * fixtures. Widget reads/refreshes are served straight from the fixture set built once at
- * install time; the handful of write endpoints (Hue, layout, code launcher, issue capture,
- * device location) apply optimistically to that same in-memory state so the demo feels alive —
- * they never claim to persist anywhere real. Anything outside `/api/` passes through untouched. */
+ * fixtures. Most widget reads/refreshes are served straight from the fixture set built once at
+ * install time; calendar and Spotify are rebased to the current time. The handful of write
+ * endpoints (Hue, layout, code launcher, issue capture, device location) apply optimistically
+ * to that same in-memory state so the demo feels alive — they never claim to persist anywhere
+ * real. Anything outside `/api/` passes through untouched. */
 export function installDemoApi(): void {
   const now = new Date();
   const envelopes = buildDemoEnvelopes(now);
