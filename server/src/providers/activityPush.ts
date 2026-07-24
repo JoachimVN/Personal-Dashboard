@@ -5,7 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { activityPushSchema, clashRoyaleSchema, type ActivityPushData, type ClashRoyaleData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
-import { jsonlFiles } from './aiUsage.js';
+import { jsonlFiles } from './aiUsage/index.js';
 
 const execFileAsync = promisify(execFile);
 const CLAUDE_ACTIVITY_WINDOW_MS = 10 * 60_000;

@@ -12,7 +12,7 @@ import { SteamHistoryStore } from '../steamHistory.js';
 import { ValorantHistoryStore } from '../valorantHistory.js';
 import { createActivityPushProvider } from './activityPush.js';
 import { createAiNewsProvider } from './aiNews.js';
-import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
+import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage/index.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
 import { createGmailProvider } from './gmail.js';

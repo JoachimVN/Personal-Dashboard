@@ -8,8 +8,9 @@ in this codebase prunes on a retention window.
 
 ## Why some providers look more complex than others
 
-- **AI usage** (`aiUsage.ts`) is actually two providers,
-  `createClaudeUsageProvider` and `createCodexUsageProvider`, each with its own widget id
+- **AI usage** (`aiUsage/`) is actually two providers,
+  `createClaudeUsageProvider` (`aiUsage/claude.ts`) and `createCodexUsageProvider`
+  (`aiUsage/codex.ts`) over a small shared base (`aiUsage/shared.ts`), each with its own widget id
   (`ai-usage-claude`, `ai-usage-codex`) and refresh cadence, even though they render in one section.
   Codex reads local session files (cheap, configurable cadence via `config.json`). Claude shells out to
   `claude -p "/usage" --output-format json` and regex-parses the report text — a local command the CLI
