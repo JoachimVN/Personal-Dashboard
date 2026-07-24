@@ -171,6 +171,8 @@
 .valorant-overview-matches-heading span { color: var(--color-ink-faint); font-size: 0.56rem; font-variant-numeric: tabular-nums; }
 .valorant-overview-matches ol { display: grid; min-height: 0; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
 .valorant-overview-matches li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem; min-height: 0; padding: 0.45rem 0.5rem; border-radius: 0.58rem; background: color-mix(in oklab, var(--color-track) 34%, transparent); }
+.valorant-overview-matches li[data-result='win'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-win) 5%, transparent), transparent 70%), color-mix(in oklab, var(--color-track) 34%, transparent); }
+.valorant-overview-matches li[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-loss) 5%, transparent), transparent 70%), color-mix(in oklab, var(--color-track) 34%, transparent); }
 .valorant-overview-matches img { width: 1.9rem; height: 1.9rem; margin-left: 0.15rem; border-radius: 0.45rem; background: var(--color-track); object-fit: cover; }
 .valorant-overview-match-main { min-width: 0; }
 .valorant-overview-match-main span, .valorant-overview-match-result strong, .valorant-overview-match-result span { display: block; margin: 0; }
