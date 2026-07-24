@@ -1,7 +1,7 @@
 import { spotifySchema, type SpotifyData } from '@personal-dashboard/shared';
 import { readSpotifyToken, writeSpotifyToken } from '../spotifyToken.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
-import { SpotifyHistoryStore, type AlbumDetailInput, type PlayedTrackInput } from '../spotifyHistory.js';
+import { SpotifyHistoryStore, type AlbumDetailInput, type PlayedTrackInput } from '../spotifyHistory/index.js';
 import type { Provider } from '../scheduler.js';
 
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';

@@ -6,7 +6,7 @@ import { HealthStore } from '../healthStore.js';
 import { GitHubSnapshotStore } from '../githubSnapshot.js';
 import { UsageHistoryStore } from '../usageHistory.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
-import { SpotifyHistoryStore } from '../spotifyHistory.js';
+import { SpotifyHistoryStore } from '../spotifyHistory/index.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { SteamHistoryStore } from '../steamHistory.js';
 import { ValorantHistoryStore } from '../valorantHistory.js';

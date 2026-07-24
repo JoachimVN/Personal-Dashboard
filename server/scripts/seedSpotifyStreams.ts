@@ -10,7 +10,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { accessToken, toPlayedTrackInput, type RawTrack } from '../src/providers/spotify.js';
-import { SpotifyHistoryStore, type PlayedTrackInput } from '../src/spotifyHistory.js';
+import { SpotifyHistoryStore, type PlayedTrackInput } from '../src/spotifyHistory/index.js';
 import { createDatabase } from '../src/db/client.js';
 
 const clientId = process.env.SPOTIFY_CLIENT_ID;

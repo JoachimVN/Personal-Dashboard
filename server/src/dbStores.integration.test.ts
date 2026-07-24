@@ -4,7 +4,7 @@ import { migrateDatabase } from './db/migrate.js';
 import { HealthStore } from './healthStore.js';
 import { UsageHistoryStore } from './usageHistory.js';
 import { SpotifySnapshotStore } from './spotifyCache.js';
-import { SpotifyHistoryStore } from './spotifyHistory.js';
+import { SpotifyHistoryStore } from './spotifyHistory/index.js';
 import { SignalHistoryStore } from './signalHistory.js';
 import { SteamSnapshotStore } from './steamSnapshot.js';
 
