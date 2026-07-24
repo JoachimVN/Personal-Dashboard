@@ -10,13 +10,17 @@ function clashRoyaleCard(id: number, name: string, level: number, maxLevel: numb
 
 export function clashRoyale(now: Date): ClashRoyaleData {
   const deck = [
+    {
+      ...clashRoyaleCard(27000006, 'Tesla', 12, 13, 'common'),
+      evolutionLevel: 1,
+      iconUrl: 'https://static.wikia.nocookie.net/clashroyale/images/7/7b/TeslaCardEvolution.png',
+    },
     clashRoyaleCard(26000000, 'Knight', 14, 14, 'common'),
-    clashRoyaleCard(26000012, 'Musketeer', 13, 13, 'common'),
     clashRoyaleCard(26000015, 'Baby Dragon', 11, 13, 'epic'),
     clashRoyaleCard(26000024, 'Mini P.E.K.K.A', 13, 13, 'common'),
     clashRoyaleCard(28000000, 'Fireball', 12, 13, 'rare'),
     clashRoyaleCard(28000008, 'Zap', 13, 13, 'common'),
-    clashRoyaleCard(27000006, 'Tesla', 12, 13, 'common'),
+    clashRoyaleCard(26000012, 'Musketeer', 13, 13, 'common'),
     clashRoyaleCard(26000037, 'Hog Rider', 13, 13, 'rare'),
   ];
   const battles: ClashRoyaleData['recentBattles'] = [];

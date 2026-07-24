@@ -16,9 +16,11 @@ const REGULAR_CARD_ART_WIDTH = 277;
 const REGULAR_CARD_ART_HEIGHT = 330;
 const EVOLUTION_CARD_ART_WIDTH = 302;
 const EVOLUTION_CARD_ART_HEIGHT = 363;
+const BATTLE_MODE_ICON_SIZE = 128;
 type FramedCardArtType = 'regular' | 'evolution';
 type DeckCardArtType = FramedCardArtType | 'hero';
 const framedCardArtUrls = new Map<string, Promise<string>>();
+const trimmedBattleModeIconUrls = new Map<string, Promise<string>>();
 
 /** Wiki files have uneven padding. Most Evolution art has an outer glow that fades to a
  * near-invisible haze without ever reaching true alpha-zero before the canvas edge, so a
@@ -122,6 +124,96 @@ function FramedClashRoyaleCardImage({ card, artType }: Readonly<{ card: ClashRoy
       }}
     />
   );
+}
+
+/** Battle-mode assets use inconsistent transparent canvas padding, including nearly invisible
+ * antialiased halos. Trim that padding, then redraw the entire visible mark in a shared square
+ * so no emblem is clipped. */
+function trimmedBattleModeIconUrl(url: string): Promise<string> {
+  const cached = trimmedBattleModeIconUrls.get(url);
+  if (cached) return cached;
+
+  const request = new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      try {
+        const source = document.createElement('canvas');
+        source.width = image.naturalWidth;
+        source.height = image.naturalHeight;
+        const sourceContext = source.getContext('2d', { willReadFrequently: true });
+        if (!sourceContext) throw new Error('Could not read battle-mode art');
+        sourceContext.drawImage(image, 0, 0);
+        const pixels = sourceContext.getImageData(0, 0, source.width, source.height).data;
+        let left = source.width;
+        let top = source.height;
+        let right = -1;
+        let bottom = -1;
+        const alphaThreshold = 32;
+        for (let y = 0; y < source.height; y += 1) {
+          for (let x = 0; x < source.width; x += 1) {
+            if (pixels[(y * source.width + x) * 4 + 3] <= alphaThreshold) continue;
+            left = Math.min(left, x);
+            top = Math.min(top, y);
+            right = Math.max(right, x);
+            bottom = Math.max(bottom, y);
+          }
+        }
+        if (right < left || bottom < top) throw new Error('Battle-mode art is fully transparent');
+
+        const croppedWidth = right - left + 1;
+        const croppedHeight = bottom - top + 1;
+        const inset = Math.ceil(Math.max(croppedWidth, croppedHeight) * 0.04);
+        const scale = Math.min(window.devicePixelRatio || 1, 2);
+        const target = document.createElement('canvas');
+        target.width = BATTLE_MODE_ICON_SIZE * scale;
+        target.height = BATTLE_MODE_ICON_SIZE * scale;
+        const targetContext = target.getContext('2d');
+        if (!targetContext) throw new Error('Could not draw battle-mode art');
+        const availableSize = target.width - inset * 2 * scale;
+        const imageScale = Math.min(availableSize / croppedWidth, availableSize / croppedHeight);
+        const drawWidth = croppedWidth * imageScale;
+        const drawHeight = croppedHeight * imageScale;
+        targetContext.drawImage(
+          image,
+          left,
+          top,
+          croppedWidth,
+          croppedHeight,
+          (target.width - drawWidth) / 2,
+          (target.height - drawHeight) / 2,
+          drawWidth,
+          drawHeight,
+        );
+        resolve(target.toDataURL('image/png'));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    image.onerror = () => reject(new Error('Could not load battle-mode art'));
+    image.src = url;
+  });
+  trimmedBattleModeIconUrls.set(url, request);
+  return request;
+}
+
+function TrimmedBattleModeIcon({ src }: Readonly<{ src: string }>) {
+  const [trimmedSrc, setTrimmedSrc] = useState(src);
+
+  useEffect(() => {
+    let disposed = false;
+    setTrimmedSrc(src);
+    trimmedBattleModeIconUrl(src)
+      .then((framedSrc) => {
+        if (!disposed) setTrimmedSrc(framedSrc);
+      })
+      .catch(() => {
+        // Keep the original source visible if its host disallows canvas reads.
+      });
+    return () => { disposed = true; };
+  }, [src]);
+
+  return <img src={trimmedSrc} alt="" className="clash-recent-games-mode-icon" loading="lazy" decoding="async" />;
 }
 function ClashDeckCardArt({ card, artType }: Readonly<{ card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }>) {
   if (artType !== 'hero') return <FramedClashRoyaleCardImage card={card} artType={artType} />;
@@ -297,12 +389,16 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
 
 function BattleModeTile({ battle, index, battleCount, fallbackPathLeagueNumber }: Readonly<{ battle: ClashRoyaleBattle; index: number; battleCount: number; fallbackPathLeagueNumber?: number }>) {
   const icon = clashRoyaleBattleIcon(battle, fallbackPathLeagueNumber);
+  const isModeEmblem = icon.src !== CLASH_ROYALE_BATTLE_ART.trophyRoad;
+  const isMergeTactics = `${battle.type} ${battle.modeName ?? ''}`.toLowerCase().includes('merge tactics');
   return (
     <li
       data-result={battle.result}
       aria-label={`Game ${index + 1} of ${battleCount}: ${BATTLE_RESULT_LABELS[battle.result]} in ${icon.label}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns, ${relativeTime(battle.battleTime)}`}
     >
-      <img src={icon.src} alt="" aria-hidden className="clash-recent-games-mode-icon" loading="lazy" decoding="async" />
+      <span className={`clash-recent-games-mode-icon-frame${isModeEmblem ? ' clash-recent-games-mode-icon-frame--emblem' : ''}${isMergeTactics ? ' clash-recent-games-mode-icon-frame--merge-tactics' : ''}`} aria-hidden>
+        <TrimmedBattleModeIcon src={icon.src} />
+      </span>
     </li>
   );
 }
