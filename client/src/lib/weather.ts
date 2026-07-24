@@ -55,6 +55,9 @@ export function windCompass(directionDeg: number): string {
 
 export const WIND_COLOR = 'light-dark(#0f8a7f, #4dd9c4)';
 export const HUMIDITY_COLOR = 'light-dark(#6d5fd6, #b8a6ff)';
+export const PRECIP_COLOR = 'light-dark(#0d7fc4, #5ec2ff)';
+export const TEMP_COLOR = 'var(--color-accent-weather)';
+export const UV_COLOR = 'light-dark(#c99a06, #ffd666)';
 
 export interface UvLevel {
   label: string;
