@@ -31,10 +31,8 @@ const configSchema = z.object({
       claudeRefreshMs: z.number().int().min(60_000).default(15 * 60_000),
       /** Minimum spacing between recorded usage-history points, in ms. */
       historySampleMs: z.number().int().min(60_000).default(15 * 60_000),
-      /** How long recorded usage-history points are kept. */
-      historyRetentionDays: z.number().int().min(1).default(7),
     })
-    .default({ codexRefreshMs: 30_000, claudeRefreshMs: 15 * 60_000, historySampleMs: 15 * 60_000, historyRetentionDays: 7 }),
+    .default({ codexRefreshMs: 30_000, claudeRefreshMs: 15 * 60_000, historySampleMs: 15 * 60_000 }),
   health: z
     .object({
       /** Daily step goal the widget's progress bar fills toward. */
@@ -45,14 +43,12 @@ const configSchema = z.object({
       exerciseGoalMinutes: z.number().int().positive().default(30),
       /** Daily completed-stand-hours goal for the Apple Fitness Stand ring. */
       standGoalHours: z.number().int().positive().default(12),
-      /** How many recent days of samples to retain for the trend chart. */
-      historyRetentionDays: z.number().int().min(1).default(30),
       /** Trailing completed days used for personal physiological baselines. */
       baselineWindowDays: z.number().int().min(3).default(7),
       /** Minimum percentage away from the personal baseline before it becomes a signal. */
       baselineDeviationPercent: z.number().positive().default(15),
     })
-    .default({ stepGoal: 10_000, moveGoalKcal: 290, exerciseGoalMinutes: 30, standGoalHours: 12, historyRetentionDays: 30, baselineWindowDays: 7, baselineDeviationPercent: 15 }),
+    .default({ stepGoal: 10_000, moveGoalKcal: 290, exerciseGoalMinutes: 30, standGoalHours: 12, baselineWindowDays: 7, baselineDeviationPercent: 15 }),
   commandCenter: z.object({
     /** How old the newest unread thread's message must be before the inbox is deprioritized as ignored, not urgent. */
     gmailStaleMs: z.number().int().min(60_000).default(24 * 60 * 60_000),
@@ -121,14 +117,12 @@ const configSchema = z.object({
   }),
   steam: z
     .object({
-      /** How many days of daily playtime samples to retain for the trend chart. */
-      historyRetentionDays: z.number().int().min(1).default(90),
       /** Cap on how many friends' libraries to fetch for the playtime leaderboard — each one is an extra Steam API call. */
       leaderboardMaxFriends: z.number().int().min(1).default(50),
       /** How long a computed friends leaderboard is cached before re-fetching every friend's library. */
       leaderboardTtlHours: z.number().int().min(1).default(12),
     })
-    .default({ historyRetentionDays: 90, leaderboardMaxFriends: 50, leaderboardTtlHours: 12 }),
+    .default({ leaderboardMaxFriends: 50, leaderboardTtlHours: 12 }),
   transit: z
     .object({
       /** NSR stop place ids you actually use (find yours at stoppested.entur.org) — shown whenever

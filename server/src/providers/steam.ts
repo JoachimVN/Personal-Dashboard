@@ -641,7 +641,8 @@ export function createSteamProvider(
       };
 
       const validated = steamSchema.parse(data);
-      await snapshotStore?.setSnapshot(validated);
+      // Best-effort: a dropped snapshot write must not blank data the Steam API already gave us.
+      await snapshotStore?.setSnapshot(validated).catch(() => undefined);
       return validated;
     },
   };

@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import { accentStyle, type SectionDef } from './registry';
+import { DETAIL_BODY_ENTER, PAGE_EXIT, SECTION_MORPH_TRANSITION } from './transitions';
 import { OVERVIEW_HREF } from '../router';
 import { ThemeToggle } from '../components/ThemeToggle';
 
@@ -13,11 +14,12 @@ export function SectionView({ section, anchor }: Readonly<{ section: SectionDef;
       className="col-start-1 row-start-1 min-w-0"
       style={accentStyle(section)}
       initial={false}
-      animate={{ opacity: 1, filter: 'blur(0px)' }}
-      exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeOut' } }}
+      animate={{ opacity: 1 }}
+      exit={PAGE_EXIT}
     >
       <motion.header
         layoutId={`section-${section.id}`}
+        transition={SECTION_MORPH_TRANSITION}
         className="detail-header glass relative z-10 mb-6 flex items-center gap-3 rounded-[1.5rem] p-3 pr-4 sm:mb-8"
       >
         <a
@@ -30,7 +32,11 @@ export function SectionView({ section, anchor }: Readonly<{ section: SectionDef;
         <span className="h-7 w-px bg-card-border" />
         <div>
           <span className="block text-[9px] font-semibold uppercase tracking-[0.2em] text-ink-faint">{section.label}</span>
-          <motion.p layoutId={`section-title-${section.id}`} className="text-sm font-semibold tracking-tight text-ink">
+          <motion.p
+            layoutId={`section-title-${section.id}`}
+            transition={SECTION_MORPH_TRANSITION}
+            className="text-sm font-semibold tracking-tight text-ink"
+          >
             {section.title}
           </motion.p>
         </div>
@@ -39,9 +45,9 @@ export function SectionView({ section, anchor }: Readonly<{ section: SectionDef;
         </div>
       </motion.header>
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0, transition: { delay: 0.15 } }}
-        exit={{ opacity: 0, y: 8, transition: { duration: 0.12 } }}
+        initial={{ opacity: 0, y: 10 }}
+        animate={DETAIL_BODY_ENTER}
+        exit={{ opacity: 0, y: 6, transition: { duration: 0.12 } }}
       >
         <section.Detail anchor={anchor} />
       </motion.div>

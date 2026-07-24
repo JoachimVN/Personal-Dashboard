@@ -40,7 +40,7 @@ import {
   transitCandidates,
   weatherCandidates,
   type SpotifyFreshness,
-} from '../importance/sources.js';
+} from '../importance/sources/index.js';
 import type { ProviderScheduler, Provider } from '../scheduler.js';
 import { SignalHistoryStore } from '../signalHistory.js';
 import type { ClashRoyaleMoments, SteamMoments } from '../importance/types.js';
@@ -48,6 +48,25 @@ import type { ClashRoyaleMoments, SteamMoments } from '../importance/types.js';
 function widgetData<T>(envelopes: Record<string, WidgetEnvelope>, id: string): T | undefined {
   const envelope = envelopes[id];
   return envelope?.status === 'ready' || envelope?.status === 'stale' ? envelope.data as T | undefined : undefined;
+}
+
+const EMPTY_SPOTIFY_FRESHNESS: SpotifyFreshness = {
+  trackShort: false, trackMedium: false, trackLong: false,
+  trackAllTime: false,
+  artistShort: false, artistMedium: false, artistLong: false,
+  artistAllTime: false, albumAllTime: false,
+};
+
+/** The signal-history checks below are ~12 concurrent transactions against a remote Postgres; a
+ * single dropped connection there must not blank the whole ranked list, since most candidates
+ * (calendar, gmail, weather, health...) never touch that database at all. Degrade to "no moment
+ * detected" instead of failing the fetch. */
+async function withFallback<T>(promise: Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await promise;
+  } catch {
+    return fallback;
+  }
 }
 
 /** Whether a metric just recorded via `record()` changed within `freshMs` — one round trip
@@ -79,12 +98,7 @@ export async function computeSpotifyFreshness(
   spotify: SpotifyData | undefined,
   freshMs: number,
 ): Promise<SpotifyFreshness> {
-  const fresh: SpotifyFreshness = {
-    trackShort: false, trackMedium: false, trackLong: false,
-    trackAllTime: false,
-    artistShort: false, artistMedium: false, artistLong: false,
-    artistAllTime: false, albumAllTime: false,
-  };
+  const fresh: SpotifyFreshness = { ...EMPTY_SPOTIFY_FRESHNESS };
   if (!spotify) return fresh;
   const checks: [keyof SpotifyFreshness, string, string | undefined][] = [
     ['trackShort', 'topTrack:short', spotify.topTracks.shortTerm[0]?.id ?? spotify.topTracks.shortTerm[0]?.track],
@@ -258,11 +272,20 @@ export function createCommandCenterProvider(
       const steam = widgetData<SteamData>(envelopes, 'steam');
       const clashRoyale = widgetData<ClashRoyaleData>(envelopes, 'clash-royale');
       const [spotifyFresh, steamMoments, clashRoyaleMoments] = await Promise.all([
-        computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs),
-        computeSteamMoments(
-          signalHistory, steam, config.commandCenter.steamPlaytimeMilestoneHours, config.commandCenter.steamMomentFreshMs,
+        withFallback(
+          computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs),
+          EMPTY_SPOTIFY_FRESHNESS,
         ),
-        computeClashRoyaleMoments(signalHistory, clashRoyale, config.commandCenter.clashRoyaleMomentFreshMs),
+        withFallback(
+          computeSteamMoments(
+            signalHistory, steam, config.commandCenter.steamPlaytimeMilestoneHours, config.commandCenter.steamMomentFreshMs,
+          ),
+          { completedGame: false },
+        ),
+        withFallback(
+          computeClashRoyaleMoments(signalHistory, clashRoyale, config.commandCenter.clashRoyaleMomentFreshMs),
+          {},
+        ),
       ]);
       return rankCandidates([
         ...calendarCandidates(calendar, Date.now()),

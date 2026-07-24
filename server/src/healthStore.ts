@@ -36,10 +36,7 @@ function toHealthDay(row: HealthDayRow): HealthDay {
 
 /** PostgreSQL-backed source of truth for Apple Health day rollups. */
 export class HealthStore {
-  constructor(
-    private readonly database: Database,
-    private readonly retentionDays: number,
-  ) {}
+  constructor(private readonly database: Database) {}
 
   /** Upsert an additive sample while preserving independently reported device totals. */
   async ingest(sample: HealthIngest, today: string): Promise<HealthDay> {
@@ -78,12 +75,6 @@ export class HealthStore {
         end,
         updated_at = now()
       returning *
-    `;
-    await sql`
-      delete from health_days
-      where date < (
-        select date from health_days order by date desc offset ${this.retentionDays - 1} limit 1
-      )
     `;
     return toHealthDay(row);
   }

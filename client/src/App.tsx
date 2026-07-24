@@ -6,6 +6,7 @@ import { SkyTimeContext } from './lib/skyTime';
 import { SECTIONS, sectionById, SteamGradientDefs } from './sections/registry';
 import { SectionCard } from './sections/SectionCard';
 import { SectionView } from './sections/SectionView';
+import { PAGE_EXIT, SECTION_GLOW_ENTER, SECTION_GLOW_EXIT, UI_SPRING } from './sections/transitions';
 import { SystemFooter } from './components/SystemFooter';
 import { DailyCommandCenter } from './components/DailyCommandCenter';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -121,13 +122,22 @@ function BackgroundGlow() {
 
 /** Section-accent color wash layered on top of the sky wash while a section page is open —
     each section's own accent (AI purple, GitHub blue, Spotify green, ...) on top of whatever
-    time of day it is, the same way the Spotify page's green wash worked before this generalized. */
+    time of day it is, the same way the Spotify page's green wash worked before this generalized.
+    It fades rather than switching on with the route: an instant accent behind a page that is
+    still morphing into place reads as a flash, and it outlasts the page swap on the way out. */
 function SectionGlow({ accentVar }: Readonly<{ accentVar: string }>) {
   return (
-    <div aria-hidden className="section-page-glow" style={{ '--section-accent': `var(${accentVar})` } as CSSProperties}>
+    <motion.div
+      aria-hidden
+      className="section-page-glow"
+      style={{ '--section-accent': `var(${accentVar})` } as CSSProperties}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, transition: SECTION_GLOW_ENTER }}
+      exit={{ opacity: 0, transition: SECTION_GLOW_EXIT }}
+    >
       <div className="section-page-aurora" />
       <div className="section-page-horizon" />
-    </div>
+    </motion.div>
   );
 }
 
@@ -166,8 +176,8 @@ function Overview({ now }: Readonly<{ now: Date }>) {
     <motion.div
       className="col-start-1 row-start-1 min-w-0"
       initial={false}
-      animate={{ opacity: 1, filter: 'blur(0px)' }}
-      exit={{ opacity: 0, filter: 'blur(6px)', transition: { duration: 0.18, ease: 'easeOut' } }}
+      animate={{ opacity: 1 }}
+      exit={PAGE_EXIT}
     >
       <motion.header
         className="dashboard-hero"
@@ -229,12 +239,13 @@ export default function App() {
       <SteamGradientDefs />
       <BackgroundGlow />
       {SHOW_SKY_TIME_DEBUGGER && <SkyTimeDebugger minute={skyDebugMinute} onMinuteChange={setSkyDebugMinute} />}
-      {route.view === 'section' && <SectionGlow accentVar={sectionById(route.sectionId).accentVar} />}
+      <AnimatePresence>
+        {route.view === 'section' && (
+          <SectionGlow key={route.sectionId} accentVar={sectionById(route.sectionId).accentVar} />
+        )}
+      </AnimatePresence>
       <main className="mx-auto max-w-[78rem] px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 sm:px-8 sm:pt-10 lg:px-10">
-        <MotionConfig
-          reducedMotion="user"
-          transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-        >
+        <MotionConfig reducedMotion="user" transition={UI_SPRING}>
           <LayoutGroup>
             <div className="relative grid grid-cols-[minmax(0,1fr)]">
               <AnimatePresence mode="popLayout" initial={false}>

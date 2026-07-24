@@ -51,7 +51,7 @@ export function valorantTierIconUrl(tierId: number): string | undefined {
   return tierId > 0 ? `https://media.valorant-api.com/competitivetiers/${COMPETITIVE_TIERS_UUID}/${tierId}/smallicon.png` : undefined;
 }
 
-/** A single fixed player card ("Firestarter") for the demo's wide/large art — the server provider
+/** A single fixed player card ("Lanterns") for the demo's wide/large art — the server provider
  * resolves this per-account from the real equipped card id, which the demo has no account to read. */
-export const VALORANT_DEMO_CARD_WIDE_ART = 'https://media.valorant-api.com/playercards/7c7becb5-a6b4-4b48-ad20-5a816fbc5750/wideart.png';
-export const VALORANT_DEMO_CARD_LARGE_ART = 'https://media.valorant-api.com/playercards/7c7becb5-a6b4-4b48-ad20-5a816fbc5750/largeart.png';
+export const VALORANT_DEMO_CARD_WIDE_ART = 'https://static.wikia.nocookie.net/valorant/images/3/3f/Lanterns_Card_Large.png/revision/latest?cb=20230711195224';
+export const VALORANT_DEMO_CARD_LARGE_ART = 'https://static.wikia.nocookie.net/valorant/images/3/3f/Lanterns_Card_Large.png/revision/latest?cb=20230711195224';

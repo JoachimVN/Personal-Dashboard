@@ -2,6 +2,15 @@
  * nav pill's Clash Royale icon (see sections/registry.tsx), which this re-exports for reuse. */
 export const CLASH_ROYALE_APP_ICON_URL = 'https://media.ffycdn.net/eu/supercell/nxaaEWAgbRGADkoAETG8.png';
 
+/** Battle-mode emblems used by the homepage history. The hammer is the game's normal Trophy Road
+ * marker; the mode-specific shields are only used when Supercell identifies that game as 2v2 or
+ * Clan Wars. */
+export const CLASH_ROYALE_BATTLE_ART = {
+  trophyRoad: 'https://media.ffycdn.net/eu/supercell/jRQrei1MNcyVLey6oS3p.png?width=64',
+  twoVTwo: 'https://static.wikia.nocookie.net/clashroyale/images/1/11/Shield_2v2.png/revision/latest?cb=20170615223652',
+  clanWar: 'https://static.wikia.nocookie.net/clashroyale/images/9/9f/War_Shield.png/revision/latest?cb=20180425130200',
+} as const;
+
 /**
  * Trophy-road arena key art, keyed by the exact `arenaName` string the Clash Royale API reports
  * (e.g. `player.arena.name`). Sourced from the Clash Royale Fandom wiki's Trophy Road table
@@ -84,6 +93,80 @@ const LEAGUE_ART: Record<number, string> = {
 
 export function clashRoyaleLeagueArt(leagueNumber: number): string | undefined {
   return LEAGUE_ART[leagueNumber];
+}
+
+const PATH_OF_LEGENDS_LEAGUE_NAMES = [
+  'Challenger I', 'Challenger II', 'Challenger III', 'Master I', 'Master II',
+  'Master III', 'Champion', 'Grand Champion', 'Royal Champion', 'Ultimate Champion',
+] as const;
+
+const MERGE_TACTICS_LEAGUE_ART: Record<string, string> = {
+  bronze1: 'https://static.wikia.nocookie.net/clashroyale/images/4/4c/Bronze1MT.png',
+  bronze2: 'https://static.wikia.nocookie.net/clashroyale/images/9/9b/Bronze2MT.png',
+  bronze3: 'https://static.wikia.nocookie.net/clashroyale/images/e/eb/Bronze3MT.png/revision/latest?cb=20250928160552',
+  silver1: 'https://static.wikia.nocookie.net/clashroyale/images/1/11/Silver1MT.png',
+  silver2: 'https://static.wikia.nocookie.net/clashroyale/images/0/03/Silver2MT.png',
+  silver3: 'https://static.wikia.nocookie.net/clashroyale/images/f/f6/Silver3MT.png',
+  gold1: 'https://static.wikia.nocookie.net/clashroyale/images/1/17/Gold1MT.png',
+  gold2: 'https://static.wikia.nocookie.net/clashroyale/images/a/ad/Gold2MT.png',
+  gold3: 'https://static.wikia.nocookie.net/clashroyale/images/6/63/Gold3MT.png',
+  diamond1: 'https://static.wikia.nocookie.net/clashroyale/images/9/90/Diamond1MT.png',
+  diamond2: 'https://static.wikia.nocookie.net/clashroyale/images/c/c6/Diamond2MT.png',
+  diamond3: 'https://static.wikia.nocookie.net/clashroyale/images/e/ec/Diamond3MT.png',
+  master1: 'https://static.wikia.nocookie.net/clashroyale/images/3/37/Master1MT.png',
+  master2: 'https://static.wikia.nocookie.net/clashroyale/images/b/ba/Master2MT.png',
+  master3: 'https://static.wikia.nocookie.net/clashroyale/images/8/83/Master3MT.png',
+  champion1: 'https://static.wikia.nocookie.net/clashroyale/images/5/5d/Champion1MT.png',
+  champion2: 'https://static.wikia.nocookie.net/clashroyale/images/5/5c/Champion2MT.png',
+  champion3: 'https://static.wikia.nocookie.net/clashroyale/images/0/04/Champion3MT.png',
+  ultimate1: 'https://static.wikia.nocookie.net/clashroyale/images/b/bd/Ultimate1MT.png',
+  ultimate2: 'https://static.wikia.nocookie.net/clashroyale/images/7/71/Ultimate2MT.png',
+  ultimate3: 'https://static.wikia.nocookie.net/clashroyale/images/e/ee/Ultimate3MT.png',
+};
+
+function compactRankName(value: string): string {
+  const rankWithDigits = value.trim().replace(/\b(III|II|I)$/i, (roman) => ({ i: '1', ii: '2', iii: '3' })[roman.toLowerCase()]!);
+  return rankWithDigits.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
+}
+
+function pathOfLegendsBattleArt(arenaName: string | undefined): string | undefined {
+  if (!arenaName) return undefined;
+  const normalizedName = arenaName.trim().toLowerCase();
+  const namedLeagueIndex = PATH_OF_LEGENDS_LEAGUE_NAMES.findIndex((name) => name.toLowerCase() === normalizedName);
+  if (namedLeagueIndex >= 0) return clashRoyaleLeagueArt(namedLeagueIndex + 1);
+
+  // Some battle-log versions report the legacy badge number instead of the league name.
+  const match = /^league\s*(\d+)$/i.exec(arenaName.trim());
+  return match ? clashRoyaleLeagueArt(Number(match[1])) : undefined;
+}
+
+/** `fallbackPathLeagueNumber` is the player's current, display-adjusted Path league. Supercell's
+ * battle log does not consistently include a historic league label, so it keeps known Path games
+ * game-native while a recorded per-battle arena/league always takes precedence. */
+export function clashRoyaleBattleIcon(
+  battle: { type: string; modeName?: string; arenaName?: string },
+  fallbackPathLeagueNumber?: number,
+): { src: string; label: string } {
+  const mode = `${battle.type} ${battle.modeName ?? ''}`
+    .replaceAll(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .replaceAll(/[_-]/g, ' ');
+
+  if (/\b(?:2\s*v\s*2|2v2|two\s*(?:v|versus)\s*two)\b/.test(mode)) {
+    return { src: CLASH_ROYALE_BATTLE_ART.twoVTwo, label: '2v2' };
+  }
+  if (mode.includes('river race') || mode.includes('clan war')) {
+    return { src: CLASH_ROYALE_BATTLE_ART.clanWar, label: 'Clan Wars' };
+  }
+  if (mode.includes('merge tactics')) {
+    const leagueArt = battle.arenaName ? MERGE_TACTICS_LEAGUE_ART[compactRankName(battle.arenaName)] : undefined;
+    return { src: leagueArt ?? CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Merge Tactics' };
+  }
+  if (mode.includes('path of legend')) {
+    const leagueArt = pathOfLegendsBattleArt(battle.arenaName) ?? (fallbackPathLeagueNumber === undefined ? undefined : clashRoyaleLeagueArt(fallbackPathLeagueNumber));
+    return { src: leagueArt ?? CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Path of Legends' };
+  }
+  return { src: CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Trophy Road' };
 }
 
 /**

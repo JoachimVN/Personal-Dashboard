@@ -1,5 +1,17 @@
 # Personal Dashboard
 
+<p align="center">
+  <a href="https://github.com/JoachimVN/Personal-Dashboard/actions/workflows/ci.yml">
+    <img src="https://github.com/JoachimVN/Personal-Dashboard/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  </a>
+  <a href="https://github.com/JoachimVN/Personal-Dashboard/actions/workflows/privacy-guard.yml">
+    <img src="https://github.com/JoachimVN/Personal-Dashboard/actions/workflows/privacy-guard.yml/badge.svg" alt="Privacy guard" />
+  </a>
+  <a href="https://sonarcloud.io/summary/new_code?id=JoachimVN_Personal-Dashboard3">
+    <img src="https://sonarcloud.io/api/project_badges/measure?project=JoachimVN_Personal-Dashboard3&amp;metric=alert_status" alt="SonarCloud Quality Gate" />
+  </a>
+</p>
+
 One glanceable page for life + dev: weather, calendar, email, GitHub, transit departures,
 electricity prices, and AI usage. Runs locally on
 your own machine (macOS or Windows) and is just a web app at `localhost:4821`: open it in a browser

@@ -1,6 +1,7 @@
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { motion } from 'motion/react';
 import { accentStyle, SectionIcon, type SectionDef, type SectionId } from './registry';
+import { SECTION_MORPH_TRANSITION } from './transitions';
 import { sectionHref } from '../router';
 import { publicAsset } from '../lib/publicAsset';
 
@@ -54,6 +55,7 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
         }
       }}
       layoutId={`section-${section.id}`}
+      transition={SECTION_MORPH_TRANSITION}
       variants={sectionCardVariants}
       whileHover={{ y: -4 }}
       whileTap={{ scale: 0.99 }}
@@ -67,7 +69,11 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
             <span className={wordmark.markClassName} aria-hidden>
               <SectionIcon id={section.id} />
             </span>
-            <motion.h2 layoutId={`section-title-${section.id}`} className="sr-only">
+            <motion.h2
+              layoutId={`section-title-${section.id}`}
+              transition={SECTION_MORPH_TRANSITION}
+              className="sr-only"
+            >
               {section.title}
             </motion.h2>
             <img
@@ -84,6 +90,7 @@ export function SectionCard({ section }: Readonly<{ section: SectionDef }>) {
             </span>
             <motion.h2
               layoutId={`section-title-${section.id}`}
+              transition={SECTION_MORPH_TRANSITION}
               className="min-w-0 text-[1.05rem] font-semibold tracking-[-0.02em] text-ink"
             >
               {section.title}

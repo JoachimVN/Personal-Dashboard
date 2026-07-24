@@ -1,0 +1,1010 @@
+/* The command center — hero, signal rail, secondary carousel and every per-source card body it can seat. Panel tints animate through @property <color> vars on one background stack; a separate overlay fade layer would show as a gray film. */
+
+.command-center {
+  position: relative;
+  z-index: 10;
+  overflow: hidden;
+  border-radius: 2rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.command-center::before {
+  content: '';
+  position: absolute;
+  inset: -18rem auto auto -12rem;
+  width: 34rem;
+  height: 34rem;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in oklab, var(--sky-a) 22%, transparent), transparent 68%);
+  pointer-events: none;
+  transition: background 1.2s ease;
+}
+
+.command-center-head,
+.command-agenda-heading,
+.dashboard-section-heading {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.command-eyebrow,
+.command-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+.command-title {
+  margin-top: 0.4rem;
+  font-size: clamp(1.3rem, 2.5vw, 1.8rem);
+  font-weight: 620;
+  letter-spacing: -0.04em;
+}
+
+.command-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-card-border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-canvas) 55%, transparent);
+}
+
+.command-nav a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  color: var(--color-ink-muted);
+  transition: background 180ms ease, color 180ms ease;
+}
+
+@media (hover: hover) {
+  .command-nav a:hover {
+    color: var(--accent);
+  }
+}
+
+/* Steam's mark is two-tone (gradient disc + white swirl), so it can't hover-tint via currentColor
+   like the other glyphs. Default: swirl only, ink-muted, disc hidden. Colored (always in the
+   overview card, on hover in the compact nav): disc gets the brand gradient, swirl goes white.
+   The disc's fill stays a constant gradient reference and fades via opacity — url(#steam-gradient)
+   itself can't be transitioned — while the swirl's solid-to-solid color change transitions normally.
+   The swirl's resting fill is the literal ink-muted token, not currentColor: `.command-nav a:hover`
+   also tweens the anchor's `color` to --accent on its own 180ms transition, and if the swirl tracked
+   currentColor it would pick up that live in-flight value on mouse-leave (once :hover stops matching
+   and the swirl falls back to this base rule) — a visible flash of the flat accent blue before it
+   settles to grey, instead of just fading white->grey.
+   Hover-only guarded below so a tap on touch devices (no real :hover) doesn't leave the badge and
+   the flat accent tint stuck on — the same sticky-hover problem .dashboard-section-card:hover
+   already guards against further down this file. */
+.section-icon-steam-disc {
+  fill: url(#steam-gradient);
+  opacity: 0;
+  transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.section-icon-steam-swirl {
+  fill: var(--color-ink-muted);
+  transition: fill 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dashboard-section-card .section-icon-steam-disc {
+  opacity: 1;
+}
+
+.dashboard-section-card .section-icon-steam-swirl {
+  fill: #fff;
+}
+
+@media (hover: hover) {
+  .command-nav a:hover .section-icon-steam-disc {
+    opacity: 1;
+  }
+
+  .command-nav a:hover .section-icon-steam-swirl {
+    fill: #fff;
+  }
+}
+
+.command-layout {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.command-primary,
+.command-signals {
+  border: 1px solid var(--color-card-border);
+  background: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
+}
+
+/* Registered so the secondary card's tint interpolates when the carousel swaps slots. The colors
+   have to animate inside a single background stack — layering a translucent fade surface over the
+   agenda's own glass compounds into a gray wash instead of crossfading. */
+@property --panel-accent {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: transparent;
+}
+
+@property --agenda-surface {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+@property --agenda-art-primary {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+@property --agenda-art-secondary {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: transparent;
+}
+
+.command-panel--personal { --panel-accent: var(--color-accent-personal); }
+.command-panel--github { --panel-accent: var(--color-accent-github); }
+.command-panel--ai { --panel-accent: var(--color-accent-ai); }
+.command-panel--claude { --panel-accent: var(--color-claude); }
+.command-panel--codex { --panel-accent: var(--color-codex); }
+.command-panel--health { --panel-accent: var(--color-accent-health); }
+.command-panel--spotify { --panel-accent: var(--color-accent-spotify); }
+.command-panel--weather { --panel-accent: var(--color-accent-weather); }
+.command-panel--steam { --panel-accent: var(--color-accent-steam); }
+.command-panel--roblox { --panel-accent: var(--color-accent-roblox); }
+.command-panel--clash-royale { --panel-accent: var(--color-accent-clash-royale); }
+
+.command-agenda.command-agenda--roblox {
+  --panel-accent: var(--color-ink);
+  --agenda-art-primary: rgb(var(--roblox-art-primary, 194 40 30) / 0.24);
+  --agenda-art-secondary: rgb(var(--roblox-art-secondary, 194 40 30) / 0.16);
+  --agenda-surface: light-dark(rgb(255 255 255 / 0.58), rgb(17 20 28 / 0.7));
+  border-color: var(--color-card-border);
+}
+
+.command-agenda.command-agenda--roblox::before,
+.command-agenda.command-agenda--roblox:hover::before {
+  opacity: 0;
+}
+
+.command-agenda--roblox > .command-secondary-carousel {
+  z-index: 1;
+}
+
+.command-agenda {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-top: 1rem;
+  border: 1px solid var(--color-card-border);
+  border-radius: 1.4rem;
+  padding: 1rem 1.25rem;
+  --agenda-surface: light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
+  background:
+    radial-gradient(circle at 79% -24%, var(--agenda-art-primary), transparent 58%),
+    linear-gradient(118deg, var(--agenda-art-secondary), transparent 70%),
+    linear-gradient(135deg, color-mix(in oklab, var(--panel-accent) 3%, transparent), transparent 58%),
+    var(--agenda-surface);
+  transition:
+    transform 280ms cubic-bezier(.2,.8,.2,1),
+    border-color 240ms ease,
+    box-shadow 240ms ease,
+    --panel-accent 520ms ease,
+    --agenda-surface 520ms ease,
+    --agenda-art-primary 520ms ease,
+    --agenda-art-secondary 520ms ease;
+}
+
+.command-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-width: 0;
+  border-radius: 1.4rem;
+  padding: 1.25rem;
+  background:
+    linear-gradient(135deg, color-mix(in oklab, var(--panel-accent) 3%, transparent), transparent 58%),
+    light-dark(rgb(255 255 255 / 0.34), rgb(2 5 10 / 0.22));
+  transition: transform 280ms cubic-bezier(.2,.8,.2,1), border-color 240ms ease, box-shadow 240ms ease;
+}
+
+.command-primary::before,
+.command-agenda::before {
+  position: absolute;
+  inset: -20%;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  background: radial-gradient(circle at 14% 8%, color-mix(in oklab, var(--panel-accent) 28%, transparent), transparent 56%);
+  opacity: 0;
+  transform: translate3d(-8%, -5%, 0) scale(0.9);
+  transition: opacity 380ms ease, transform 560ms cubic-bezier(.2,.8,.2,1);
+}
+
+.command-primary > *,
+.command-agenda > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The hero's content sits above its stretched link (z-index 1 vs 0) so text stays crisp, which
+   would otherwise block clicks from reaching the link underneath. Drop content out of hit-testing
+   so clicks fall through to the link, then opt the genuinely interactive descendants (the event's
+   map-location link, the weather-row links) back in. */
+.command-primary > * {
+  pointer-events: none;
+}
+
+.command-primary a {
+  pointer-events: auto;
+}
+
+.command-primary > .command-panel-stretched-link,
+.command-agenda > .command-panel-stretched-link {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.command-panel--full-link > .command-panel-stretched-link {
+  z-index: 2;
+}
+
+.command-panel--full-link > .command-secondary-carousel {
+  z-index: auto;
+}
+
+.command-panel--full-link .command-secondary-carousel-dots {
+  position: relative;
+  z-index: 3;
+}
+
+.command-panel-stretched-link:focus-visible {
+  outline: 2px solid var(--color-accent-personal);
+  outline-offset: 4px;
+}
+
+.command-event-time {
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--color-accent-personal);
+}
+
+.command-event-title {
+  max-width: 36rem;
+  margin-top: 0.35rem;
+  font-size: clamp(1.65rem, 4vw, 2.75rem);
+  font-weight: 620;
+  line-height: 1.02;
+  letter-spacing: -0.055em;
+}
+
+.command-weather-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 1.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-card-border);
+}
+
+.command-weather-target {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  flex: 1;
+  min-width: 0;
+  margin: -0.45rem -0.35rem;
+  padding: 0.45rem 0.35rem;
+  border-radius: 0.85rem;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), color 180ms ease;
+}
+
+.command-weather-target::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(100deg, color-mix(in oklab, var(--color-accent-personal) 14%, transparent), transparent 70%);
+  opacity: 0;
+  transform: translateX(-12%);
+  transition: opacity 260ms ease, transform 380ms cubic-bezier(.2,.8,.2,1);
+}
+
+.command-weather-summary {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.command-weather-target > * {
+  position: relative;
+  z-index: 1;
+}
+
+.command-weather-location {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0.1rem 0 0;
+  color: var(--color-ink-faint);
+  font-size: 0.6875rem;
+  transition: color 180ms ease;
+}
+
+.command-weather-location:hover {
+  color: var(--color-ink);
+}
+
+.command-forecast {
+  margin-left: auto;
+  text-align: center;
+  font-size: 0.625rem;
+  color: var(--color-ink-faint);
+}
+
+.command-forecast + .command-forecast {
+  margin-left: 0;
+}
+
+.command-forecast strong {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--color-ink-muted);
+  font-size: 0.7rem;
+}
+
+.command-signals {
+  display: grid;
+  border-radius: 1.4rem;
+  padding: 0.25rem 0.55rem;
+}
+
+.command-signal {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 1rem 0.6rem;
+  border-radius: 1rem;
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1);
+}
+
+.command-signal::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  content: '';
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--signal-color) 14%, transparent), transparent 76%);
+  opacity: 0;
+  transform: translateX(-14%);
+  transition: opacity 240ms ease, transform 360ms cubic-bezier(.2,.8,.2,1);
+}
+
+.command-signal > * {
+  position: relative;
+  z-index: 1;
+}
+
+.command-signal + .command-signal {
+  border-top: 1px solid var(--color-card-border);
+}
+
+.command-signal-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--signal-color);
+  box-shadow: 0 0 10px color-mix(in oklab, var(--signal-color) 55%, transparent);
+}
+
+.command-contribution-squares {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 1rem;
+  margin-top: 0.25rem;
+}
+
+.command-contribution-squares span {
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 3px;
+}
+
+.command-signal--personal { --signal-color: var(--color-accent-personal); }
+.command-signal--github { --signal-color: var(--color-accent-github); }
+.command-signal--ai { --signal-color: var(--color-accent-ai); }
+.command-signal--claude { --signal-color: var(--color-claude); }
+.command-signal--codex { --signal-color: var(--color-codex); }
+.command-signal--health { --signal-color: var(--color-accent-health); }
+.command-signal--spotify { --signal-color: var(--color-accent-spotify); }
+.command-signal--weather { --signal-color: var(--color-accent-weather); }
+.command-signal--steam { --signal-color: var(--color-accent-steam); }
+.command-signal--roblox { --signal-color: var(--color-accent-roblox); }
+.command-signal--clash-royale { --signal-color: var(--color-accent-clash-royale); }
+
+.command-roblox-tile-mark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.625rem;
+  background: var(--color-accent-roblox);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-roblox) 32%, transparent);
+}
+
+.command-roblox-tile-mark img {
+  width: 1rem;
+  height: 1rem;
+}
+
+.command-roblox-tile-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  object-fit: cover;
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-roblox) 32%, transparent);
+}
+
+.command-clash-royale-tile-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  object-fit: cover;
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-clash-royale) 32%, transparent);
+}
+
+/* Disambiguates a hero/secondary card as Clash Royale even when it has no backdrop art (most
+   milestones don't — see lib/clashRoyale.ts). Sits inline with the uppercase kicker label. */
+.command-kicker-badge {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin: 0 0.4rem -0.1rem 0;
+  border-radius: 0.25rem;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+/* Arena/league key art, right-anchored and faded into the card rather than stretched full-bleed —
+   these are portrait renders and square badges, not wide backdrop crops, so `cover` would distort
+   them. Sits behind all other panel children (see the z-index rule below); the panel's own
+   `--panel-accent` tint and glass base still show through the faded edge. */
+.command-panel-art {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  width: 55%;
+  height: 100%;
+  object-fit: contain;
+  object-position: right center;
+  opacity: 0.5;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to left, black 45%, transparent 92%);
+  mask-image: linear-gradient(to left, black 45%, transparent 92%);
+}
+
+.command-primary > .command-panel-art,
+.command-agenda > .command-panel-art {
+  z-index: 0;
+}
+
+/* The game artwork adds atmosphere, while the wordmark and structured stats make the surface
+   unmistakably Roblox instead of reading like another generic game card. The panel-level
+   `--roblox` tint swaps the instant the carousel index changes, so these styles stay on the slide
+   itself — otherwise the outgoing slide would restyle halfway through its exit animation. */
+.command-roblox-now {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: var(--secondary-carousel-media-size) minmax(0, 1fr);
+  gap: 0.9rem;
+  width: 100%;
+  height: var(--secondary-carousel-content-height);
+}
+
+.command-roblox-icon {
+  width: var(--secondary-carousel-media-size);
+  height: var(--secondary-carousel-media-size);
+  border-radius: 0.375rem;
+  object-fit: cover;
+  align-self: center;
+}
+
+.command-roblox-brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  height: 1rem;
+}
+
+.command-roblox-details {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex-direction: column;
+  padding: 1rem 1.15rem 1rem 0;
+}
+
+.command-roblox-brand img {
+  width: 4.7rem;
+  height: auto;
+}
+
+:root[style*="color-scheme: light"] .command-roblox-brand img {
+  filter: invert(1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([style*="color-scheme: dark"]) .command-roblox-brand img {
+    filter: invert(1);
+  }
+}
+
+.command-roblox-brand span {
+  padding-left: 0.55rem;
+  border-left: 1px solid color-mix(in oklab, var(--color-ink) 22%, transparent);
+  color: var(--color-ink-muted);
+  font-size: 0.5625rem;
+  font-weight: 750;
+  letter-spacing: 0.15em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.command-roblox-game {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: end;
+  padding-top: 0.5rem;
+}
+
+.command-roblox-game > div > p {
+  color: var(--color-ink);
+  letter-spacing: -0.025em;
+}
+
+.command-roblox-stats {
+  display: flex;
+  gap: 1.2rem;
+  margin-top: 0.6rem;
+}
+
+.command-roblox-stats dt {
+  color: var(--color-ink-muted);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.command-roblox-stats dd {
+  margin-top: 0.1rem;
+  color: var(--color-ink);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.command-roblox-icon--fallback {
+  display: grid;
+  place-items: center;
+  background: var(--color-accent-roblox);
+}
+
+.command-roblox-icon--fallback img {
+  width: 3rem;
+  height: 3rem;
+}
+
+.command-signal-arrow {
+  font-size: 0.85rem;
+  color: var(--color-ink-faint);
+  transition: color 160ms ease, transform 160ms ease;
+}
+
+.command-signal:hover .command-signal-arrow {
+  color: var(--color-ink);
+  transform: translate(1px, -1px);
+}
+
+.command-meter {
+  display: block;
+  height: 3px;
+  margin-top: 0.55rem;
+  border-radius: 999px;
+  background: var(--color-track);
+  overflow: hidden;
+}
+
+.command-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--signal-color);
+}
+
+.command-meter--low span {
+  background: var(--color-accent-health);
+}
+
+.command-agenda-link {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  transition: color 160ms ease;
+}
+
+@media (hover: hover) {
+  .command-primary:hover:not(:has(.command-weather-target:hover)) {
+    border-color: color-mix(in oklab, var(--panel-accent) 27%, var(--color-card-border));
+    box-shadow: 0 14px 34px color-mix(in oklab, var(--panel-accent) 8%, transparent);
+    transform: translateY(-2px);
+  }
+
+  .command-primary:hover:not(:has(.command-weather-target:hover))::before {
+    opacity: 0.72;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .command-agenda:hover {
+    border-color: color-mix(in oklab, var(--panel-accent) 14%, var(--color-card-border));
+    box-shadow: 0 14px 34px color-mix(in oklab, var(--panel-accent) 4%, transparent);
+    transform: translateY(-2px);
+  }
+
+  .command-agenda:hover::before {
+    opacity: 0.35;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .command-primary:hover .command-weather-row {
+    border-color: color-mix(in oklab, var(--panel-accent) 22%, var(--color-card-border));
+  }
+
+  .command-weather-target:hover {
+    transform: translateY(-1px);
+  }
+
+  .command-weather-target:hover::before {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .command-agenda:hover .command-agenda-link {
+    color: var(--panel-accent);
+  }
+
+  .command-signal:hover {
+    transform: translateY(-1px);
+  }
+
+  .command-signal:hover::before {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .command-signal:hover .command-signal-arrow {
+    color: var(--signal-color);
+  }
+}
+
+.command-agenda-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+}
+
+.command-secondary-carousel {
+  --secondary-carousel-content-height: 10.625rem;
+  --secondary-carousel-media-size: 8.5rem;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.command-secondary-carousel-viewport {
+  position: relative;
+  height: var(--secondary-carousel-content-height);
+  overflow: hidden;
+}
+
+.command-secondary-carousel-slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  will-change: transform;
+}
+
+.command-secondary-spotify {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: var(--secondary-carousel-media-size);
+}
+
+.command-secondary-spotify-artwork {
+  /* Keep Now Playing legible without letting one album cover outweigh the
+     signal itself in the compact secondary panel. */
+  width: 6.25rem;
+  height: 6.25rem;
+}
+
+.command-secondary-artist-artwork {
+  width: 5.5rem;
+  height: 5.5rem;
+}
+
+.command-secondary-track-artwork {
+  width: 4.75rem;
+  height: 4.75rem;
+}
+
+.command-secondary-ai {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  height: var(--secondary-carousel-media-size);
+}
+
+.command-secondary-album-details {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-self: stretch;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.command-secondary-artist-details {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-self: stretch;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.command-secondary-artist-tracks {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.25rem;
+}
+
+.command-secondary-artist-track-label {
+  margin-top: 0.55rem;
+  color: var(--color-ink-faint);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.command-secondary-artist-tracks li {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: var(--color-ink-muted);
+  font-size: 0.6875rem;
+}
+
+.command-secondary-artist-tracks span {
+  flex: 0 0 0.75rem;
+  color: var(--color-ink-faint);
+  font-size: 0.5625rem;
+  font-weight: 700;
+}
+
+.command-secondary-clash-streak {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  height: var(--secondary-carousel-media-size);
+}
+
+.command-clash-streak-badge {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 5.5rem;
+  height: 5.5rem;
+  border: 1px solid color-mix(in oklab, var(--color-accent-clash-royale) 24%, var(--color-card-border));
+  border-radius: 1.25rem;
+  background: color-mix(in oklab, var(--color-accent-clash-royale) 14%, var(--color-card));
+}
+
+.command-clash-streak-flame {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.command-clash-streak-count {
+  margin-top: 0.15rem;
+  color: var(--color-ink);
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.command-clash-streak-crowns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.command-clash-streak-crowns li {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid color-mix(in oklab, var(--color-accent-clash-royale) 22%, var(--color-card-border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-accent-clash-royale) 8%, var(--color-card));
+  color: var(--color-ink);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.command-clash-streak-crowns .clash-crown {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.68rem;
+  color: var(--color-accent-clash-royale);
+}
+
+.command-secondary-artist-tracks p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-secondary-album-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.7rem;
+  margin-top: 0.7rem;
+}
+
+.command-secondary-album-meta dt {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.command-secondary-album-meta dd {
+  margin-top: 0.1rem;
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-secondary-carousel-timeline {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.command-secondary-carousel-dots {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.command-secondary-carousel-dots button {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: var(--color-card-border);
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.command-secondary-carousel-dots button:hover,
+.command-secondary-carousel-dots button:focus-visible,
+.command-secondary-carousel-dots button.is-active {
+  transform: scale(1.5);
+  background: var(--panel-accent);
+}
+
+.command-secondary-carousel-dots button:focus-visible {
+  outline: 2px solid var(--panel-accent);
+  outline-offset: 3px;
+}
+
+.command-agenda-item {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.8rem;
+  font-size: 0.78rem;
+}
+
+.command-agenda-item time {
+  color: var(--color-ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.command-agenda-item span {
+  overflow: hidden;
+  font-weight: 520;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Non-date lead cell (PR repo, mail sender) styled like the agenda's time column. */
+.command-agenda-item .command-agenda-lead {
+  overflow: hidden;
+  color: var(--color-ink-faint);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-hours {
+  display: flex;
+  gap: 1.15rem;
+}
+
+.command-hour {
+  display: grid;
+  gap: 0.15rem;
+  text-align: center;
+  font-size: 0.625rem;
+  color: var(--color-ink-faint);
+}
+
+.command-hour strong {
+  color: var(--color-ink-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,7 +1,7 @@
 import { pathOfLegendsDisplayLeagueNumber, pathOfLegendsLeagueName, type ClashRoyaleBattle, type ClashRoyaleData } from '@personal-dashboard/shared';
 import { useEffect, useState } from 'react';
 import { relativeTime } from '../lib/time';
-import { clashRoyaleLeagueArt } from '../lib/clashRoyale';
+import { CLASH_ROYALE_BATTLE_ART, clashRoyaleBattleIcon, clashRoyaleLeagueArt } from '../lib/clashRoyale';
 
 const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
   win: 'Victory',
@@ -9,7 +9,6 @@ const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
   draw: 'Draw',
 };
 const CLASH_ART = {
-  battle: 'https://media.ffycdn.net/eu/supercell/jRQrei1MNcyVLey6oS3p.png?width=64',
   playerCrown: 'https://media.ffycdn.net/eu/supercell/m1xRh8chWGRUyA5BcuWA.png?width=64',
   opponentCrown: 'https://media.ffycdn.net/eu/supercell/QTQoZZ8e18aR8d3ZtvEK.png?width=64',
 } as const;
@@ -17,9 +16,11 @@ const REGULAR_CARD_ART_WIDTH = 277;
 const REGULAR_CARD_ART_HEIGHT = 330;
 const EVOLUTION_CARD_ART_WIDTH = 302;
 const EVOLUTION_CARD_ART_HEIGHT = 363;
+const BATTLE_MODE_ICON_SIZE = 128;
 type FramedCardArtType = 'regular' | 'evolution';
 type DeckCardArtType = FramedCardArtType | 'hero';
 const framedCardArtUrls = new Map<string, Promise<string>>();
+const trimmedBattleModeIconUrls = new Map<string, Promise<string>>();
 
 /** Wiki files have uneven padding. Most Evolution art has an outer glow that fades to a
  * near-invisible haze without ever reaching true alpha-zero before the canvas edge, so a
@@ -124,6 +125,96 @@ function FramedClashRoyaleCardImage({ card, artType }: Readonly<{ card: ClashRoy
     />
   );
 }
+
+/** Battle-mode assets use inconsistent transparent canvas padding, including nearly invisible
+ * antialiased halos. Trim that padding, then redraw the entire visible mark in a shared square
+ * so no emblem is clipped. */
+function trimmedBattleModeIconUrl(url: string): Promise<string> {
+  const cached = trimmedBattleModeIconUrls.get(url);
+  if (cached) return cached;
+
+  const request = new Promise<string>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => {
+      try {
+        const source = document.createElement('canvas');
+        source.width = image.naturalWidth;
+        source.height = image.naturalHeight;
+        const sourceContext = source.getContext('2d', { willReadFrequently: true });
+        if (!sourceContext) throw new Error('Could not read battle-mode art');
+        sourceContext.drawImage(image, 0, 0);
+        const pixels = sourceContext.getImageData(0, 0, source.width, source.height).data;
+        let left = source.width;
+        let top = source.height;
+        let right = -1;
+        let bottom = -1;
+        const alphaThreshold = 32;
+        for (let y = 0; y < source.height; y += 1) {
+          for (let x = 0; x < source.width; x += 1) {
+            if (pixels[(y * source.width + x) * 4 + 3] <= alphaThreshold) continue;
+            left = Math.min(left, x);
+            top = Math.min(top, y);
+            right = Math.max(right, x);
+            bottom = Math.max(bottom, y);
+          }
+        }
+        if (right < left || bottom < top) throw new Error('Battle-mode art is fully transparent');
+
+        const croppedWidth = right - left + 1;
+        const croppedHeight = bottom - top + 1;
+        const inset = Math.ceil(Math.max(croppedWidth, croppedHeight) * 0.04);
+        const scale = Math.min(window.devicePixelRatio || 1, 2);
+        const target = document.createElement('canvas');
+        target.width = BATTLE_MODE_ICON_SIZE * scale;
+        target.height = BATTLE_MODE_ICON_SIZE * scale;
+        const targetContext = target.getContext('2d');
+        if (!targetContext) throw new Error('Could not draw battle-mode art');
+        const availableSize = target.width - inset * 2 * scale;
+        const imageScale = Math.min(availableSize / croppedWidth, availableSize / croppedHeight);
+        const drawWidth = croppedWidth * imageScale;
+        const drawHeight = croppedHeight * imageScale;
+        targetContext.drawImage(
+          image,
+          left,
+          top,
+          croppedWidth,
+          croppedHeight,
+          (target.width - drawWidth) / 2,
+          (target.height - drawHeight) / 2,
+          drawWidth,
+          drawHeight,
+        );
+        resolve(target.toDataURL('image/png'));
+      } catch (error) {
+        reject(error);
+      }
+    };
+    image.onerror = () => reject(new Error('Could not load battle-mode art'));
+    image.src = url;
+  });
+  trimmedBattleModeIconUrls.set(url, request);
+  return request;
+}
+
+function TrimmedBattleModeIcon({ src }: Readonly<{ src: string }>) {
+  const [trimmedSrc, setTrimmedSrc] = useState(src);
+
+  useEffect(() => {
+    let disposed = false;
+    setTrimmedSrc(src);
+    trimmedBattleModeIconUrl(src)
+      .then((framedSrc) => {
+        if (!disposed) setTrimmedSrc(framedSrc);
+      })
+      .catch(() => {
+        // Keep the original source visible if its host disallows canvas reads.
+      });
+    return () => { disposed = true; };
+  }, [src]);
+
+  return <img src={trimmedSrc} alt="" className="clash-recent-games-mode-icon" loading="lazy" decoding="async" />;
+}
 function ClashDeckCardArt({ card, artType }: Readonly<{ card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }>) {
   if (artType !== 'hero') return <FramedClashRoyaleCardImage card={card} artType={artType} />;
   if (!card.iconUrl) return <span aria-hidden>{card.name.charAt(0)}</span>;
@@ -166,6 +257,11 @@ function formatBattleType(type: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function deckCardArtType(card: ClashRoyaleData['currentDeck'][number]): DeckCardArtType {
+  if (card.rarity === 'champion') return 'hero';
+  return card.iconUrl?.endsWith('CardEvolution.png') ? 'evolution' : 'regular';
+}
+
 export function Crown({ filled }: Readonly<{ filled: boolean }>) {
   return (
     <svg viewBox="0 0 24 18" aria-hidden className="clash-crown">
@@ -189,7 +285,7 @@ function ClashCrownScore({ crownsFor, crownsAgainst, className = '' }: Readonly<
 function ClashBattleHeading({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <p className="clash-eyebrow clash-battle-heading">
-      <span className="clash-battle-heading-art"><img src={CLASH_ART.battle} alt="" width="64" height="64" /></span>
+      <span className="clash-battle-heading-art"><img src={CLASH_ROYALE_BATTLE_ART.trophyRoad} alt="" width="64" height="64" /></span>
       {children}
     </p>
   );
@@ -245,7 +341,7 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
 export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
   const deck: { card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }[] = data.currentDeck.map((card) => ({
     card,
-    artType: card.iconUrl?.endsWith('CardEvolution.png') ? 'evolution' as const : 'regular' as const,
+    artType: deckCardArtType(card),
   }));
   if (data.deckHero) deck.splice(Math.min(data.deckHeroIndex ?? deck.length, deck.length), 0, { card: data.deckHero, artType: 'hero' as const });
   if (deck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;
@@ -262,14 +358,17 @@ export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: Clas
 
 export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">Play a battle to start a fresh activity readout.</p>;
-  // The API supplies up to 25 battles, while this compact pulse explicitly represents twelve.
+  // The API supplies up to 25 battles, while this compact pulse explicitly represents fifteen.
   // Use one bounded list for both the result strip and its aggregate figures.
-  const battles = data.recentBattles.slice(0, 12);
+  const battles = data.recentBattles.slice(0, 15);
   const chronologicalBattles = battles.slice().reverse();
   const record = recentRecord(battles);
   const battleCount = battles.length;
   const winRate = Math.round((record.wins / battleCount) * 100);
   const gamesLabel = `Last ${battleCount} ${battleCount === 1 ? 'game' : 'games'}`;
+  const currentPathLeagueNumber = data.profile.pathOfLegends
+    ? pathOfLegendsDisplayLeagueNumber(data.profile.pathOfLegends.leagueNumber)
+    : undefined;
   return (
     <section className="clash-recent-games">
       <header className="clash-recent-games-header">
@@ -281,12 +380,26 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
       </header>
       <ol className="clash-recent-games-grid" aria-label={`Results of ${gamesLabel.toLowerCase()}, oldest to newest`}>
         {chronologicalBattles.map((battle, index) => (
-          <li key={`${battle.battleTime}-${index}`} data-result={battle.result} aria-label={`Game ${index + 1} of ${battleCount}: ${BATTLE_RESULT_LABELS[battle.result]}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns, ${relativeTime(battle.battleTime)}`}>
-            <ClashCrownScore crownsFor={battle.crownsFor} crownsAgainst={battle.crownsAgainst} className="clash-recent-games-score" />
-          </li>
+          <BattleModeTile key={`${battle.battleTime}-${index}`} battle={battle} index={index} battleCount={battleCount} fallbackPathLeagueNumber={currentPathLeagueNumber} />
         ))}
       </ol>
     </section>
+  );
+}
+
+function BattleModeTile({ battle, index, battleCount, fallbackPathLeagueNumber }: Readonly<{ battle: ClashRoyaleBattle; index: number; battleCount: number; fallbackPathLeagueNumber?: number }>) {
+  const icon = clashRoyaleBattleIcon(battle, fallbackPathLeagueNumber);
+  const isModeEmblem = icon.src !== CLASH_ROYALE_BATTLE_ART.trophyRoad;
+  const isMergeTactics = `${battle.type} ${battle.modeName ?? ''}`.toLowerCase().includes('merge tactics');
+  return (
+    <li
+      data-result={battle.result}
+      aria-label={`Game ${index + 1} of ${battleCount}: ${BATTLE_RESULT_LABELS[battle.result]} in ${icon.label}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns, ${relativeTime(battle.battleTime)}`}
+    >
+      <span className={`clash-recent-games-mode-icon-frame${isModeEmblem ? ' clash-recent-games-mode-icon-frame--emblem' : ''}${isMergeTactics ? ' clash-recent-games-mode-icon-frame--merge-tactics' : ''}`} aria-hidden>
+        <TrimmedBattleModeIcon src={icon.src} />
+      </span>
+    </li>
   );
 }
 

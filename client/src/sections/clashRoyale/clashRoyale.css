@@ -24,6 +24,8 @@
    same reasoning). Falls back to no art at all when the current arena isn't in the local lookup. */
 .dashboard-section-card--clash-royale:has(.clash-overview) {
   isolation: isolate;
+  display: flex;
+  flex-direction: column;
   background:
     linear-gradient(112deg, color-mix(in oklab, var(--color-card) 91%, transparent), color-mix(in oklab, var(--color-card) 60%, transparent)),
     linear-gradient(135deg, color-mix(in oklab, var(--color-accent-clash-royale) 14%, transparent), transparent 62%),
@@ -58,6 +60,7 @@
 .dashboard-section-card--clash-royale:has(.clash-overview) > .section-card-content,
 .dashboard-section-card--clash-royale:has(.clash-overview) > p { z-index: 1; }
 .dashboard-section-card--clash-royale:has(.clash-overview) > .section-card-aura { z-index: 0; }
+.dashboard-section-card--clash-royale:has(.clash-overview) > .section-card-content { display: flex; min-height: 0; flex: 1; }
 
 .section-card-header--clash-royale { min-height: 2.5rem; gap: 0.72rem; }
 .clash-royale-overview-mark {
@@ -82,7 +85,7 @@
   object-position: left center;
 }
 
-.clash-overview { position: relative; display: grid; gap: 0.85rem; }
+.clash-overview { position: relative; display: grid; min-height: 0; width: 100%; flex: 1; grid-template-rows: auto auto minmax(0, 1fr); gap: 0.85rem; }
 .clash-crown { display: inline-block; width: 1rem; height: 0.8rem; }
 
 /* Profile: identity plus Trophy Road and Path of Legends, as one flat neutral panel. */
@@ -157,7 +160,7 @@
 .clash-card--legendary { z-index: 1; }
 .clash-card span:first-child { display: grid; aspect-ratio: 0.84; width: 100%; place-content: center; color: var(--color-ink); font-size: 1.2rem; font-weight: 800; }
 
-.clash-recent-games { display: grid; gap: 0.7rem; padding: 0.95rem 1rem; border-radius: 1rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
+.clash-recent-games { display: grid; min-height: 0; grid-template-rows: auto minmax(0, 1fr); gap: 0.7rem; padding: 0.95rem 1rem; border-radius: 1rem; background: color-mix(in oklab, var(--color-track) 25%, transparent); }
 .clash-recent-games-header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; }
 .clash-recent-games-record { margin: 0.36rem 0 0; color: var(--color-ink-muted); font-size: 0.78rem; }
 .clash-recent-games-record strong { color: var(--color-ink); font-size: 1rem; }
@@ -166,10 +169,17 @@
 .clash-recent-games-rate strong { color: var(--color-ink); font-size: 1.2rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
 .clash-battle-heading-art { display: block; width: 0.92rem; height: 0.92rem; overflow: hidden; }
 .clash-battle-heading-art img { display: block; width: 1.18rem; height: 1.18rem; max-width: none; margin: -0.13rem; }
-.clash-recent-games-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.38rem; margin: 0; padding: 0; list-style: none; }
-.clash-recent-games-grid li { display: grid; width: max-content; max-width: 100%; min-width: 0; min-height: 2.55rem; place-items: center; justify-self: center; padding: 0.35rem 0.28rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 75%, transparent); border-radius: 0.58rem; background: color-mix(in oklab, var(--color-card) 88%, transparent); font-variant-numeric: tabular-nums; }
-.clash-recent-games-grid li[data-result='win'] { background: color-mix(in srgb, var(--clash-chip-win) 5%, var(--color-card)); }
-.clash-recent-games-grid li[data-result='loss'] { background: color-mix(in srgb, var(--clash-chip-loss) 5%, var(--color-card)); }
+.clash-recent-games-grid { display: grid; min-height: 0; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 0.42rem; margin: 0; padding: 0; list-style: none; }
+.clash-recent-games-grid li { position: relative; display: grid; min-width: 0; min-height: 2.8rem; place-items: center; isolation: isolate; overflow: hidden; padding: 0.35rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 72%, transparent); border-radius: 0.76rem; background: color-mix(in oklab, var(--color-card) 88%, transparent); transition: transform 280ms cubic-bezier(0.16, 1, 0.3, 1); }
+/* The mode emblem remains the only content. These low-contrast inset layers give each result a
+   distinct in-game tile behind it without turning the compact activity pulse into a score log. */
+.clash-recent-games-grid li::before { position: absolute; z-index: -1; inset: 0.18rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 42%, transparent); border-radius: 0.56rem; background: linear-gradient(145deg, color-mix(in oklab, var(--color-ink) 5%, transparent), transparent 62%); content: ''; }
+.clash-recent-games-grid li[data-result='win'] { border-color: color-mix(in srgb, var(--clash-chip-win) 24%, var(--color-card-border)); background: linear-gradient(145deg, color-mix(in srgb, var(--clash-chip-win) 8%, var(--color-card)), var(--color-card)); }
+.clash-recent-games-grid li[data-result='loss'] { border-color: color-mix(in srgb, var(--clash-chip-loss) 24%, var(--color-card-border)); background: linear-gradient(145deg, color-mix(in srgb, var(--clash-chip-loss) 8%, var(--color-card)), var(--color-card)); }
+.clash-recent-games-mode-icon-frame { position: relative; z-index: 1; display: grid; width: min(3.2rem, 82%); aspect-ratio: 1; place-items: center; }
+.clash-recent-games-mode-icon-frame--emblem { width: min(4.5rem, 112%); }
+.clash-recent-games-mode-icon-frame--merge-tactics { width: min(3.75rem, 92%); }
+.clash-recent-games-mode-icon { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 3px color-mix(in oklab, var(--color-ink) 24%, transparent)); }
 .clash-crown-score { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: clamp(0.08rem, 0.3vw, 0.14rem); color: var(--color-ink-muted); }
 .clash-crown-score strong { min-width: 0; color: var(--color-ink); font-size: clamp(0.68rem, 1.8vw, 0.76rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1; text-align: center; white-space: nowrap; }
 /* Fluid like the hourly weather glyphs (text-[clamp(...)] in HourGlyphStrip) rather than a
@@ -215,11 +225,16 @@
 .clash-overview .clash-card:hover {
   transform: translateY(-2px);
 }
+.clash-overview .clash-recent-games-grid li:hover {
+  transform: translateY(-2px);
+}
 .clash-overview .clash-card img { filter: drop-shadow(0 2px 3px color-mix(in oklab, var(--color-ink) 22%, transparent)); }
 
 @media (prefers-reduced-motion: reduce) {
-  .clash-overview .clash-card { transition: none; }
+  .clash-overview .clash-card,
+  .clash-overview .clash-recent-games-grid li { transition: none; }
   .clash-overview .clash-card:hover { transform: none; }
+  .clash-overview .clash-recent-games-grid li:hover { transform: none; }
 }
 
 @media (max-width: 480px) {

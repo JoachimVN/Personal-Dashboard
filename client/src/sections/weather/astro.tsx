@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
+import type { WeatherData } from '@personal-dashboard/shared';
 import { motion } from 'motion/react';
 import { moonIllumination, moonPhaseName } from '../../lib/weather';
 import { useSkyNow } from '../../lib/skyTime';
@@ -277,5 +278,54 @@ export function MoonDisc({ phaseDeg, size = 72 }: Readonly<MoonDiscProps>) {
       )}
       <circle r="1" fill="none" stroke="var(--color-card-border)" strokeWidth="0.02" />
     </svg>
+  );
+}
+
+const SYNODIC_DAYS = 29.53;
+
+/** Days until the moon reaches a target phase angle, walking forward through the lunation. */
+function daysUntilPhase(phaseDeg: number, targetDeg: number): number {
+  return ((((targetDeg - phaseDeg) % 360) + 360) % 360 / 360) * SYNODIC_DAYS;
+}
+
+function nextMoonEventLabel(phaseDeg: number): string {
+  const toFull = daysUntilPhase(phaseDeg, 180);
+  const toNew = daysUntilPhase(phaseDeg, 360);
+  const [days, name] = toFull <= toNew ? [toFull, 'full moon'] : [toNew, 'new moon'];
+  if (days < 1) return `${name} tonight`;
+  const rounded = Math.round(days);
+  return `${name} in ${rounded} ${rounded === 1 ? 'day' : 'days'}`;
+}
+
+/** Disc sized to stand on its own next to the full-width sun arc, not shrunk down as an aside. */
+export function MoonPanel({ moon }: Readonly<{ moon: NonNullable<WeatherData['moon']> }>) {
+  const illumination = Math.round(moonIllumination(moon.phaseDeg) * 100);
+  return (
+    <div className="flex items-center gap-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.88 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 20, delay: 0.15 }}
+        className="shrink-0"
+        style={{
+          filter: `drop-shadow(0 0 ${5 + illumination * 0.14}px light-dark(rgb(118 136 163 / ${0.12 + illumination * 0.003}), rgb(231 237 248 / ${0.1 + illumination * 0.004})))`,
+        }}
+      >
+        <MoonDisc phaseDeg={moon.phaseDeg} size={92} />
+      </motion.div>
+      <div className="min-w-0">
+        <p className="truncate text-base font-semibold tracking-[-0.01em]">{moonPhaseName(moon.phaseDeg)}</p>
+        <p className="mt-1 truncate text-xs text-ink-muted">
+          {illumination}% lit · {nextMoonEventLabel(moon.phaseDeg)}
+        </p>
+        {(moon.moonrise || moon.moonset) && (
+          <p className="mt-1 truncate text-xs tabular-nums text-ink-faint">
+            {moon.moonrise ? `↑ ${timeLabel(moon.moonrise)}` : 'no moonrise today'}
+            {moon.moonrise && moon.moonset && '   '}
+            {moon.moonset && `↓ ${timeLabel(moon.moonset)}`}
+          </p>
+        )}
+      </div>
+    </div>
   );
 }

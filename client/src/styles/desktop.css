@@ -1,0 +1,150 @@
+/* Large-screen overrides. Kept in one file, loaded last, because these rules win by source order over the equal-specificity base rules above; distributing them back into the files they override would change which one applies. */
+
+@media (min-width: 1024px) {
+  .command-layout {
+    grid-template-columns: minmax(0, 1.75fr) minmax(18rem, 0.8fr);
+  }
+
+  .dashboard-section-card--ai {
+    grid-column: span 5;
+  }
+
+  .dashboard-section-card--github {
+    grid-column: span 7;
+  }
+
+  .dashboard-section-card--personal {
+    grid-column: span 12;
+  }
+
+  .dashboard-section-card--health {
+    grid-column: span 12;
+  }
+
+  .personal-overview {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 2rem;
+    row-gap: 1.15rem;
+  }
+
+  .personal-overview-agenda {
+    grid-column: span 7;
+    border-right: 1px solid color-mix(in oklab, var(--accent) 13%, var(--color-card-border));
+    padding-right: 2rem;
+  }
+
+  .personal-overview-communications {
+    grid-column: span 5;
+  }
+
+  .personal-overview-home {
+    grid-column: span 4;
+    border-top: 1px solid color-mix(in oklab, var(--accent) 13%, var(--color-card-border));
+    padding-top: 1.15rem;
+  }
+
+  .personal-overview-news {
+    grid-column: span 8;
+    border-top: 1px solid color-mix(in oklab, var(--accent) 13%, var(--color-card-border));
+    padding-top: 1.15rem;
+  }
+
+  .personal-overview-agenda-body {
+    grid-template-columns: minmax(0, 1.15fr) minmax(11rem, 0.85fr);
+    align-items: end;
+  }
+
+  .personal-overview-following-events {
+    border-top: 0;
+    border-left: 1px solid color-mix(in oklab, var(--accent) 12%, var(--color-card-border));
+    padding-top: 0;
+    padding-left: 0.85rem;
+  }
+
+  /* Whatever sits first goes full-width, the rest pair up 2×2 (odd one out sits alone last). */
+  .arrangeable-grid--personal > :nth-child(1) {
+    grid-column: span 2;
+  }
+}
+
+/* Grid rows stretch item boxes by default, but the visible glass card is a nested <section> that
+   only grows to its content — without this, a short card in a row next to a tall one leaves a
+   visible gap instead of matching its neighbor's height. */
+.arrangeable-grid--personal > * > section {
+  height: 100%;
+}
+
+/* Briefly rings the widget a command-center tile deep-linked to, so the scroll's destination
+   reads as deliberate rather than the page just landing somewhere unexplained. */
+.widget-highlight > section {
+  animation: widget-highlight-ring 1.6s ease-out;
+}
+
+@keyframes widget-highlight-ring {
+  0% { box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-accent-personal) 55%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+
+@media (max-width: 639px) {
+  .dashboard-hero {
+    padding-bottom: 1.75rem;
+  }
+
+  .hero-title {
+    letter-spacing: -0.06em;
+  }
+
+  .dashboard-section-card {
+    min-height: 0;
+  }
+
+  .command-center-head,
+  .dashboard-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .command-nav {
+    align-self: stretch;
+  }
+
+  .command-nav a {
+    flex: 1;
+    text-align: center;
+  }
+
+  .command-weather-row {
+    flex-wrap: wrap;
+  }
+
+  .command-forecast {
+    display: none;
+  }
+
+  .dashboard-section-heading > p {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .detail-intro-orb {
+    animation: none;
+  }
+
+  .dashboard-section-card,
+  .section-card-aura,
+  .section-arrow,
+  .command-primary,
+  .command-primary::before,
+  .command-agenda,
+  .command-agenda::before,
+  .command-signal,
+  .command-signal::before,
+  .command-weather-target,
+  .command-weather-target::before,
+  .action-card,
+  .premium-primary-button,
+  .premium-secondary-button {
+    transition-duration: 0.01ms;
+  }
+}

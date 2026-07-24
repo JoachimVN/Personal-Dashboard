@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { battleResult, clashRoyaleWikiCardImageUrl, createClashRoyaleProvider, findDeckHero, isEvolutionDeckSlot, mapBattle, mapCard, normalizeTag, toIsoTimestamp } from './clashRoyale.js';
+import { battleResult, clashRoyaleWikiCardImageUrl, createClashRoyaleProvider, findDeckHero, isEvolutionDeckSlot, mapBattle, mapCard, normalizeTag, orderDeckFromMatchingBattle, toIsoTimestamp } from './clashRoyale.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -107,6 +107,25 @@ describe('findDeckHero', () => {
   });
 });
 
+describe('orderDeckFromMatchingBattle', () => {
+  it('restores the visible slot order for an eight-card player deck', () => {
+    const playerDeck = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: `Card ${index + 1}`, level: 14, maxLevel: 14 }));
+    const battleOrder = [playerDeck[0], playerDeck[2], playerDeck[1], ...playerDeck.slice(3)];
+    const ordered = orderDeckFromMatchingBattle('#PLAYER', playerDeck, [{
+      battleTime: '20260724T120000.000Z', type: 'pathOfLegend', team: [{ tag: '#PLAYER', crowns: 1, cards: battleOrder }], opponent: [{ crowns: 0 }],
+    }]);
+
+    expect(ordered?.map((card) => card.id)).toEqual([1, 3, 2, 4, 5, 6, 7, 8]);
+  });
+
+  it('leaves the player order alone when no battle has the exact same eight cards', () => {
+    const playerDeck = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: `Card ${index + 1}`, level: 14, maxLevel: 14 }));
+    expect(orderDeckFromMatchingBattle('#PLAYER', playerDeck, [{
+      battleTime: '20260724T120000.000Z', type: 'pathOfLegend', team: [{ tag: '#PLAYER', crowns: 1, cards: [...playerDeck.slice(0, 7), { ...playerDeck[7], id: 99 }] }], opponent: [{ crowns: 0 }],
+    }])).toBeUndefined();
+  });
+});
+
 describe('battleResult', () => {
   it('is a win when the player crowned more than the opponent', () => {
     expect(battleResult([{ crowns: 2 }], [{ crowns: 1 }])).toBe('win');
@@ -122,17 +141,21 @@ describe('battleResult', () => {
 });
 
 describe('mapBattle', () => {
-  it('derives result, crown totals, opponent name and trophy change', () => {
+  it('retains battle-specific mode and arena metadata with the result details', () => {
     expect(
       mapBattle({
         battleTime: '20260721T120000.000Z',
         type: 'PvP',
+        gameMode: { name: 'Ladder' },
+        arena: { name: 'Legendary Arena' },
         team: [{ crowns: 2, name: 'Me', trophyChange: 28 }],
         opponent: [{ crowns: 1, name: 'Rival' }],
       }),
     ).toEqual({
       battleTime: '2026-07-21T12:00:00.000Z',
       type: 'PvP',
+      modeName: 'Ladder',
+      arenaName: 'Legendary Arena',
       result: 'win',
       crownsFor: 2,
       crownsAgainst: 1,

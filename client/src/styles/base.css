@@ -1,0 +1,164 @@
+/* Page chrome: the :root/html/body baseline, the ambient sky wash the app blends behind everything, and the dashboard hero. */
+
+:root {
+  color-scheme: light dark;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  min-width: 320px;
+  background: var(--color-canvas);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-accent-ai) 70%, white);
+  outline-offset: 3px;
+}
+
+.ambient-canvas {
+  isolation: isolate;
+}
+
+/* Sky wash, not a drifting blob farm. App.tsx continually blends --sky-a/--sky-b
+   from the real clock in OKLab, and puts them on .app-shell so the command center
+   shares the same time-of-day color. Static shape, one soft vertical fade, no grid/noise. */
+.app-shell {
+  /* Night fallback for the first paint and browsers that lack color-mix(). */
+  --sky-a: light-dark(#bccfff, #1e407a);
+  --sky-b: light-dark(#80a0ff, #081634);
+  --sky-a-start: light-dark(#bccfff, #1e407a);
+  --sky-a-end: light-dark(#bccfff, #1e407a);
+  --sky-b-start: light-dark(#80a0ff, #081634);
+  --sky-b-end: light-dark(#80a0ff, #081634);
+  --sky-start-weight: 100%;
+}
+
+@supports (color: color-mix(in oklab, red, blue)) {
+  .app-shell {
+    --sky-a: color-mix(in oklab, var(--sky-a-start) var(--sky-start-weight), var(--sky-a-end));
+    --sky-b: color-mix(in oklab, var(--sky-b-start) var(--sky-start-weight), var(--sky-b-end));
+  }
+}
+
+.ambient-aurora {
+  position: absolute;
+  top: -3rem;
+  left: 50%;
+  width: min(90rem, 170vw);
+  height: 26rem;
+  translate: -50% 0;
+  background: linear-gradient(180deg, var(--sky-a), var(--sky-b) 45%, transparent 82%);
+  filter: blur(70px);
+  opacity: 0.55;
+  transition: background 1.2s ease;
+}
+
+/* A lower horizon balances the sky wash at the top of longer pages. It reuses the
+   same clock-driven colors, but stays broad and low enough to remain background. */
+.ambient-horizon {
+  position: absolute;
+  bottom: -4rem;
+  left: 50%;
+  width: min(136rem, 230vw);
+  height: 34rem;
+  translate: -50% 0;
+  background: radial-gradient(
+    ellipse at 50% 82%,
+    color-mix(in oklab, var(--sky-b) 40%, transparent),
+    color-mix(in oklab, var(--sky-a) 18%, transparent) 42%,
+    transparent 76%
+  );
+  filter: blur(76px);
+  opacity: 0.54;
+  transition: background 1.2s ease;
+}
+
+/* Section-accent wash layered on top of the sky wash while a section page is
+   open (App.tsx SectionGlow) — --section-accent is set inline per section from
+   its registry.tsx accentVar, so this one rule covers every section. */
+.section-page-glow {
+  position: fixed;
+  inset: 0;
+  z-index: -5;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.section-page-aurora {
+  position: absolute;
+  top: -14rem;
+  left: 50%;
+  width: min(64rem, 150vw);
+  height: 30rem;
+  translate: -50% 0;
+  background: radial-gradient(ellipse at 50% 30%, color-mix(in oklab, var(--section-accent) 30%, transparent), transparent 72%);
+  filter: blur(70px);
+  opacity: 0.6;
+}
+
+.section-page-horizon {
+  position: absolute;
+  bottom: -5rem;
+  left: 50%;
+  width: min(104rem, 220vw);
+  height: 32rem;
+  translate: -50% 0;
+  background: radial-gradient(ellipse at 50% 85%, color-mix(in oklab, var(--section-accent) 20%, transparent), transparent 72%);
+  filter: blur(72px);
+  opacity: 0.6;
+}
+
+/* The hero text sits directly on the sky wash with no card behind it — unlike everywhere
+   else, so contrast against it varies with the time-of-day color; the faint gray date/
+   eyebrow text is the most exposed since it isn't light or dark enough to always win
+   against a mid-toned wash in either mode. A soft halo (canvas-colored per mode) keeps
+   it legible without touching the wash colors themselves. */
+.dashboard-hero {
+  padding: 0.25rem 0.25rem 1.75rem;
+  text-shadow:
+    0 1px 3px light-dark(rgb(255 255 255 / 0.85), rgb(0 0 0 / 0.55)),
+    0 0 22px light-dark(rgb(255 255 255 / 0.65), rgb(0 0 0 / 0.45));
+}
+
+/* A very faint time-of-day tint on top of the normal white/dark text — almost all ink,
+   just a whisper of warmth/coolness matching the sky, not a "gradient text" effect.
+   -webkit-text-fill-color (not just color) is required for background-clip:text to
+   actually paint the gradient instead of leaving the glyphs transparent. No text-shadow
+   here — the fill is still ~90% ink so it doesn't need the contrast halo the sibling
+   eyebrow text does. */
+.hero-title {
+  max-width: 760px;
+  font-size: clamp(2.5rem, 5.6vw, 4.8rem);
+  font-weight: 620;
+  line-height: 0.91;
+  letter-spacing: -0.07em;
+  /* line-height is tighter than the font's natural descender depth, and background-clip:text
+     (unlike a plain color fill) clips strictly to the line box — pad it out a touch so
+     descenders like the "g" in "evening" don't get cut off, offset by an equal negative
+     margin so the extra room doesn't shift surrounding layout. */
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
+  background: linear-gradient(
+    115deg,
+    color-mix(in oklab, var(--sky-a) 24%, light-dark(#000, var(--color-ink))),
+    color-mix(in oklab, var(--sky-b) 24%, light-dark(#000, var(--color-ink)))
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}

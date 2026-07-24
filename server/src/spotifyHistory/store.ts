@@ -1,9 +1,22 @@
-import { z } from 'zod';
 import type { Sql, TransactionSql } from 'postgres';
-import type { Database } from './db/client.js';
-
-type ReleaseDatePrecision = 'year' | 'month' | 'day';
-type AlbumType = 'album' | 'single' | 'compilation';
+import type { Database } from '../db/client.js';
+import {
+  albumArtist,
+  albumRecordSchema,
+  artistRecordSchema,
+  byPlayCountDesc,
+  trackRecordSchema,
+  type AlbumDetailInput,
+  type AlbumLike,
+  type AlbumRecord,
+  type ArtistLike,
+  type ArtistMetadataInput,
+  type ArtistRecord,
+  type PlayedTrackInput,
+  type SeedArtistInput,
+  type TrackRecord,
+} from './records.js';
+import { canonicalTitle } from './titles.js';
 
 const TOP_LIMIT = 100;
 /**
@@ -25,187 +38,6 @@ const COMPILATION_TYPE_OVERRIDES = new Set([
   '5EbpxRwbbpCJUepbqVTZ1U', // Trilogy (The Weeknd) — bundles three early mixtapes into one official release
 ]);
 
-const trackRecordSchema = z.object({
-  id: z.string(),
-  track: z.string(),
-  artist: z.string(),
-  artistIds: z.array(z.string()).default([]),
-  album: z.string().optional(),
-  albumId: z.string().optional(),
-  releaseDate: z.string().optional(),
-  durationMs: z.number().optional(),
-  imageUrl: z.string().optional(),
-  url: z.string().optional(),
-  playCount: z.number(),
-  /** True only for tracks set via applyRealStreamCounts — everything else is a long_term-rank guess or a partial organic count, not a trustworthy absolute number. */
-  verified: z.boolean().optional(),
-});
-
-/**
- * Metadata only — no playCount. Artist/album totals are *derived* at read time by summing their
- * own tracks' playCounts (see getAllTime), rather than maintained as a separately-incremented
- * number. Two independently-bookkept numbers (per-track and per-artist/album) drift apart the
- * moment any write path updates one without the other with perfect symmetry — which is exactly
- * what happened here across this store's iterative changes. Deriving from the single source of
- * truth (tracks) makes that whole bug class impossible.
- */
-const artistRecordSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  imageUrl: z.string().optional(),
-  url: z.string().optional(),
-  genres: z.array(z.string()).default([]),
-});
-
-const albumRecordSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  artist: z.string(),
-  imageUrl: z.string().optional(),
-  url: z.string().optional(),
-  releaseDate: z.string().optional(),
-  releaseDatePrecision: z.enum(['year', 'month', 'day']).optional(),
-  totalTracks: z.number().optional(),
-  /** Sum of every track's duration_ms from the full Spotify album — backfilled once via enrichAlbumDetails, since recentlyPlayed/top lists don't carry it. */
-  totalDurationMs: z.number().optional(),
-  /** Spotify's own classification — used to exclude compilations/greatest-hits from "top albums", since those aren't really an album you listened through. */
-  albumType: z.enum(['album', 'single', 'compilation']).optional(),
-});
-
-export interface PlayedTrackInput {
-  id: string;
-  name: string;
-  url?: string;
-  durationMs?: number;
-  artists: { id: string; name: string }[];
-  album: {
-    id: string;
-    name: string;
-    /** Album-level credit, distinct from the artists on an individual track. */
-    artist?: string;
-    imageUrl?: string;
-    url?: string;
-    releaseDate?: string;
-    releaseDatePrecision?: ReleaseDatePrecision;
-    totalTracks?: number;
-    albumType?: AlbumType;
-  };
-}
-
-export interface AlbumDetailInput {
-  id: string;
-  totalDurationMs: number;
-  totalTracks?: number;
-  releaseDatePrecision?: ReleaseDatePrecision;
-  albumType?: AlbumType;
-  /** Every track on the album, per Spotify — used to backfill albumId/artistIds on our own track records. */
-  tracks: { id: string; artistIds: string[] }[];
-}
-
-export interface SeedArtistInput {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  url?: string;
-  genres: string[];
-}
-
-export interface ArtistMetadataInput {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  url?: string;
-  genres: string[];
-}
-
-type TrackRecord = z.infer<typeof trackRecordSchema>;
-type ArtistRecord = z.infer<typeof artistRecordSchema>;
-type AlbumRecord = z.infer<typeof albumRecordSchema>;
-
-interface ArtistLike {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  url?: string;
-  genres?: string[];
-}
-
-interface AlbumLike {
-  id: string;
-  name: string;
-  artist: string;
-  imageUrl?: string;
-  url?: string;
-  releaseDate?: string;
-  releaseDatePrecision?: ReleaseDatePrecision;
-  totalTracks?: number;
-  albumType?: AlbumType;
-}
-
-/** A featured track must not replace the album's own credited artist. */
-function albumArtist(track: PlayedTrackInput): string {
-  return track.album.artist || track.artists.map((artist) => artist.name).join(', ');
-}
-
-const byPlayCountDesc = (a: { playCount: number }, b: { playCount: number }) => b.playCount - a.playCount;
-
-/**
- * Spotify assigns a distinct album id to every reissue (Deluxe/Extended/Anniversary/Remastered/...),
- * which splits one album's plays across several "albums" in getAllTime — e.g. Kiss Land vs. Kiss
- * Land (Deluxe) never accumulate enough tracked tracks individually to clear
- * MIN_TRACKED_TRACKS_PER_ALBUM even though the underlying album is well-tracked. Stripping a
- * trailing edition marker gives editions of the same album a shared grouping key so they can be
- * merged before ranking.
- */
-const EDITION_PREFIXES = [
-  'deluxe',
-  'extended',
-  'expanded',
-  'anniversary',
-  'remaster',
-  'remastered',
-  'special',
-  'super deluxe',
-  'bonus',
-  'bonus track',
-  'bonus track version',
-  'explicit',
-  'clean',
-  'international',
-  'complete',
-  'revisited',
-  'reissue',
-];
-
-function isEditionLabel(label: string): boolean {
-  const normalized = label.trim().toLowerCase();
-  return EDITION_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix} `));
-}
-
-function editionSuffixStart(name: string): number | undefined {
-  const trimmed = name.trim();
-  const close = trimmed.at(-1);
-  if (close === ')' || close === ']') {
-    const open = close === ')' ? '(' : '[';
-    const start = trimmed.lastIndexOf(open);
-    if (start >= 0 && isEditionLabel(trimmed.slice(start + 1, -1))) return start;
-  }
-  // Track titles more often carry their edition as a trailing " - Remastered 2015" / " - Explicit"
-  // segment than a parenthetical — same vocabulary, different punctuation.
-  const dashStart = trimmed.lastIndexOf(' - ');
-  if (dashStart >= 0 && isEditionLabel(trimmed.slice(dashStart + 3))) return dashStart;
-  return undefined;
-}
-
-/** Strips a trailing edition marker — "(Deluxe)", " - Remastered 2015", etc. — so editions of the
- * same album or track share a grouping key and their plays can be merged before ranking. */
-function canonicalTitle(name: string): string {
-  let result = name;
-  for (let suffixStart = editionSuffixStart(result); suffixStart !== undefined; suffixStart = editionSuffixStart(result)) {
-    result = result.slice(0, suffixStart).trim();
-  }
-  return result;
-}
 
 /**
  * Accumulates real Spotify play counts (from recentlyPlayed, deduped by played_at) into an

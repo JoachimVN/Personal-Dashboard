@@ -1,7 +1,7 @@
 // Fake, fully-anonymized data for the README screenshot workflow (see screenshots.ts). One
 // consistent fake persona across all 5 pages — no real names, places, or events from the actual
 // dashboard owner. Command-center ranking still runs through the real scoring functions in
-// ../src/importance/sources.ts so that page's output reflects actual behavior, not a hand-picked
+// ../src/importance/sources/ so that page's output reflects actual behavior, not a hand-picked
 // result. Track/album art comes from the iTunes Search API and artist photos from Wikipedia's
 // summary API — both free, unauthenticated, and meant for exactly this kind of lookup — so the
 // Spotify page shows real cover art instead of generic stock photos.

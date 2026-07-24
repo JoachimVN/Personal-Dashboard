@@ -6,13 +6,13 @@ import { HealthStore } from '../healthStore.js';
 import { GitHubSnapshotStore } from '../githubSnapshot.js';
 import { UsageHistoryStore } from '../usageHistory.js';
 import { SpotifySnapshotStore } from '../spotifyCache.js';
-import { SpotifyHistoryStore } from '../spotifyHistory.js';
+import { SpotifyHistoryStore } from '../spotifyHistory/index.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { SteamHistoryStore } from '../steamHistory.js';
 import { ValorantHistoryStore } from '../valorantHistory.js';
 import { createActivityPushProvider } from './activityPush.js';
 import { createAiNewsProvider } from './aiNews.js';
-import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage.js';
+import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage/index.js';
 import { createCalendarProvider } from './calendar.js';
 import { createGitHubProvider } from './github.js';
 import { createGmailProvider } from './gmail.js';
@@ -60,20 +60,13 @@ export function createProviders(
   const transit = createTransitProvider(env.weather, config.transit);
   const power = createPowerProvider(config.power.area, env.weather, env.timezone);
   const hue = createHueProvider(env.hue);
-  const health = new HealthStore(
-    database,
-    config.health.historyRetentionDays,
-  );
-  const usageHistory = new UsageHistoryStore(
-    database,
-    config.aiUsage.historySampleMs,
-    config.aiUsage.historyRetentionDays * 24 * 60 * 60_000,
-  );
+  const health = new HealthStore(database);
+  const usageHistory = new UsageHistoryStore(database, config.aiUsage.historySampleMs);
   const spotifySnapshot = new SpotifySnapshotStore(database);
   const githubSnapshot = new GitHubSnapshotStore(database);
   const spotifyHistory = new SpotifyHistoryStore(database);
   const steamSnapshot = new SteamSnapshotStore(database);
-  const steamHistory = new SteamHistoryStore(database, config.steam.historyRetentionDays);
+  const steamHistory = new SteamHistoryStore(database);
   const valorantHistory = new ValorantHistoryStore(database);
   return {
     weather,
