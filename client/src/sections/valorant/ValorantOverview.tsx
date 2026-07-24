@@ -3,6 +3,7 @@ import type { ValorantData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
+import { valorantMapArt } from '../../lib/valorant';
 import {
   RESULT_LABELS,
   actLabel,
@@ -141,11 +142,13 @@ function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
               const score = match.roundsWon !== undefined && match.roundsLost !== undefined
                 ? `${match.roundsWon}–${match.roundsLost}`
                 : RESULT_LABELS[match.result];
+              const mapArtUrl = valorantMapArt(match.map);
               let mvpBadge: ReactNode;
-              if (match.isMatchMvp) mvpBadge = <span className="valorant-overview-mvp is-match">MVP</span>;
-              else if (match.isTeamMvp) mvpBadge = <span className="valorant-overview-mvp is-team">Team</span>;
+              if (match.isMatchMvp) mvpBadge = <span className="valorant-overview-mvp is-match">Match MVP</span>;
+              else if (match.isTeamMvp) mvpBadge = <span className="valorant-overview-mvp is-team">Team MVP</span>;
               return (
-                <li key={`${match.matchId}-${index}`} data-result={match.result}>
+                <li key={`${match.matchId}-${index}`} data-result={match.result} data-has-art={mapArtUrl ? 'true' : undefined}>
+                  {mapArtUrl && <span className="valorant-overview-match-map-art" aria-hidden style={{ backgroundImage: `url("${mapArtUrl}")` }} />}
                   {match.agentIconUrl && <img src={match.agentIconUrl} alt="" aria-hidden loading="lazy" decoding="async" />}
                   <div className="valorant-overview-match-main">
                     <div className="valorant-overview-match-title">

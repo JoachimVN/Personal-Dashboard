@@ -170,9 +170,14 @@
 .valorant-overview-matches-heading p { color: var(--color-ink-muted); font-size: 0.56rem; font-weight: 750; letter-spacing: 0.11em; text-transform: uppercase; }
 .valorant-overview-matches-heading span { color: var(--color-ink-faint); font-size: 0.56rem; font-variant-numeric: tabular-nums; }
 .valorant-overview-matches ol { display: grid; min-height: 0; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
-.valorant-overview-matches li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem; min-height: 0; padding: 0.45rem 0.5rem; border-radius: 0.58rem; background: color-mix(in oklab, var(--color-track) 34%, transparent); }
+.valorant-overview-matches li { position: relative; isolation: isolate; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem; min-height: 0; overflow: hidden; padding: 0.45rem 0.5rem; border-radius: 0.58rem; background: color-mix(in oklab, var(--color-track) 34%, transparent); }
 .valorant-overview-matches li[data-result='win'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-win) 5%, transparent), transparent 70%), color-mix(in oklab, var(--color-track) 34%, transparent); }
 .valorant-overview-matches li[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-loss) 5%, transparent), transparent 70%), color-mix(in oklab, var(--color-track) 34%, transparent); }
+.valorant-overview-match-map-art { position: absolute; z-index: 0; inset: -0.12rem; background: center / cover no-repeat; filter: blur(1.25px); opacity: 0.72; }
+.valorant-overview-matches li[data-has-art='true']::before { content: ''; position: absolute; z-index: 1; inset: 0; background: linear-gradient(98deg, rgba(7, 8, 11, 0.88), rgba(7, 8, 11, 0.73) 62%, rgba(7, 8, 11, 0.55)); }
+.valorant-overview-matches li[data-has-art='true'][data-result='win']::before { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-win) 3%, transparent), transparent 72%), linear-gradient(98deg, rgba(7, 8, 11, 0.88), rgba(7, 8, 11, 0.73) 62%, rgba(7, 8, 11, 0.55)); }
+.valorant-overview-matches li[data-has-art='true'][data-result='loss']::before { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-loss) 3%, transparent), transparent 72%), linear-gradient(98deg, rgba(7, 8, 11, 0.88), rgba(7, 8, 11, 0.73) 62%, rgba(7, 8, 11, 0.55)); }
+.valorant-overview-matches li[data-has-art='true'] > :not(.valorant-overview-match-map-art) { position: relative; z-index: 2; }
 .valorant-overview-matches img { width: 1.9rem; height: 1.9rem; margin-left: 0.15rem; border-radius: 0.45rem; background: var(--color-track); object-fit: cover; }
 .valorant-overview-match-main { min-width: 0; }
 .valorant-overview-match-main span, .valorant-overview-match-result strong, .valorant-overview-match-result span { display: block; margin: 0; }
@@ -187,6 +192,12 @@
 .valorant-overview-matches li[data-result='win'] .valorant-overview-match-result strong { color: var(--valorant-win); }
 .valorant-overview-matches li[data-result='loss'] .valorant-overview-match-result strong { color: var(--valorant-loss); }
 .valorant-overview-match-result span { margin-top: 0.15rem; color: var(--color-ink-faint); font-size: 0.51rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-title p,
+.valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-result strong { color: #fff; }
+.valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-main span,
+.valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-result span { color: rgba(255, 255, 255, 0.68); }
+.valorant-overview-matches li[data-has-art='true'][data-result='win'] .valorant-overview-match-result strong { color: #55dc93; }
+.valorant-overview-matches li[data-has-art='true'][data-result='loss'] .valorant-overview-match-result strong { color: #ff8c98; }
 
 /* The rank row's three columns stop fitting well before the card itself gets narrow, so peak drops
    to its own line rather than squeezing the tier name and RR bar. */
