@@ -245,7 +245,9 @@ export function ClashRoyaleProfile({ data, compact = false }: Readonly<{ data: C
 export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: ClashRoyaleData; compact?: boolean }>) {
   const deck: { card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }[] = data.currentDeck.map((card) => ({
     card,
-    artType: card.iconUrl?.endsWith('CardEvolution.png') ? 'evolution' as const : 'regular' as const,
+    artType: card.rarity === 'champion'
+      ? 'hero' as const
+      : card.iconUrl?.endsWith('CardEvolution.png') ? 'evolution' as const : 'regular' as const,
   }));
   if (data.deckHero) deck.splice(Math.min(data.deckHeroIndex ?? deck.length, deck.length), 0, { card: data.deckHero, artType: 'hero' as const });
   if (deck.length === 0) return <p className="text-sm text-ink-faint">No current deck reported.</p>;

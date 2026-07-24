@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { battleResult, clashRoyaleWikiCardImageUrl, createClashRoyaleProvider, findDeckHero, isEvolutionDeckSlot, mapBattle, mapCard, normalizeTag, toIsoTimestamp } from './clashRoyale.js';
+import { battleResult, clashRoyaleWikiCardImageUrl, createClashRoyaleProvider, findDeckHero, isEvolutionDeckSlot, mapBattle, mapCard, normalizeTag, orderDeckFromMatchingBattle, toIsoTimestamp } from './clashRoyale.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -104,6 +104,25 @@ describe('findDeckHero', () => {
   it('does not take a card from a battle with a different regular deck', () => {
     const deck = Array.from({ length: 7 }, (_, index) => ({ id: index + 1, name: `Card ${index + 1}`, level: 14, maxLevel: 14 }));
     expect(findDeckHero('#PLAYER', deck, [{ battleTime: '20260721T120000.000Z', type: 'pathOfLegend', team: [{ tag: '#PLAYER', crowns: 1, cards: [{ ...deck[0], id: 77 }, ...deck.slice(1), { id: 99, name: 'Archer Queen', level: 6, maxLevel: 6 }] }], opponent: [{ crowns: 0 }] }])).toBeUndefined();
+  });
+});
+
+describe('orderDeckFromMatchingBattle', () => {
+  it('restores the visible slot order for an eight-card player deck', () => {
+    const playerDeck = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: `Card ${index + 1}`, level: 14, maxLevel: 14 }));
+    const battleOrder = [playerDeck[0], playerDeck[2], playerDeck[1], ...playerDeck.slice(3)];
+    const ordered = orderDeckFromMatchingBattle('#PLAYER', playerDeck, [{
+      battleTime: '20260724T120000.000Z', type: 'pathOfLegend', team: [{ tag: '#PLAYER', crowns: 1, cards: battleOrder }], opponent: [{ crowns: 0 }],
+    }]);
+
+    expect(ordered?.map((card) => card.id)).toEqual([1, 3, 2, 4, 5, 6, 7, 8]);
+  });
+
+  it('leaves the player order alone when no battle has the exact same eight cards', () => {
+    const playerDeck = Array.from({ length: 8 }, (_, index) => ({ id: index + 1, name: `Card ${index + 1}`, level: 14, maxLevel: 14 }));
+    expect(orderDeckFromMatchingBattle('#PLAYER', playerDeck, [{
+      battleTime: '20260724T120000.000Z', type: 'pathOfLegend', team: [{ tag: '#PLAYER', crowns: 1, cards: [...playerDeck.slice(0, 7), { ...playerDeck[7], id: 99 }] }], opponent: [{ crowns: 0 }],
+    }])).toBeUndefined();
   });
 });
 

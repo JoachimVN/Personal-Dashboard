@@ -192,6 +192,25 @@ export function findDeckHero(playerTag: string, currentDeck: RawCard[], battles:
   return undefined;
 }
 
+/**
+ * The player endpoint can return all eight cards in its own category order rather than the order
+ * of the deck's visible slots. A recent battle with the same eight ids preserves the slot order,
+ * so use it only when it is an exact match. Keep the player payload's card objects afterwards:
+ * it carries the current evolution level even when the matched battle predates a level change.
+ */
+export function orderDeckFromMatchingBattle(playerTag: string, currentDeck: RawCard[], battles: RawBattle[]): RawCard[] | undefined {
+  if (currentDeck.length !== 8) return undefined;
+  const cardsById = new Map(currentDeck.map((card) => [card.id, card]));
+  if (cardsById.size !== currentDeck.length) return undefined;
+
+  for (const battle of battles) {
+    const cards = battle.team.find((candidate) => candidate.tag === playerTag)?.cards;
+    if (cards?.length !== currentDeck.length || new Set(cards.map((card) => card.id)).size !== cards.length) continue;
+    if (cards.every((card) => cardsById.has(card.id))) return cards.map((card) => cardsById.get(card.id)!);
+  }
+  return undefined;
+}
+
 export function battleResult(team: RawBattleTeamMember[], opponent: RawBattleTeamMember[]): 'win' | 'loss' | 'draw' {
   const crownsFor = team.reduce((sum, m) => sum + m.crowns, 0);
   const crownsAgainst = opponent.reduce((sum, m) => sum + m.crowns, 0);
@@ -236,7 +255,9 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
       const rarityById = new Map(cardReference.items.map((card) => [card.id, card.rarity]));
       const clanBadgeUrl = player.clan?.badgeId === undefined ? undefined : (await getClanBadgeUrls()).get(player.clan.badgeId);
 
-      const deckHero = findDeckHero(player.tag, player.currentDeck ?? [], battleLog);
+      const playerDeck = player.currentDeck ?? [];
+      const deckHero = findDeckHero(player.tag, playerDeck, battleLog);
+      const orderedDeck = orderDeckFromMatchingBattle(player.tag, playerDeck, battleLog) ?? playerDeck;
       const data: ClashRoyaleData = {
         profile: {
           tag: player.tag,
@@ -255,7 +276,7 @@ export function createClashRoyaleProvider(auth: ClashRoyaleAuth | undefined): Pr
           clanBadgeUrl,
           pathOfLegends: player.currentPathOfLegendSeasonResult,
         },
-        currentDeck: (player.currentDeck ?? []).map((card, index) => {
+        currentDeck: orderedDeck.map((card, index) => {
           // `currentDeck` omits the Hero, so account for its recovered battle position before
           // checking whether this card occupies an Evolution-capable slot in the full eight-card deck.
           const deckIndex = deckHero?.index !== undefined && index >= deckHero.index ? index + 1 : index;
