@@ -16,6 +16,7 @@ export interface ServerEnv {
   hue?: { clientId: string; clientSecret: string };
   steam?: { apiKey: string; steamId: string };
   clashRoyale?: { apiKey: string; playerTag: string };
+  clashOfClans?: { apiKey: string; playerTag: string };
   roblox?: { idOrUsername: string; robloSecurity?: string };
   valorant?: { apiKey: string; name: string; tag: string; region: string };
   sonarCloud?: { token: string; orgKey: string };
@@ -47,6 +48,13 @@ export function parseSteam(): ServerEnv['steam'] {
 export function parseClashRoyale(): ServerEnv['clashRoyale'] {
   const apiKey = process.env.CLASH_ROYALE_API_KEY;
   const playerTag = process.env.CLASH_ROYALE_ID;
+  if (!apiKey || !playerTag) return undefined;
+  return { apiKey, playerTag };
+}
+
+export function parseClashOfClans(): ServerEnv['clashOfClans'] {
+  const apiKey = process.env.CLASH_OF_CLANS_API_KEY;
+  const playerTag = process.env.CLASH_OF_CLANS_ID;
   if (!apiKey || !playerTag) return undefined;
   return { apiKey, playerTag };
 }
@@ -136,6 +144,7 @@ export function loadEnv(): ServerEnv {
         : undefined,
     steam: parseSteam(),
     clashRoyale: parseClashRoyale(),
+    clashOfClans: parseClashOfClans(),
     roblox: parseRoblox(),
     valorant: parseValorant(),
     sonarCloud: parseSonarCloud(),
