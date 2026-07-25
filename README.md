@@ -8,7 +8,7 @@
     <img src="https://github.com/JoachimVN/Personal-Dashboard/actions/workflows/privacy-guard.yml/badge.svg" alt="Privacy guard" />
   </a>
   <a href="https://sonarcloud.io/summary/new_code?id=JoachimVN_Personal-Dashboard3">
-    <img src="https://sonarcloud.io/api/project_badges/measure?project=JoachimVN_Personal-Dashboard3&amp;metric=alert_status" alt="SonarCloud Quality Gate" />
+    <img src="https://img.shields.io/badge/SonarCloud-Project-4E9BCD?logo=sonarcloud&amp;logoColor=white" alt="SonarCloud project" />
   </a>
 </p>
 
