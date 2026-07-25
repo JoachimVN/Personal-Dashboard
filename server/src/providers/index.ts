@@ -107,7 +107,7 @@ export function createProviders(
         createClashRoyaleProvider(env.clashRoyale),
         createValorantProvider(env.valorant, valorantHistory),
         createSonarCloudProvider(env.sonarCloud),
-        createActivityPushProvider(env.dashboardPush, getClashRoyaleData),
+        createActivityPushProvider(env.dashboardPush, getClashRoyaleData, env.clashOfClans),
       ] satisfies Provider[]
     ).map((provider) => withEnabledToggle(provider, config)),
   };
