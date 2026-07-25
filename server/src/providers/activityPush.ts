@@ -413,6 +413,70 @@ export function detectClashOfClansMilestones(
   return milestones;
 }
 
+interface ClashOfClansActivitySnapshot {
+  attack: PushedClashOfClansAttack | null;
+  attackKey: string | undefined;
+  raidAttack: PushedClashOfClansRaidAttack | null;
+  raidKey: string | undefined;
+  milestones: PushedClashOfClansMilestone[];
+  newMilestoneBaseline: ClashOfClansMilestoneBaseline;
+  counters: ClashOfClansCounters;
+  activeAt: string | undefined;
+}
+
+/** Everything the provider's `fetch` needs from Clash of Clans, in one lookup — pulled out so a
+ * hiccup here (auth, IP allowlist, network) can be caught in one place without inflating the
+ * cognitive complexity of the tick that also handles Epic/Claude/Codex/Clash Royale. Returns null
+ * on any failure; the caller then just keeps whatever state it already had. */
+async function fetchClashOfClansActivity(
+  signal: AbortSignal,
+  clashOfClans: ClashOfClansAuth,
+  previous: {
+    counters: ClashOfClansCounters | undefined;
+    milestoneBaseline: ClashOfClansMilestoneBaseline | undefined;
+    attackKey: string | undefined;
+    raidKey: string | undefined;
+  },
+): Promise<ClashOfClansActivitySnapshot | null> {
+  try {
+    const player = await fetchClashOfClansPlayer(signal, clashOfClans.apiKey, clashOfClans.playerTag);
+
+    // Cheap, single-fetch signals first, so a later failure (war/raid lookups) never loses them.
+    const counters = extractClashOfClansCounters(player);
+    const activeAt = previous.counters && clashOfClansCountersIncreased(previous.counters, counters)
+      ? new Date().toISOString()
+      : undefined;
+
+    // No baseline yet means this is the first tick ever — seed silently rather than reporting
+    // every existing TH level/league/trophy record as a fresh "milestone" on startup.
+    const newMilestoneBaseline = extractClashOfClansMilestoneBaseline(player);
+    const milestones = previous.milestoneBaseline
+      ? detectClashOfClansMilestones(previous.milestoneBaseline, newMilestoneBaseline)
+      : [];
+
+    const [attack, raidAttack] = await Promise.all([
+      latestClashOfClansAttack(signal, clashOfClans.apiKey, player),
+      latestClashOfClansRaidAttack(signal, clashOfClans.apiKey, player),
+    ]);
+
+    return {
+      attack: attack && attack.key !== previous.attackKey ? attack.attack : null,
+      attackKey: attack && attack.key !== previous.attackKey ? attack.key : undefined,
+      raidAttack: raidAttack && raidAttack.key !== previous.raidKey ? raidAttack.attack : null,
+      raidKey: raidAttack && raidAttack.key !== previous.raidKey ? raidAttack.key : undefined,
+      milestones,
+      newMilestoneBaseline,
+      counters,
+      activeAt,
+    };
+  } catch (err) {
+    // A Clash of Clans hiccup (auth, IP allowlist, network) should never block the other signals
+    // this provider pushes every minute.
+    console.warn(`[activity-push] Clash of Clans lookup failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+    return null;
+  }
+}
+
 export function createActivityPushProvider(
   push: { url: string; secret: string } | undefined,
   getClashRoyaleData: () => unknown = () => undefined,
@@ -443,48 +507,17 @@ export function createActivityPushProvider(
       ]);
       const clashRoyale = clashRoyaleSchema.safeParse(getClashRoyaleData());
 
-      let clashOfClansAttack: PushedClashOfClansAttack | null = null;
-      let clashOfClansAttackKey: string | undefined;
-      let clashOfClansRaidAttack: PushedClashOfClansRaidAttack | null = null;
-      let clashOfClansRaidKey: string | undefined;
-      let clashOfClansMilestones: PushedClashOfClansMilestone[] = [];
-      let newMilestoneBaseline: ClashOfClansMilestoneBaseline | undefined;
-
-      if (clashOfClans) {
-        try {
-          const player = await fetchClashOfClansPlayer(signal, clashOfClans.apiKey, clashOfClans.playerTag);
-
-          // Cheap, single-fetch signals first, so a later failure (war/raid lookups) never loses them.
-          const counters = extractClashOfClansCounters(player);
-          if (clashOfClansCounters && clashOfClansCountersIncreased(clashOfClansCounters, counters)) {
-            clashOfClansLastActiveAt = new Date().toISOString();
-          }
-          clashOfClansCounters = counters;
-
-          newMilestoneBaseline = extractClashOfClansMilestoneBaseline(player);
-          // No baseline yet means this is the first tick ever — seed silently rather than reporting
-          // every existing TH level/league/trophy record as a fresh "milestone" on startup.
-          if (clashOfClansMilestoneBaseline) {
-            clashOfClansMilestones = detectClashOfClansMilestones(clashOfClansMilestoneBaseline, newMilestoneBaseline);
-          }
-
-          const [attack, raidAttack] = await Promise.all([
-            latestClashOfClansAttack(signal, clashOfClans.apiKey, player),
-            latestClashOfClansRaidAttack(signal, clashOfClans.apiKey, player),
-          ]);
-          if (attack && attack.key !== lastPushedClashOfClansAttackKey) {
-            clashOfClansAttack = attack.attack;
-            clashOfClansAttackKey = attack.key;
-          }
-          if (raidAttack && raidAttack.key !== lastPushedClashOfClansRaidKey) {
-            clashOfClansRaidAttack = raidAttack.attack;
-            clashOfClansRaidKey = raidAttack.key;
-          }
-        } catch (err) {
-          // A Clash of Clans hiccup (auth, IP allowlist, network) should never block the other
-          // signals this provider pushes every minute.
-          console.warn(`[activity-push] Clash of Clans lookup failed: ${err instanceof Error ? err.message : 'unknown error'}`);
-        }
+      const cocActivity = clashOfClans
+        ? await fetchClashOfClansActivity(signal, clashOfClans, {
+            counters: clashOfClansCounters,
+            milestoneBaseline: clashOfClansMilestoneBaseline,
+            attackKey: lastPushedClashOfClansAttackKey,
+            raidKey: lastPushedClashOfClansRaidKey,
+          })
+        : null;
+      if (cocActivity) {
+        clashOfClansCounters = cocActivity.counters;
+        if (cocActivity.activeAt) clashOfClansLastActiveAt = cocActivity.activeAt;
       }
 
       const res = await fetch(push.url, {
@@ -499,16 +532,16 @@ export function createActivityPushProvider(
           claudeActiveAt,
           codexActiveAt,
           clashRoyale: latestClashRoyaleActivity(clashRoyale.success ? clashRoyale.data : undefined),
-          clashOfClans: clashOfClansAttack,
-          clashOfClansRaidAttack,
+          clashOfClans: cocActivity?.attack ?? null,
+          clashOfClansRaidAttack: cocActivity?.raidAttack ?? null,
           clashOfClansLastActiveAt,
-          clashOfClansMilestones,
+          clashOfClansMilestones: cocActivity?.milestones ?? [],
         }),
       });
       if (!res.ok) throw new Error(`activity push failed: HTTP ${res.status}`);
-      if (clashOfClansAttackKey) lastPushedClashOfClansAttackKey = clashOfClansAttackKey;
-      if (clashOfClansRaidKey) lastPushedClashOfClansRaidKey = clashOfClansRaidKey;
-      if (newMilestoneBaseline) clashOfClansMilestoneBaseline = newMilestoneBaseline;
+      if (cocActivity?.attackKey) lastPushedClashOfClansAttackKey = cocActivity.attackKey;
+      if (cocActivity?.raidKey) lastPushedClashOfClansRaidKey = cocActivity.raidKey;
+      if (cocActivity) clashOfClansMilestoneBaseline = cocActivity.newMilestoneBaseline;
 
       return { lastPushedAt: new Date().toISOString(), lastPushOk: true };
     },
