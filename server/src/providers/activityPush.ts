@@ -104,8 +104,21 @@ export interface ClashOfClansAuth {
   playerTag: string;
 }
 
+/** Only the fields this file actually reads off GetPlayer — verified against a live response
+ * rather than assumed, since Supercell does rename things (`league` is `leagueTier` as of this
+ * writing, which memory alone got wrong once already). */
 interface RawClashOfClansPlayer {
   tag: string;
+  townHallLevel: number;
+  builderHallLevel?: number;
+  bestTrophies: number;
+  bestBuilderBaseTrophies?: number;
+  warStars: number;
+  attackWins: number;
+  donations: number;
+  clanCapitalContributions: number;
+  leagueTier?: { name: string };
+  builderBaseLeague?: { name: string };
   clan?: { tag: string };
 }
 
@@ -116,19 +129,23 @@ interface RawClashOfClansAttack {
   defenderTag: string;
 }
 
+/** Both sides of a war report the same shape — `attacks` is just absent until that member has
+ * actually attacked. Kept as one type (rather than separate "us"/"opponent" shapes) because CWL
+ * fallback can swap which side is ours. */
 interface RawClashOfClansWarMember {
   tag: string;
+  townhallLevel: number;
   attacks?: RawClashOfClansAttack[];
 }
 
-interface RawClashOfClansOpponentMember {
-  tag: string;
-  townhallLevel: number;
+interface RawClashOfClansWar {
+  state?: string;
+  clan: { tag?: string; members: RawClashOfClansWarMember[] };
+  opponent: { tag?: string; members: RawClashOfClansWarMember[] };
 }
 
-interface RawClashOfClansWar {
-  clan: { members: RawClashOfClansWarMember[] };
-  opponent: { members: RawClashOfClansOpponentMember[] };
+interface RawClashOfClansLeagueGroup {
+  rounds: { warTags: string[] }[];
 }
 
 export interface PushedClashOfClansAttack {
@@ -162,6 +179,11 @@ async function cocRequest<T>(signal: AbortSignal, apiKey: string, path: string, 
   return (await res.json()) as T;
 }
 
+async function fetchClashOfClansPlayer(signal: AbortSignal, apiKey: string, playerTag: string): Promise<RawClashOfClansPlayer> {
+  const tag = normalizeClashOfClansTag(playerTag);
+  return cocRequest<RawClashOfClansPlayer>(signal, apiKey, `/players/${encodeURIComponent(tag)}`, 'GetPlayer');
+}
+
 /** Unlike GetPlayer, a missing current war is routine (not in a war, private war log) rather than
  * a configuration problem — Supercell reports it as a 403 or 404 depending on the reason, and
  * either should be treated as "nothing to report", not surfaced as an error. */
@@ -175,20 +197,56 @@ async function currentClashOfClansWar(signal: AbortSignal, apiKey: string, clanT
   return (await res.json()) as RawClashOfClansWar;
 }
 
+/** During Clan War League, `/currentwar` reports `notInWar` — the real battles live behind this
+ * separate pair of calls: the league group lists each round's war tag, and each war tag resolves
+ * to a war with the same shape as `/currentwar`. Only tried as a fallback when classic war
+ * explicitly reports `notInWar`, so it costs nothing outside CWL weeks. Checks the most recent
+ * round first and stops at the first one that involves our clan, so it's usually one extra call,
+ * not one per round.
+ *
+ * Unverified: this clan wasn't in a league war when this was written, so — unlike everything else
+ * in this file — this schema comes from community documentation, not a live response. Worth
+ * double-checking the first time a CWL push looks wrong. */
+async function currentClashOfClansLeagueWar(signal: AbortSignal, apiKey: string, clanTag: string): Promise<RawClashOfClansWar | null> {
+  const groupRes = await fetch(`${COC_API_BASE}/clans/${encodeURIComponent(clanTag)}/currentwar/leaguegroup`, {
+    signal,
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (groupRes.status === 403 || groupRes.status === 404) return null;
+  if (!groupRes.ok) throw new Error(`Clash of Clans GetLeagueGroup failed: HTTP ${groupRes.status}`);
+  const group = (await groupRes.json()) as RawClashOfClansLeagueGroup;
+
+  const warTags = group.rounds.flatMap((round) => round.warTags).filter((tag) => tag !== '#0').toReversed();
+  for (const warTag of warTags) {
+    const warRes = await fetch(`${COC_API_BASE}/clanwarleagues/wars/${encodeURIComponent(warTag)}`, {
+      signal,
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!warRes.ok) continue;
+    const war = (await warRes.json()) as RawClashOfClansWar;
+    if (war.clan.tag === clanTag) return war;
+    if (war.opponent.tag === clanTag) return { state: war.state, clan: war.opponent, opponent: war.clan };
+  }
+  return null;
+}
+
 /** Finds the player's most recent war attack — the last entry in their `attacks` array, since
  * Supercell doesn't timestamp individual attacks, only orders them — paired with a stable identity
  * (`defenderTag:order`) the caller uses to detect whether this is the same attack already pushed.
- * Returns null for every "nothing to report" case (no clan, no current war, no attacks yet) and
- * only throws for a genuine request failure. */
+ * Falls back to the current Clan War League round when classic war reports `notInWar`. Returns null
+ * for every "nothing to report" case (no clan, no war, no attacks yet) and only throws for a
+ * genuine request failure. */
 export async function latestClashOfClansAttack(
   signal: AbortSignal,
-  auth: ClashOfClansAuth,
+  apiKey: string,
+  player: Pick<RawClashOfClansPlayer, 'tag' | 'clan'>,
 ): Promise<{ attack: PushedClashOfClansAttack; key: string } | null> {
-  const playerTag = normalizeClashOfClansTag(auth.playerTag);
-  const player = await cocRequest<RawClashOfClansPlayer>(signal, auth.apiKey, `/players/${encodeURIComponent(playerTag)}`, 'GetPlayer');
   if (!player.clan?.tag) return null;
+  const clanTag = player.clan.tag;
 
-  const war = await currentClashOfClansWar(signal, auth.apiKey, player.clan.tag);
+  let war = await currentClashOfClansWar(signal, apiKey, clanTag);
+  if (war?.state === 'notInWar') war = await currentClashOfClansLeagueWar(signal, apiKey, clanTag);
+
   const member = war?.clan.members.find((candidate) => candidate.tag === player.tag);
   const attack = member?.attacks?.at(-1);
   if (!attack) return null;
@@ -208,14 +266,167 @@ export async function latestClashOfClansAttack(
   };
 }
 
+interface RawClashOfClansRaidAttack {
+  attacker: { tag: string };
+  destructionPercent: number;
+  stars: number;
+}
+
+interface RawClashOfClansRaidDistrict {
+  id: number;
+  name: string;
+  attacks?: RawClashOfClansRaidAttack[];
+}
+
+interface RawClashOfClansRaidLogEntry {
+  defender: { tag: string; name: string };
+  districts: RawClashOfClansRaidDistrict[];
+}
+
+interface RawClashOfClansRaidSeason {
+  attackLog: RawClashOfClansRaidLogEntry[];
+}
+
+export interface PushedClashOfClansRaidAttack {
+  stars: number;
+  destructionPercentage: number;
+  defenderClanName: string;
+  districtName: string;
+  timestamp: string;
+}
+
+/** Capital Raid attacks carry no order or timestamp field at all (war at least has `order`). A
+ * same-attacker, same-district attack sequence in a live response showed destruction climbing
+ * towards the *end* of its `attacks` array (20% -> 47% -> 100%) — only sensible read newest-first —
+ * so this treats `attacks[0]` as most recent, and assumes (unverified beyond that one sample) the
+ * same newest-first convention holds for `attackLog`/`districts` ordering too. Worth re-checking
+ * against a real raid weekend if a pushed "last raid attack" ever looks stale. */
+export async function latestClashOfClansRaidAttack(
+  signal: AbortSignal,
+  apiKey: string,
+  player: Pick<RawClashOfClansPlayer, 'tag' | 'clan'>,
+): Promise<{ attack: PushedClashOfClansRaidAttack; key: string } | null> {
+  if (!player.clan?.tag) return null;
+  const res = await fetch(`${COC_API_BASE}/clans/${encodeURIComponent(player.clan.tag)}/capitalraidseasons?limit=1`, {
+    signal,
+    headers: { Authorization: `Bearer ${apiKey}` },
+  });
+  if (res.status === 403 || res.status === 404) return null;
+  if (!res.ok) throw new Error(`Clash of Clans GetCapitalRaidSeasons failed: HTTP ${res.status}`);
+  const body = (await res.json()) as { items: RawClashOfClansRaidSeason[] };
+  const season = body.items[0];
+  if (!season) return null;
+
+  for (const entry of season.attackLog) {
+    for (const district of entry.districts) {
+      const attack = district.attacks?.find((candidate) => candidate.attacker.tag === player.tag);
+      if (!attack) continue;
+      return {
+        attack: {
+          stars: attack.stars,
+          destructionPercentage: attack.destructionPercent,
+          defenderClanName: entry.defender.name,
+          districtName: district.name,
+          timestamp: new Date().toISOString(),
+        },
+        key: `${entry.defender.tag}:${district.id}:${attack.destructionPercent}:${attack.stars}`,
+      };
+    }
+  }
+  return null;
+}
+
+interface ClashOfClansCounters {
+  donations: number;
+  clanCapitalContributions: number;
+  attackWins: number;
+  warStars: number;
+}
+
+function extractClashOfClansCounters(player: RawClashOfClansPlayer): ClashOfClansCounters {
+  return {
+    donations: player.donations,
+    clanCapitalContributions: player.clanCapitalContributions,
+    attackWins: player.attackWins,
+    warStars: player.warStars,
+  };
+}
+
+/** `donations`/`attackWins` reset each season and `clanCapitalContributions`/`warStars` never do,
+ * but the same rule handles both: only an *increase* is activity. A drop is a season reset, not
+ * evidence of nothing happening — trophies aren't in this set at all, since they move from being
+ * defended against while offline just as easily as from a player's own attacks. */
+function clashOfClansCountersIncreased(previous: ClashOfClansCounters, current: ClashOfClansCounters): boolean {
+  return (Object.keys(current) as (keyof ClashOfClansCounters)[]).some((key) => current[key] > previous[key]);
+}
+
+interface ClashOfClansMilestoneBaseline {
+  townHallLevel: number;
+  builderHallLevel?: number;
+  bestTrophies: number;
+  bestBuilderBaseTrophies?: number;
+  leagueTierName?: string;
+  builderBaseLeagueName?: string;
+}
+
+export interface PushedClashOfClansMilestone {
+  type: 'townHallLevel' | 'builderHallLevel' | 'bestTrophies' | 'bestBuilderBaseTrophies' | 'leagueTier' | 'builderBaseLeague';
+  value: number | string;
+  timestamp: string;
+}
+
+function extractClashOfClansMilestoneBaseline(player: RawClashOfClansPlayer): ClashOfClansMilestoneBaseline {
+  return {
+    townHallLevel: player.townHallLevel,
+    builderHallLevel: player.builderHallLevel,
+    bestTrophies: player.bestTrophies,
+    bestBuilderBaseTrophies: player.bestBuilderBaseTrophies,
+    leagueTierName: player.leagueTier?.name,
+    builderBaseLeagueName: player.builderBaseLeague?.name,
+  };
+}
+
+export function detectClashOfClansMilestones(
+  previous: ClashOfClansMilestoneBaseline,
+  current: ClashOfClansMilestoneBaseline,
+): PushedClashOfClansMilestone[] {
+  const timestamp = new Date().toISOString();
+  const milestones: PushedClashOfClansMilestone[] = [];
+  if (current.townHallLevel > previous.townHallLevel) milestones.push({ type: 'townHallLevel', value: current.townHallLevel, timestamp });
+  if (current.builderHallLevel !== undefined && current.builderHallLevel > (previous.builderHallLevel ?? 0)) {
+    milestones.push({ type: 'builderHallLevel', value: current.builderHallLevel, timestamp });
+  }
+  if (current.bestTrophies > previous.bestTrophies) milestones.push({ type: 'bestTrophies', value: current.bestTrophies, timestamp });
+  if (current.bestBuilderBaseTrophies !== undefined && current.bestBuilderBaseTrophies > (previous.bestBuilderBaseTrophies ?? 0)) {
+    milestones.push({ type: 'bestBuilderBaseTrophies', value: current.bestBuilderBaseTrophies, timestamp });
+  }
+  if (current.leagueTierName !== undefined && previous.leagueTierName !== undefined && current.leagueTierName !== previous.leagueTierName) {
+    milestones.push({ type: 'leagueTier', value: current.leagueTierName, timestamp });
+  }
+  if (
+    current.builderBaseLeagueName !== undefined
+    && previous.builderBaseLeagueName !== undefined
+    && current.builderBaseLeagueName !== previous.builderBaseLeagueName
+  ) {
+    milestones.push({ type: 'builderBaseLeague', value: current.builderBaseLeagueName, timestamp });
+  }
+  return milestones;
+}
+
 export function createActivityPushProvider(
   push: { url: string; secret: string } | undefined,
   getClashRoyaleData: () => unknown = () => undefined,
   clashOfClans?: ClashOfClansAuth,
 ): Provider<ActivityPushData> {
-  // Only committed after a push actually succeeds (see below), so a failed POST doesn't cause the
-  // next attack to be silently skipped as "already sent".
-  let lastPushedClashOfClansKey: string | undefined;
+  // The attack/raid keys and milestone baseline are only committed after a push actually succeeds
+  // (see below), so a failed POST doesn't cause the next event to be silently skipped as "already
+  // sent". The counters and activity timestamp are persisted status, not one-shot events — every
+  // tick resends whatever's current, so they're safe to update immediately.
+  let lastPushedClashOfClansAttackKey: string | undefined;
+  let lastPushedClashOfClansRaidKey: string | undefined;
+  let clashOfClansMilestoneBaseline: ClashOfClansMilestoneBaseline | undefined;
+  let clashOfClansCounters: ClashOfClansCounters | undefined;
+  let clashOfClansLastActiveAt: string | null = null;
 
   return {
     id: 'activity-push',
@@ -233,13 +444,41 @@ export function createActivityPushProvider(
       const clashRoyale = clashRoyaleSchema.safeParse(getClashRoyaleData());
 
       let clashOfClansAttack: PushedClashOfClansAttack | null = null;
-      let clashOfClansKey: string | undefined;
+      let clashOfClansAttackKey: string | undefined;
+      let clashOfClansRaidAttack: PushedClashOfClansRaidAttack | null = null;
+      let clashOfClansRaidKey: string | undefined;
+      let clashOfClansMilestones: PushedClashOfClansMilestone[] = [];
+      let newMilestoneBaseline: ClashOfClansMilestoneBaseline | undefined;
+
       if (clashOfClans) {
         try {
-          const latest = await latestClashOfClansAttack(signal, clashOfClans);
-          if (latest && latest.key !== lastPushedClashOfClansKey) {
-            clashOfClansAttack = latest.attack;
-            clashOfClansKey = latest.key;
+          const player = await fetchClashOfClansPlayer(signal, clashOfClans.apiKey, clashOfClans.playerTag);
+
+          // Cheap, single-fetch signals first, so a later failure (war/raid lookups) never loses them.
+          const counters = extractClashOfClansCounters(player);
+          if (clashOfClansCounters && clashOfClansCountersIncreased(clashOfClansCounters, counters)) {
+            clashOfClansLastActiveAt = new Date().toISOString();
+          }
+          clashOfClansCounters = counters;
+
+          newMilestoneBaseline = extractClashOfClansMilestoneBaseline(player);
+          // No baseline yet means this is the first tick ever — seed silently rather than reporting
+          // every existing TH level/league/trophy record as a fresh "milestone" on startup.
+          if (clashOfClansMilestoneBaseline) {
+            clashOfClansMilestones = detectClashOfClansMilestones(clashOfClansMilestoneBaseline, newMilestoneBaseline);
+          }
+
+          const [attack, raidAttack] = await Promise.all([
+            latestClashOfClansAttack(signal, clashOfClans.apiKey, player),
+            latestClashOfClansRaidAttack(signal, clashOfClans.apiKey, player),
+          ]);
+          if (attack && attack.key !== lastPushedClashOfClansAttackKey) {
+            clashOfClansAttack = attack.attack;
+            clashOfClansAttackKey = attack.key;
+          }
+          if (raidAttack && raidAttack.key !== lastPushedClashOfClansRaidKey) {
+            clashOfClansRaidAttack = raidAttack.attack;
+            clashOfClansRaidKey = raidAttack.key;
           }
         } catch (err) {
           // A Clash of Clans hiccup (auth, IP allowlist, network) should never block the other
@@ -261,10 +500,15 @@ export function createActivityPushProvider(
           codexActiveAt,
           clashRoyale: latestClashRoyaleActivity(clashRoyale.success ? clashRoyale.data : undefined),
           clashOfClans: clashOfClansAttack,
+          clashOfClansRaidAttack,
+          clashOfClansLastActiveAt,
+          clashOfClansMilestones,
         }),
       });
       if (!res.ok) throw new Error(`activity push failed: HTTP ${res.status}`);
-      if (clashOfClansKey) lastPushedClashOfClansKey = clashOfClansKey;
+      if (clashOfClansAttackKey) lastPushedClashOfClansAttackKey = clashOfClansAttackKey;
+      if (clashOfClansRaidKey) lastPushedClashOfClansRaidKey = clashOfClansRaidKey;
+      if (newMilestoneBaseline) clashOfClansMilestoneBaseline = newMilestoneBaseline;
 
       return { lastPushedAt: new Date().toISOString(), lastPushOk: true };
     },
