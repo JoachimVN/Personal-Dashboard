@@ -18,6 +18,19 @@ import { createOwnedReposCache, listOwnedRepos } from './providers/github.js';
 import { todayInZone } from './providers/health.js';
 import { logClashRoyalePublicIp } from './providers/clashRoyale.js';
 
+// A transient network blip (e.g. a Postgres socket erroring outside any awaited query, as seen
+// with Railway's TCP proxy) otherwise crashes the whole process — Node treats an unhandled
+// rejection as fatal by default. launchd's KeepAlive then restarts it in a tight loop, wiping every
+// provider's in-memory state each time, which is why polling-cadence data (like the Claude usage
+// widget's PTY probe) can look frozen for hours even though nothing in the providers themselves
+// is broken. Log and keep running instead, matching this codebase's provider-level resilience.
+process.on('unhandledRejection', (reason) => {
+  console.error('[server] unhandled rejection:', reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('[server] uncaught exception:', error);
+});
+
 const env = loadEnv();
 const config = loadConfig();
 const database = createDatabase(env.databaseUrl);
