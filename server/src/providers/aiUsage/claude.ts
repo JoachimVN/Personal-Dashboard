@@ -394,7 +394,7 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
         tokens: tokenTotals,
         asOf: quota.asOf ?? new Date().toISOString(),
       };
-      return { ...snapshot, history: await recordHistorySafely(history, 'ai-usage-claude', snapshot, rememberedHistory) };
+      return { ...snapshot, history: recordHistorySafely(history, 'ai-usage-claude', snapshot, rememberedHistory) };
     },
     nextRefreshMs: (data) => claudeNextRefreshMs(data, refreshMs),
   };

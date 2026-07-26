@@ -63,19 +63,27 @@ export async function ensurePtySpawnHelper(): Promise<void> {
   await chmod(path.join(packageRoot, 'prebuilds', `darwin-${process.arch}`, 'spawn-helper'), 0o755).catch(() => undefined);
 }
 
-/** A transient DB hiccup writing the trend point must not blank a fetch that already has good live
- * data (see the Postgres connectivity issues that froze both AI usage widgets for days) — fall back
- * to the last successfully recorded series instead of failing the whole provider over it. */
-export async function recordHistorySafely(
+/** A slow or hung DB write must never block returning an already-successful live read (see the
+ * Postgres connectivity issues that froze both AI usage widgets for days). The Claude probe alone
+ * can already take up to 35s inside a 40s provider timeout, leaving almost no room for a DB round
+ * trip on top — Postgres retries on a dead connection can run well past whatever margin is left.
+ * So this never sits in the fetch's critical path at all: it kicks the write off in the background
+ * and returns the last known series immediately, updating it for the *next* fetch once the write
+ * settles. That removes DB latency from the provider timeout equation entirely, rather than just
+ * bounding it. */
+export function recordHistorySafely(
   historyStore: UsageHistoryStore,
   toolId: string,
   snapshot: UsageSnapshot,
   remembered: { points: UsageHistoryPoint[] },
-): Promise<UsageHistoryPoint[]> {
-  try {
-    remembered.points = await historyStore.record(toolId, snapshot);
-  } catch {
-    // Keep serving the last known-good series; a history-write failure isn't a live-data failure.
-  }
+): UsageHistoryPoint[] {
+  void historyStore
+    .record(toolId, snapshot)
+    .then((points) => {
+      remembered.points = points;
+    })
+    .catch(() => {
+      // Keep serving the last known-good series; a history-write failure isn't a live-data failure.
+    });
   return remembered.points;
 }

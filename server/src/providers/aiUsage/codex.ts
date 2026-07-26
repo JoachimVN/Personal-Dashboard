@@ -324,7 +324,7 @@ export function createCodexUsageProvider(
       }
       applyCodexFallbackWindow('fiveHour', snapshot, fallback);
       applyCodexFallbackWindow('weekly', snapshot, fallback);
-      return { ...snapshot, history: await recordHistorySafely(history, 'ai-usage-codex', snapshot, rememberedHistory) };
+      return { ...snapshot, history: recordHistorySafely(history, 'ai-usage-codex', snapshot, rememberedHistory) };
     },
   };
 }
