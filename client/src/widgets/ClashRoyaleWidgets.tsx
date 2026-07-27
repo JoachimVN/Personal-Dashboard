@@ -8,6 +8,11 @@ const BATTLE_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
   loss: 'Defeat',
   draw: 'Draw',
 };
+const STREAK_RESULT_LABELS: Record<ClashRoyaleBattle['result'], string> = {
+  win: 'W',
+  loss: 'L',
+  draw: 'D',
+};
 const CLASH_ART = {
   playerCrown: 'https://media.ffycdn.net/eu/supercell/m1xRh8chWGRUyA5BcuWA.png?width=64',
   opponentCrown: 'https://media.ffycdn.net/eu/supercell/QTQoZZ8e18aR8d3ZtvEK.png?width=64',
@@ -197,7 +202,7 @@ function trimmedBattleModeIconUrl(url: string): Promise<string> {
   return request;
 }
 
-function TrimmedBattleModeIcon({ src }: Readonly<{ src: string }>) {
+export function TrimmedBattleModeIcon({ src }: Readonly<{ src: string }>) {
   const [trimmedSrc, setTrimmedSrc] = useState(src);
 
   useEffect(() => {
@@ -250,6 +255,26 @@ function recentRecord(battles: ClashRoyaleBattle[]) {
   }, { wins: 0, losses: 0, draws: 0 });
 }
 
+/** `battles` must be newest-first (as `recentBattles` already is) — the streak is a run of the
+ * same result starting from the most recent game, same convention as the Valorant widget's
+ * `currentStreak`. */
+function currentStreak(battles: ClashRoyaleBattle[]): { result: ClashRoyaleBattle['result']; length: number } | undefined {
+  const latest = battles[0];
+  if (!latest) return undefined;
+  let length = 0;
+  for (const battle of battles) {
+    if (battle.result !== latest.result) break;
+    length += 1;
+  }
+  return { result: latest.result, length };
+}
+
+function streakModifier(result: ClashRoyaleBattle['result'] | undefined): string {
+  if (result === 'win') return ' is-up';
+  if (result === 'loss') return ' is-down';
+  return '';
+}
+
 function formatBattleType(type: string): string {
   return type
     .replace(/([a-z])([A-Z])/g, '$1 $2')
@@ -271,7 +296,7 @@ export function Crown({ filled }: Readonly<{ filled: boolean }>) {
   );
 }
 
-function ClashCrownScore({ crownsFor, crownsAgainst, className = '' }: Readonly<{ crownsFor: number; crownsAgainst: number; className?: string }>) {
+export function ClashCrownScore({ crownsFor, crownsAgainst, className = '' }: Readonly<{ crownsFor: number; crownsAgainst: number; className?: string }>) {
   const rootClassName = className ? `clash-crown-score ${className}` : 'clash-crown-score';
   return (
     <span className={rootClassName} aria-hidden>
@@ -359,13 +384,15 @@ export function ClashRoyaleDeck({ data, compact = false }: Readonly<{ data: Clas
 export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleData }>) {
   if (data.recentBattles.length === 0) return <p className="text-sm text-ink-faint">Play a battle to start a fresh activity readout.</p>;
   // The API supplies up to 25 battles, while this compact pulse explicitly represents fifteen.
-  // Use one bounded list for both the result strip and its aggregate figures.
+  // Use one bounded list for both the result strip and its aggregate figures. `recentBattles` is
+  // already newest-first, and the grid renders in that same order (top-left = latest game) so it
+  // reads consistently with the battle log on the detail page.
   const battles = data.recentBattles.slice(0, 15);
-  const chronologicalBattles = battles.slice().reverse();
   const record = recentRecord(battles);
   const battleCount = battles.length;
   const winRate = Math.round((record.wins / battleCount) * 100);
   const gamesLabel = `Last ${battleCount} ${battleCount === 1 ? 'game' : 'games'}`;
+  const streak = currentStreak(battles);
   const currentPathLeagueNumber = data.profile.pathOfLegends
     ? pathOfLegendsDisplayLeagueNumber(data.profile.pathOfLegends.leagueNumber)
     : undefined;
@@ -376,10 +403,15 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
           <ClashBattleHeading>{gamesLabel}</ClashBattleHeading>
           <p className="clash-recent-games-record"><strong>{record.wins}</strong> wins <span>·</span> <strong>{record.losses}</strong> losses{record.draws > 0 && <><span>·</span> <strong>{record.draws}</strong> draws</>}</p>
         </div>
-        <p className="clash-recent-games-rate"><strong>{winRate}%</strong><span>win rate</span></p>
+        <div className="clash-recent-games-trend">
+          <p className="clash-recent-games-rate"><strong>{winRate}%</strong><span>win rate</span></p>
+          {streak && streak.length > 1 && (
+            <span className={`clash-streak-badge${streakModifier(streak.result)}`}>{streak.length}{STREAK_RESULT_LABELS[streak.result]} streak</span>
+          )}
+        </div>
       </header>
-      <ol className="clash-recent-games-grid" aria-label={`Results of ${gamesLabel.toLowerCase()}, oldest to newest`}>
-        {chronologicalBattles.map((battle, index) => (
+      <ol className="clash-recent-games-grid" aria-label={`Results of ${gamesLabel.toLowerCase()}, latest first`}>
+        {battles.map((battle, index) => (
           <BattleModeTile key={`${battle.battleTime}-${index}`} battle={battle} index={index} battleCount={battleCount} fallbackPathLeagueNumber={currentPathLeagueNumber} />
         ))}
       </ol>

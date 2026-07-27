@@ -165,8 +165,12 @@
 .clash-recent-games-record { margin: 0.36rem 0 0; color: var(--color-ink-muted); font-size: 0.78rem; }
 .clash-recent-games-record strong { color: var(--color-ink); font-size: 1rem; }
 .clash-recent-games-record span { margin: 0 0.18rem; color: var(--color-ink-faint); }
+.clash-recent-games-trend { display: grid; justify-items: end; gap: 0.3rem; }
 .clash-recent-games-rate { display: grid; justify-items: end; margin: 0; color: var(--color-ink-muted); font-size: 0.58rem; font-weight: 700; letter-spacing: 0.08em; line-height: 1.1; text-transform: uppercase; }
 .clash-recent-games-rate strong { color: var(--color-ink); font-size: 1.2rem; font-weight: 700; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.clash-streak-badge { display: inline-flex; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--color-track); color: var(--color-ink-muted); font-size: 0.72rem; font-weight: 700; white-space: nowrap; }
+.clash-streak-badge.is-up { background: color-mix(in oklab, var(--clash-chip-win) 16%, transparent); color: var(--clash-chip-win); }
+.clash-streak-badge.is-down { background: color-mix(in oklab, var(--clash-chip-loss) 16%, transparent); color: var(--clash-chip-loss); }
 .clash-battle-heading-art { display: block; width: 0.92rem; height: 0.92rem; overflow: hidden; }
 .clash-battle-heading-art img { display: block; width: 1.18rem; height: 1.18rem; max-width: none; margin: -0.13rem; }
 .clash-recent-games-grid { display: grid; min-height: 0; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 0.42rem; margin: 0; padding: 0; list-style: none; }
@@ -174,8 +178,8 @@
 /* The mode emblem remains the only content. These low-contrast inset layers give each result a
    distinct in-game tile behind it without turning the compact activity pulse into a score log. */
 .clash-recent-games-grid li::before { position: absolute; z-index: -1; inset: 0.18rem; border: 1px solid color-mix(in oklab, var(--color-card-border) 42%, transparent); border-radius: 0.56rem; background: linear-gradient(145deg, color-mix(in oklab, var(--color-ink) 5%, transparent), transparent 62%); content: ''; }
-.clash-recent-games-grid li[data-result='win'] { border-color: color-mix(in srgb, var(--clash-chip-win) 24%, var(--color-card-border)); background: linear-gradient(145deg, color-mix(in srgb, var(--clash-chip-win) 8%, var(--color-card)), var(--color-card)); }
-.clash-recent-games-grid li[data-result='loss'] { border-color: color-mix(in srgb, var(--clash-chip-loss) 24%, var(--color-card-border)); background: linear-gradient(145deg, color-mix(in srgb, var(--clash-chip-loss) 8%, var(--color-card)), var(--color-card)); }
+.clash-recent-games-grid li[data-result='win'] { border-color: color-mix(in srgb, var(--clash-chip-win) 42%, var(--color-card-border)); background: linear-gradient(145deg, color-mix(in srgb, var(--clash-chip-win) 16%, var(--color-card)), var(--color-card)); }
+.clash-recent-games-grid li[data-result='loss'] { border-color: color-mix(in srgb, var(--clash-chip-loss) 42%, var(--color-card-border)); background: linear-gradient(145deg, color-mix(in srgb, var(--clash-chip-loss) 16%, var(--color-card)), var(--color-card)); }
 .clash-recent-games-mode-icon-frame { position: relative; z-index: 1; display: grid; width: min(3.2rem, 82%); aspect-ratio: 1; place-items: center; }
 .clash-recent-games-mode-icon-frame--emblem { width: min(4.5rem, 112%); }
 .clash-recent-games-mode-icon-frame--merge-tactics { width: min(3.75rem, 92%); }

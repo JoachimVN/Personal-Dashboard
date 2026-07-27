@@ -838,37 +838,34 @@
 }
 
 .command-clash-streak-badge {
-  display: flex;
+  position: relative;
+  display: grid;
   flex-shrink: 0;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   width: 5.5rem;
   height: 5.5rem;
-  border: 1px solid color-mix(in oklab, var(--color-accent-clash-royale) 24%, var(--color-card-border));
+  margin: 0.4rem;
+  place-items: center;
+  border: 1px solid color-mix(in oklab, var(--color-accent-clash-royale) 32%, var(--color-card-border));
   border-radius: 1.25rem;
-  background: color-mix(in oklab, var(--color-accent-clash-royale) 14%, var(--color-card));
+  background:
+    radial-gradient(120% 120% at 28% 18%, color-mix(in oklab, var(--color-accent-clash-royale) 30%, transparent), transparent 70%),
+    color-mix(in oklab, var(--color-accent-clash-royale) 12%, var(--color-card));
+  /* `.command-agenda` clips at its padding edge, and this badge sits right against it on the
+     left — an offset shadow gets clipped there no matter how small the blur. Centered, small,
+     and a touch more opaque instead, so the glow is fully visible on every side. */
+  box-shadow: 0 0 8px 1px color-mix(in oklab, var(--color-accent-clash-royale) 35%, transparent);
 }
 
-.command-clash-streak-flame {
-  font-size: 1.5rem;
-  line-height: 1;
-}
-
-.command-clash-streak-count {
-  margin-top: 0.15rem;
-  color: var(--color-ink);
-  font-size: 1.6rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
+.command-clash-streak-badge .clash-recent-games-mode-icon {
+  width: 4.6rem;
+  height: 4.6rem;
+  filter: drop-shadow(0 3px 5px color-mix(in oklab, var(--color-ink) 30%, transparent));
 }
 
 .command-clash-streak-crowns {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  overflow: hidden;
+  gap: 0.32rem;
   margin: 0.75rem 0 0;
   padding: 0;
   list-style: none;
@@ -876,23 +873,19 @@
 
 .command-clash-streak-crowns li {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.3rem 0.55rem;
-  border: 1px solid color-mix(in oklab, var(--color-accent-clash-royale) 22%, var(--color-card-border));
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--color-accent-clash-royale) 8%, var(--color-card));
-  color: var(--color-ink);
-  font-size: 0.78rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
 }
 
-.command-clash-streak-crowns .clash-crown {
-  display: inline-block;
-  width: 0.85rem;
-  height: 0.68rem;
-  color: var(--color-accent-clash-royale);
+.command-clash-streak-crowns li.command-clash-streak-crowns-overflow {
+  padding: 0.22rem 0.5rem;
+  border: 1px solid var(--color-card-border);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-track) 55%, transparent);
+  color: var(--color-ink-faint);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .command-secondary-artist-tracks p {

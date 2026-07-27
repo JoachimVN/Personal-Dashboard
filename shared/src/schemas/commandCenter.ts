@@ -36,6 +36,18 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
     /** Only present for kind 'win-streak' — crown score for each win in the streak, oldest first,
      * so the card can show the run rather than just a bare count. */
     streakCrowns: z.array(z.object({ crownsFor: z.number(), crownsAgainst: z.number(), battleTime: z.string() })).optional(),
+    /** Only present for kind 'win-streak' — the most recent streak battle's mode, resolved
+     * client-side into a mode-specific badge icon (trophy road / 2v2 / clan wars / merge tactics /
+     * Path of Legends league) with the same lookup the recent-battles pulse uses. */
+    streakBattleMode: z.object({
+      type: z.string(),
+      modeName: z.string().optional(),
+      arenaName: z.string().optional(),
+    }).optional(),
+    /** Only present for kind 'win-streak' when the player has a Path of Legends season result —
+     * their current, display-adjusted league number, used as a fallback when a Path battle in the
+     * streak doesn't carry its own historic league name. */
+    pathOfLegendsLeagueNumber: z.number().optional(),
   }),
 ]);
 
