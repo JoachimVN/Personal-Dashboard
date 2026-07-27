@@ -10,6 +10,7 @@ import { SpotifyHistoryStore } from '../spotifyHistory/index.js';
 import { SteamSnapshotStore } from '../steamSnapshot.js';
 import { SteamHistoryStore } from '../steamHistory.js';
 import { ValorantHistoryStore } from '../valorantHistory.js';
+import { ClashOfClansStateStore } from '../clashOfClansState.js';
 import { createActivityPushProvider } from './activityPush.js';
 import { createAiNewsProvider } from './aiNews.js';
 import { createClaudeUsageProvider, createCodexUsageProvider } from './aiUsage/index.js';
@@ -68,6 +69,7 @@ export function createProviders(
   const steamSnapshot = new SteamSnapshotStore(database);
   const steamHistory = new SteamHistoryStore(database);
   const valorantHistory = new ValorantHistoryStore(database);
+  const clashOfClansState = new ClashOfClansStateStore(database);
   return {
     weather,
     transit,
@@ -107,7 +109,7 @@ export function createProviders(
         createClashRoyaleProvider(env.clashRoyale),
         createValorantProvider(env.valorant, valorantHistory),
         createSonarCloudProvider(env.sonarCloud),
-        createActivityPushProvider(env.dashboardPush, getClashRoyaleData, env.clashOfClans),
+        createActivityPushProvider(env.dashboardPush, getClashRoyaleData, env.clashOfClans, clashOfClansState),
       ] satisfies Provider[]
     ).map((provider) => withEnabledToggle(provider, config)),
   };

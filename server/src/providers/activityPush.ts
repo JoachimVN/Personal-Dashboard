@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { activityPushSchema, clashRoyaleSchema, type ActivityPushData, type ClashRoyaleData } from '@personal-dashboard/shared';
 import type { Provider } from '../scheduler.js';
 import { jsonlFiles } from './aiUsage/index.js';
+import type { ClashOfClansCounters, ClashOfClansMilestoneBaseline, ClashOfClansStateStore } from '../clashOfClansState.js';
 
 const execFileAsync = promisify(execFile);
 const CLAUDE_ACTIVITY_WINDOW_MS = 10 * 60_000;
@@ -336,13 +337,6 @@ export async function latestClashOfClansRaidAttack(
   return null;
 }
 
-interface ClashOfClansCounters {
-  donations: number;
-  clanCapitalContributions: number;
-  attackWins: number;
-  warStars: number;
-}
-
 function extractClashOfClansCounters(player: RawClashOfClansPlayer): ClashOfClansCounters {
   return {
     donations: player.donations,
@@ -358,15 +352,6 @@ function extractClashOfClansCounters(player: RawClashOfClansPlayer): ClashOfClan
  * defended against while offline just as easily as from a player's own attacks. */
 function clashOfClansCountersIncreased(previous: ClashOfClansCounters, current: ClashOfClansCounters): boolean {
   return (Object.keys(current) as (keyof ClashOfClansCounters)[]).some((key) => current[key] > previous[key]);
-}
-
-interface ClashOfClansMilestoneBaseline {
-  townHallLevel: number;
-  builderHallLevel?: number;
-  bestTrophies: number;
-  bestBuilderBaseTrophies?: number;
-  leagueTierName?: string;
-  builderBaseLeagueName?: string;
 }
 
 export interface PushedClashOfClansMilestone {
@@ -481,6 +466,7 @@ export function createActivityPushProvider(
   push: { url: string; secret: string } | undefined,
   getClashRoyaleData: () => unknown = () => undefined,
   clashOfClans?: ClashOfClansAuth,
+  clashOfClansState?: ClashOfClansStateStore,
 ): Provider<ActivityPushData> {
   // The attack/raid keys and milestone baseline are only committed after a push actually succeeds
   // (see below), so a failed POST doesn't cause the next event to be silently skipped as "already
@@ -492,6 +478,48 @@ export function createActivityPushProvider(
   let clashOfClansCounters: ClashOfClansCounters | undefined;
   let clashOfClansLastActiveAt: string | null = null;
 
+  // Without this, a process restart resets all of the above to undefined, which makes the very
+  // next tick treat whatever war attack/raid attack is already on record as brand new — re-stamping
+  // it with the current time and re-pushing it to Batabiboing, which then displays the same stale
+  // event with a timestamp that looks fresh. Loaded once, lazily, before the first fetch.
+  let stateLoaded: Promise<void> | undefined;
+  function ensureClashOfClansStateLoaded(): Promise<void> {
+    if (!clashOfClansState) return Promise.resolve();
+    stateLoaded ??= clashOfClansState.get().then((state) => {
+      if (!state) return;
+      lastPushedClashOfClansAttackKey = state.attackKey;
+      lastPushedClashOfClansRaidKey = state.raidKey;
+      clashOfClansMilestoneBaseline = state.milestoneBaseline;
+      clashOfClansCounters = state.counters;
+      clashOfClansLastActiveAt = state.lastActiveAt;
+    });
+    return stateLoaded;
+  }
+
+  /** Commits a successfully-pushed attack/raid/milestone into the closure state that the next
+   * tick's dedup check reads — pulled out of `fetch` to keep its cognitive complexity down. */
+  function commitClashOfClansActivity(cocActivity: ClashOfClansActivitySnapshot | null): void {
+    if (!cocActivity) return;
+    if (cocActivity.attackKey) lastPushedClashOfClansAttackKey = cocActivity.attackKey;
+    if (cocActivity.raidKey) lastPushedClashOfClansRaidKey = cocActivity.raidKey;
+    clashOfClansMilestoneBaseline = cocActivity.newMilestoneBaseline;
+  }
+
+  async function persistClashOfClansState(): Promise<void> {
+    if (!clashOfClansState || !clashOfClans) return;
+    try {
+      await clashOfClansState.set({
+        attackKey: lastPushedClashOfClansAttackKey,
+        raidKey: lastPushedClashOfClansRaidKey,
+        milestoneBaseline: clashOfClansMilestoneBaseline,
+        counters: clashOfClansCounters,
+        lastActiveAt: clashOfClansLastActiveAt,
+      });
+    } catch (err) {
+      console.warn(`[activity-push] Could not persist Clash of Clans state: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
+  }
+
   return {
     id: 'activity-push',
     schema: activityPushSchema,
@@ -500,6 +528,7 @@ export function createActivityPushProvider(
     isConfigured: () => push !== undefined,
     async fetch(signal) {
       if (!push) throw new Error('activity push is not configured');
+      if (clashOfClans) await ensureClashOfClansStateLoaded();
       const [epicRunning, claudeActiveAt, codexActiveAt] = await Promise.all([
         isProcessRunning('Epic Games Launcher'),
         claudeLastActiveAt(),
@@ -539,9 +568,8 @@ export function createActivityPushProvider(
         }),
       });
       if (!res.ok) throw new Error(`activity push failed: HTTP ${res.status}`);
-      if (cocActivity?.attackKey) lastPushedClashOfClansAttackKey = cocActivity.attackKey;
-      if (cocActivity?.raidKey) lastPushedClashOfClansRaidKey = cocActivity.raidKey;
-      if (cocActivity) clashOfClansMilestoneBaseline = cocActivity.newMilestoneBaseline;
+      commitClashOfClansActivity(cocActivity);
+      await persistClashOfClansState();
 
       return { lastPushedAt: new Date().toISOString(), lastPushOk: true };
     },
