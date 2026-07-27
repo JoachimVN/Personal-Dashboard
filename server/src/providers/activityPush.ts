@@ -485,17 +485,39 @@ export function createActivityPushProvider(
   let stateLoaded: Promise<void> | undefined;
   function ensureClashOfClansStateLoaded(): Promise<void> {
     if (!clashOfClansState) return Promise.resolve();
-    if (!stateLoaded) {
-      stateLoaded = clashOfClansState.get().then((state) => {
-        if (!state) return;
-        lastPushedClashOfClansAttackKey = state.attackKey;
-        lastPushedClashOfClansRaidKey = state.raidKey;
-        clashOfClansMilestoneBaseline = state.milestoneBaseline;
-        clashOfClansCounters = state.counters;
-        clashOfClansLastActiveAt = state.lastActiveAt;
-      });
-    }
+    stateLoaded ??= clashOfClansState.get().then((state) => {
+      if (!state) return;
+      lastPushedClashOfClansAttackKey = state.attackKey;
+      lastPushedClashOfClansRaidKey = state.raidKey;
+      clashOfClansMilestoneBaseline = state.milestoneBaseline;
+      clashOfClansCounters = state.counters;
+      clashOfClansLastActiveAt = state.lastActiveAt;
+    });
     return stateLoaded;
+  }
+
+  /** Commits a successfully-pushed attack/raid/milestone into the closure state that the next
+   * tick's dedup check reads — pulled out of `fetch` to keep its cognitive complexity down. */
+  function commitClashOfClansActivity(cocActivity: ClashOfClansActivitySnapshot | null): void {
+    if (!cocActivity) return;
+    if (cocActivity.attackKey) lastPushedClashOfClansAttackKey = cocActivity.attackKey;
+    if (cocActivity.raidKey) lastPushedClashOfClansRaidKey = cocActivity.raidKey;
+    clashOfClansMilestoneBaseline = cocActivity.newMilestoneBaseline;
+  }
+
+  async function persistClashOfClansState(): Promise<void> {
+    if (!clashOfClansState || !clashOfClans) return;
+    try {
+      await clashOfClansState.set({
+        attackKey: lastPushedClashOfClansAttackKey,
+        raidKey: lastPushedClashOfClansRaidKey,
+        milestoneBaseline: clashOfClansMilestoneBaseline,
+        counters: clashOfClansCounters,
+        lastActiveAt: clashOfClansLastActiveAt,
+      });
+    } catch (err) {
+      console.warn(`[activity-push] Could not persist Clash of Clans state: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
   }
 
   return {
@@ -546,23 +568,8 @@ export function createActivityPushProvider(
         }),
       });
       if (!res.ok) throw new Error(`activity push failed: HTTP ${res.status}`);
-      if (cocActivity?.attackKey) lastPushedClashOfClansAttackKey = cocActivity.attackKey;
-      if (cocActivity?.raidKey) lastPushedClashOfClansRaidKey = cocActivity.raidKey;
-      if (cocActivity) clashOfClansMilestoneBaseline = cocActivity.newMilestoneBaseline;
-
-      if (clashOfClansState && clashOfClans) {
-        try {
-          await clashOfClansState.set({
-            attackKey: lastPushedClashOfClansAttackKey,
-            raidKey: lastPushedClashOfClansRaidKey,
-            milestoneBaseline: clashOfClansMilestoneBaseline,
-            counters: clashOfClansCounters,
-            lastActiveAt: clashOfClansLastActiveAt,
-          });
-        } catch (err) {
-          console.warn(`[activity-push] Could not persist Clash of Clans state: ${err instanceof Error ? err.message : 'unknown error'}`);
-        }
-      }
+      commitClashOfClansActivity(cocActivity);
+      await persistClashOfClansState();
 
       return { lastPushedAt: new Date().toISOString(), lastPushOk: true };
     },
