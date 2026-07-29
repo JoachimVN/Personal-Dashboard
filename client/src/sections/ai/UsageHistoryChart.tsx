@@ -124,7 +124,12 @@ function buildGeometry(chartPoints: ChartPoint[]): ChartGeometry {
  * that observation, then falls vertically instead of misleadingly interpolating a gradual decline.
  */
 function addObservedResetPoints(chartPoints: ChartPoint[]): void {
-  for (let index = 1; index < chartPoints.length; index += 1) {
+  // Bounded to the pre-existing length: the loop pushes synthetic points onto chartPoints as it
+  // goes, and `chartPoints.length` is re-read every iteration, so an unbounded loop would
+  // eventually treat an earlier reset's synthetic point as a fresh neighbor of a later, unrelated
+  // one — comparing their values as if adjacent in time and fabricating a bogus extra reset.
+  const observedLength = chartPoints.length;
+  for (let index = 1; index < observedLength; index += 1) {
     const previous = chartPoints[index - 1]!;
     const current = chartPoints[index]!;
     const drop = previous.percent - current.percent;
