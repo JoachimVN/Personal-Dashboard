@@ -145,6 +145,55 @@ function addObservedResetPoints(chartPoints: ChartPoint[]): void {
   }
 }
 
+/** Collapse reset readings that land less than a full window apart (they're the same still-ongoing
+ * window's deadline drifting between polls, not separate resets), keeping the latest of each. */
+function clusterResets(rawResets: number[], sessionWindowMs: number): number[] {
+  const resets: number[] = [];
+  for (const reset of rawResets) {
+    if (resets.length && reset - resets.at(-1)! < sessionWindowMs) {
+      resets[resets.length - 1] = reset;
+    } else {
+      resets.push(reset);
+    }
+  }
+  return resets;
+}
+
+/** Pushes the cap-end/reset-anchor pair for one reset timestamp, if it falls in the visible window.
+ * `stablePoints` is a pre-loop snapshot so one reset's insertions can't leak into another's lookup. */
+function addResetAnchor(
+  chartPoints: ChartPoint[],
+  stablePoints: ChartPoint[],
+  reset: number,
+  start: number,
+  end: number,
+  windowMs: number,
+): void {
+  if (reset <= start || reset > end) return;
+  const observedZero = stablePoints.some((point) => Date.parse(point.at) === reset && point.percent === 0);
+  const prior = stablePoints.findLast((point) => Date.parse(point.at) < reset);
+  if (prior?.percent === 100) {
+    chartPoints.push({
+      x: ((reset - start) / windowMs) * W,
+      y: 0,
+      at: new Date(reset).toISOString(),
+      percent: 100,
+      order: 1,
+      sessionCapEnd: true,
+    });
+  }
+  if (!observedZero) {
+    chartPoints.push({
+      x: ((reset - start) / windowMs) * W,
+      y: H,
+      at: new Date(reset).toISOString(),
+      percent: 0,
+      order: 2,
+      resetAnchor: true,
+    });
+  }
+}
+
 /** Splices the synthetic reset/session-start markers (see ChartPoint) into chartPoints in place,
  * one set per known reset timestamp within the visible window. */
 function addSessionResetPoints(
@@ -165,47 +214,15 @@ function addSessionResetPoints(
     .filter((reset) => Number.isFinite(reset))
     .sort((a, b) => a - b);
   // The provider's reported reset deadline can drift a little from poll to poll (it reflects the
-  // live rolling window, not a fixed boundary), and two genuinely separate resets can't land less
-  // than a full window apart. Collapse readings that are closer than that into one, keeping the
-  // most recently observed deadline for that window.
-  const resets: number[] = [];
-  for (const reset of rawResets) {
-    if (resets.length && reset - resets.at(-1)! < sessionWindowMs) {
-      resets[resets.length - 1] = reset;
-    } else {
-      resets.push(reset);
-    }
-  }
+  // live rolling window, not a fixed boundary); see clusterResets.
+  const resets = clusterResets(rawResets, sessionWindowMs);
   // Snapshot before mutating: without this, an earlier reset's synthetic insertions (pushed onto
   // chartPoints below) could be picked up as a *later* reset's "prior" sample, since they're
   // appended out of chronological order.
   const stablePoints = [...chartPoints];
   for (const reset of resets) {
+    addResetAnchor(chartPoints, stablePoints, reset, start, end, windowMs);
     const sessionStart = reset - sessionWindowMs;
-    if (reset > start && reset <= end) {
-      const observedZero = stablePoints.some((point) => Date.parse(point.at) === reset && point.percent === 0);
-      const prior = stablePoints.findLast((point) => Date.parse(point.at) < reset);
-      if (prior?.percent === 100) {
-        chartPoints.push({
-          x: ((reset - start) / windowMs) * W,
-          y: 0,
-          at: new Date(reset).toISOString(),
-          percent: 100,
-          order: 1,
-          sessionCapEnd: true,
-        });
-      }
-      if (!observedZero) {
-        chartPoints.push({
-          x: ((reset - start) / windowMs) * W,
-          y: H,
-          at: new Date(reset).toISOString(),
-          percent: 0,
-          order: 2,
-          resetAnchor: true,
-        });
-      }
-    }
     if (sessionStart <= start || sessionStart > end) continue;
     chartPoints.push({
       x: ((sessionStart - start) / windowMs) * W,
