@@ -2,7 +2,7 @@ import { chmod, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import type { AiUsageToolData, UsageHistoryPoint } from '@personal-dashboard/shared';
-import type { UsageHistoryStore } from '../../usageHistory.js';
+import { isUsageReset, type UsageHistoryStore } from '../../usageHistory.js';
 
 const require = createRequire(import.meta.url);
 
@@ -77,6 +77,24 @@ export function recordHistorySafely(
   snapshot: UsageSnapshot,
   remembered: { points: UsageHistoryPoint[] },
 ): UsageHistoryPoint[] {
+  const latest = remembered.points.at(-1);
+  const asOf = snapshot.asOf ? Date.parse(snapshot.asOf) : undefined;
+  // Persisting remains off the provider's critical path, but an observed reset must be visible to
+  // this very response (and its command-center refresh), not only after the next polling cycle.
+  const resetObserved = Boolean(latest && Number.isFinite(asOf) && asOf! > Date.parse(latest.at)) && (
+    isUsageReset(latest?.fiveHourUsedPercent, snapshot.fiveHour?.usedPercent)
+    || isUsageReset(latest?.weeklyUsedPercent, snapshot.weekly?.usedPercent)
+  );
+  if (resetObserved && snapshot.asOf) {
+    remembered.points = [...remembered.points, {
+      at: snapshot.asOf,
+      fiveHourUsedPercent: snapshot.fiveHour?.usedPercent,
+      fiveHourResetsAt: snapshot.fiveHour?.resetsAt,
+      weeklyUsedPercent: snapshot.weekly?.usedPercent,
+      weeklyResetsAt: snapshot.weekly?.resetsAt,
+      modelWeeklyUsedPercent: snapshot.modelWeekly?.usedPercent,
+    }];
+  }
   void historyStore
     .record(toolId, snapshot)
     .then((points) => {
