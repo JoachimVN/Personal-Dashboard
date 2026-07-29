@@ -27,7 +27,7 @@ import './valorant.css';
 function ValorantWordmark() {
   return (
     <img
-      src={publicAsset('valorant_wordmark.png')}
+      src={publicAsset('valorant/wordmark.png')}
       alt="Valorant"
       className="block h-[0.9rem]"
       style={{

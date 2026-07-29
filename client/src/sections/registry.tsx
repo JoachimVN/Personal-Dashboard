@@ -186,7 +186,7 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
       );
     }
     return (
-      <img src={publicAsset('spotify.svg')} alt="" aria-hidden className="h-5 w-5" />
+      <img src={publicAsset('spotify/icon.svg')} alt="" aria-hidden className="h-5 w-5" />
     );
   }
     case 'weather': {
@@ -275,11 +275,11 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
         style={{
           aspectRatio: '1841 / 1514',
           backgroundColor: monochrome ? 'currentColor' : 'var(--accent)',
-          maskImage: `url(${publicAsset('valorant.png')})`,
+          maskImage: `url(${publicAsset('valorant/mark.png')})`,
           maskRepeat: 'no-repeat',
           maskPosition: 'center',
           maskSize: 'contain',
-          WebkitMaskImage: `url(${publicAsset('valorant.png')})`,
+          WebkitMaskImage: `url(${publicAsset('valorant/mark.png')})`,
           WebkitMaskRepeat: 'no-repeat',
           WebkitMaskPosition: 'center',
           WebkitMaskSize: 'contain',

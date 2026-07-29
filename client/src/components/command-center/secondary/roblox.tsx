@@ -11,13 +11,13 @@ export function RobloxNowPlayingSecondary({ slot, roblox }: Readonly<{ slot: Com
   const gameIcon = presence.iconUrl ? (
     <img src={presence.iconUrl} alt="" className="command-roblox-icon" />
   ) : (
-    <span className="command-roblox-icon command-roblox-icon--fallback" aria-hidden><img src={publicAsset('roblox.svg')} alt="" /></span>
+    <span className="command-roblox-icon command-roblox-icon--fallback" aria-hidden><img src={publicAsset('roblox/icon.svg')} alt="" /></span>
   );
   return <div className="command-roblox-now">
     {gameIcon}
     <div className="command-roblox-details">
       <div className="command-roblox-brand" aria-label="Roblox">
-        <img src={publicAsset('roblox_wordmark.svg')} alt="Roblox" />
+        <img src={publicAsset('roblox/wordmark.svg')} alt="Roblox" />
         <span>In game</span>
       </div>
       <div className="command-roblox-game">
