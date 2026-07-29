@@ -7,6 +7,7 @@
 export { aiCandidates, type AiTool } from './ai.js';
 export { calendarCandidates } from './calendar.js';
 export { clashRoyaleCandidates } from './clashRoyale.js';
+export { clashOfClansCandidates } from './clashOfClans.js';
 export { fallbackCandidates } from './fallback.js';
 export { githubCandidates } from './github.js';
 export { gmailCandidates } from './gmail.js';

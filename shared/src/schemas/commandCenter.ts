@@ -49,12 +49,24 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
      * streak doesn't carry its own historic league name. */
     pathOfLegendsLeagueNumber: z.number().optional(),
   }),
+  z.object({
+    type: z.literal('clash-of-clans-moment'),
+    kind: z.enum(['war-preparation', 'war', 'raid-weekend', 'league']),
+    opponentName: z.string().optional(),
+    /** Only present for kind 'war' — the war-wide tally, not this player's own stars. */
+    clanStars: z.number().optional(),
+    opponentStars: z.number().optional(),
+    /** Only present for kind 'raid-weekend'. */
+    capitalTotalLoot: z.number().optional(),
+    /** Only present for kind 'league' — Supercell's own league-tier art, not a locally-vendored asset. */
+    leagueIconUrl: z.string().optional(),
+  }),
 ]);
 
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'transit', 'power', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'clash-of-clans', 'transit', 'power', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

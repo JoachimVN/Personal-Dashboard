@@ -7,6 +7,16 @@ import { activityPushSchema, clashRoyaleSchema, type ActivityPushData, type Clas
 import type { Provider } from '../scheduler.js';
 import { jsonlFiles } from './aiUsage/index.js';
 import type { ClashOfClansCounters, ClashOfClansMilestoneBaseline, ClashOfClansStateStore } from '../clashOfClansState.js';
+import {
+  currentClashOfClansLeagueWar,
+  currentClashOfClansWar,
+  fetchClashOfClansPlayer,
+  fetchLatestClashOfClansRaidSeason,
+  type ClashOfClansAuth,
+  type RawClashOfClansPlayer,
+} from './clashOfClansApi.js';
+
+export type { ClashOfClansAuth } from './clashOfClansApi.js';
 
 const execFileAsync = promisify(execFile);
 const CLAUDE_ACTIVITY_WINDOW_MS = 10 * 60_000;
@@ -98,137 +108,11 @@ export function latestClashRoyaleActivity(data: Pick<ClashRoyaleData, 'recentBat
     : null;
 }
 
-const COC_API_BASE = 'https://api.clashofclans.com/v1';
-
-export interface ClashOfClansAuth {
-  apiKey: string;
-  playerTag: string;
-}
-
-/** Only the fields this file actually reads off GetPlayer — verified against a live response
- * rather than assumed, since Supercell does rename things (`league` is `leagueTier` as of this
- * writing, which memory alone got wrong once already). */
-interface RawClashOfClansPlayer {
-  tag: string;
-  townHallLevel: number;
-  builderHallLevel?: number;
-  bestTrophies: number;
-  bestBuilderBaseTrophies?: number;
-  warStars: number;
-  attackWins: number;
-  donations: number;
-  clanCapitalContributions: number;
-  leagueTier?: { name: string };
-  builderBaseLeague?: { name: string };
-  clan?: { tag: string };
-}
-
-interface RawClashOfClansAttack {
-  order: number;
-  stars: number;
-  destructionPercentage: number;
-  defenderTag: string;
-}
-
-/** Both sides of a war report the same shape — `attacks` is just absent until that member has
- * actually attacked. Kept as one type (rather than separate "us"/"opponent" shapes) because CWL
- * fallback can swap which side is ours. */
-interface RawClashOfClansWarMember {
-  tag: string;
-  townhallLevel: number;
-  attacks?: RawClashOfClansAttack[];
-}
-
-interface RawClashOfClansWar {
-  state?: string;
-  clan: { tag?: string; members: RawClashOfClansWarMember[] };
-  opponent: { tag?: string; members: RawClashOfClansWarMember[] };
-}
-
-interface RawClashOfClansLeagueGroup {
-  rounds: { warTags: string[] }[];
-}
-
 export interface PushedClashOfClansAttack {
   stars: number;
   destructionPercentage: number;
   defenderTownHall?: number;
   timestamp: string;
-}
-
-/** Clash of Clans tags use the same '#'-prefixed, upper-case convention as Clash Royale's. */
-function normalizeClashOfClansTag(tag: string): string {
-  const trimmed = tag.trim().toUpperCase();
-  return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
-}
-
-/** Mirrors clashRoyale.ts's crRequest — the Clash of Clans key is also IP-allowlisted at
- * developer.clashofclans.com, and a 403 here almost always means the server's current public IP
- * has drifted off that allowlist. */
-async function cocRequest<T>(signal: AbortSignal, apiKey: string, path: string, label: string): Promise<T> {
-  const res = await fetch(`${COC_API_BASE}${path}`, {
-    signal,
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  if (res.status === 403) {
-    throw new Error(
-      `Clash of Clans ${label} failed: HTTP 403 — the API key's allowed IP list probably doesn't include this ` +
-        'server\'s current public IP. Check developer.clashofclans.com and update it.',
-    );
-  }
-  if (!res.ok) throw new Error(`Clash of Clans ${label} failed: HTTP ${res.status}`);
-  return (await res.json()) as T;
-}
-
-async function fetchClashOfClansPlayer(signal: AbortSignal, apiKey: string, playerTag: string): Promise<RawClashOfClansPlayer> {
-  const tag = normalizeClashOfClansTag(playerTag);
-  return cocRequest<RawClashOfClansPlayer>(signal, apiKey, `/players/${encodeURIComponent(tag)}`, 'GetPlayer');
-}
-
-/** Unlike GetPlayer, a missing current war is routine (not in a war, private war log) rather than
- * a configuration problem — Supercell reports it as a 403 or 404 depending on the reason, and
- * either should be treated as "nothing to report", not surfaced as an error. */
-async function currentClashOfClansWar(signal: AbortSignal, apiKey: string, clanTag: string): Promise<RawClashOfClansWar | null> {
-  const res = await fetch(`${COC_API_BASE}/clans/${encodeURIComponent(clanTag)}/currentwar`, {
-    signal,
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  if (res.status === 403 || res.status === 404) return null;
-  if (!res.ok) throw new Error(`Clash of Clans GetCurrentWar failed: HTTP ${res.status}`);
-  return (await res.json()) as RawClashOfClansWar;
-}
-
-/** During Clan War League, `/currentwar` reports `notInWar` — the real battles live behind this
- * separate pair of calls: the league group lists each round's war tag, and each war tag resolves
- * to a war with the same shape as `/currentwar`. Only tried as a fallback when classic war
- * explicitly reports `notInWar`, so it costs nothing outside CWL weeks. Checks the most recent
- * round first and stops at the first one that involves our clan, so it's usually one extra call,
- * not one per round.
- *
- * Unverified: this clan wasn't in a league war when this was written, so — unlike everything else
- * in this file — this schema comes from community documentation, not a live response. Worth
- * double-checking the first time a CWL push looks wrong. */
-async function currentClashOfClansLeagueWar(signal: AbortSignal, apiKey: string, clanTag: string): Promise<RawClashOfClansWar | null> {
-  const groupRes = await fetch(`${COC_API_BASE}/clans/${encodeURIComponent(clanTag)}/currentwar/leaguegroup`, {
-    signal,
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  if (groupRes.status === 403 || groupRes.status === 404) return null;
-  if (!groupRes.ok) throw new Error(`Clash of Clans GetLeagueGroup failed: HTTP ${groupRes.status}`);
-  const group = (await groupRes.json()) as RawClashOfClansLeagueGroup;
-
-  const warTags = group.rounds.flatMap((round) => round.warTags).filter((tag) => tag !== '#0').toReversed();
-  for (const warTag of warTags) {
-    const warRes = await fetch(`${COC_API_BASE}/clanwarleagues/wars/${encodeURIComponent(warTag)}`, {
-      signal,
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!warRes.ok) continue;
-    const war = (await warRes.json()) as RawClashOfClansWar;
-    if (war.clan.tag === clanTag) return war;
-    if (war.opponent.tag === clanTag) return { state: war.state, clan: war.opponent, opponent: war.clan };
-  }
-  return null;
 }
 
 /** Finds the player's most recent war attack — the last entry in their `attacks` array, since
@@ -267,27 +151,6 @@ export async function latestClashOfClansAttack(
   };
 }
 
-interface RawClashOfClansRaidAttack {
-  attacker: { tag: string };
-  destructionPercent: number;
-  stars: number;
-}
-
-interface RawClashOfClansRaidDistrict {
-  id: number;
-  name: string;
-  attacks?: RawClashOfClansRaidAttack[];
-}
-
-interface RawClashOfClansRaidLogEntry {
-  defender: { tag: string; name: string };
-  districts: RawClashOfClansRaidDistrict[];
-}
-
-interface RawClashOfClansRaidSeason {
-  attackLog: RawClashOfClansRaidLogEntry[];
-}
-
 export interface PushedClashOfClansRaidAttack {
   stars: number;
   destructionPercentage: number;
@@ -308,14 +171,7 @@ export async function latestClashOfClansRaidAttack(
   player: Pick<RawClashOfClansPlayer, 'tag' | 'clan'>,
 ): Promise<{ attack: PushedClashOfClansRaidAttack; key: string } | null> {
   if (!player.clan?.tag) return null;
-  const res = await fetch(`${COC_API_BASE}/clans/${encodeURIComponent(player.clan.tag)}/capitalraidseasons?limit=1`, {
-    signal,
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  if (res.status === 403 || res.status === 404) return null;
-  if (!res.ok) throw new Error(`Clash of Clans GetCapitalRaidSeasons failed: HTTP ${res.status}`);
-  const body = (await res.json()) as { items: RawClashOfClansRaidSeason[] };
-  const season = body.items[0];
+  const season = await fetchLatestClashOfClansRaidSeason(signal, apiKey, player.clan.tag);
   if (!season) return null;
 
   for (const entry of season.attackLog) {

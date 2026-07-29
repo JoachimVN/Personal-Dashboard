@@ -25,6 +25,7 @@ import { createPowerProvider, type PowerProvider } from './power.js';
 import { createSpotifyProvider } from './spotify.js';
 import { createSteamProvider } from './steam.js';
 import { createClashRoyaleProvider } from './clashRoyale.js';
+import { createClashOfClansProvider } from './clashOfClans.js';
 import { createRobloxProvider } from './roblox.js';
 import { createValorantProvider } from './valorant.js';
 import { createSonarCloudProvider } from './sonarCloud.js';
@@ -107,6 +108,7 @@ export function createProviders(
         }),
         createRobloxProvider(env.roblox),
         createClashRoyaleProvider(env.clashRoyale),
+        createClashOfClansProvider(env.clashOfClans),
         createValorantProvider(env.valorant, valorantHistory),
         createSonarCloudProvider(env.sonarCloud),
         createActivityPushProvider(env.dashboardPush, getClashRoyaleData, env.clashOfClans, clashOfClansState),

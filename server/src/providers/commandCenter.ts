@@ -3,6 +3,7 @@ import {
   type AiNewsData,
   type AiUsageToolData,
   type CalendarData,
+  type ClashOfClansData,
   type ClashRoyaleData,
   type GitHubData,
   type GmailData,
@@ -25,6 +26,7 @@ import {
   aiCandidates,
   aiNewsCandidates,
   calendarCandidates,
+  clashOfClansCandidates,
   clashRoyaleCandidates,
   fallbackCandidates,
   githubCandidates,
@@ -271,6 +273,7 @@ export function createCommandCenterProvider(
       const spotify = widgetData<SpotifyData>(envelopes, 'spotify');
       const steam = widgetData<SteamData>(envelopes, 'steam');
       const clashRoyale = widgetData<ClashRoyaleData>(envelopes, 'clash-royale');
+      const clashOfClans = widgetData<ClashOfClansData>(envelopes, 'clash-of-clans');
       const [spotifyFresh, steamMoments, clashRoyaleMoments] = await Promise.all([
         withFallback(
           computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs),
@@ -305,6 +308,7 @@ export function createCommandCenterProvider(
           config.commandCenter.clashRoyaleMomentFreshMs,
           config.commandCenter.clashRoyaleWinStreakFreshMs,
         ),
+        ...clashOfClansCandidates(clashOfClans),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),
           config.commandCenter.weatherHotC,
