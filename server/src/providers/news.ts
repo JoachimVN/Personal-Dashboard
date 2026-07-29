@@ -17,20 +17,28 @@ interface FeedItem {
 }
 
 /**
- * Keep the news card useful when one high-volume feed publishes several newer
- * stories than the others. Each healthy feed gets its newest headline first;
- * the remaining slots are then filled by recency.
+ * Keep the news card useful when one high-volume feed (e.g. NRK) publishes far
+ * more stories than the others. Each healthy feed gets its newest headline
+ * first; the remaining slots are then split evenly across feeds by recency,
+ * so no single feed can crowd out a quieter one. A feed only gets more than
+ * its even share if another feed doesn't have enough items to fill its own.
  */
 export function selectNewsItems<T extends FeedItem>(feedItems: T[][], maxItems = MAX_ITEMS): T[] {
   const groups = feedItems
     .map((items) => items.filter((item) => item.url).toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)))
     .filter((items) => items.length > 0);
   const leading = groups.map(([item]) => item);
-  const remaining = groups.flatMap(([, ...items]) => items);
+  const rest = groups.map(([, ...items]) => items);
+
+  const remainingSlots = Math.max(maxItems - leading.length, 0);
+  const capPerFeed = rest.length > 0 ? Math.ceil(remainingSlots / rest.length) : remainingSlots;
+  const cappedRest = rest.flatMap((items) => items.slice(0, capPerFeed));
+  const overflowRest = rest.flatMap((items) => items.slice(capPerFeed));
 
   const combined = [
     ...leading.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
-    ...remaining.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+    ...cappedRest.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
+    ...overflowRest.toSorted((a, b) => b.publishedAt.localeCompare(a.publishedAt)),
   ];
   // The same story can appear in more than one feed (e.g. a regional and a national
   // NRK feed); keep only its first, highest-priority occurrence.

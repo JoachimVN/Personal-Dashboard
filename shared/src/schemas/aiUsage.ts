@@ -22,6 +22,8 @@ export const usageHistoryPointSchema = z.object({
   /** Reset deadline observed alongside the five-hour percentage at this sample. */
   fiveHourResetsAt: z.string().datetime().optional(),
   weeklyUsedPercent: z.number().min(0).max(100).optional(),
+  /** Reset deadline observed alongside the weekly percentage at this sample. */
+  weeklyResetsAt: z.string().datetime().optional(),
   modelWeeklyUsedPercent: z.number().min(0).max(100).optional(),
 });
 

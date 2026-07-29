@@ -14,6 +14,7 @@ import type {
 import type { AiUsageByTool } from './useCommandCenterData';
 import { AiUsageSecondary, AiUsageTrend } from './secondary/ai';
 import { CalendarAgendaSecondary } from './secondary/calendar';
+import { ClashOfClansMomentSecondary } from './secondary/clashOfClans';
 import { ClashRoyaleWinStreakSecondary } from './secondary/clashRoyale';
 import { FallbackSecondary } from './secondary/fallback';
 import { GithubContributionsSecondary, GithubReviewList, GithubReviewsSecondary } from './secondary/github';
@@ -66,6 +67,7 @@ export function SecondaryContent(props: Readonly<{
     case 'steam-achievement': return SteamAchievementSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     case 'roblox-now-playing': return <RobloxNowPlayingSecondary slot={slot} roblox={roblox} />;
     case 'clash-royale-moment': return ClashRoyaleWinStreakSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
+    case 'clash-of-clans-moment': return ClashOfClansMomentSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
     default: return <FallbackSecondary slot={slot} />;
   }
 }

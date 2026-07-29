@@ -4,6 +4,8 @@ import type { UsageHistoryPoint } from '@personal-dashboard/shared';
 
 const W = 100;
 const H = 32;
+/** Mirrors the server's command-center reset threshold for provider reports above zero. */
+const RESET_DROP_PERCENT = 40;
 
 type Metric = 'fiveHourUsedPercent' | 'weeklyUsedPercent' | 'modelWeeklyUsedPercent';
 
@@ -20,6 +22,8 @@ interface ChartPoint {
   resetAnchor?: boolean;
   /** Synthetic zero at the start of a newly-reset rolling allowance. */
   sessionStart?: boolean;
+  /** The zero is an observed reset, rather than a predicted reset deadline. */
+  observedReset?: boolean;
 }
 
 function timeLabel(iso: string, windowMs: number): string {
@@ -114,6 +118,28 @@ function buildGeometry(chartPoints: ChartPoint[]): ChartGeometry {
   };
 }
 
+/**
+ * A provider-reported zero after positive use, or a large downward jump, is concrete reset
+ * evidence. Add the preceding value at the new sample's timestamp so the line stays level until
+ * that observation, then falls vertically instead of misleadingly interpolating a gradual decline.
+ */
+function addObservedResetPoints(chartPoints: ChartPoint[]): void {
+  for (let index = 1; index < chartPoints.length; index += 1) {
+    const previous = chartPoints[index - 1]!;
+    const current = chartPoints[index]!;
+    const drop = previous.percent - current.percent;
+    const confirmedZero = previous.percent > 0 && current.percent === 0;
+    if (!confirmedZero && drop < RESET_DROP_PERCENT) continue;
+    current.observedReset = true;
+    chartPoints.push({
+      ...previous,
+      x: current.x,
+      at: current.at,
+      order: -1,
+    });
+  }
+}
+
 /** Splices the synthetic reset/session-start markers (see ChartPoint) into chartPoints in place,
  * one set per known reset timestamp within the visible window. */
 function addSessionResetPoints(
@@ -134,6 +160,7 @@ function addSessionResetPoints(
     if (!Number.isFinite(reset)) continue;
     const sessionStart = reset - sessionWindowMs;
     if (reset > start && reset <= end) {
+      const observedZero = chartPoints.some((point) => Date.parse(point.at) === reset && point.percent === 0);
       const prior = chartPoints.findLast((point) => Date.parse(point.at) < reset);
       if (prior?.percent === 100) {
         chartPoints.push({
@@ -145,14 +172,16 @@ function addSessionResetPoints(
           sessionCapEnd: true,
         });
       }
-      chartPoints.push({
-        x: ((reset - start) / windowMs) * W,
-        y: H,
-        at: new Date(reset).toISOString(),
-        percent: 0,
-        order: 2,
-        resetAnchor: true,
-      });
+      if (!observedZero) {
+        chartPoints.push({
+          x: ((reset - start) / windowMs) * W,
+          y: H,
+          at: new Date(reset).toISOString(),
+          percent: 0,
+          order: 2,
+          resetAnchor: true,
+        });
+      }
     }
     if (sessionStart <= start || sessionStart > end) continue;
     chartPoints.push({
@@ -187,6 +216,8 @@ function useChartGeometry(
           percent,
         };
       });
+    chartPoints.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    addObservedResetPoints(chartPoints);
     if (sessionWindowMs) {
       addSessionResetPoints(chartPoints, points, sessionResetsAt, sessionWindowMs, start, end, windowMs);
     }
@@ -227,7 +258,7 @@ export function UsageHistoryChart({
 
   let captionText = caption;
   if (hovered) {
-    const resetSuffix = hovered.sessionStart ? ' · session reset' : '';
+    const resetSuffix = hovered.sessionStart || hovered.observedReset ? ' · reset' : '';
     captionText = `${Math.round(hovered.percent)}% · ${timeLabel(hovered.at, windowMs)}${resetSuffix}`;
   }
 
@@ -299,7 +330,7 @@ export function UsageHistoryChart({
           )}
           {geometry.dots.map((point) => (
             <path
-              key={point.at}
+              key={`${point.at}-${point.order ?? 0}`}
               // A zero-length round-capped stroke renders as a circular dot even
               // though preserveAspectRatio="none" would distort a <circle>.
               d={`M${point.x},${point.y} l0.01,0`}
@@ -373,7 +404,7 @@ export function UsageSparkline({
       )}
       {geometry.dots.map((point) => (
         <path
-          key={point.at}
+          key={`${point.at}-${point.order ?? 0}`}
           d={`M${point.x},${point.y} l0.01,0`}
           stroke={color}
           strokeWidth={3}

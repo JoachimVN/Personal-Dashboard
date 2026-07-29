@@ -16,6 +16,7 @@ export * from './schemas/health.js';
 export * from './schemas/steam.js';
 export * from './schemas/roblox.js';
 export * from './schemas/clashRoyale.js';
+export * from './schemas/clashOfClans.js';
 export * from './schemas/valorant.js';
 export * from './schemas/sonarCloud.js';
 export * from './schemas/transit.js';

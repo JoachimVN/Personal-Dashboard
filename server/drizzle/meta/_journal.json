@@ -29,6 +29,13 @@
       "when": 1784292435036,
       "tag": "0003_ai_usage_reset_deadlines",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785326400000,
+      "tag": "0004_ai_usage_weekly_reset_deadlines",
+      "breakpoints": true
     }
   ]
 }

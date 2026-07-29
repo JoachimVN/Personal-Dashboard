@@ -68,6 +68,16 @@ interface WeeklyReset {
   usedPercent: number;
   drop: number;
   resetsAt: string | undefined;
+  /** Present when the drop arrived before the preceding sample's weekly deadline. */
+  expectedResetsAt: string | undefined;
+}
+
+interface FiveHourReset {
+  tool: AiTool;
+  /** Post-reset five-hour percent. */
+  usedPercent: number;
+  /** The reset deadline reported before the allowance rolled over, when known. */
+  expectedResetsAt: string | undefined;
 }
 
 function weeklyReset(tool: AiTool): WeeklyReset | undefined {
@@ -76,11 +86,56 @@ function weeklyReset(tool: AiTool): WeeklyReset | undefined {
   const prev = data.history.at(-2);
   if (last?.weeklyUsedPercent === undefined || prev?.weeklyUsedPercent === undefined) return undefined;
   const drop = prev.weeklyUsedPercent - last.weeklyUsedPercent;
-  if (drop < RESET_DROP_PERCENT) return undefined;
+  // A confirmed zero after any positive sample is a reset even when a light-use account did not
+  // have enough percentage to cross the usual large-drop threshold.
+  if (last.weeklyUsedPercent !== 0 && drop < RESET_DROP_PERCENT) return undefined;
   // Some providers zero the percentage before rolling resetsAt forward — an expired timestamp
   // isn't a clean-slate horizon, so treat it as unknown rather than saying "until <yesterday>".
   const resetsAt = data.weekly && Date.parse(data.weekly.resetsAt) > Date.now() ? data.weekly.resetsAt : undefined;
-  return { tool, usedPercent: last.weeklyUsedPercent, drop, resetsAt };
+  const expectedAt = prev.weeklyResetsAt && Date.parse(prev.weeklyResetsAt);
+  const resetArrivedEarly = expectedAt && Date.parse(last.at) < expectedAt;
+  return {
+    tool, usedPercent: last.weeklyUsedPercent, drop, resetsAt,
+    expectedResetsAt: resetArrivedEarly ? prev.weeklyResetsAt : undefined,
+  };
+}
+
+/**
+ * A sampled zero after positive use is an observed reset, not an interpolated decline. Retain the
+ * large-drop fallback too: some providers report a new window a few percent above zero already.
+ */
+function fiveHourReset(tool: AiTool): FiveHourReset | undefined {
+  const data = tool.data!;
+  const last = data.history.at(-1);
+  const prev = data.history.at(-2);
+  if (
+    last?.fiveHourUsedPercent === undefined
+    || prev?.fiveHourUsedPercent === undefined
+  ) return undefined;
+
+  const droppedBy = prev.fiveHourUsedPercent - last.fiveHourUsedPercent;
+  if (last.fiveHourUsedPercent !== 0 && droppedBy < RESET_DROP_PERCENT) return undefined;
+  const expectedAt = prev.fiveHourResetsAt && Date.parse(prev.fiveHourResetsAt);
+  const observedAt = Date.parse(last.at);
+  const resetArrivedEarly = expectedAt && Number.isFinite(expectedAt) && observedAt < expectedAt;
+
+  return { tool, usedPercent: last.fiveHourUsedPercent, expectedResetsAt: resetArrivedEarly ? prev.fiveHourResetsAt : undefined };
+}
+
+function fiveHourResetCandidates(available: AiTool[]): Candidate[] {
+  return available.flatMap((tool) => {
+    const reset = fiveHourReset(tool);
+    if (!reset) return [];
+    return [{
+      id: `ai-usage:five-hour-reset:${tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
+      shapes: ['secondary', 'tile'], kicker: 'Fresh allowance',
+      title: `${tool.label} 5-hour usage ${reset.expectedResetsAt ? 'reset early' : 'just reset'}`,
+      detail: reset.expectedResetsAt
+        ? `Back down to ${reset.usedPercent.toFixed(0)}% · expected ${resetLabel(reset.expectedResetsAt)}`
+        : `Back down to ${reset.usedPercent.toFixed(0)}% of the 5-hour limit`,
+      href: '#/ai', accent: aiAccent(tool), render: aiUsageRender([aiAccent(tool)], 'fiveHour'),
+    }];
+  });
 }
 
 /**
@@ -97,10 +152,13 @@ function aiResetCandidates(available: AiTool[]): Candidate[] {
     const reset = resets[0]!;
     return [{
       id: `ai-usage:reset:${reset.tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
-      shapes: ['secondary', 'tile'], kicker: 'Fresh allowance', title: `${reset.tool.label} usage just reset`,
-      detail: reset.resetsAt
-        ? `Back down to ${reset.usedPercent.toFixed(0)}% · clean slate until ${resetLabel(reset.resetsAt)}`
-        : `Back down to ${reset.usedPercent.toFixed(0)}% of the weekly limit`,
+      shapes: ['secondary', 'tile'], kicker: 'Fresh allowance',
+      title: `${reset.tool.label} usage ${reset.expectedResetsAt ? 'reset early' : 'just reset'}`,
+      detail: reset.expectedResetsAt
+        ? `Back down to ${reset.usedPercent.toFixed(0)}% · expected ${resetLabel(reset.expectedResetsAt)}`
+        : reset.resetsAt
+          ? `Back down to ${reset.usedPercent.toFixed(0)}% · clean slate until ${resetLabel(reset.resetsAt)}`
+          : `Back down to ${reset.usedPercent.toFixed(0)}% of the weekly limit`,
       href: '#/ai', accent: aiAccent(reset.tool), render: aiUsageRender([aiAccent(reset.tool)], 'weekly'),
     }];
   }
@@ -188,6 +246,7 @@ export function aiCandidates(
   const runway = aiRunwayCandidate(available);
   if (runway) candidates.push(runway);
   candidates.push(...aiResetCandidates(available));
+  candidates.push(...fiveHourResetCandidates(available));
   for (const tool of available) candidates.push(...aiToolCandidates(tool, baselineWindowDays, baselineDeviationPercent));
 
   return candidates;

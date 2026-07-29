@@ -14,14 +14,14 @@ export const sectionCardVariants = {
 const SECTION_WORDMARKS: Partial<Record<SectionId, { markClassName: string; src: string; alt: string; className: string; aspectRatio: string }>> = {
   valorant: {
     markClassName: 'valorant-overview-mark',
-    src: publicAsset('valorant_wordmark.png'),
+    src: publicAsset('valorant/wordmark.png'),
     alt: 'Valorant',
     className: 'valorant-overview-wordmark',
     aspectRatio: '3633 / 533',
   },
   'clash-royale': {
     markClassName: 'clash-royale-overview-mark',
-    src: publicAsset('clash-royale-wordmark.png'),
+    src: publicAsset('clash-royale/wordmark.png'),
     alt: 'Clash Royale',
     className: 'clash-royale-overview-wordmark',
     aspectRatio: '1500 / 650',

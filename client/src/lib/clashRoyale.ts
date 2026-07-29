@@ -6,7 +6,7 @@ export const CLASH_ROYALE_APP_ICON_URL = 'https://media.ffycdn.net/eu/supercell/
  * marker; the mode-specific shields are only used when Supercell identifies that game as 2v2 or
  * Clan Wars. */
 export const CLASH_ROYALE_BATTLE_ART = {
-  trophyRoad: 'https://media.ffycdn.net/eu/supercell/jRQrei1MNcyVLey6oS3p.png?width=64',
+  trophyRoad: 'https://media.ffycdn.net/eu/supercell/jRQrei1MNcyVLey6oS3p.png?width=512',
   twoVTwo: 'https://static.wikia.nocookie.net/clashroyale/images/1/11/Shield_2v2.png/revision/latest?cb=20170615223652',
   clanWar: 'https://static.wikia.nocookie.net/clashroyale/images/9/9f/War_Shield.png/revision/latest?cb=20180425130200',
 } as const;

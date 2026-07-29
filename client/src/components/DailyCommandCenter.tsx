@@ -14,6 +14,11 @@ import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
 import { CLASH_ROYALE_APP_ICON_URL, clashRoyaleArenaArt, clashRoyaleLeagueArt } from '../lib/clashRoyale';
+import {
+  CLASH_OF_CLANS_APP_ICON_URL,
+  CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL,
+  CLASH_OF_CLANS_WAR_ICON_URL,
+} from '../lib/clashOfClans';
 import { publicAsset } from '../lib/publicAsset';
 import { accentStyle, SECTIONS, SectionIcon } from '../sections/registry';
 import { sectionHref } from '../router';
@@ -56,7 +61,7 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'claude' | 'codex' {
+function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'clash-of-clans' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
@@ -66,6 +71,7 @@ function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'healt
   if (slot.source === 'steam') return 'steam';
   if (slot.source === 'roblox') return 'roblox';
   if (slot.source === 'clash-royale') return 'clash-royale';
+  if (slot.source === 'clash-of-clans') return 'clash-of-clans';
   return 'personal';
 }
 
@@ -119,8 +125,22 @@ function slotArt(slot: CommandCenterSlot): string | undefined {
 /** A small game-icon badge next to the kicker on hero/secondary cards, so a Clash Royale card reads
  * unambiguously even without art (or before an unmapped arena's art loads). */
 function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
-  if (slot.render.type !== 'clash-royale-moment') return null;
-  return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-kicker-badge" />;
+  if (slot.render.type === 'clash-royale-moment') {
+    return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-kicker-badge" />;
+  }
+  if (slot.render.type === 'clash-of-clans-moment') {
+    return <img src={CLASH_OF_CLANS_APP_ICON_URL} alt="" aria-hidden className="command-kicker-badge" />;
+  }
+  return null;
+}
+
+/** Which badge illustrates a Clash of Clans moment card — war and raid weekend get their own
+ * in-game icon (war preparation reuses the war icon, since it's the same event just before it's
+ * actionable); league uses the player's own current league-tier art straight from Supercell's API
+ * rather than a static local asset, since there are far too many numbered tiers to vendor. */
+function clashOfClansMomentIcon(render: Extract<CommandCenterSlot['render'], { type: 'clash-of-clans-moment' }>): string {
+  if (render.kind === 'league') return render.leagueIconUrl ?? CLASH_OF_CLANS_APP_ICON_URL;
+  return render.kind === 'raid-weekend' ? CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL : CLASH_OF_CLANS_WAR_ICON_URL;
 }
 
 function signalMark(
@@ -131,6 +151,9 @@ function signalMark(
   const activityDay = health ? latestActivityDay(health) : undefined;
   if (slot.render.type === 'clash-royale-moment') {
     return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-clash-royale-tile-icon" />;
+  }
+  if (slot.render.type === 'clash-of-clans-moment') {
+    return <img src={clashOfClansMomentIcon(slot.render)} alt="" aria-hidden className="command-clash-of-clans-tile-icon" />;
   }
   if (slot.render.type === 'health-rings' && health && activityDay) {
     return <CompactActivityRings
@@ -155,7 +178,7 @@ function signalMark(
   if (slot.render.type === 'roblox-now-playing') {
     const iconUrl = roblox?.presence?.iconUrl;
     if (iconUrl) return <img src={iconUrl} alt="" className="command-roblox-tile-icon" />;
-    return <span className="command-roblox-tile-mark" aria-hidden><img src={publicAsset('roblox.svg')} alt="" /></span>;
+    return <span className="command-roblox-tile-mark" aria-hidden><img src={publicAsset('roblox/icon.svg')} alt="" /></span>;
   }
   return <span className="command-signal-dot" aria-hidden />;
 }

@@ -35,6 +35,7 @@ export const aiUsageHistoryPoints = pgTable(
     fiveHourUsedPercent: doublePrecision('five_hour_used_percent'),
     fiveHourResetsAt: timestamp('five_hour_resets_at', { withTimezone: true }),
     weeklyUsedPercent: doublePrecision('weekly_used_percent'),
+    weeklyResetsAt: timestamp('weekly_resets_at', { withTimezone: true }),
     modelWeeklyUsedPercent: doublePrecision('model_weekly_used_percent'),
   },
   (table) => [primaryKey({ columns: [table.toolId, table.at] }), index('ai_usage_points_tool_at_idx').on(table.toolId, table.at)],

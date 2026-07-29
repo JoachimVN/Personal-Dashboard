@@ -33,4 +33,23 @@ describe('selectNewsItems', () => {
 
     expect(selectNewsItems([items])).toHaveLength(12);
   });
+
+  it('caps a high-volume feed instead of letting it crowd out quieter feeds', () => {
+    const makeGroup = (source: string, count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        title: `${source} ${index}`,
+        source,
+        url: `https://${source}.example/${index}`,
+        publishedAt: `2026-07-15T${String(23 - index).padStart(2, '0')}:00:00.000Z`,
+      }));
+
+    const selected = selectNewsItems([makeGroup('NRK', 20), makeGroup('HN', 20), makeGroup('Tek', 20)]);
+
+    const bySource = new Map<string, number>();
+    for (const item of selected) bySource.set(item.source, (bySource.get(item.source) ?? 0) + 1);
+
+    expect(selected).toHaveLength(12);
+    expect(bySource.get('NRK')).toBeLessThanOrEqual(4);
+    expect(bySource.get('Tek')).toBeGreaterThanOrEqual(3);
+  });
 });

@@ -23,6 +23,9 @@
   --color-accent-health: light-dark(#d9385a, #ff6f91);
   /* No dedicated section anymore — kept only for the command-center "playing now" tile/secondary. */
   --color-accent-roblox: light-dark(#c2281e, #ff6b57);
+  /* No dedicated section at all (war/raid-weekend events only) — a warmer copper than Clash
+     Royale's gold so the two don't read as the same game when seated side by side. */
+  --color-accent-clash-of-clans: light-dark(#9a4a1f, #ff9152);
 
   /* Brand accents */
   --color-claude: #de7356;
