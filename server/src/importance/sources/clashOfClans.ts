@@ -34,6 +34,10 @@ function playerHref(playerTag: string): string {
   return `https://link.clashofclans.com/en?action=OpenPlayerProfile&tag=${encodeURIComponent(playerTag)}`;
 }
 
+function pluralize(count: number, noun: string): string {
+  return count === 1 ? noun : `${noun}s`;
+}
+
 /** `bestTrophies` is a leftover from the pre-revamp, never-resetting trophy system — it isn't a
  * "personal best" on the same scale as the new league trophies, which reset roughly weekly, so
  * pairing them (e.g. "39 trophies · best 5,037") reads as a nonsensical collapse against a season
@@ -66,31 +70,34 @@ function warCandidate(war: ClashOfClansData['war'], clanTag: string | undefined,
 
   const attacksRemaining = Math.max(0, war.attacksTotal - war.attacksUsed);
   const urgent = attacksRemaining > 0 && msRemaining < URGENT_WAR_HORIZON_MS;
-  const detail = `${war.clanStars}★ vs ${war.opponentStars}★${war.opponentName ? ` · ${war.opponentName}` : ''}`;
+  const opponentSuffix = war.opponentName ? ` · ${war.opponentName}` : '';
+  const detail = `${war.clanStars}★ vs ${war.opponentStars}★${opponentSuffix}`;
+  const title = attacksRemaining > 0
+    ? `${attacksRemaining} ${pluralize(attacksRemaining, 'attack')} left in war`
+    : `War ends in ${formatDuration(msRemaining)}`;
   return {
     id: `clash-of-clans:war:in-war:${war.endTime}:${war.attacksUsed}`, source: 'clash-of-clans', kind: 'clash-of-clans',
     score: urgent ? 84 : 58, shapes: urgent ? [...allShapes] : ['secondary', 'tile'],
-    kicker: 'Clan war', title: attacksRemaining > 0
-      ? `${attacksRemaining} attack${attacksRemaining === 1 ? '' : 's'} left in war`
-      : `War ends in ${formatDuration(msRemaining)}`,
+    kicker: 'Clan war', title,
     detail, href,
     render: { type: 'clash-of-clans-moment', kind: 'war', opponentName: war.opponentName, clanStars: war.clanStars, opponentStars: war.opponentStars },
   };
 }
 
 function raidWeekendCandidate(raidWeekend: ClashOfClansData['raidWeekend'], clanTag: string | undefined, now: number): Candidate | undefined {
-  if (!raidWeekend || raidWeekend.state !== 'ongoing') return undefined;
+  if (raidWeekend?.state !== 'ongoing') return undefined;
   const msRemaining = Date.parse(raidWeekend.endTime) - now;
   if (msRemaining <= 0) return undefined;
 
   const attacksRemaining = Math.max(0, raidWeekend.attacksLimit - raidWeekend.attacksUsed);
   const urgent = attacksRemaining > 0 && msRemaining < URGENT_RAID_HORIZON_MS;
+  const title = attacksRemaining > 0
+    ? `${attacksRemaining} raid ${pluralize(attacksRemaining, 'attack')} left`
+    : `Raid weekend ends in ${formatDuration(msRemaining)}`;
   return {
     id: `clash-of-clans:raid-weekend:${raidWeekend.endTime}:${raidWeekend.attacksUsed}`, source: 'clash-of-clans', kind: 'clash-of-clans',
     score: urgent ? 80 : 50, shapes: urgent ? [...allShapes] : ['secondary', 'tile'],
-    kicker: 'Raid weekend', title: attacksRemaining > 0
-      ? `${attacksRemaining} raid attack${attacksRemaining === 1 ? '' : 's'} left`
-      : `Raid weekend ends in ${formatDuration(msRemaining)}`,
+    kicker: 'Raid weekend', title,
     detail: `${raidWeekend.capitalTotalLoot.toLocaleString()} capital gold looted so far`,
     href: clanHref(clanTag),
     render: { type: 'clash-of-clans-moment', kind: 'raid-weekend', capitalTotalLoot: raidWeekend.capitalTotalLoot },
