@@ -8,6 +8,12 @@ import {
   CLASH_OF_CLANS_WAR_ICON_URL,
 } from '../../../lib/clashOfClans';
 
+function badgeIconUrl(kind: 'war' | 'war-preparation' | 'raid-weekend' | 'league', leagueIconUrl: string | undefined): string {
+  if (kind === 'raid-weekend') return CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL;
+  if (kind === 'league') return leagueIconUrl ?? CLASH_OF_CLANS_APP_ICON_URL;
+  return CLASH_OF_CLANS_WAR_ICON_URL;
+}
+
 /** War and raid weekend both get the same badge-plus-stat-row treatment as Clash Royale's
  * win-streak card (see secondary/clashRoyale.tsx) — a badge for the moment, then the one number
  * that matters (star tally or capital loot) rendered with the game's own icon instead of a plain
@@ -17,11 +23,7 @@ import {
 export function ClashOfClansMomentSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
   if (slot.render.type !== 'clash-of-clans-moment') return null;
   const { kind, clanStars, opponentStars, capitalTotalLoot, leagueIconUrl } = slot.render;
-  const badgeSrc = kind === 'raid-weekend'
-    ? CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL
-    : kind === 'league'
-      ? (leagueIconUrl ?? CLASH_OF_CLANS_APP_ICON_URL)
-      : CLASH_OF_CLANS_WAR_ICON_URL;
+  const badgeSrc = badgeIconUrl(kind, leagueIconUrl);
 
   return <div className="command-secondary-clash-of-clans mt-4">
     <div className="command-clash-of-clans-badge" aria-hidden>

@@ -124,7 +124,12 @@ function buildGeometry(chartPoints: ChartPoint[]): ChartGeometry {
  * that observation, then falls vertically instead of misleadingly interpolating a gradual decline.
  */
 function addObservedResetPoints(chartPoints: ChartPoint[]): void {
-  for (let index = 1; index < chartPoints.length; index += 1) {
+  // Bounded to the pre-existing length: the loop pushes synthetic points onto chartPoints as it
+  // goes, and `chartPoints.length` is re-read every iteration, so an unbounded loop would
+  // eventually treat an earlier reset's synthetic point as a fresh neighbor of a later, unrelated
+  // one — comparing their values as if adjacent in time and fabricating a bogus extra reset.
+  const observedLength = chartPoints.length;
+  for (let index = 1; index < observedLength; index += 1) {
     const previous = chartPoints[index - 1]!;
     const current = chartPoints[index]!;
     const drop = previous.percent - current.percent;
@@ -140,6 +145,55 @@ function addObservedResetPoints(chartPoints: ChartPoint[]): void {
   }
 }
 
+/** Collapse reset readings that land less than a full window apart (they're the same still-ongoing
+ * window's deadline drifting between polls, not separate resets), keeping the latest of each. */
+function clusterResets(rawResets: number[], sessionWindowMs: number): number[] {
+  const resets: number[] = [];
+  for (const reset of rawResets) {
+    if (resets.length && reset - resets.at(-1)! < sessionWindowMs) {
+      resets[resets.length - 1] = reset;
+    } else {
+      resets.push(reset);
+    }
+  }
+  return resets;
+}
+
+/** Pushes the cap-end/reset-anchor pair for one reset timestamp, if it falls in the visible window.
+ * `stablePoints` is a pre-loop snapshot so one reset's insertions can't leak into another's lookup. */
+function addResetAnchor(
+  chartPoints: ChartPoint[],
+  stablePoints: ChartPoint[],
+  reset: number,
+  start: number,
+  end: number,
+  windowMs: number,
+): void {
+  if (reset <= start || reset > end) return;
+  const observedZero = stablePoints.some((point) => Date.parse(point.at) === reset && point.percent === 0);
+  const prior = stablePoints.findLast((point) => Date.parse(point.at) < reset);
+  if (prior?.percent === 100) {
+    chartPoints.push({
+      x: ((reset - start) / windowMs) * W,
+      y: 0,
+      at: new Date(reset).toISOString(),
+      percent: 100,
+      order: 1,
+      sessionCapEnd: true,
+    });
+  }
+  if (!observedZero) {
+    chartPoints.push({
+      x: ((reset - start) / windowMs) * W,
+      y: H,
+      at: new Date(reset).toISOString(),
+      percent: 0,
+      order: 2,
+      resetAnchor: true,
+    });
+  }
+}
+
 /** Splices the synthetic reset/session-start markers (see ChartPoint) into chartPoints in place,
  * one set per known reset timestamp within the visible window. */
 function addSessionResetPoints(
@@ -151,38 +205,24 @@ function addSessionResetPoints(
   end: number,
   windowMs: number,
 ): void {
-  const resets = new Set([
+  const rawResets = [
     ...points.map((point) => point.fiveHourResetsAt).filter((reset): reset is string => Boolean(reset)),
     sessionResetsAt,
-  ].filter((reset): reset is string => Boolean(reset)));
-  for (const resetAt of resets) {
-    const reset = Date.parse(resetAt);
-    if (!Number.isFinite(reset)) continue;
+  ]
+    .filter((reset): reset is string => Boolean(reset))
+    .map((reset) => Date.parse(reset))
+    .filter((reset) => Number.isFinite(reset))
+    .sort((a, b) => a - b);
+  // The provider's reported reset deadline can drift a little from poll to poll (it reflects the
+  // live rolling window, not a fixed boundary); see clusterResets.
+  const resets = clusterResets(rawResets, sessionWindowMs);
+  // Snapshot before mutating: without this, an earlier reset's synthetic insertions (pushed onto
+  // chartPoints below) could be picked up as a *later* reset's "prior" sample, since they're
+  // appended out of chronological order.
+  const stablePoints = [...chartPoints];
+  for (const reset of resets) {
+    addResetAnchor(chartPoints, stablePoints, reset, start, end, windowMs);
     const sessionStart = reset - sessionWindowMs;
-    if (reset > start && reset <= end) {
-      const observedZero = chartPoints.some((point) => Date.parse(point.at) === reset && point.percent === 0);
-      const prior = chartPoints.findLast((point) => Date.parse(point.at) < reset);
-      if (prior?.percent === 100) {
-        chartPoints.push({
-          x: ((reset - start) / windowMs) * W,
-          y: 0,
-          at: new Date(reset).toISOString(),
-          percent: 100,
-          order: 1,
-          sessionCapEnd: true,
-        });
-      }
-      if (!observedZero) {
-        chartPoints.push({
-          x: ((reset - start) / windowMs) * W,
-          y: H,
-          at: new Date(reset).toISOString(),
-          percent: 0,
-          order: 2,
-          resetAnchor: true,
-        });
-      }
-    }
     if (sessionStart <= start || sessionStart > end) continue;
     chartPoints.push({
       x: ((sessionStart - start) / windowMs) * W,
@@ -266,8 +306,12 @@ export function UsageHistoryChart({
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * W;
     setHovered(
+      // On an exact tie (e.g. the synthetic pre-reset duplicate and the flagged real sample
+      // that follows it share the drop's x-coordinate), prefer the later point: chartPoints is
+      // sorted with the reset-flagged sample after its synthetic predecessor, so `<=` surfaces
+      // the reset instead of silently reporting the stale pre-reset value.
       chartPoints.reduce((best, point) =>
-        Math.abs(point.x - x) < Math.abs(best.x - x) ? point : best,
+        Math.abs(point.x - x) <= Math.abs(best.x - x) ? point : best,
       ),
     );
   };

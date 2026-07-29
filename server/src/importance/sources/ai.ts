@@ -150,15 +150,19 @@ function aiResetCandidates(available: AiTool[]): Candidate[] {
   if (!resets.length) return [];
   if (resets.length === 1) {
     const reset = resets[0]!;
+    let detail: string;
+    if (reset.expectedResetsAt) {
+      detail = `Back down to ${reset.usedPercent.toFixed(0)}% · expected ${resetLabel(reset.expectedResetsAt)}`;
+    } else if (reset.resetsAt) {
+      detail = `Back down to ${reset.usedPercent.toFixed(0)}% · clean slate until ${resetLabel(reset.resetsAt)}`;
+    } else {
+      detail = `Back down to ${reset.usedPercent.toFixed(0)}% of the weekly limit`;
+    }
     return [{
       id: `ai-usage:reset:${reset.tool.id}`, source: 'ai-usage', kind: 'ai-usage', score: 65,
       shapes: ['secondary', 'tile'], kicker: 'Fresh allowance',
       title: `${reset.tool.label} usage ${reset.expectedResetsAt ? 'reset early' : 'just reset'}`,
-      detail: reset.expectedResetsAt
-        ? `Back down to ${reset.usedPercent.toFixed(0)}% · expected ${resetLabel(reset.expectedResetsAt)}`
-        : reset.resetsAt
-          ? `Back down to ${reset.usedPercent.toFixed(0)}% · clean slate until ${resetLabel(reset.resetsAt)}`
-          : `Back down to ${reset.usedPercent.toFixed(0)}% of the weekly limit`,
+      detail,
       href: '#/ai', accent: aiAccent(reset.tool), render: aiUsageRender([aiAccent(reset.tool)], 'weekly'),
     }];
   }
@@ -241,13 +245,12 @@ export function aiCandidates(
   baselineDeviationPercent: number,
 ): Candidate[] {
   const available = tools.filter((tool) => tool.data?.available);
-  const candidates: Candidate[] = [];
-
   const runway = aiRunwayCandidate(available);
-  if (runway) candidates.push(runway);
-  candidates.push(...aiResetCandidates(available));
-  candidates.push(...fiveHourResetCandidates(available));
-  for (const tool of available) candidates.push(...aiToolCandidates(tool, baselineWindowDays, baselineDeviationPercent));
 
-  return candidates;
+  return [
+    ...(runway ? [runway] : []),
+    ...aiResetCandidates(available),
+    ...fiveHourResetCandidates(available),
+    ...available.flatMap((tool) => aiToolCandidates(tool, baselineWindowDays, baselineDeviationPercent)),
+  ];
 }
