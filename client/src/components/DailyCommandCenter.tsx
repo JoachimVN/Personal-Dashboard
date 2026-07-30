@@ -444,7 +444,8 @@ export function HeroPanel({
                 {!event.location && !event.description && <p>{hero.detail}</p>}
               </div>
             ) : (
-              (hero.render.type === 'gmail-threads' || hero.render.type === 'sonar-quality-gate') && extra
+              (hero.render.type === 'gmail-threads' || hero.render.type === 'sonar-quality-gate'
+                || (hero.render.type === 'clash-royale-moment' && hero.render.kind === 'best-trophies')) && extra
                 ? null
                 : <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{hero.detail}</p>
             )}

@@ -7,6 +7,7 @@ import {
   CLASH_OF_CLANS_STAR_ICON_URL,
   CLASH_OF_CLANS_WAR_ICON_URL,
 } from '../../../lib/clashOfClans';
+import { CLASH_ROYALE_TROPHY_ICON_URL } from '../../../lib/clashRoyale';
 
 function badgeIconUrl(kind: 'war' | 'war-preparation' | 'raid-weekend' | 'league', leagueIconUrl: string | undefined): string {
   if (kind === 'raid-weekend') return CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL;
@@ -45,7 +46,7 @@ export function ClashOfClansMomentSecondary({ slot }: Readonly<{ slot: CommandCe
       )}
       {kind === 'league' && trophies !== undefined && (
         <p className="command-clash-of-clans-stat" aria-label={`${trophies.toLocaleString()} trophies`}>
-          <span>{trophies.toLocaleString()} trophies</span>
+          <span><img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" aria-hidden />{trophies.toLocaleString()} trophies</span>
         </p>
       )}
       {kind === 'war-preparation' && <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>}

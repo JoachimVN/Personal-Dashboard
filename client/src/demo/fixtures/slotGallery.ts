@@ -302,7 +302,7 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
       label: 'clash-royale-moment (best-trophies)',
       slot: {
         id: 'gallery:clash-royale:best-trophies', source: 'clash-royale', kind: 'clash-royale', kicker: 'New best',
-        title: 'Personal trophy record', detail: '6,214 trophies — a new high', href: '#/clash-royale', score: 50,
+        title: 'Personal trophy record', detail: 'Your highest trophy count yet', href: '#/clash-royale', score: 50,
         render: { type: 'clash-royale-moment', kind: 'best-trophies', bestTrophies: 6214 },
       },
     },
@@ -356,9 +356,9 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
       label: 'clash-of-clans-moment (league)',
       slot: {
         id: 'gallery:clash-of-clans:league', source: 'clash-of-clans', kind: 'clash-of-clans',
-        kicker: 'Clash of Clans', title: 'Legend League', detail: '5,214 trophies',
+        kicker: 'Clash of Clans', title: 'Titan League 26', detail: '312 trophies',
         href: '#/clash-of-clans', score: 50,
-        render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: 'https://api-assets.clashofclans.com/leaguetiers/326/abc.png', trophies: 5214 },
+        render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: 'https://api-assets.clashofclans.com/leaguetiers/125/yIfqSgrhiYRcuMbAPCoeCj1FTmfylCLxnrAljEZc8K0.png', trophies: 312 },
       },
     },
   ];
