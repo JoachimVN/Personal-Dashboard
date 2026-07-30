@@ -21,3 +21,9 @@ export interface ClashRoyaleMoments {
   newLeague?: { leagueNumber: number; trophies: number };
   newBestTrophies?: number;
 }
+
+/** SonarCloud quality gate transitions (same cross-poll-history reasoning as SteamMoments) —
+ * computed once in commandCenter.ts via SignalHistoryStore and passed into sonarCandidates(). */
+export interface SonarMoments {
+  changed: { projectKey: string; projectName: string; status: 'passed' | 'failed' }[];
+}

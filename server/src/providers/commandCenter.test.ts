@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ClashRoyaleData, SpotifyData, SteamData } from '@personal-dashboard/shared';
-import { computeClashRoyaleMoments, computeSpotifyFreshness, computeSteamMoments } from './commandCenter.js';
+import type { ClashRoyaleData, SonarCloudData, SpotifyData, SteamData } from '@personal-dashboard/shared';
+import { computeClashRoyaleMoments, computeSonarMoments, computeSpotifyFreshness, computeSteamMoments } from './commandCenter.js';
 import type { SignalHistoryStore } from '../signalHistory.js';
 
 class InMemorySignals {
@@ -159,5 +159,27 @@ describe('computeClashRoyaleMoments', () => {
     await expect(computeClashRoyaleMoments(signals, clashRoyale({ bestTrophies: 5000 }), FRESH_MS)).resolves.toMatchObject({ newBestTrophies: undefined });
     await expect(computeClashRoyaleMoments(signals, clashRoyale({ bestTrophies: 5200 }), FRESH_MS)).resolves.toMatchObject({ newBestTrophies: 5200 });
     await expect(computeClashRoyaleMoments(signals, clashRoyale({ bestTrophies: 5200 }), FRESH_MS)).resolves.toMatchObject({ newBestTrophies: undefined });
+  });
+});
+
+function sonarCloud(status: 'passed' | 'failed' | 'none'): SonarCloudData {
+  return { projects: [{ key: 'proj-a', name: 'Project A', visibility: 'public', qualityGateStatus: status, languages: [] }] };
+}
+
+describe('computeSonarMoments', () => {
+  it('does not fire on the first observation, only once the quality gate actually changes', async () => {
+    const signals = new InMemorySignals() as unknown as SignalHistoryStore;
+
+    await expect(computeSonarMoments(signals, sonarCloud('passed'), FRESH_MS)).resolves.toEqual({ changed: [] });
+    await expect(computeSonarMoments(signals, sonarCloud('passed'), FRESH_MS)).resolves.toEqual({ changed: [] });
+    await expect(computeSonarMoments(signals, sonarCloud('failed'), FRESH_MS))
+      .resolves.toEqual({ changed: [{ projectKey: 'proj-a', projectName: 'Project A', status: 'failed' }] });
+  });
+
+  it('ignores projects with no quality gate configured', async () => {
+    const signals = new InMemorySignals() as unknown as SignalHistoryStore;
+
+    await computeSonarMoments(signals, sonarCloud('none'), FRESH_MS);
+    await expect(computeSonarMoments(signals, sonarCloud('none'), FRESH_MS)).resolves.toEqual({ changed: [] });
   });
 });

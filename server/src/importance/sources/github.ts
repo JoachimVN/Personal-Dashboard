@@ -11,6 +11,7 @@ export function githubCandidates(
 ): Candidate[] {
   if (!data) return [];
   const reviews = data.pullRequests.filter((pr) => pr.role === 'review-requested');
+  const openPrs = data.pullRequests.filter((pr) => pr.role === 'author' && !pr.draft);
   const days = data.contributions.days;
   const today = days.at(-1)?.count ?? 0;
   const candidates: Candidate[] = [];
@@ -19,6 +20,13 @@ export function githubCandidates(
       id: `github:review:${reviews[0].repo}:${reviews[0].number}`, source: 'github', kind: 'github', score: 91,
       shapes: [...allShapes], kicker: reviews.length > 1 ? `${reviews.length} reviews waiting` : 'Review requested',
       title: reviews[0].title, detail: reviews[0].repo, href: '#/github', render: { type: 'github-reviews' },
+    });
+  }
+  if (openPrs.length) {
+    candidates.push({
+      id: `github:open-pr:${openPrs[0].repo}:${openPrs[0].number}`, source: 'github', kind: 'github', score: 50,
+      shapes: [...allShapes], kicker: openPrs.length > 1 ? `${openPrs.length} open pull requests` : 'Open pull request',
+      title: openPrs[0].title, detail: openPrs[0].repo, href: '#/github', render: { type: 'github-open-prs' },
     });
   }
   // Only an unusually HIGH day is a signal — a quiet day isn't a "code anomaly" worth surfacing.

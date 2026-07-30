@@ -17,6 +17,7 @@ export { imessageCandidates } from './imessage.js';
 export { aiNewsCandidates, newsCandidates } from './news.js';
 export { powerCandidates } from './power.js';
 export { robloxCandidates } from './roblox.js';
+export { sonarCandidates } from './sonar.js';
 export { spotifyCandidates, type SpotifyFreshness } from './spotify.js';
 export { steamCandidates } from './steam.js';
 export { transitCandidates } from './transit.js';

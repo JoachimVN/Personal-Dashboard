@@ -11,6 +11,12 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('health-rings') }),
   z.object({ type: z.literal('github-contributions') }),
   z.object({ type: z.literal('github-reviews') }),
+  z.object({ type: z.literal('github-open-prs') }),
+  z.object({
+    type: z.literal('sonar-quality-gate'),
+    status: z.enum(['passed', 'failed']),
+    projects: z.array(z.object({ key: z.string(), name: z.string() })).min(1),
+  }),
   z.object({ type: z.literal('gmail-threads'), threadIds: z.array(z.string()) }),
   z.object({
     type: z.literal('weather-signal'),
@@ -65,7 +71,7 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'clash-of-clans', 'transit', 'power', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'sonar', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'clash-of-clans', 'transit', 'power', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

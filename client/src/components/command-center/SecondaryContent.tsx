@@ -17,10 +17,17 @@ import { CalendarAgendaSecondary } from './secondary/calendar';
 import { ClashOfClansMomentSecondary } from './secondary/clashOfClans';
 import { ClashRoyaleWinStreakSecondary } from './secondary/clashRoyale';
 import { FallbackSecondary } from './secondary/fallback';
-import { GithubContributionsSecondary, GithubReviewList, GithubReviewsSecondary } from './secondary/github';
+import {
+  GithubContributionsSecondary,
+  GithubOpenPrList,
+  GithubOpenPrsSecondary,
+  GithubReviewList,
+  GithubReviewsSecondary,
+} from './secondary/github';
 import { GmailThreadList, GmailThreadsSecondary } from './secondary/gmail';
 import { HealthRingsSecondary } from './secondary/health';
 import { RobloxNowPlayingSecondary } from './secondary/roblox';
+import { SonarQualityGateSecondary } from './secondary/sonar';
 import {
   SpotifyAlbumSecondary,
   SpotifyArtistSecondary,
@@ -60,6 +67,8 @@ export function SecondaryContent(props: Readonly<{
     case 'health-rings': return HealthRingsSecondary({ slot, health }) ?? <FallbackSecondary slot={slot} />;
     case 'github-contributions': return GithubContributionsSecondary({ slot, github, hoveredDay, onHover }) ?? <FallbackSecondary slot={slot} />;
     case 'github-reviews': return GithubReviewsSecondary({ slot, github }) ?? <FallbackSecondary slot={slot} />;
+    case 'github-open-prs': return GithubOpenPrsSecondary({ slot, github }) ?? <FallbackSecondary slot={slot} />;
+    case 'sonar-quality-gate': return SonarQualityGateSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
     case 'gmail-threads': return GmailThreadsSecondary({ slot, gmail }) ?? <FallbackSecondary slot={slot} />;
     case 'weather-signal': return WeatherSignalSecondary({ slot, weather }) ?? <FallbackSecondary slot={slot} />;
     case 'ai-usage-tool': return AiUsageSecondary({ slot, aiUsage }) ?? <FallbackSecondary slot={slot} />;
@@ -75,6 +84,7 @@ export function SecondaryContent(props: Readonly<{
 export function heroExtraFor(hero: CommandCenterData['hero'], github: GitHubData | undefined, gmail: GmailData | undefined, aiUsage: AiUsageByTool, weather: WeatherData | undefined): ReactNode {
   const { render } = hero;
   if (render.type === 'github-reviews') return GithubReviewList({ github, skip: 1 });
+  if (render.type === 'github-open-prs') return GithubOpenPrList({ github, skip: 1 });
   if (render.type === 'gmail-threads') return GmailThreadList({ threadIds: render.threadIds, gmail });
   if (render.type === 'weather-signal' && render.kind === 'severe' && weather) {
     return <div className="mt-4"><WeatherHourlyRows weather={weather} /></div>;

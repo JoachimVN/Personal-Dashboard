@@ -13,6 +13,7 @@ import {
   type NewsData,
   type PowerData,
   type RobloxData,
+  type SonarCloudData,
   type SpotifyData,
   type SteamData,
   type SteamGame,
@@ -37,6 +38,7 @@ import {
   newsCandidates,
   powerCandidates,
   robloxCandidates,
+  sonarCandidates,
   spotifyCandidates,
   steamCandidates,
   transitCandidates,
@@ -45,7 +47,7 @@ import {
 } from '../importance/sources/index.js';
 import type { ProviderScheduler, Provider } from '../scheduler.js';
 import { SignalHistoryStore } from '../signalHistory.js';
-import type { ClashRoyaleMoments, SteamMoments } from '../importance/types.js';
+import type { ClashRoyaleMoments, SonarMoments, SteamMoments } from '../importance/types.js';
 
 function widgetData<T>(envelopes: Record<string, WidgetEnvelope>, id: string): T | undefined {
   const envelope = envelopes[id];
@@ -250,6 +252,32 @@ export async function computeClashRoyaleMoments(
   return { newArena, newLeague, newBestTrophies };
 }
 
+/**
+ * Detects SonarCloud quality gate transitions (same "first observation is a baseline, not a
+ * change" guard as the other moment detectors above). Projects with no quality gate configured
+ * ('none') are skipped — there's no pass/fail state to transition between.
+ */
+export async function computeSonarMoments(
+  signalHistory: SignalHistoryStore,
+  sonarCloud: SonarCloudData | undefined,
+  freshMs: number,
+): Promise<SonarMoments> {
+  if (!sonarCloud) return { changed: [] };
+  const results = await Promise.all(
+    sonarCloud.projects
+      .filter((project) => project.qualityGateStatus !== 'none')
+      .map(async (project) => {
+        const metric = `quality-gate:${project.key}`;
+        await signalHistory.record('sonar-cloud', metric, project.qualityGateStatus);
+        const fresh = await isFreshSinceRecord(signalHistory, 'sonar-cloud', metric, freshMs);
+        return fresh
+          ? { projectKey: project.key, projectName: project.name, status: project.qualityGateStatus as 'passed' | 'failed' }
+          : undefined;
+      }),
+  );
+  return { changed: results.filter((result): result is NonNullable<typeof result> => result !== undefined) };
+}
+
 export function createCommandCenterProvider(
   scheduler: ProviderScheduler,
   signalHistory: SignalHistoryStore,
@@ -274,7 +302,8 @@ export function createCommandCenterProvider(
       const steam = widgetData<SteamData>(envelopes, 'steam');
       const clashRoyale = widgetData<ClashRoyaleData>(envelopes, 'clash-royale');
       const clashOfClans = widgetData<ClashOfClansData>(envelopes, 'clash-of-clans');
-      const [spotifyFresh, steamMoments, clashRoyaleMoments] = await Promise.all([
+      const sonarCloud = widgetData<SonarCloudData>(envelopes, 'sonar-cloud');
+      const [spotifyFresh, steamMoments, clashRoyaleMoments, sonarMoments] = await Promise.all([
         withFallback(
           computeSpotifyFreshness(signalHistory, spotify, config.commandCenter.spotifyFreshMs),
           EMPTY_SPOTIFY_FRESHNESS,
@@ -288,6 +317,10 @@ export function createCommandCenterProvider(
         withFallback(
           computeClashRoyaleMoments(signalHistory, clashRoyale, config.commandCenter.clashRoyaleMomentFreshMs),
           {},
+        ),
+        withFallback(
+          computeSonarMoments(signalHistory, sonarCloud, config.commandCenter.sonarQualityGateFreshMs),
+          { changed: [] },
         ),
       ]);
       return rankCandidates([
@@ -309,6 +342,7 @@ export function createCommandCenterProvider(
           config.commandCenter.clashRoyaleWinStreakFreshMs,
         ),
         ...clashOfClansCandidates(clashOfClans),
+        ...sonarCandidates(sonarCloud, sonarMoments),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),
           config.commandCenter.weatherHotC,
