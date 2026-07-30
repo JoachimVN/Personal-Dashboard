@@ -374,6 +374,27 @@
   font-size: 0.7rem;
 }
 
+/* Arena/league backdrop art (.command-panel-art) is right-anchored and reaches down into the
+   weather row, which sits right-aligned in that same region — light, low-contrast forecast text
+   directly over bright key art was hard to read. Scoped to cards that actually have art so every
+   other hero card's weather row is untouched. */
+.command-primary:has(.command-panel-art) .command-weather-row {
+  position: relative;
+  isolation: isolate;
+  margin: 1.75rem -0.85rem 0;
+  padding: 1rem 0.85rem 0;
+  border-radius: 0 0 1.4rem 1.4rem;
+}
+
+.command-primary:has(.command-panel-art) .command-weather-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: light-dark(rgb(255 255 255 / 0.6), rgb(4 8 16 / 0.6));
+}
+
 .command-signals {
   display: grid;
   border-radius: 1.4rem;
@@ -502,6 +523,26 @@
   border-radius: 0.25rem;
   object-fit: cover;
   vertical-align: middle;
+}
+
+/* Weather's badge is a plain emoji glyph, not art — the fixed image box above would clip or
+   squash it, so this resets to the glyph's own natural size instead. */
+.command-kicker-badge--glyph {
+  width: auto;
+  height: auto;
+  margin: 0 0.35rem -0.05rem 0;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* Reused secondary bodies (Spotify/Steam/Roblox/Clash cards) size their artwork and rows off
+   --secondary-carousel-media-size/-content-height, which the carousel wrapper normally defines —
+   this stands in for that wrapper when those same components render as the hero's lead content,
+   at the carousel's own default size so hero can't end up smaller than secondary. */
+.command-hero-lead {
+  --secondary-carousel-media-size: 8.5rem;
+  --secondary-carousel-content-height: 10.625rem;
+  margin-top: 1.25rem;
 }
 
 /* Arena/league key art, right-anchored and faded into the card rather than stretched full-bleed —
@@ -869,11 +910,28 @@
   border-radius: 0.85rem;
 }
 
+.command-clash-streak-crowns-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+/* Community-sourced (see lib/clashRoyale.ts) and noticeably lower-res than the rest of the art on
+   this card — kept small enough that it reads as a mark rather than a blurry hero image. */
+.command-clash-trophy-icon {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  object-fit: contain;
+  opacity: 0.9;
+}
+
 .command-clash-streak-crowns {
   display: flex;
   overflow: hidden;
   gap: 0.32rem;
-  margin: 0.75rem 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }

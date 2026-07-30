@@ -1,7 +1,30 @@
 import type { ReactNode } from 'react';
 import type { CommandCenterSlot } from '@personal-dashboard/shared';
-import { clashRoyaleBattleIcon } from '../../../lib/clashRoyale';
+import { CLASH_ROYALE_TROPHY_ICON_URL, clashRoyaleBattleIcon } from '../../../lib/clashRoyale';
 import { ClashCrownScore, TrimmedBattleModeIcon } from '../../../widgets/ClashRoyaleWidgets';
+
+/** Crown-score chips for a run of battles, prefixed with a small trophy mark — shared by the
+ * win-streak and session cards below, which differ only in their badge column and which battles
+ * they pass in. */
+function ClashCrownRow({ battles }: Readonly<{ battles: { crownsFor: number; crownsAgainst: number; battleTime: string; result?: 'win' | 'loss' | 'draw' }[] }>): ReactNode {
+  const shown = battles.slice(-5);
+  const hiddenCount = battles.length - shown.length;
+  return (
+    <div className="command-clash-streak-crowns-row">
+      <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" aria-hidden className="command-clash-trophy-icon" />
+      <ol className="command-clash-streak-crowns" aria-label="Crown score for each battle">
+        {hiddenCount > 0 && <li className="command-clash-streak-crowns-overflow">+{hiddenCount}</li>}
+        {shown.map((battle, index) => (
+          <li key={`${battle.battleTime}-${index}`} data-result={battle.result}>
+            <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
+              <ClashCrownScore crownsFor={battle.crownsFor} crownsAgainst={battle.crownsAgainst} />
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
 
 /** This only reaches the secondary carousel for a long streak (>10, see clashRoyaleWinStreakCandidate)
  * — short ones are tile-only now, so this card can afford to be a little more celebratory. The badge
@@ -15,24 +38,29 @@ export function ClashRoyaleWinStreakSecondary({ slot }: Readonly<{ slot: Command
   const { streakCrowns, streakBattleMode } = slot.render;
   if (!streakCrowns?.length) return null;
   const icon = streakBattleMode ? clashRoyaleBattleIcon(streakBattleMode) : undefined;
-  const shown = streakCrowns.slice(-5);
-  const hiddenCount = streakCrowns.length - shown.length;
   return <div className="command-secondary-clash-streak mt-4">
     <div className="command-clash-streak-badge" aria-hidden>
       {icon && <TrimmedBattleModeIcon src={icon.src} isAppIcon={icon.isAppIcon} />}
     </div>
     <div className="min-w-0 flex-1">
       <p className="text-sm font-semibold text-ink">{slot.title}</p>
-      <ol className="command-clash-streak-crowns" aria-label="Crown score for each win in the streak">
-        {hiddenCount > 0 && <li className="command-clash-streak-crowns-overflow">+{hiddenCount}</li>}
-        {shown.map((battle, index) => (
-          <li key={`${battle.battleTime}-${index}`}>
-            <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
-              <ClashCrownScore crownsFor={battle.crownsFor} crownsAgainst={battle.crownsAgainst} />
-            </div>
-          </li>
-        ))}
-      </ol>
+      <ClashCrownRow battles={streakCrowns} />
+      <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>
+    </div>
+  </div>;
+}
+
+/** A session has no single battle mode to badge (it's whatever mix of games happened in the
+ * window), so unlike the win-streak card above it skips the badge column entirely and leans on
+ * the trophy mark in the crowns row for its Clash Royale identity. */
+export function ClashRoyaleSessionSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
+  if (slot.render.type !== 'clash-royale-moment' || slot.render.kind !== 'session') return null;
+  const { sessionCrowns } = slot.render;
+  if (!sessionCrowns?.length) return null;
+  return <div className="command-secondary-clash-streak mt-4">
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-semibold text-ink">{slot.title}</p>
+      <ClashCrownRow battles={sessionCrowns} />
       <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>
     </div>
   </div>;

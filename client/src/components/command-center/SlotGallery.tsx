@@ -93,7 +93,7 @@ export function SlotGallery() {
         <div className="flex flex-wrap gap-6">
           {slots.map(({ label, slot }: GallerySlot) => (
             <GalleryCard key={slot.id} label={label} width={heroWidth}>
-              <HeroPanel hero={slot} {...heroPropsFor(slot, data)} weather={data.weather} />
+              <HeroPanel hero={slot} {...heroPropsFor(slot, { ...data, hoveredDay, onHover: setHoveredDay })} weather={data.weather} />
             </GalleryCard>
           ))}
         </div>

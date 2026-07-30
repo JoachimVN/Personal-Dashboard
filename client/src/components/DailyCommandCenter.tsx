@@ -12,7 +12,7 @@ import type {
   SteamData,
   WeatherData,
 } from '@personal-dashboard/shared';
-import { deg, glyph, weatherLocation } from '../lib/weather';
+import { deg, glyph, HUMIDITY_COLOR, PRECIP_COLOR, UV_COLOR, weatherLocation, WIND_COLOR } from '../lib/weather';
 import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
@@ -27,9 +27,9 @@ import { publicAsset } from '../lib/publicAsset';
 import { accentStyle, SECTIONS, SectionIcon } from '../sections/registry';
 import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
-import { Thumb } from '../widgets/SpotifyWidget';
 import { GitHubMark } from './GitHubMark';
-import { heroExtraFor, SecondaryContent } from './command-center/SecondaryContent';
+import { SteamMark } from './SteamMark';
+import { heroExtraFor, heroLeadFor, SecondaryContent } from './command-center/SecondaryContent';
 import { AiToolMark } from './command-center/secondary/fallback';
 import { QualityGatePill } from './command-center/secondary/sonar';
 import { useRobloxArtPalette } from './command-center/useRobloxArtPalette';
@@ -82,6 +82,21 @@ const WEATHER_KIND_GLYPH: Record<Extract<CommandCenterSlot['render'], { type: 'w
   severe: '⛈️', hot: '🌡️', cold: '🥶', rain: '🌧️', wind: '💨', uv: '☀️', sunset: '🌇', moon: '🌕',
 };
 
+/** Recolors the hero panel's accent per weather signal kind instead of one flat weather orange for
+ * all eight — reuses the same per-quantity colors the weather section's own gauges/sparkline use
+ * (wind/UV/rain), so "cold" reading blue and "hot" reading orange isn't a color invented just for
+ * this card. */
+const WEATHER_KIND_COLOR: Record<Extract<CommandCenterSlot['render'], { type: 'weather-signal' }>['kind'], string> = {
+  severe: 'light-dark(#c0392b, #f87171)',
+  hot: 'light-dark(#c2410c, #fb923c)',
+  cold: 'light-dark(#1d4ed8, #7dd3fc)',
+  rain: PRECIP_COLOR,
+  wind: WIND_COLOR,
+  uv: UV_COLOR,
+  sunset: 'light-dark(#c2477c, #fda4af)',
+  moon: HUMIDITY_COLOR,
+};
+
 function secondarySlotsFor(commandCenter: CommandCenterData | undefined): CommandCenterSlot[] {
   if (!commandCenter) return [];
   return Array.isArray(commandCenter.secondary)
@@ -125,14 +140,30 @@ export function slotArt(slot: CommandCenterSlot): string | undefined {
   return undefined;
 }
 
-/** A small game-icon badge next to the kicker on hero/secondary cards, so a Clash Royale card reads
- * unambiguously even without art (or before an unmapped arena's art loads). */
+/** A small service-icon badge next to the kicker on hero/secondary cards, so a card reads
+ * unambiguously even before its own art/thumbnail loads (or, for arena/league, when there's no art
+ * mapped for that name yet). */
 function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
   if (slot.render.type === 'clash-royale-moment') {
     return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-kicker-badge" />;
   }
   if (slot.render.type === 'clash-of-clans-moment') {
     return <img src={CLASH_OF_CLANS_APP_ICON_URL} alt="" aria-hidden className="command-kicker-badge" />;
+  }
+  if (slot.render.type === 'spotify-now-playing' || slot.render.type === 'spotify-track' || slot.render.type === 'spotify-artist' || slot.render.type === 'spotify-album') {
+    return <img src={publicAsset('spotify/icon.svg')} alt="" aria-hidden className="command-kicker-badge" />;
+  }
+  if (slot.render.type === 'steam-now-playing' || slot.render.type === 'steam-achievement') {
+    return <SteamMark className="command-kicker-badge" />;
+  }
+  if (slot.render.type === 'roblox-now-playing') {
+    return <img src={publicAsset('roblox/icon.svg')} alt="" aria-hidden className="command-kicker-badge" />;
+  }
+  if (slot.render.type === 'github-contributions' || slot.render.type === 'github-reviews' || slot.render.type === 'github-open-prs') {
+    return <GitHubMark className="command-kicker-badge text-(--color-github-mark)" />;
+  }
+  if (slot.render.type === 'weather-signal') {
+    return <span className="command-kicker-badge command-kicker-badge--glyph" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
   }
   return null;
 }
@@ -363,7 +394,7 @@ function CommandCenterSkeleton() {
 export function HeroPanel({
   hero,
   event,
-  track,
+  lead,
   kicker,
   extra,
   activity,
@@ -371,47 +402,53 @@ export function HeroPanel({
 }: Readonly<{
   hero: CommandCenterData['hero'];
   event: CalendarData['events'][number] | undefined;
-  track: { imageUrl?: string; track: string; artist: string } | undefined;
+  /** Full-fidelity replacement for the generic title/detail block below, for render types whose
+   * secondary body already has everything a plain title/detail block would (see `heroLeadFor`). */
+  lead: ReactNode;
   kicker: string;
   extra: ReactNode;
   activity: HealthData | undefined;
   weather: WeatherData | undefined;
 }>) {
   const today = weather?.days[0];
-  const nonEventDetail = hero.render.type === 'gmail-threads' && extra
-    ? null
-    : <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{track?.artist ?? hero.detail}</p>;
+  const weatherAccentStyle = hero.render.type === 'weather-signal'
+    ? ({ '--panel-accent': WEATHER_KIND_COLOR[hero.render.kind] } as CSSProperties)
+    : undefined;
   return (
     <CommandPanel
       href={hero.href}
-      label={`Open ${hero.kicker}: ${event?.title ?? track?.track ?? hero.title}`}
+      label={`Open ${hero.kicker}: ${event?.title ?? hero.title}`}
       className={`command-primary command-panel--${toneFor(hero)}`}
       art={slotArt(hero)}
+      style={weatherAccentStyle}
     >
       <p className="command-label"><KickerBadge slot={hero} />{hero.kicker}</p>
-      <div className="mt-5 flex items-start gap-4">
-        {track && <Thumb url={track.imageUrl} size="h-16 w-16" />}
-        <div className="min-w-0">
-          {kicker !== hero.kicker && <p className="command-event-time">{kicker}</p>}
-          <p className="command-event-title">{event?.title ?? track?.track ?? hero.title}</p>
-          {event ? (
-            <div className="mt-2 space-y-1.5 text-sm text-ink-muted">
-              {event.location && (
-                <p className="flex items-center gap-1.5">
-                  <a href={mapsSearchHref(event.location)} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1.5 transition hover:text-ink">
-                    <span aria-hidden>📍</span>
-                    <span className="truncate">{event.location}</span>
-                  </a>
-                </p>
-              )}
-              {event.description && (
-                <p className="line-clamp-2 border-l border-card-border pl-2.5 text-ink-faint">{event.description}</p>
-              )}
-              {!event.location && !event.description && <p>{hero.detail}</p>}
-            </div>
-          ) : nonEventDetail}
+      {lead ?? (
+        <div className="mt-5 flex items-start gap-4">
+          <div className="min-w-0">
+            {kicker !== hero.kicker && <p className="command-event-time">{kicker}</p>}
+            <p className="command-event-title">{event?.title ?? hero.title}</p>
+            {event ? (
+              <div className="mt-2 space-y-1.5 text-sm text-ink-muted">
+                {event.location && (
+                  <p className="flex items-center gap-1.5">
+                    <a href={mapsSearchHref(event.location)} target="_blank" rel="noreferrer" className="flex min-w-0 items-center gap-1.5 transition hover:text-ink">
+                      <span aria-hidden>📍</span>
+                      <span className="truncate">{event.location}</span>
+                    </a>
+                  </p>
+                )}
+                {event.description && (
+                  <p className="line-clamp-2 border-l border-card-border pl-2.5 text-ink-faint">{event.description}</p>
+                )}
+                {!event.location && !event.description && <p>{hero.detail}</p>}
+              </div>
+            ) : (
+              hero.render.type === 'gmail-threads' && extra ? null : <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{hero.detail}</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
       {extra}
       {activity?.today && (
         <div className="mt-4">
@@ -442,18 +479,23 @@ export function HeroPanel({
  * the real command center builds one for `commandCenter.hero`. */
 export function heroPropsFor(
   hero: CommandCenterData['hero'],
-  { calendar, spotify, health, github, gmail, aiUsage, weather }: Readonly<{
+  { calendar, spotify, spotifyFetchedAt, health, github, gmail, aiUsage, weather, steam, roblox, hoveredDay, onHover }: Readonly<{
     calendar: CalendarData | undefined;
     spotify: SpotifyData | undefined;
+    spotifyFetchedAt: string | undefined;
     health: HealthData | undefined;
     github: GitHubData | undefined;
     gmail: GmailData | undefined;
     aiUsage: AiUsageByTool;
     weather: WeatherData | undefined;
+    steam: SteamData | undefined;
+    roblox: RobloxData | undefined;
+    hoveredDay: { date: string; count: number } | null;
+    onHover: (day: { date: string; count: number } | null) => void;
   }>,
 ): Readonly<{
   event: CalendarData['events'][number] | undefined;
-  track: { imageUrl?: string; track: string; artist: string } | undefined;
+  lead: ReactNode;
   kicker: string;
   extra: ReactNode;
   activity: HealthData | undefined;
@@ -462,16 +504,15 @@ export function heroPropsFor(
   const event = heroRender.type === 'calendar-event'
     ? calendar?.events.find((candidate) => candidate.id === heroRender.eventId)
     : undefined;
-  const track = heroRender.type === 'spotify-track'
-    ? [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? [], ...spotify?.allTime.tracks ?? []]
-      .find((candidate) => (candidate.id ?? candidate.track) === heroRender.trackId)
-    : undefined;
   const activity = heroRender.type === 'health-rings' && health?.today ? health : undefined;
   const kicker = event ? eventTiming(event, Date.now()) : hero.kicker;
-  // Richer hero bodies for signals whose title/detail alone undersell them. The GitHub list skips
-  // the first PR because the hero title already names it.
-  const extra = heroExtraFor(hero, github, gmail, aiUsage, weather);
-  return { event, track, kicker, extra, activity };
+  // Full-fidelity bodies (artwork, progress bars, stat rows) for signals a plain title/detail
+  // block would undersell — reused directly from the secondary carousel's own components.
+  const lead = heroLeadFor(hero, { spotify, spotifyFetchedAt, steam, roblox });
+  // Extra content appended below the generic title/detail block. The GitHub list skips the first
+  // PR because the hero title already names it.
+  const extra = heroExtraFor(hero, github, gmail, aiUsage, weather, hoveredDay, onHover);
+  return { event, lead, kicker, extra, activity };
 }
 
 /** The secondary card's per-slot body — a kicker heading (skipped for Roblox, which already shows
@@ -517,7 +558,10 @@ export function DailyCommandCenter() {
   if (!commandCenter) return <CommandCenterSkeleton />;
 
   const ranked = commandCenter;
-  const heroProps = heroPropsFor(ranked.hero, { calendar, spotify, health, github, gmail, aiUsage, weather });
+  const heroProps = heroPropsFor(ranked.hero, {
+    calendar, spotify, spotifyFetchedAt, health, github, gmail, aiUsage, weather, steam, roblox,
+    hoveredDay, onHover: setHoveredDay,
+  });
 
   return (
     <section className="command-center glass" aria-labelledby="command-center-title">

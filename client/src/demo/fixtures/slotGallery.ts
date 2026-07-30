@@ -65,6 +65,14 @@ function crownsBackTo(now: Date, count: number): { crownsFor: number; crownsAgai
   });
 }
 
+function sessionCrownsBackTo(now: Date, results: ('win' | 'loss')[]): { crownsFor: number; crownsAgainst: number; battleTime: string; result: 'win' | 'loss' }[] {
+  const scores: Record<'win' | 'loss', [number, number]> = { win: [3, 1], loss: [1, 3] };
+  return results.map((result, i) => {
+    const [crownsFor, crownsAgainst] = scores[result];
+    return { crownsFor, crownsAgainst, result, battleTime: new Date(now.getTime() - (results.length - i) * 3_600_000).toISOString() };
+  });
+}
+
 export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
   const events = data.calendar.events;
   // calendar-agenda is only ever built from same-day events in production — its layout assumes a
@@ -315,7 +323,7 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
       slot: {
         id: 'gallery:clash-royale:session', source: 'clash-royale', kind: 'clash-royale', kicker: 'This session',
         title: '4 wins, 1 loss', detail: 'Since you started playing an hour ago', href: '#/clash-royale', score: 50,
-        render: { type: 'clash-royale-moment', kind: 'session' },
+        render: { type: 'clash-royale-moment', kind: 'session', sessionCrowns: sessionCrownsBackTo(now, ['win', 'win', 'loss', 'win', 'win']) },
       },
     },
     {

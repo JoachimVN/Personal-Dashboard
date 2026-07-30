@@ -15,19 +15,20 @@ import type { AiUsageByTool } from './useCommandCenterData';
 import { AiUsageSecondary, AiUsageTrend } from './secondary/ai';
 import { CalendarAgendaSecondary } from './secondary/calendar';
 import { ClashOfClansMomentSecondary } from './secondary/clashOfClans';
-import { ClashRoyaleWinStreakSecondary } from './secondary/clashRoyale';
-import { FallbackSecondary } from './secondary/fallback';
+import { ClashRoyaleSessionSecondary, ClashRoyaleWinStreakSecondary } from './secondary/clashRoyale';
+import { AiToolMark, FallbackSecondary } from './secondary/fallback';
 import {
   GithubContributionsSecondary,
   GithubOpenPrList,
   GithubOpenPrsSecondary,
   GithubReviewList,
   GithubReviewsSecondary,
+  PrMeta,
 } from './secondary/github';
 import { GmailThreadList, GmailThreadsSecondary } from './secondary/gmail';
 import { HealthRingsSecondary } from './secondary/health';
 import { RobloxNowPlayingSecondary } from './secondary/roblox';
-import { SonarQualityGateSecondary, SonarRatingBadges } from './secondary/sonar';
+import { QualityGatePill, SonarQualityGateSecondary, SonarRatingBadges } from './secondary/sonar';
 import {
   SpotifyAlbumSecondary,
   SpotifyArtistSecondary,
@@ -75,23 +76,84 @@ export function SecondaryContent(props: Readonly<{
     case 'steam-now-playing': return SteamNowPlayingSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     case 'steam-achievement': return SteamAchievementSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     case 'roblox-now-playing': return <RobloxNowPlayingSecondary slot={slot} roblox={roblox} />;
-    case 'clash-royale-moment': return ClashRoyaleWinStreakSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
+    case 'clash-royale-moment': return ClashRoyaleWinStreakSecondary({ slot }) ?? ClashRoyaleSessionSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
     case 'clash-of-clans-moment': return ClashOfClansMomentSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
     default: return <FallbackSecondary slot={slot} />;
   }
 }
 
-export function heroExtraFor(hero: CommandCenterData['hero'], github: GitHubData | undefined, gmail: GmailData | undefined, aiUsage: AiUsageByTool, weather: WeatherData | undefined): ReactNode {
+export function heroExtraFor(
+  hero: CommandCenterData['hero'],
+  github: GitHubData | undefined,
+  gmail: GmailData | undefined,
+  aiUsage: AiUsageByTool,
+  weather: WeatherData | undefined,
+  hoveredDay: { date: string; count: number } | null,
+  onHover: (day: { date: string; count: number } | null) => void,
+): ReactNode {
   const { render } = hero;
-  if (render.type === 'github-reviews') return GithubReviewList({ github, skip: 1 });
-  if (render.type === 'github-open-prs') return GithubOpenPrList({ github, skip: 1 });
+  if (render.type === 'github-contributions') return GithubContributionsSecondary({ slot: hero, github, hoveredDay, onHover });
+  if (render.type === 'github-reviews' || render.type === 'github-open-prs') {
+    const prs = github?.pullRequests.filter((pr) => (render.type === 'github-reviews' ? pr.role === 'review-requested' : pr.role === 'author' && !pr.draft)) ?? [];
+    const [first] = prs;
+    const overflow = render.type === 'github-reviews' ? GithubReviewList({ github, skip: 1 }) : GithubOpenPrList({ github, skip: 1 });
+    return <>{first && <div className="mt-2"><PrMeta pr={first} /></div>}{overflow}</>;
+  }
   if (render.type === 'gmail-threads') return GmailThreadList({ threadIds: render.threadIds, gmail });
   if (render.type === 'weather-signal' && render.kind === 'severe' && weather) {
     return <div className="mt-4"><WeatherHourlyRows weather={weather} /></div>;
   }
-  if (render.type === 'sonar-quality-gate') return <div className="mt-4"><SonarRatingBadges project={render.projects[0]} /></div>;
+  if (render.type === 'sonar-quality-gate') {
+    const [first, ...rest] = render.projects;
+    return <div className="mt-4">
+      <QualityGatePill status={render.status} />
+      <div className="mt-4"><SonarRatingBadges project={first} /></div>
+      {rest.length > 0 && <div className="command-agenda-list mt-4">
+        {rest.map((project) => <div key={project.key} className="command-agenda-item"><span className="command-agenda-lead">SonarCloud</span><span>{project.name}</span></div>)}
+      </div>}
+    </div>;
+  }
   if (render.type !== 'ai-usage-tool') return null;
 
   const trend = AiUsageTrend({ render, aiUsage });
-  return trend ? <div className="mt-4 max-w-sm">{trend}</div> : null;
+  if (!trend) return null;
+  return <div className="mt-4 flex max-w-sm items-center gap-3">
+    <div className="flex shrink-0 flex-col items-center gap-2">
+      {render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className={render.toolIds.length > 1 ? 'h-5 w-5' : 'h-8 w-8'} />)}
+    </div>
+    <div className="min-w-0 flex-1">{trend}</div>
+  </div>;
+}
+
+function heroLead(content: ReactNode): ReactNode {
+  return content ? <div className="command-hero-lead">{content}</div> : undefined;
+}
+
+/** Full-fidelity hero header for render types whose secondary body already carries everything a
+ * plain title/detail block would (artwork, progress bars, stat rows) — reusing that exact
+ * component means the hero card can't end up thinner than secondary for the same slot. Returns
+ * undefined for every other type, so HeroPanel falls back to its generic kicker/title/detail
+ * block (and, for calendar events, the location/description rendering that block owns). */
+export function heroLeadFor(
+  hero: CommandCenterData['hero'],
+  { spotify, spotifyFetchedAt, steam, roblox }: Readonly<{
+    spotify: SpotifyData | undefined;
+    spotifyFetchedAt: string | undefined;
+    steam: SteamData | undefined;
+    roblox: RobloxData | undefined;
+  }>,
+): ReactNode {
+  const { render } = hero;
+  if (render.type === 'spotify-now-playing') return heroLead(SpotifyNowPlayingSecondary({ spotify, spotifyFetchedAt }));
+  if (render.type === 'spotify-track') return heroLead(SpotifyTrackSecondary({ slot: hero, spotify }));
+  if (render.type === 'spotify-artist') return heroLead(SpotifyArtistSecondary({ slot: hero, spotify }));
+  if (render.type === 'spotify-album') return heroLead(SpotifyAlbumSecondary({ slot: hero, spotify }));
+  if (render.type === 'steam-now-playing') return heroLead(SteamNowPlayingSecondary({ slot: hero, steam }));
+  if (render.type === 'steam-achievement') return heroLead(SteamAchievementSecondary({ slot: hero, steam }));
+  if (render.type === 'roblox-now-playing') return heroLead(RobloxNowPlayingSecondary({ slot: hero, roblox }));
+  if (render.type === 'clash-royale-moment' && (render.kind === 'win-streak' || render.kind === 'session')) {
+    return heroLead(ClashRoyaleWinStreakSecondary({ slot: hero }) ?? ClashRoyaleSessionSecondary({ slot: hero }));
+  }
+  if (render.type === 'clash-of-clans-moment') return heroLead(ClashOfClansMomentSecondary({ slot: hero }));
+  return undefined;
 }

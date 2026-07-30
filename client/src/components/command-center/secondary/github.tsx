@@ -39,20 +39,31 @@ function PrDiffStats({ pr }: Readonly<{ pr: PullRequest }>): ReactNode {
   );
 }
 
-/** Prominent single-PR headline — repo, branch, and diff stats — for whichever PR leads the card.
- * Kept separate from the thin-row list below it, which is deliberately compact for the overflow. */
+/** Repo, branch, updated-time, and diff stats for a PR — everything about it besides its title.
+ * Exported so the hero card can show this same meta line under its own (larger) title instead of
+ * duplicating the title a second time via the full `PrHeadline` below. */
+export function PrMeta({ pr }: Readonly<{ pr: PullRequest }>): ReactNode {
+  return (
+    <>
+      <p className="text-xs text-ink-muted">
+        {pr.repo}
+        {pr.branch && <> · <span className="font-mono">{pr.branch}</span></>}
+        {' · '}Updated {relativeTime(pr.updatedAt)}
+      </p>
+      <PrDiffStats pr={pr} />
+    </>
+  );
+}
+
+/** Prominent single-PR headline — title plus `PrMeta` — for whichever PR leads the card. Kept
+ * separate from the thin-row list below it, which is deliberately compact for the overflow. */
 function PrHeadline({ pr }: Readonly<{ pr: PullRequest }>): ReactNode {
   return (
     <div className="mt-4">
       <p className="text-sm font-semibold text-ink">
         {pr.title} <span className="font-normal text-ink-faint">#{pr.number}</span>
       </p>
-      <p className="mt-1 text-xs text-ink-muted">
-        {pr.repo}
-        {pr.branch && <> · <span className="font-mono">{pr.branch}</span></>}
-        {' · '}Updated {relativeTime(pr.updatedAt)}
-      </p>
-      <PrDiffStats pr={pr} />
+      <div className="mt-1"><PrMeta pr={pr} /></div>
     </div>
   );
 }
