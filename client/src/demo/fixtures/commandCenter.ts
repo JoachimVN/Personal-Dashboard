@@ -16,17 +16,14 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
         detail: 'Dua Lipa', href: '#/spotify', score: 90, render: { type: 'spotify-now-playing' },
       },
       {
-        id: 'github:open-pr:personal-dashboard:31', source: 'github', kind: 'github', kicker: '2 open pull requests',
-        title: 'Show issue counts alongside SonarQube rating grades', detail: 'personal-dashboard', href: '#/github', score: 50,
-        render: { type: 'github-open-prs' },
+        id: 'roblox:now-playing', source: 'roblox', kind: 'roblox', kicker: 'Roblox', title: 'Jailbreak',
+        detail: 'In game right now', href: 'https://www.roblox.com/home', score: 70,
+        render: { type: 'roblox-now-playing' },
       },
       {
-        id: 'sonar:failed:weekend-project', source: 'sonar', kind: 'sonar', kicker: 'SonarCloud Quality Gate',
-        title: 'weekend-project', detail: 'SonarCloud', href: '#/github', score: 78,
-        render: {
-          type: 'sonar-quality-gate', status: 'failed',
-          projects: [{ key: 'weekend-project', name: 'weekend-project', security: 'B', reliability: 'C', maintainability: 'A', vulnerabilitiesCount: 2, bugsCount: 5, codeSmellsCount: 8 }],
-        },
+        id: 'gmail:threads', source: 'gmail', kind: 'gmail', kicker: 'Inbox', title: '5 unread',
+        detail: 'Newsletter, GitHub review request and 3 more', href: '#/personal', score: 60,
+        render: { type: 'gmail-threads', threadIds: ['t1', 't2', 't4'] },
       },
     ],
     tiles: [
@@ -35,12 +32,8 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
         detail: 'On track for your goals', href: '#/health', score: 80, render: { type: 'health-rings' },
       },
       {
-        id: 'sonar:passed:personal-dashboard', source: 'sonar', kind: 'sonar', kicker: 'SonarCloud Quality Gate',
-        title: 'personal-dashboard', detail: 'SonarCloud', href: '#/github', score: 42,
-        render: {
-          type: 'sonar-quality-gate', status: 'passed',
-          projects: [{ key: 'personal-dashboard', name: 'personal-dashboard', security: 'A', reliability: 'A', maintainability: 'A', vulnerabilitiesCount: 0, bugsCount: 0, codeSmellsCount: 12 }],
-        },
+        id: 'github:contributions', source: 'github', kind: 'github', kicker: 'GitHub', title: '3 commits today',
+        detail: 'personal-dashboard', href: '#/github', score: 75, render: { type: 'github-contributions' },
       },
       {
         id: 'ai-usage:claude', source: 'ai-usage', kind: 'ai-usage', kicker: 'Claude', title: '54% of 5h window',
@@ -50,4 +43,3 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
     ],
   };
 }
-
