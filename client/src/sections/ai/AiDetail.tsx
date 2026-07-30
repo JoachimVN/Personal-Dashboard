@@ -140,8 +140,6 @@ function ToolCard({
                   windowMs={WEEKLY_MS}
                   color={color}
                   caption="Weekly window · last 7 d"
-                  sessionResetsAt={data.weekly.resetsAt}
-                  sessionWindowMs={WEEKLY_MS}
                 />
               )}
               {data.modelWeekly && (
