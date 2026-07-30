@@ -27,7 +27,7 @@ import {
 import { GmailThreadList, GmailThreadsSecondary } from './secondary/gmail';
 import { HealthRingsSecondary } from './secondary/health';
 import { RobloxNowPlayingSecondary } from './secondary/roblox';
-import { SonarQualityGateSecondary } from './secondary/sonar';
+import { SonarQualityGateSecondary, SonarRatingBadges } from './secondary/sonar';
 import {
   SpotifyAlbumSecondary,
   SpotifyArtistSecondary,
@@ -89,6 +89,7 @@ export function heroExtraFor(hero: CommandCenterData['hero'], github: GitHubData
   if (render.type === 'weather-signal' && render.kind === 'severe' && weather) {
     return <div className="mt-4"><WeatherHourlyRows weather={weather} /></div>;
   }
+  if (render.type === 'sonar-quality-gate') return <div className="mt-4"><SonarRatingBadges project={render.projects[0]} /></div>;
   if (render.type !== 'ai-usage-tool') return null;
 
   const trend = AiUsageTrend({ render, aiUsage });

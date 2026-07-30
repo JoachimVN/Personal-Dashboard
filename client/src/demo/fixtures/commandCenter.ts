@@ -23,7 +23,10 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
       {
         id: 'sonar:failed:weekend-project', source: 'sonar', kind: 'sonar', kicker: 'Quality gate failed',
         title: 'weekend-project', detail: 'SonarCloud', href: '#/github', score: 78,
-        render: { type: 'sonar-quality-gate', status: 'failed', projects: [{ key: 'weekend-project', name: 'weekend-project' }] },
+        render: {
+          type: 'sonar-quality-gate', status: 'failed',
+          projects: [{ key: 'weekend-project', name: 'weekend-project', security: 'B', reliability: 'C', maintainability: 'A', vulnerabilitiesCount: 2, bugsCount: 5, codeSmellsCount: 8 }],
+        },
       },
     ],
     tiles: [
@@ -32,8 +35,12 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
         detail: 'On track for your goals', href: '#/health', score: 80, render: { type: 'health-rings' },
       },
       {
-        id: 'github:contributions', source: 'github', kind: 'github', kicker: 'GitHub', title: '3 commits today',
-        detail: 'personal-dashboard', href: '#/github', score: 75, render: { type: 'github-contributions' },
+        id: 'sonar:passed:personal-dashboard', source: 'sonar', kind: 'sonar', kicker: 'Quality gate passed',
+        title: 'personal-dashboard', detail: 'SonarCloud', href: '#/github', score: 42,
+        render: {
+          type: 'sonar-quality-gate', status: 'passed',
+          projects: [{ key: 'personal-dashboard', name: 'personal-dashboard', security: 'A', reliability: 'A', maintainability: 'A', vulnerabilitiesCount: 0, bugsCount: 0, codeSmellsCount: 12 }],
+        },
       },
       {
         id: 'ai-usage:claude', source: 'ai-usage', kind: 'ai-usage', kicker: 'Claude', title: '54% of 5h window',

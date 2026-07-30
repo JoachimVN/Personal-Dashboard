@@ -8,7 +8,7 @@ const RATING_COLOR: Record<SonarRating, string> = {
   E: 'light-dark(#b91c1c, #fb7185)',
 };
 
-function RatingBadge({ rating, label, value, issueCount }: Readonly<{ rating?: SonarRating; label: string; value?: string; issueCount?: number }>) {
+export function RatingBadge({ rating, label, value, issueCount }: Readonly<{ rating?: SonarRating; label: string; value?: string; issueCount?: number }>) {
   const color = rating ? RATING_COLOR[rating] : 'var(--color-ink-faint)';
   return (
     <div className="flex flex-col items-center gap-1">

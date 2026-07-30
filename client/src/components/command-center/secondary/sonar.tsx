@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import type { CommandCenterSlot } from '@personal-dashboard/shared';
+import { RatingBadge } from '../../../widgets/SonarCloudWidgets';
+
+type SonarRender = Extract<CommandCenterSlot['render'], { type: 'sonar-quality-gate' }>;
 
 /** Same pass/fail pill treatment as SonarProjectCard, so a quality-gate moment reads consistently
- * whether it's seen on the command center or the Code quality detail section. */
-function QualityGatePill({ status }: Readonly<{ status: 'passed' | 'failed' }>): ReactNode {
+ * across the Code quality detail section, the command-center secondary card, and its tile. */
+export function QualityGatePill({ status }: Readonly<{ status: 'passed' | 'failed' }>): ReactNode {
   return (
     <span
       className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold"
@@ -17,18 +20,30 @@ function QualityGatePill({ status }: Readonly<{ status: 'passed' | 'failed' }>):
   );
 }
 
+export function SonarRatingBadges({ project }: Readonly<{ project: SonarRender['projects'][number] }>): ReactNode {
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      <RatingBadge rating={project.security} label="Security" issueCount={project.vulnerabilitiesCount} />
+      <RatingBadge rating={project.reliability} label="Reliability" issueCount={project.bugsCount} />
+      <RatingBadge rating={project.maintainability} label="Maintainability" issueCount={project.codeSmellsCount} />
+    </div>
+  );
+}
+
 export function SonarQualityGateSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
   if (slot.render.type !== 'sonar-quality-gate') return null;
   const { status, projects } = slot.render;
-  const rest = projects.slice(1);
+  const [first, ...rest] = projects;
   return (
     <div className="mt-4">
-      <div className="flex items-center gap-2">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">SonarCloud</p>
+      <div className="mt-1 flex items-center gap-2">
         <QualityGatePill status={status} />
-        <span className="text-sm font-semibold text-ink">{projects[0].name}</span>
+        <span className="text-sm font-semibold text-ink">{first.name}</span>
       </div>
+      <div className="mt-4"><SonarRatingBadges project={first} /></div>
       {rest.length > 0 && (
-        <div className="command-agenda-list mt-3">
+        <div className="command-agenda-list mt-4">
           {rest.map((project) => (
             <div key={project.key} className="command-agenda-item">
               <span className="command-agenda-lead">SonarCloud</span><span>{project.name}</span>

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sonarRatingSchema } from './sonarCloud.js';
 
 export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text') }),
@@ -15,7 +16,16 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('sonar-quality-gate'),
     status: z.enum(['passed', 'failed']),
-    projects: z.array(z.object({ key: z.string(), name: z.string() })).min(1),
+    projects: z.array(z.object({
+      key: z.string(),
+      name: z.string(),
+      security: sonarRatingSchema.optional(),
+      reliability: sonarRatingSchema.optional(),
+      maintainability: sonarRatingSchema.optional(),
+      vulnerabilitiesCount: z.number().optional(),
+      bugsCount: z.number().optional(),
+      codeSmellsCount: z.number().optional(),
+    })).min(1),
   }),
   z.object({ type: z.literal('gmail-threads'), threadIds: z.array(z.string()) }),
   z.object({

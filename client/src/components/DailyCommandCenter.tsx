@@ -28,6 +28,7 @@ import { Thumb } from '../widgets/SpotifyWidget';
 import { GitHubMark } from './GitHubMark';
 import { heroExtraFor, SecondaryContent } from './command-center/SecondaryContent';
 import { AiToolMark } from './command-center/secondary/fallback';
+import { QualityGatePill } from './command-center/secondary/sonar';
 import { useRobloxArtPalette } from './command-center/useRobloxArtPalette';
 import { useCommandCenterData } from './command-center/useCommandCenterData';
 import '../sections/spotify/spotify.css';
@@ -187,18 +188,24 @@ function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenter
     ? github?.contributions.days.slice(-7)
     : undefined;
   const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
-  const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now' : slot.kicker;
+  const isSonarGate = slot.render.type === 'sonar-quality-gate';
+  const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now'
+    : isSonarGate && slot.render.type === 'sonar-quality-gate' ? slot.render.projects[0].name
+    : slot.kicker;
+  const signalTitle = isSonarGate ? 'SonarCloud Quality Gate' : slot.title;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
       {signalMark(slot, health, roblox)}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{signalKicker}</p>
-        <p className="mt-1 truncate text-sm font-semibold text-ink">{slot.title}</p>
+        <p className="mt-1 truncate text-sm font-semibold text-ink">{signalTitle}</p>
         {contributionDays?.length
           ? <div className="command-contribution-squares" aria-label="Contributions over the last seven days">
               {contributionDays.map((day) => <span key={day.date} aria-hidden style={{ backgroundColor: rampColor(day.count, maxContributions) }} />)}
             </div>
-          : <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>}
+          : slot.render.type === 'sonar-quality-gate'
+            ? <div className="mt-1"><QualityGatePill status={slot.render.status} /></div>
+            : <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>}
         {slot.meter !== undefined && (
           <span className={`command-meter${slot.meter <= 15 ? ' command-meter--low' : ''}`}>
             <span style={{ width: `${Math.min(100, Math.max(0, slot.meter))}%` }} />
