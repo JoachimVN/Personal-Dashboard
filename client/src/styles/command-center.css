@@ -479,7 +479,7 @@
   place-items: center;
   border-radius: 0.625rem;
   background: var(--color-accent-roblox);
-  box-shadow: 0 3px 8px color-mix(in oklab, var(--color-accent-roblox) 18%, transparent);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-roblox) 25%, transparent);
 }
 
 .command-roblox-tile-mark img {
@@ -493,7 +493,7 @@
   height: 2rem;
   border-radius: 0.625rem;
   object-fit: cover;
-  box-shadow: 0 3px 8px color-mix(in oklab, var(--color-accent-roblox) 18%, transparent);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-roblox) 25%, transparent);
 }
 
 .command-clash-royale-tile-icon {
@@ -502,7 +502,7 @@
   height: 2rem;
   border-radius: 0.625rem;
   object-fit: cover;
-  box-shadow: 0 3px 8px color-mix(in oklab, var(--color-accent-clash-royale) 18%, transparent);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-clash-royale) 25%, transparent);
 }
 
 .command-clash-royale-trophy-tile {
@@ -527,7 +527,7 @@
   width: 2rem;
   height: 2rem;
   object-fit: contain;
-  filter: drop-shadow(0 2px 4px color-mix(in oklab, var(--color-accent-clash-of-clans) 22%, transparent));
+  filter: drop-shadow(0 3px 6px color-mix(in oklab, var(--color-accent-clash-of-clans) 30%, transparent));
 }
 
 .command-spotify-tile-icon {
@@ -536,7 +536,7 @@
   height: 2rem;
   border-radius: 0.625rem;
   object-fit: cover;
-  box-shadow: 0 3px 8px color-mix(in oklab, var(--color-accent-spotify) 18%, transparent);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-spotify) 25%, transparent);
 }
 
 .command-steam-tile-icon {
@@ -545,7 +545,7 @@
   height: 2rem;
   border-radius: 0.625rem;
   object-fit: cover;
-  box-shadow: 0 3px 8px color-mix(in oklab, var(--color-accent-steam) 18%, transparent);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-steam) 25%, transparent);
 }
 
 .command-steam-tile-mark {
@@ -556,7 +556,7 @@
   place-items: center;
   border-radius: 0.625rem;
   background: var(--color-accent-steam);
-  box-shadow: 0 3px 8px color-mix(in oklab, var(--color-accent-steam) 18%, transparent);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-steam) 25%, transparent);
 }
 
 /* Disambiguates a hero/secondary card as Clash Royale even when it has no backdrop art (most
