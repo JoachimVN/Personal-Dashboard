@@ -101,6 +101,9 @@ describe('createSonarCloudProvider', () => {
                 { metric: 'security_hotspots_reviewed', value: '100' },
                 { metric: 'coverage', value: '0' },
                 { metric: 'duplicated_lines_density', value: '0.4' },
+                { metric: 'vulnerabilities', value: '2' },
+                { metric: 'bugs', value: '1' },
+                { metric: 'code_smells', value: '17' },
               ],
             },
           }),
@@ -121,6 +124,9 @@ describe('createSonarCloudProvider', () => {
       hotspotsReviewedPercent: 100,
       coveragePercent: 0,
       duplicationsPercent: 0.4,
+      vulnerabilitiesCount: 2,
+      bugsCount: 1,
+      codeSmellsCount: 17,
     });
     expect(oldRepo).toMatchObject({ qualityGateStatus: 'failed', linesOfCode: 500, security: 'C' });
     fetchMock.mockRestore();

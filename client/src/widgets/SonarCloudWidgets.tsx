@@ -8,7 +8,7 @@ const RATING_COLOR: Record<SonarRating, string> = {
   E: 'light-dark(#b91c1c, #fb7185)',
 };
 
-function RatingBadge({ rating, label, value }: Readonly<{ rating?: SonarRating; label: string; value?: string }>) {
+function RatingBadge({ rating, label, value, issueCount }: Readonly<{ rating?: SonarRating; label: string; value?: string; issueCount?: number }>) {
   const color = rating ? RATING_COLOR[rating] : 'var(--color-ink-faint)';
   return (
     <div className="flex flex-col items-center gap-1">
@@ -20,8 +20,19 @@ function RatingBadge({ rating, label, value }: Readonly<{ rating?: SonarRating; 
       </span>
       <span className="text-sm font-semibold tabular-nums text-ink">{value ?? '–'}</span>
       <span className="text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-faint">{label}</span>
+      {issueCount !== undefined && (
+        <span className="text-[10px] tabular-nums text-ink-faint">
+          {issueCount} issue{issueCount === 1 ? '' : 's'}
+        </span>
+      )}
     </div>
   );
+}
+
+function totalIssueCount(project: SonarProject): number | undefined {
+  const { vulnerabilitiesCount, bugsCount, codeSmellsCount } = project;
+  if (vulnerabilitiesCount === undefined && bugsCount === undefined && codeSmellsCount === undefined) return undefined;
+  return (vulnerabilitiesCount ?? 0) + (bugsCount ?? 0) + (codeSmellsCount ?? 0);
 }
 
 function formatDate(iso: string): string {
@@ -67,13 +78,21 @@ export function SonarProjectCard({ project }: Readonly<{ project: SonarProject }
           <p className="mt-2 text-xs text-ink-faint">
             Last analysis: {formatDate(lastAnalysis)} · <span className="font-semibold text-ink-muted">{formatLoc(project.linesOfCode)}</span> Lines of Code
             {project.languages.length > 0 && ` · ${project.languages.join(', ')}`}
+            {totalIssueCount(project) !== undefined && (
+              <>
+                {' '}
+                · <span className="font-semibold text-ink-muted">{totalIssueCount(project)}</span> issues total
+              </>
+            )}
           </p>
-          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-(--color-card-border) pt-4 sm:grid-cols-6">
-            <RatingBadge rating={project.security} label="Security" />
-            <RatingBadge rating={project.reliability} label="Reliability" />
-            <RatingBadge rating={project.maintainability} label="Maintainability" />
+          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-(--color-card-border) pt-4 sm:grid-cols-5">
+            <RatingBadge rating={project.security} label="Security" issueCount={project.vulnerabilitiesCount} />
+            <RatingBadge rating={project.reliability} label="Reliability" issueCount={project.bugsCount} />
+            <RatingBadge rating={project.maintainability} label="Maintainability" issueCount={project.codeSmellsCount} />
             <RatingBadge label="Hotspots Reviewed" value={project.hotspotsReviewedPercent !== undefined ? `${project.hotspotsReviewedPercent.toFixed(0)}%` : undefined} />
-            <RatingBadge label="Coverage" value={project.coveragePercent !== undefined ? `${project.coveragePercent.toFixed(1)}%` : '–'} />
+            {/* Coverage is omitted: SonarCloud only reports it from CI-based analysis with an
+                uploaded coverage report, and this repo's CI has no such step yet (Automatic
+                Analysis mode can't run tests). Re-add once that's wired up. */}
             <RatingBadge label="Duplications" value={project.duplicationsPercent !== undefined ? `${project.duplicationsPercent.toFixed(1)}%` : '0.0%'} />
           </div>
         </>

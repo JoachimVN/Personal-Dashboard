@@ -11,6 +11,9 @@ const MEASURE_KEYS = [
   'security_hotspots_reviewed',
   'coverage',
   'duplicated_lines_density',
+  'vulnerabilities',
+  'bugs',
+  'code_smells',
 ].join(',');
 
 /** Sonar's language keys aren't display names; only the ones likely to show up in this user's
@@ -129,6 +132,9 @@ async function fetchProjectDetails(signal: AbortSignal, token: string, component
     hotspotsReviewedPercent: byMetric.has('security_hotspots_reviewed') ? Number(byMetric.get('security_hotspots_reviewed')) : undefined,
     coveragePercent: byMetric.has('coverage') ? Number(byMetric.get('coverage')) : undefined,
     duplicationsPercent: byMetric.has('duplicated_lines_density') ? Number(byMetric.get('duplicated_lines_density')) : undefined,
+    vulnerabilitiesCount: byMetric.has('vulnerabilities') ? Number(byMetric.get('vulnerabilities')) : undefined,
+    bugsCount: byMetric.has('bugs') ? Number(byMetric.get('bugs')) : undefined,
+    codeSmellsCount: byMetric.has('code_smells') ? Number(byMetric.get('code_smells')) : undefined,
   };
 }
 
