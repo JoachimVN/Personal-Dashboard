@@ -286,7 +286,7 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
       label: 'clash-royale-moment (arena)',
       slot: {
         id: 'gallery:clash-royale:arena', source: 'clash-royale', kind: 'clash-royale', kicker: 'New arena',
-        title: 'Legendary Arena', detail: 'Promoted from Silver League III', href: '#/clash-royale', score: 50,
+        title: 'Legendary Arena', detail: 'Promoted from Valkalla', href: '#/clash-royale', score: 50,
         render: { type: 'clash-royale-moment', kind: 'arena', arenaName: 'Legendary Arena' },
       },
     },
