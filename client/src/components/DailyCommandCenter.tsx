@@ -256,7 +256,10 @@ function SecondaryCarousel({
   }, [activeIndex, hasMultipleItems, items.length, onActiveChange, paused]);
 
   if (!items.length) return null;
-  if (!hasMultipleItems) return <>{renderItem(items[0]!)}</>;
+  // Single item still needs the .command-secondary-carousel wrapper — it's what defines the
+  // --secondary-carousel-media-size/-content-height custom properties several secondary bodies
+  // size off (e.g. the Roblox icon), not just the slide/dots machinery skipped below.
+  if (!hasMultipleItems) return <div className="command-secondary-carousel">{renderItem(items[0]!)}</div>;
 
   const goTo = (index: number) => {
     const target = (index + items.length) % items.length;
