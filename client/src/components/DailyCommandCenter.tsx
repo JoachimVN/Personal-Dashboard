@@ -38,7 +38,7 @@ const SOON_MS = 6 * 60 * 60_000;
 function formatEventDay(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
   if (event.date === today) return event.allDay ? 'Today' : event.startLabel;
-  return formatEventDate(event.date, 'long');
+  return formatEventDate(event.date, 'long', 'long');
 }
 
 function startsIn(ms: number): string {

@@ -8,13 +8,17 @@ export function relativeTime(iso: string): string {
 
 /** Weekday + day + month, plus year if the date isn't in the current year — otherwise a distant
  *  event (e.g. next year's birthday) reads identically to one happening this week. */
-export function formatEventDate(date: string, weekday: 'long' | 'short'): string {
+export function formatEventDate(
+  date: string,
+  weekday: 'long' | 'short',
+  month: 'long' | 'short' = 'short',
+): string {
   const parsed = new Date(`${date}T12:00:00`);
   const sameYear = parsed.getFullYear() === new Date().getFullYear();
   return parsed.toLocaleDateString('en-GB', {
     weekday,
     day: 'numeric',
-    month: 'short',
+    month,
     ...(sameYear ? {} : { year: 'numeric' }),
   });
 }
