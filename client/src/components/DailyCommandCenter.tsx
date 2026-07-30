@@ -17,6 +17,7 @@ import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
 import { formatEventDate } from '../lib/time';
+import { pathOfLegendsDisplayLeagueNumber } from '@personal-dashboard/shared';
 import { CLASH_ROYALE_APP_ICON_URL, clashRoyaleArenaArt, clashRoyaleLeagueArt } from '../lib/clashRoyale';
 import {
   CLASH_OF_CLANS_APP_ICON_URL,
@@ -137,7 +138,9 @@ export function CommandPanel({
 export function slotArt(slot: CommandCenterSlot): string | undefined {
   if (slot.render.type !== 'clash-royale-moment') return undefined;
   if (slot.render.kind === 'arena' && slot.render.arenaName) return clashRoyaleArenaArt(slot.render.arenaName);
-  if (slot.render.kind === 'league' && slot.render.leagueNumber !== undefined) return clashRoyaleLeagueArt(slot.render.leagueNumber);
+  if (slot.render.kind === 'league' && slot.render.leagueNumber !== undefined) {
+    return clashRoyaleLeagueArt(pathOfLegendsDisplayLeagueNumber(slot.render.leagueNumber));
+  }
   return undefined;
 }
 
@@ -212,7 +215,7 @@ function signalMark(
     return <span className="command-steam-tile-mark" aria-hidden><SteamMark className="h-4 w-4" /></span>;
   }
   if (slot.render.type === 'clash-royale-moment') {
-    return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-clash-royale-tile-icon" />;
+    return <img src={slotArt(slot) ?? CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-clash-royale-tile-icon" />;
   }
   if (slot.render.type === 'clash-of-clans-moment') {
     return <img src={clashOfClansMomentIcon(slot.render)} alt="" aria-hidden className="command-clash-of-clans-tile-icon" />;
@@ -252,6 +255,7 @@ export function Signal({ slot, github, health, roblox, spotify, steam }: Readonl
   const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
   const isSonarGate = slot.render.type === 'sonar-quality-gate';
   const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now'
+    : slot.source === 'clash-royale' ? `Clash Royale · ${slot.kicker}`
     : isSonarGate ? 'SonarCloud Quality Gate'
     : slot.kicker;
   const signalTitle = isSonarGate && slot.render.type === 'sonar-quality-gate' ? slot.render.projects[0].name : slot.title;

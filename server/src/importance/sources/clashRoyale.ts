@@ -112,7 +112,7 @@ function clashRoyaleSessionCandidate(data: ClashRoyaleData, sessionGapMs: number
     .map((battle) => ({ crownsFor: battle.crownsFor, crownsAgainst: battle.crownsAgainst, battleTime: battle.battleTime, result: battle.result }));
   return {
     id: `clash-royale:session:${latest.battleTime}`, source: 'clash-royale', kind: 'clash-royale', score: wins >= losses ? 26 : 22, shapes: ['tile'],
-    kicker: 'Clash Royale', title: `${record} last session`,
+    kicker: 'This session', title: `${record} last session`,
     detail: `${session.length} battle${session.length === 1 ? '' : 's'} · ${data.profile.arenaName}`,
     href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'session', sessionCrowns },
   };
