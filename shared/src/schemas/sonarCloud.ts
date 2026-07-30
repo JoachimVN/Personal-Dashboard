@@ -17,6 +17,9 @@ export const sonarProjectSchema = z.object({
   hotspotsReviewedPercent: z.number().optional(),
   coveragePercent: z.number().optional(),
   duplicationsPercent: z.number().optional(),
+  vulnerabilitiesCount: z.number().optional(),
+  bugsCount: z.number().optional(),
+  codeSmellsCount: z.number().optional(),
 });
 
 export type SonarProject = z.infer<typeof sonarProjectSchema>;
