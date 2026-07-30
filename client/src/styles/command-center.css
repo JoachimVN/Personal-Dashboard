@@ -513,6 +513,15 @@
   filter: drop-shadow(0 3px 6px color-mix(in oklab, var(--color-accent-clash-of-clans) 40%, transparent));
 }
 
+.command-spotify-tile-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  object-fit: cover;
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-spotify) 32%, transparent);
+}
+
 /* Disambiguates a hero/secondary card as Clash Royale even when it has no backdrop art (most
    milestones don't — see lib/clashRoyale.ts). Sits inline with the uppercase kicker label. */
 .command-kicker-badge {

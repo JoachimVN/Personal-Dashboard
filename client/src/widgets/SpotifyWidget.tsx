@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SpotifyData } from '@personal-dashboard/shared';
+import type { CommandCenterSlot, SpotifyData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { StaleBadge, WidgetBody, WidgetShell } from '../components/WidgetCard';
 import { relativeTime } from '../lib/time';
@@ -32,6 +32,24 @@ function formatClock(ms?: number | null): string | undefined {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+/** Resolves the artwork for any Spotify command-center render type, so hero/secondary/tile all
+ * show the same art for the same slot instead of each re-implementing the lookup. */
+export function spotifyArtFor(
+  render: Extract<CommandCenterSlot['render'], { type: 'spotify-now-playing' | 'spotify-track' | 'spotify-artist' | 'spotify-album' }>,
+  spotify: SpotifyData | undefined,
+): string | undefined {
+  if (render.type === 'spotify-now-playing') return spotify?.nowPlaying?.imageUrl;
+  if (render.type === 'spotify-track') {
+    return [...spotify?.topTracks.shortTerm ?? [], ...spotify?.topTracks.mediumTerm ?? [], ...spotify?.topTracks.longTerm ?? [], ...spotify?.allTime.tracks ?? [], ...spotify?.recentlyPlayed ?? []]
+      .find((item) => (item.id ?? item.track) === render.trackId)?.imageUrl;
+  }
+  if (render.type === 'spotify-artist') {
+    return [...spotify?.topArtists.shortTerm ?? [], ...spotify?.topArtists.mediumTerm ?? [], ...spotify?.topArtists.longTerm ?? [], ...spotify?.allTime.artists ?? []]
+      .find((a) => (a.id ?? a.name) === render.artistId)?.imageUrl;
+  }
+  return spotify?.allTime.albums.find((a) => (a.id ?? a.name) === render.albumId)?.imageUrl;
 }
 
 export function Thumb({ url, size = 'h-10 w-10' }: { url?: string; size?: string }) {

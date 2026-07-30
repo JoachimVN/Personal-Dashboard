@@ -24,6 +24,7 @@ import {
   CLASH_OF_CLANS_WAR_ICON_URL,
 } from '../lib/clashOfClans';
 import { publicAsset } from '../lib/publicAsset';
+import { spotifyArtFor } from '../widgets/SpotifyWidget';
 import { accentStyle, SECTIONS, SectionIcon } from '../sections/registry';
 import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
@@ -181,8 +182,13 @@ function signalMark(
   slot: CommandCenterSlot,
   health: HealthData | undefined,
   roblox: RobloxData | undefined,
+  spotify: SpotifyData | undefined,
 ): ReactNode {
   const activityDay = health ? latestActivityDay(health) : undefined;
+  if (slot.render.type === 'spotify-now-playing' || slot.render.type === 'spotify-track' || slot.render.type === 'spotify-artist' || slot.render.type === 'spotify-album') {
+    const artUrl = spotifyArtFor(slot.render, spotify);
+    return <img src={artUrl ?? publicAsset('spotify/icon.svg')} alt="" aria-hidden className="command-spotify-tile-icon" />;
+  }
   if (slot.render.type === 'clash-royale-moment') {
     return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-clash-royale-tile-icon" />;
   }
@@ -217,7 +223,7 @@ function signalMark(
   return <span className="command-signal-dot" aria-hidden />;
 }
 
-export function Signal({ slot, github, health, roblox }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined }>) {
+export function Signal({ slot, github, health, roblox, spotify }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined; spotify: SpotifyData | undefined }>) {
   const contributionDays = slot.render.type === 'github-contributions'
     ? github?.contributions.days.slice(-7)
     : undefined;
@@ -229,7 +235,7 @@ export function Signal({ slot, github, health, roblox }: Readonly<{ slot: Comman
   const signalTitle = isSonarGate && slot.render.type === 'sonar-quality-gate' ? slot.render.projects[0].name : slot.title;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
-      {signalMark(slot, health, roblox)}
+      {signalMark(slot, health, roblox, spotify)}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{signalKicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{signalTitle}</p>
@@ -574,7 +580,7 @@ export function DailyCommandCenter() {
       </div>
       <div className="command-layout">
         <HeroPanel hero={ranked.hero} {...heroProps} weather={weather} />
-        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} />)}</div>
+        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} spotify={spotify} />)}</div>
       </div>
       {activeSecondary && <CommandPanel
         href={activeSecondary.href}

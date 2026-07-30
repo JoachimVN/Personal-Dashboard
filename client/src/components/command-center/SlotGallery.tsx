@@ -106,7 +106,7 @@ export function SlotGallery() {
           {slots.map(({ label, slot }: GallerySlot) => (
             <GalleryCard key={slot.id} label={label}>
               <div className="command-signals">
-                <Signal slot={slot} github={data.github} health={data.health} roblox={data.roblox} />
+                <Signal slot={slot} github={data.github} health={data.health} roblox={data.roblox} spotify={data.spotify} />
               </div>
             </GalleryCard>
           ))}
