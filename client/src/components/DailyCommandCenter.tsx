@@ -233,8 +233,11 @@ export function Signal({ slot, github, health, roblox, spotify }: Readonly<{ slo
     : isSonarGate ? 'SonarCloud Quality Gate'
     : slot.kicker;
   const signalTitle = isSonarGate && slot.render.type === 'sonar-quality-gate' ? slot.render.projects[0].name : slot.title;
+  const weatherAccentStyle = slot.render.type === 'weather-signal'
+    ? ({ '--signal-color': WEATHER_KIND_COLOR[slot.render.kind] } as CSSProperties)
+    : undefined;
   return (
-    <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`}>
+    <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`} style={weatherAccentStyle}>
       {signalMark(slot, health, roblox, spotify)}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{signalKicker}</p>
