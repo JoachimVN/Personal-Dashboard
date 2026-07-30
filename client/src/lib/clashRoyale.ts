@@ -167,7 +167,10 @@ export function clashRoyaleBattleIcon(
   }
   if (mode.includes('path of legend')) {
     const leagueArt = pathOfLegendsBattleArt(battle.arenaName) ?? (fallbackPathLeagueNumber === undefined ? undefined : clashRoyaleLeagueArt(fallbackPathLeagueNumber));
-    return { src: leagueArt ?? CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Path of Legends' };
+    // Falls back to the app icon rather than the Trophy Road hammer: Path of Legends is a distinct
+    // ranked mode, so stamping an unresolved game with the ladder's own icon would misrepresent it
+    // as a Trophy Road battle instead of just an "unknown league" Path of Legends one.
+    return { src: leagueArt ?? CLASH_ROYALE_APP_ICON_URL, label: battle.arenaName ?? 'Path of Legends' };
   }
   return { src: CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Trophy Road' };
 }
