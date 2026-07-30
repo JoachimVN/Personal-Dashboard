@@ -21,7 +21,7 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
         render: { type: 'github-open-prs' },
       },
       {
-        id: 'sonar:failed:weekend-project', source: 'sonar', kind: 'sonar', kicker: 'Quality gate failed',
+        id: 'sonar:failed:weekend-project', source: 'sonar', kind: 'sonar', kicker: 'SonarCloud Quality Gate',
         title: 'weekend-project', detail: 'SonarCloud', href: '#/github', score: 78,
         render: {
           type: 'sonar-quality-gate', status: 'failed',
@@ -35,7 +35,7 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
         detail: 'On track for your goals', href: '#/health', score: 80, render: { type: 'health-rings' },
       },
       {
-        id: 'sonar:passed:personal-dashboard', source: 'sonar', kind: 'sonar', kicker: 'Quality gate passed',
+        id: 'sonar:passed:personal-dashboard', source: 'sonar', kind: 'sonar', kicker: 'SonarCloud Quality Gate',
         title: 'personal-dashboard', detail: 'SonarCloud', href: '#/github', score: 42,
         render: {
           type: 'sonar-quality-gate', status: 'passed',

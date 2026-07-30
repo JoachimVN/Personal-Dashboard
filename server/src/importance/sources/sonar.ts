@@ -32,7 +32,7 @@ export function sonarCandidates(data: SonarCloudData | undefined, moments: Sonar
   if (failed.length) {
     candidates.push({
       id: `sonar:failed:${failed[0].projectKey}`, source: 'sonar', kind: 'sonar', score: 78, shapes: [...allShapes],
-      kicker: failed.length > 1 ? `${failed.length} quality gates failed` : 'Quality gate failed',
+      kicker: 'SonarCloud Quality Gate',
       title: failed[0].projectName, detail: 'SonarCloud', href: '#/github',
       render: { type: 'sonar-quality-gate', status: 'failed', projects: failed.map(summarize) },
     });
@@ -40,7 +40,7 @@ export function sonarCandidates(data: SonarCloudData | undefined, moments: Sonar
   if (passed.length) {
     candidates.push({
       id: `sonar:passed:${passed[0].projectKey}`, source: 'sonar', kind: 'sonar', score: 42, shapes: ['tile'],
-      kicker: passed.length > 1 ? `${passed.length} quality gates passed` : 'Quality gate passed',
+      kicker: 'SonarCloud Quality Gate',
       title: passed[0].projectName, detail: 'SonarCloud', href: '#/github',
       render: { type: 'sonar-quality-gate', status: 'passed', projects: passed.map(summarize) },
     });

@@ -36,8 +36,7 @@ export function SonarQualityGateSecondary({ slot }: Readonly<{ slot: CommandCent
   const [first, ...rest] = projects;
   return (
     <div className="mt-4">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">SonarCloud</p>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <QualityGatePill status={status} />
         <span className="text-sm font-semibold text-ink">{first.name}</span>
       </div>

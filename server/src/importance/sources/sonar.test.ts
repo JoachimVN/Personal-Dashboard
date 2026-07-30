@@ -16,7 +16,7 @@ describe('sonarCandidates', () => {
     const candidates = sonarCandidates(sonarData(), { changed: [{ projectKey: 'proj-a', projectName: 'Project A', status: 'failed' }] });
 
     expect(candidates).toContainEqual(expect.objectContaining({
-      id: 'sonar:failed:proj-a', score: 78, kicker: 'Quality gate failed', title: 'Project A',
+      id: 'sonar:failed:proj-a', score: 78, kicker: 'SonarCloud Quality Gate', title: 'Project A',
       render: { type: 'sonar-quality-gate', status: 'failed', projects: [{ key: 'proj-a', name: 'Project A' }] },
     }));
   });
@@ -25,7 +25,7 @@ describe('sonarCandidates', () => {
     const candidates = sonarCandidates(sonarData(), { changed: [{ projectKey: 'proj-b', projectName: 'Project B', status: 'passed' }] });
 
     expect(candidates).toContainEqual(expect.objectContaining({
-      id: 'sonar:passed:proj-b', score: 42, shapes: ['tile'], kicker: 'Quality gate passed',
+      id: 'sonar:passed:proj-b', score: 42, shapes: ['tile'], kicker: 'SonarCloud Quality Gate',
     }));
   });
 
