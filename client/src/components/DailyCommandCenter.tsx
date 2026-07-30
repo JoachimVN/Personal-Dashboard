@@ -13,6 +13,7 @@ import { deg, glyph, weatherLocation } from '../lib/weather';
 import { mapsCoordinatesHref, mapsSearchHref } from '../lib/maps';
 import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
+import { formatEventDate } from '../lib/time';
 import { CLASH_ROYALE_APP_ICON_URL, clashRoyaleArenaArt, clashRoyaleLeagueArt } from '../lib/clashRoyale';
 import {
   CLASH_OF_CLANS_APP_ICON_URL,
@@ -37,10 +38,7 @@ const SOON_MS = 6 * 60 * 60_000;
 function formatEventDay(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
   if (event.date === today) return event.allDay ? 'Today' : event.startLabel;
-  return new Date(`${event.date}T12:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-  });
+  return formatEventDate(event.date, 'long');
 }
 
 function startsIn(ms: number): string {

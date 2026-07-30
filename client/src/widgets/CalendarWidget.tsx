@@ -3,6 +3,7 @@ import type { CalendarData } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 import { mapsSearchHref } from '../lib/maps';
+import { formatEventDate } from '../lib/time';
 
 type CalendarEvent = CalendarData['events'][number];
 
@@ -55,11 +56,7 @@ function dayHeading(date: string): string {
   const tomorrowStr = new Date(Date.now() + 86_400_000).toLocaleDateString('en-CA');
   if (date === todayStr) return 'Today';
   if (date === tomorrowStr) return 'Tomorrow';
-  return new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'short',
-  });
+  return formatEventDate(date, 'long');
 }
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
