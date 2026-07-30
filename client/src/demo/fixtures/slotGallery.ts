@@ -192,7 +192,7 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
     {
       label: 'sonar-quality-gate (passed)',
       slot: {
-        id: 'gallery:sonar:passed', source: 'sonar', kind: 'sonar', kicker: 'Quality gate passed',
+        id: 'gallery:sonar:passed', source: 'sonar', kind: 'sonar', kicker: 'SonarCloud Quality Gate',
         title: 'personal-dashboard', detail: 'SonarCloud', href: '#/github', score: 50,
         render: {
           type: 'sonar-quality-gate', status: 'passed',
@@ -203,7 +203,7 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
     {
       label: 'sonar-quality-gate (failed)',
       slot: {
-        id: 'gallery:sonar:failed', source: 'sonar', kind: 'sonar', kicker: 'Quality gate failed',
+        id: 'gallery:sonar:failed', source: 'sonar', kind: 'sonar', kicker: 'SonarCloud Quality Gate',
         title: 'weekend-project', detail: 'SonarCloud', href: '#/github', score: 50,
         render: {
           type: 'sonar-quality-gate', status: 'failed',
