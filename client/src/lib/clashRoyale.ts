@@ -1,3 +1,5 @@
+import { pathOfLegendsDisplayLeagueNumber } from '@personal-dashboard/shared';
+
 /** The game's own app icon — hotlinked the same way as the Steam mark (Wikimedia Commons) and the
  * nav pill's Clash Royale icon (see sections/registry.tsx), which this re-exports for reuse. */
 export const CLASH_ROYALE_APP_ICON_URL = 'https://media.ffycdn.net/eu/supercell/nxaaEWAgbRGADkoAETG8.png';
@@ -135,9 +137,10 @@ function pathOfLegendsBattleArt(arenaName: string | undefined): string | undefin
   const namedLeagueIndex = PATH_OF_LEGENDS_LEAGUE_NAMES.findIndex((name) => name.toLowerCase() === normalizedName);
   if (namedLeagueIndex >= 0) return clashRoyaleLeagueArt(namedLeagueIndex + 1);
 
-  // Some battle-log versions report the legacy badge number instead of the league name.
+  // Some battle-log versions report the raw API leagueNumber instead of the league name — same
+  // API-to-display shift as pathOfLegendsDisplayLeagueNumber, so it needs the same offset applied.
   const match = /^league\s*(\d+)$/i.exec(arenaName.trim());
-  return match ? clashRoyaleLeagueArt(Number(match[1])) : undefined;
+  return match ? clashRoyaleLeagueArt(pathOfLegendsDisplayLeagueNumber(Number(match[1]))) : undefined;
 }
 
 /** `fallbackPathLeagueNumber` is the player's current, display-adjusted Path league. Supercell's
