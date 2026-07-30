@@ -37,9 +37,9 @@ export function github(now: Date): GitHubData {
       { id: 'ev4', summary: '2 commits', repo: 'yourname/dotfiles', timestamp: iso(now, -50), url: '#', branch: 'main', commits: [{ sha: 'e5f6a7b', title: 'Tidy up shell aliases' }, { sha: 'f6a7b8c', title: 'Add starship prompt config' }] },
     ],
     pullRequests: [
-      { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(now, -2) },
-      { title: 'Bump Vite to 7.x', repo: 'yourname/personal-dashboard', number: 40, url: '#', role: 'review-requested', draft: false, updatedAt: iso(now, -20) },
-      { title: 'WIP: offline sync queue', repo: 'yourname/weekend-project', number: 3, url: '#', role: 'author', draft: true, updatedAt: iso(now, -26) },
+      { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(now, -2), branch: 'importance-scoring', additions: 312, deletions: 47, changedFiles: 9, commits: 6 },
+      { title: 'Bump Vite to 7.x', repo: 'yourname/personal-dashboard', number: 40, url: '#', role: 'review-requested', draft: false, updatedAt: iso(now, -20), branch: 'deps/vite-7', additions: 58, deletions: 22, changedFiles: 4, commits: 2 },
+      { title: 'WIP: offline sync queue', repo: 'yourname/weekend-project', number: 3, url: '#', role: 'author', draft: true, updatedAt: iso(now, -26), branch: 'offline-sync', additions: 140, deletions: 8, changedFiles: 5, commits: 3 },
     ],
     issues: [
       { title: 'Contribution grid should scroll on narrow viewports', repo: 'yourname/personal-dashboard', number: 38, url: '#', updatedAt: iso(now, -40) },

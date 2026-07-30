@@ -285,25 +285,40 @@ export function createGitHubProvider(
         }),
       );
 
-      const toPr = (item: SearchItem, role: 'author' | 'review-requested') => ({
-        title: item.title,
-        repo: repoFromApiUrl(item.repository_url),
-        number: item.number,
-        url: item.html_url,
-        role,
-        draft: item.draft ?? false,
-        updatedAt: item.updated_at,
-      });
+      // The search/issues listing above is cheap but doesn't carry a PR's branch or diff size —
+      // that only comes from the full PR resource, one extra call per open PR. Bounded by how many
+      // PRs are actually open (typically a handful), same tradeoff as the per-repo health calls above.
+      const toPr = async (item: SearchItem, role: 'author' | 'review-requested') => {
+        const repo = repoFromApiUrl(item.repository_url);
+        const [owner, repoName] = repo.split('/');
+        const details = owner && repoName
+          ? await octokit
+              .request('GET /repos/{owner}/{repo}/pulls/{pull_number}', { owner, repo: repoName, pull_number: item.number, request })
+              .catch(() => undefined)
+          : undefined;
+        return {
+          title: item.title,
+          repo,
+          number: item.number,
+          url: item.html_url,
+          role,
+          draft: item.draft ?? false,
+          updatedAt: item.updated_at,
+          branch: details?.data.head?.ref,
+          additions: details?.data.additions,
+          deletions: details?.data.deletions,
+          changedFiles: details?.data.changed_files,
+          commits: details?.data.commits,
+        };
+      };
 
       const calendar = contributions.user.contributionsCollection.contributionCalendar;
 
       const data: GitHubData = {
         activity,
         pullRequests: [
-          ...(authored.data.items as SearchItem[]).map((item) => toPr(item, 'author')),
-          ...(reviewRequested.data.items as SearchItem[]).map((item) =>
-            toPr(item, 'review-requested'),
-          ),
+          ...(await Promise.all((authored.data.items as SearchItem[]).map((item) => toPr(item, 'author')))),
+          ...(await Promise.all((reviewRequested.data.items as SearchItem[]).map((item) => toPr(item, 'review-requested')))),
         ],
         issues: (assignedIssues.data.items as SearchItem[]).map((item) => ({
           title: item.title,
