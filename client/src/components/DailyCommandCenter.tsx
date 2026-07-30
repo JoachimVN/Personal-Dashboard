@@ -64,7 +64,7 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'clash-of-clans' | 'claude' | 'codex' {
+export function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'clash-of-clans' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
