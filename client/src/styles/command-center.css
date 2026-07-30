@@ -522,6 +522,26 @@
   box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-spotify) 32%, transparent);
 }
 
+.command-steam-tile-icon {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.625rem;
+  object-fit: cover;
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-steam) 32%, transparent);
+}
+
+.command-steam-tile-mark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.625rem;
+  background: var(--color-accent-steam);
+  box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-steam) 32%, transparent);
+}
+
 /* Disambiguates a hero/secondary card as Clash Royale even when it has no backdrop art (most
    milestones don't — see lib/clashRoyale.ts). Sits inline with the uppercase kicker label. */
 .command-kicker-badge {

@@ -178,16 +178,38 @@ function clashOfClansMomentIcon(render: Extract<CommandCenterSlot['render'], { t
   return render.kind === 'raid-weekend' ? CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL : CLASH_OF_CLANS_WAR_ICON_URL;
 }
 
+/** The square Steam icon for a tile — the game's library icon for now-playing, the achievement's
+ * own icon for achievements — never the wide capsule header used in secondary/hero. */
+function steamIconFor(
+  render: Extract<CommandCenterSlot['render'], { type: 'steam-now-playing' | 'steam-achievement' }>,
+  steam: SteamData | undefined,
+): string | undefined {
+  if (render.type === 'steam-now-playing') {
+    const game = steam?.currentGame?.appId === render.appId
+      ? steam.currentGame
+      : steam?.recentlyPlayed.find((g) => g.appId === render.appId);
+    return game?.iconUrl;
+  }
+  const achievements = steam?.achievements?.appId === render.appId ? steam.achievements : undefined;
+  return achievements?.recentUnlocks.find((a) => a.apiName === render.apiName)?.iconUrl;
+}
+
 function signalMark(
   slot: CommandCenterSlot,
   health: HealthData | undefined,
   roblox: RobloxData | undefined,
   spotify: SpotifyData | undefined,
+  steam: SteamData | undefined,
 ): ReactNode {
   const activityDay = health ? latestActivityDay(health) : undefined;
   if (slot.render.type === 'spotify-now-playing' || slot.render.type === 'spotify-track' || slot.render.type === 'spotify-artist' || slot.render.type === 'spotify-album') {
     const artUrl = spotifyArtFor(slot.render, spotify);
     return <img src={artUrl ?? publicAsset('spotify/icon.svg')} alt="" aria-hidden className="command-spotify-tile-icon" />;
+  }
+  if (slot.render.type === 'steam-now-playing' || slot.render.type === 'steam-achievement') {
+    const iconUrl = steamIconFor(slot.render, steam);
+    if (iconUrl) return <img src={iconUrl} alt="" aria-hidden className="command-steam-tile-icon" />;
+    return <span className="command-steam-tile-mark" aria-hidden><SteamMark className="h-4 w-4" /></span>;
   }
   if (slot.render.type === 'clash-royale-moment') {
     return <img src={CLASH_ROYALE_APP_ICON_URL} alt="" aria-hidden className="command-clash-royale-tile-icon" />;
@@ -223,7 +245,7 @@ function signalMark(
   return <span className="command-signal-dot" aria-hidden />;
 }
 
-export function Signal({ slot, github, health, roblox, spotify }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined; spotify: SpotifyData | undefined }>) {
+export function Signal({ slot, github, health, roblox, spotify, steam }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined; spotify: SpotifyData | undefined; steam: SteamData | undefined }>) {
   const contributionDays = slot.render.type === 'github-contributions'
     ? github?.contributions.days.slice(-7)
     : undefined;
@@ -238,7 +260,7 @@ export function Signal({ slot, github, health, roblox, spotify }: Readonly<{ slo
     : undefined;
   return (
     <a href={slot.href} className={`command-signal command-signal--${toneFor(slot)}`} style={weatherAccentStyle}>
-      {signalMark(slot, health, roblox, spotify)}
+      {signalMark(slot, health, roblox, spotify, steam)}
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{signalKicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{signalTitle}</p>
@@ -583,7 +605,7 @@ export function DailyCommandCenter() {
       </div>
       <div className="command-layout">
         <HeroPanel hero={ranked.hero} {...heroProps} weather={weather} />
-        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} spotify={spotify} />)}</div>
+        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} spotify={spotify} steam={steam} />)}</div>
       </div>
       {activeSecondary && <CommandPanel
         href={activeSecondary.href}
