@@ -85,12 +85,14 @@ export function SonarProjectCard({ project }: Readonly<{ project: SonarProject }
               </>
             )}
           </p>
-          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-(--color-card-border) pt-4 sm:grid-cols-6">
+          <div className="mt-4 grid grid-cols-3 gap-3 border-t border-(--color-card-border) pt-4 sm:grid-cols-5">
             <RatingBadge rating={project.security} label="Security" issueCount={project.vulnerabilitiesCount} />
             <RatingBadge rating={project.reliability} label="Reliability" issueCount={project.bugsCount} />
             <RatingBadge rating={project.maintainability} label="Maintainability" issueCount={project.codeSmellsCount} />
             <RatingBadge label="Hotspots Reviewed" value={project.hotspotsReviewedPercent !== undefined ? `${project.hotspotsReviewedPercent.toFixed(0)}%` : undefined} />
-            <RatingBadge label="Coverage" value={project.coveragePercent !== undefined ? `${project.coveragePercent.toFixed(1)}%` : '–'} />
+            {/* Coverage is omitted: SonarCloud only reports it from CI-based analysis with an
+                uploaded coverage report, and this repo's CI has no such step yet (Automatic
+                Analysis mode can't run tests). Re-add once that's wired up. */}
             <RatingBadge label="Duplications" value={project.duplicationsPercent !== undefined ? `${project.duplicationsPercent.toFixed(1)}%` : '0.0%'} />
           </div>
         </>
