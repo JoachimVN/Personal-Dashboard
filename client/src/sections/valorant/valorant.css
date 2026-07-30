@@ -4,10 +4,43 @@
   --color-accent-valorant: light-dark(#c22a3a, #ff4655);
   --valorant-win: light-dark(#137343, #55dc93);
   --valorant-loss: light-dark(#b53a45, #ff8c98);
+  /* The hero rr-delta and the map-art match results sit on a photo rather than the plain
+     card/track surface --valorant-win/-loss was tuned for, so they get their own pair — dark
+     enough in light mode to clear 4.5:1 against the scrim (a brighter, more "vivid" green reads
+     as horrible contrast the moment it's over anything lighter than solid black). Dark mode is
+     identical to --valorant-win/-loss. */
+  --valorant-overview-win: light-dark(#0b7a3f, #55dc93);
+  --valorant-overview-loss: light-dark(#c81f3a, #ff8c98);
   /* Fixed (not light-dark) — text in the hero banner always sits on a literal black scrim over a
      photo, regardless of the app's own light/dark theme. */
   --valorant-hero-win: #55dc93;
   --valorant-hero-loss: #ff8c98;
+  /* The hero scrim is kept light in both themes — the equipped card art should read as the
+     banner's actual content, not be hidden under a wash — but with enough of a vignette that the
+     text-shadow halo below has something consistent to sit on. Match-row scrims are separate
+     (below) and keep their original, much stronger dark-mode values — that gradient's weak end
+     sits right under the score text, so it still needs real suppression for reliable contrast;
+     the hero band has no small text sitting directly on its dimmest corner in the same way. */
+  --valorant-overview-hero-scrim-1: light-dark(rgba(255, 255, 255, 0.26), rgba(8, 8, 10, 0.26));
+  --valorant-overview-hero-scrim-2: light-dark(rgba(255, 255, 255, 0.18), rgba(8, 8, 10, 0.18));
+  --valorant-overview-hero-scrim-3: light-dark(rgba(255, 255, 255, 0.1), rgba(8, 8, 10, 0.1));
+  --valorant-overview-hero-scrim-4: light-dark(rgba(255, 255, 255, 0.04), rgba(8, 8, 10, 0.04));
+  /* The score sits at the *weak* end of this gradient (98deg fades left-to-right, and the score
+     column is on the right) — at 0.3 that's mostly raw map art with almost no wash, so text
+     contrast there depended entirely on luck-of-the-photo. Raised so the weakest stop still
+     suppresses the art enough for reliable contrast, even though that means less of the photo
+     shows through than the original "keep it light" pass aimed for. */
+  --valorant-overview-match-scrim-1: light-dark(rgba(255, 255, 255, 0.82), rgba(7, 8, 11, 0.88));
+  --valorant-overview-match-scrim-2: light-dark(rgba(255, 255, 255, 0.68), rgba(7, 8, 11, 0.73));
+  --valorant-overview-match-scrim-3: light-dark(rgba(255, 255, 255, 0.55), rgba(7, 8, 11, 0.55));
+  /* Text sitting directly on those scrims (not inside the always-dark peak pill) needs its own
+     light-dark pair rather than the card's generic ink tokens — the ink tokens are tuned for
+     flat card surfaces and read as a duller, bluer gray here, a visible change from the original
+     plain white-alpha hierarchy in dark mode. Dark branch matches the pre-existing literal values. */
+  --valorant-overview-text: light-dark(#18181d, #fff);
+  --valorant-overview-text-dim: light-dark(rgba(24, 24, 29, 0.62), rgba(255, 255, 255, 0.6));
+  --valorant-overview-text-mid: light-dark(rgba(24, 24, 29, 0.8), rgba(255, 255, 255, 0.82));
+  --valorant-overview-match-text-dim: light-dark(rgba(24, 24, 29, 0.68), rgba(255, 255, 255, 0.68));
 }
 
 @media (min-width: 1024px) {
@@ -75,19 +108,23 @@
   max-width: min(9.4rem, 34vw);
   object-fit: contain;
   object-position: left center;
+}
+/* The wordmark art is solid black on transparent, which already reads fine on the card's own
+   light-mode surface — it only needs inverting to white in dark mode. Mirrors the Roblox brand
+   logo treatment in command-center.css, since `light-dark()` can't drive a `filter`. */
+:root[style*="color-scheme: dark"] .valorant-overview-wordmark {
   filter: brightness(0) invert(1);
 }
-.dashboard-section-card--valorant:has(.valorant-overview) .section-arrow {
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(12, 12, 14, 0.42);
-  color: #fff;
-  box-shadow: none;
+@media (prefers-color-scheme: dark) {
+  :root:not([style*="color-scheme: light"]) .valorant-overview-wordmark {
+    filter: brightness(0) invert(1);
+  }
 }
 .valorant-overview { display: grid; min-height: 0; width: 100%; flex: 1; grid-template-rows: auto auto minmax(0, 1fr); gap: 0.75rem; }
 
-/* Hero band — identity, live rank and peak over the equipped card's wide art. Its text colors are
-   fixed rather than light-dark(): the band commits to a dark treatment in both themes because it
-   always sits on a photo (and on the same dark gradient fallback when the account has no card). */
+/* Hero band — identity, live rank and peak over the equipped card's wide art. Text sitting on the
+   scrim uses the --valorant-overview-text-* pair below rather than plain light-dark(), so dark
+   mode keeps the original literal white-alpha values pixel for pixel. */
 .valorant-overview-hero {
   position: relative;
   isolation: isolate;
@@ -101,7 +138,7 @@
   border-radius: 0.2rem 1.1rem 0.2rem 1.1rem;
   background:
     linear-gradient(135deg, color-mix(in oklab, var(--color-accent-valorant) 26%, transparent), transparent 62%),
-    linear-gradient(100deg, #101014, #1b1418);
+    linear-gradient(100deg, light-dark(#e4dad7, #101014), light-dark(#d8c9c8, #1b1418));
 }
 .valorant-overview-hero::after {
   content: '';
@@ -119,25 +156,27 @@
   z-index: 1;
   inset: 0;
   background:
-    linear-gradient(96deg, rgba(8, 8, 10, 0.95) 0%, rgba(8, 8, 10, 0.88) 34%, rgba(8, 8, 10, 0.5) 74%, rgba(8, 8, 10, 0.3) 100%),
-    linear-gradient(180deg, rgba(8, 8, 10, 0.5), transparent 45%, rgba(8, 8, 10, 0.55));
+    linear-gradient(96deg, var(--valorant-overview-hero-scrim-1) 0%, var(--valorant-overview-hero-scrim-2) 34%, var(--valorant-overview-hero-scrim-3) 74%, var(--valorant-overview-hero-scrim-4) 100%),
+    linear-gradient(180deg, var(--valorant-overview-hero-scrim-3), transparent 45%, var(--valorant-overview-hero-scrim-3));
 }
 .valorant-overview-hero-body { position: relative; z-index: 2; min-width: 0; }
-.valorant-overview-kicker { display: flex; align-items: center; gap: 0.4rem; margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 0.55rem; font-weight: 750; letter-spacing: 0.13em; line-height: 1.2; text-transform: uppercase; }
-.valorant-overview-name { overflow: hidden; margin: 0.34rem 0 0; color: #fff; font-size: clamp(1.4rem, 3.1vw, 1.95rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
-.valorant-overview-name span { margin-left: 0.32rem; color: rgba(255, 255, 255, 0.58); font-size: 0.62em; font-weight: 600; letter-spacing: -0.02em; }
+.valorant-overview-kicker { display: flex; align-items: center; gap: 0.4rem; margin: 0; color: var(--valorant-overview-text-dim); font-size: 0.55rem; font-weight: 750; letter-spacing: 0.13em; line-height: 1.2; text-transform: uppercase; }
+.valorant-overview-name { overflow: hidden; margin: 0.34rem 0 0; color: var(--valorant-overview-text); font-size: clamp(1.4rem, 3.1vw, 1.95rem); font-weight: 800; letter-spacing: -0.045em; line-height: 1; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-name span { margin-left: 0.32rem; color: var(--valorant-overview-text-dim); font-size: 0.62em; font-weight: 600; letter-spacing: -0.02em; }
 .valorant-overview-rank { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.55rem 0.72rem; margin-top: 0.9rem; }
-.valorant-overview-rank-icon { width: 3.1rem; height: 3.1rem; flex: 0 0 auto; object-fit: contain; filter: drop-shadow(0 0.3rem 0.8rem rgba(0, 0, 0, 0.55)); }
+.valorant-overview-rank-icon { width: 3.1rem; height: 3.1rem; flex: 0 0 auto; object-fit: contain; filter: drop-shadow(0 0.3rem 0.8rem light-dark(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.55))); }
 .valorant-overview-rank-body { min-width: 0; }
-.valorant-overview-rank-name { overflow: hidden; margin: 0; color: #fff; font-size: 0.92rem; font-weight: 800; letter-spacing: -0.02em; text-overflow: ellipsis; white-space: nowrap; }
+.valorant-overview-rank-name { overflow: hidden; margin: 0; color: var(--valorant-overview-text); font-size: 0.92rem; font-weight: 800; letter-spacing: -0.02em; text-overflow: ellipsis; white-space: nowrap; }
 .valorant-overview-rr { display: flex; align-items: center; gap: 0.55rem; margin-top: 0.34rem; }
 /* `.valorant-rr-track` is declared further down for the detail hero, where the bar sits on its own
    line; the extra specificity here wins the later-rule tiebreak and re-fits it into this flex row. */
 .valorant-overview-rr .valorant-overview-rr-track { flex: 1 1 auto; min-width: 3.5rem; max-width: 8.5rem; margin-top: 0; }
-.valorant-overview-rr-value { margin: 0; color: rgba(255, 255, 255, 0.82); font-size: 0.62rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.valorant-overview-rr-value { margin: 0; color: var(--valorant-overview-text-mid); font-size: 0.62rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .valorant-overview-rr-delta { margin-left: 0.35rem; font-weight: 800; }
-.valorant-overview-rr-delta.is-up { color: var(--valorant-hero-win); }
-.valorant-overview-rr-delta.is-down { color: var(--valorant-hero-loss); }
+.valorant-overview-rr-delta.is-up { color: var(--valorant-overview-win); }
+.valorant-overview-rr-delta.is-down { color: var(--valorant-overview-loss); }
+/* The peak pill stays a fixed dark badge regardless of theme (same as the original), so its text
+   stays fixed white too — it never needs to flip since its own background never does. */
 .valorant-overview-peak { display: flex; align-items: center; gap: 0.45rem; padding: 0.35rem 0.6rem 0.35rem 0.42rem; border-radius: 0.62rem; background: rgba(0, 0, 0, 0.46); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1); }
 .valorant-overview-peak img { width: 1.5rem; height: 1.5rem; flex: 0 0 auto; object-fit: contain; }
 .valorant-overview-peak div { min-width: 0; }
@@ -174,9 +213,9 @@
 .valorant-overview-matches li[data-result='win'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-win) 5%, transparent), transparent 70%), color-mix(in oklab, var(--color-track) 34%, transparent); }
 .valorant-overview-matches li[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-loss) 5%, transparent), transparent 70%), color-mix(in oklab, var(--color-track) 34%, transparent); }
 .valorant-overview-match-map-art { position: absolute; z-index: 0; inset: -0.12rem; background: center / cover no-repeat; filter: blur(1.25px); opacity: 0.72; }
-.valorant-overview-matches li[data-has-art='true']::before { content: ''; position: absolute; z-index: 1; inset: 0; background: linear-gradient(98deg, rgba(7, 8, 11, 0.88), rgba(7, 8, 11, 0.73) 62%, rgba(7, 8, 11, 0.55)); }
-.valorant-overview-matches li[data-has-art='true'][data-result='win']::before { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-win) 3%, transparent), transparent 72%), linear-gradient(98deg, rgba(7, 8, 11, 0.88), rgba(7, 8, 11, 0.73) 62%, rgba(7, 8, 11, 0.55)); }
-.valorant-overview-matches li[data-has-art='true'][data-result='loss']::before { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-loss) 3%, transparent), transparent 72%), linear-gradient(98deg, rgba(7, 8, 11, 0.88), rgba(7, 8, 11, 0.73) 62%, rgba(7, 8, 11, 0.55)); }
+.valorant-overview-matches li[data-has-art='true']::before { content: ''; position: absolute; z-index: 1; inset: 0; background: linear-gradient(98deg, var(--valorant-overview-match-scrim-1), var(--valorant-overview-match-scrim-2) 62%, var(--valorant-overview-match-scrim-3)); }
+.valorant-overview-matches li[data-has-art='true'][data-result='win']::before { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-overview-win) 3%, transparent), transparent 72%), linear-gradient(98deg, var(--valorant-overview-match-scrim-1), var(--valorant-overview-match-scrim-2) 62%, var(--valorant-overview-match-scrim-3)); }
+.valorant-overview-matches li[data-has-art='true'][data-result='loss']::before { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-overview-loss) 3%, transparent), transparent 72%), linear-gradient(98deg, var(--valorant-overview-match-scrim-1), var(--valorant-overview-match-scrim-2) 62%, var(--valorant-overview-match-scrim-3)); }
 .valorant-overview-matches li[data-has-art='true'] > :not(.valorant-overview-match-map-art) { position: relative; z-index: 2; }
 .valorant-overview-matches img { width: 1.9rem; height: 1.9rem; margin-left: 0.15rem; border-radius: 0.45rem; background: var(--color-track); object-fit: cover; }
 .valorant-overview-match-main { min-width: 0; }
@@ -193,11 +232,11 @@
 .valorant-overview-matches li[data-result='loss'] .valorant-overview-match-result strong { color: var(--valorant-loss); }
 .valorant-overview-match-result span { margin-top: 0.15rem; color: var(--color-ink-faint); font-size: 0.51rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-title p,
-.valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-result strong { color: #fff; }
+.valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-result strong { color: var(--valorant-overview-text); }
 .valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-main span,
-.valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-result span { color: rgba(255, 255, 255, 0.68); }
-.valorant-overview-matches li[data-has-art='true'][data-result='win'] .valorant-overview-match-result strong { color: #55dc93; }
-.valorant-overview-matches li[data-has-art='true'][data-result='loss'] .valorant-overview-match-result strong { color: #ff8c98; }
+.valorant-overview-matches li[data-has-art='true'] .valorant-overview-match-result span { color: var(--valorant-overview-match-text-dim); }
+.valorant-overview-matches li[data-has-art='true'][data-result='win'] .valorant-overview-match-result strong { color: var(--valorant-overview-win); }
+.valorant-overview-matches li[data-has-art='true'][data-result='loss'] .valorant-overview-match-result strong { color: var(--valorant-overview-loss); }
 
 /* The rank row's three columns stop fitting well before the card itself gets narrow, so peak drops
    to its own line rather than squeezing the tier name and RR bar. */
