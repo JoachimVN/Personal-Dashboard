@@ -16,14 +16,14 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
         detail: 'Dua Lipa', href: '#/spotify', score: 90, render: { type: 'spotify-now-playing' },
       },
       {
-        id: 'roblox:now-playing', source: 'roblox', kind: 'roblox', kicker: 'Roblox', title: 'Jailbreak',
-        detail: 'In game right now', href: 'https://www.roblox.com/home', score: 70,
-        render: { type: 'roblox-now-playing' },
+        id: 'github:open-pr:personal-dashboard:31', source: 'github', kind: 'github', kicker: '2 open pull requests',
+        title: 'Show issue counts alongside SonarQube rating grades', detail: 'personal-dashboard', href: '#/github', score: 50,
+        render: { type: 'github-open-prs' },
       },
       {
-        id: 'gmail:threads', source: 'gmail', kind: 'gmail', kicker: 'Inbox', title: '5 unread',
-        detail: 'Newsletter, GitHub review request and 3 more', href: '#/personal', score: 60,
-        render: { type: 'gmail-threads', threadIds: ['t1', 't2', 't4'] },
+        id: 'sonar:failed:weekend-project', source: 'sonar', kind: 'sonar', kicker: 'Quality gate failed',
+        title: 'weekend-project', detail: 'SonarCloud', href: '#/github', score: 78,
+        render: { type: 'sonar-quality-gate', status: 'failed', projects: [{ key: 'weekend-project', name: 'weekend-project' }] },
       },
     ],
     tiles: [
