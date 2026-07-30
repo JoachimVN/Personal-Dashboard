@@ -99,6 +99,13 @@ const WEATHER_KIND_COLOR: Record<Extract<CommandCenterSlot['render'], { type: 'w
   moon: HUMIDITY_COLOR,
 };
 
+/** Recolors a hero/secondary panel per weather signal kind — see WEATHER_KIND_COLOR above. Shared
+ * so the secondary carousel picks up the same per-kind colors the hero panel and tiles already use,
+ * instead of falling back to the flat `--color-accent-weather` every weather kind used to share. */
+export function weatherPanelStyle(slot: CommandCenterSlot): CSSProperties | undefined {
+  return slot.render.type === 'weather-signal' ? ({ '--panel-accent': WEATHER_KIND_COLOR[slot.render.kind] } as CSSProperties) : undefined;
+}
+
 function secondarySlotsFor(commandCenter: CommandCenterData | undefined): CommandCenterSlot[] {
   if (!commandCenter) return [];
   return Array.isArray(commandCenter.secondary)
@@ -478,16 +485,13 @@ export function HeroPanel({
   weather: WeatherData | undefined;
 }>) {
   const today = weather?.days[0];
-  const weatherAccentStyle = hero.render.type === 'weather-signal'
-    ? ({ '--panel-accent': WEATHER_KIND_COLOR[hero.render.kind] } as CSSProperties)
-    : undefined;
   return (
     <CommandPanel
       href={hero.href}
       label={`Open ${hero.kicker}: ${event?.title ?? hero.title}`}
       className={`command-primary command-panel--${toneFor(hero)}`}
       art={slotArt(hero)}
-      style={weatherAccentStyle}
+      style={weatherPanelStyle(hero)}
     >
       <p className="command-label"><KickerBadge slot={hero} />{hero.kicker}</p>
       {lead ?? (
@@ -624,6 +628,7 @@ export function DailyCommandCenter() {
     '--roblox-art-primary': robloxArtPalette[0].join(' '),
     '--roblox-art-secondary': robloxArtPalette[1].join(' '),
   } as CSSProperties : undefined;
+  const secondaryPanelStyle = robloxArtStyle ?? (activeSecondary ? weatherPanelStyle(activeSecondary) : undefined);
 
   if (!commandCenter) return <CommandCenterSkeleton />;
 
@@ -648,7 +653,7 @@ export function DailyCommandCenter() {
         label={`Open ${activeSecondary.kicker}: ${activeSecondary.title}`}
         className={`command-agenda command-panel--${toneFor(activeSecondary)}${isRobloxSecondary ? ' command-agenda--roblox' : ''}`}
         fullCardLink
-        style={robloxArtStyle}
+        style={secondaryPanelStyle}
         art={slotArt(activeSecondary)}
       >
         <SecondaryCarousel

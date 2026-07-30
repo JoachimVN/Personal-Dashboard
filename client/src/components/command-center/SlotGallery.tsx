@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { CommandPanel, HeroPanel, Signal, SecondaryCardBody, aiUsageTiles, heroPropsFor, slotArt, toneFor } from '../DailyCommandCenter';
+import { CommandPanel, HeroPanel, Signal, SecondaryCardBody, aiUsageTiles, heroPropsFor, slotArt, toneFor, weatherPanelStyle } from '../DailyCommandCenter';
 import { buildGalleryData, buildGallerySlots, type GallerySlot } from '../../demo/fixtures/slotGallery';
 
 /**
@@ -126,6 +126,7 @@ export function SlotGallery() {
                 label={`Open ${slot.kicker}: ${slot.title}`}
                 className={`command-agenda command-panel--${toneFor(slot)}`}
                 fullCardLink
+                style={weatherPanelStyle(slot)}
                 art={slotArt(slot)}
               >
                 {/* Matches the wrapper SecondaryCarousel gives a single item in production — several
