@@ -5,7 +5,8 @@ import { formatEventDate } from '../../../lib/time';
 function formatEventDay(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
   if (event.date === today) return event.allDay ? 'Today' : event.startLabel;
-  return formatEventDate(event.date, 'long', 'long');
+  const day = formatEventDate(event.date, 'long', 'long');
+  return event.allDay ? day : `${day} · ${event.startLabel}`;
 }
 
 export function CalendarAgendaSecondary({ slot, calendar }: Readonly<{ slot: CommandCenterSlot; calendar: CalendarData | undefined }>): ReactNode {
