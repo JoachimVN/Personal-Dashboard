@@ -862,6 +862,13 @@
   filter: drop-shadow(0 3px 6px color-mix(in oklab, var(--color-accent-clash-royale) 35%, transparent));
 }
 
+/* Overrides the `contain` above: the app-icon fallback is a solid tile, not transparent emblem
+   art, so it needs cover-cropping like the nav pill/kicker badge instead of letterboxing. */
+.command-clash-streak-badge .clash-recent-games-mode-icon--app {
+  object-fit: cover;
+  border-radius: 0.85rem;
+}
+
 .command-clash-streak-crowns {
   display: flex;
   overflow: hidden;

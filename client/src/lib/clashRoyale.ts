@@ -149,7 +149,7 @@ function pathOfLegendsBattleArt(arenaName: string | undefined): string | undefin
 export function clashRoyaleBattleIcon(
   battle: { type: string; modeName?: string; arenaName?: string },
   fallbackPathLeagueNumber?: number,
-): { src: string; label: string } {
+): { src: string; label: string; isAppIcon?: boolean } {
   const mode = `${battle.type} ${battle.modeName ?? ''}`
     .replaceAll(/([a-z])([A-Z])/g, '$1 $2')
     .toLowerCase()
@@ -167,10 +167,13 @@ export function clashRoyaleBattleIcon(
   }
   if (mode.includes('path of legend')) {
     const leagueArt = pathOfLegendsBattleArt(battle.arenaName) ?? (fallbackPathLeagueNumber === undefined ? undefined : clashRoyaleLeagueArt(fallbackPathLeagueNumber));
+    if (leagueArt) return { src: leagueArt, label: battle.arenaName ?? 'Path of Legends' };
     // Falls back to the app icon rather than the Trophy Road hammer: Path of Legends is a distinct
     // ranked mode, so stamping an unresolved game with the ladder's own icon would misrepresent it
-    // as a Trophy Road battle instead of just an "unknown league" Path of Legends one.
-    return { src: leagueArt ?? CLASH_ROYALE_APP_ICON_URL, label: battle.arenaName ?? 'Path of Legends' };
+    // as a Trophy Road battle instead of just an "unknown league" Path of Legends one. It's a solid
+    // app-icon tile rather than transparent emblem art, so callers need `isAppIcon` to render it
+    // with `object-fit: cover` (like the nav pill/kicker badge) instead of the shield-art treatment.
+    return { src: CLASH_ROYALE_APP_ICON_URL, label: battle.arenaName ?? 'Path of Legends', isAppIcon: true };
   }
   return { src: CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Trophy Road' };
 }

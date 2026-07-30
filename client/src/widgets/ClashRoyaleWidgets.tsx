@@ -202,10 +202,14 @@ function trimmedBattleModeIconUrl(url: string): Promise<string> {
   return request;
 }
 
-export function TrimmedBattleModeIcon({ src }: Readonly<{ src: string }>) {
+/** `isAppIcon` skips the trim/crop pipeline below — that's tuned for transparent battle-mode
+ * emblems, but the app icon is a solid tile meant to be cover-cropped (same as the nav pill and
+ * command-center kicker badge), not letterboxed inside a contain frame. */
+export function TrimmedBattleModeIcon({ src, isAppIcon = false }: Readonly<{ src: string; isAppIcon?: boolean }>) {
   const [trimmedSrc, setTrimmedSrc] = useState(src);
 
   useEffect(() => {
+    if (isAppIcon) return;
     let disposed = false;
     setTrimmedSrc(src);
     trimmedBattleModeIconUrl(src)
@@ -216,9 +220,10 @@ export function TrimmedBattleModeIcon({ src }: Readonly<{ src: string }>) {
         // Keep the original source visible if its host disallows canvas reads.
       });
     return () => { disposed = true; };
-  }, [src]);
+  }, [src, isAppIcon]);
 
-  return <img src={trimmedSrc} alt="" className="clash-recent-games-mode-icon" loading="lazy" decoding="async" />;
+  const className = isAppIcon ? 'clash-recent-games-mode-icon clash-recent-games-mode-icon--app' : 'clash-recent-games-mode-icon';
+  return <img src={isAppIcon ? src : trimmedSrc} alt="" className={className} loading="lazy" decoding="async" />;
 }
 function ClashDeckCardArt({ card, artType }: Readonly<{ card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }>) {
   if (artType !== 'hero') return <FramedClashRoyaleCardImage card={card} artType={artType} />;
@@ -430,7 +435,7 @@ function BattleModeTile({ battle, index, battleCount }: Readonly<{ battle: Clash
       aria-label={`Game ${index + 1} of ${battleCount}: ${BATTLE_RESULT_LABELS[battle.result]} in ${icon.label}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns, ${relativeTime(battle.battleTime)}`}
     >
       <span className={`clash-recent-games-mode-icon-frame${isModeEmblem ? ' clash-recent-games-mode-icon-frame--emblem' : ''}${isMergeTactics ? ' clash-recent-games-mode-icon-frame--merge-tactics' : ''}`} aria-hidden>
-        <TrimmedBattleModeIcon src={icon.src} />
+        <TrimmedBattleModeIcon src={icon.src} isAppIcon={icon.isAppIcon} />
       </span>
     </li>
   );

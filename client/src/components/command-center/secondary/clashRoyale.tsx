@@ -19,7 +19,7 @@ export function ClashRoyaleWinStreakSecondary({ slot }: Readonly<{ slot: Command
   const hiddenCount = streakCrowns.length - shown.length;
   return <div className="command-secondary-clash-streak mt-4">
     <div className="command-clash-streak-badge" aria-hidden>
-      {icon && <TrimmedBattleModeIcon src={icon.src} />}
+      {icon && <TrimmedBattleModeIcon src={icon.src} isAppIcon={icon.isAppIcon} />}
     </div>
     <div className="min-w-0 flex-1">
       <p className="text-sm font-semibold text-ink">{slot.title}</p>

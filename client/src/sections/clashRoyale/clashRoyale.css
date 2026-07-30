@@ -184,6 +184,9 @@
 .clash-recent-games-mode-icon-frame--emblem { width: min(4.5rem, 112%); }
 .clash-recent-games-mode-icon-frame--merge-tactics { width: min(3.75rem, 92%); }
 .clash-recent-games-mode-icon { display: block; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 2px 3px color-mix(in oklab, var(--color-ink) 24%, transparent)); }
+/* The app-icon fallback is a solid tile, not transparent emblem art — cover-crop it like the nav
+   pill/kicker badge instead of letterboxing it inside the contain frame above. */
+.clash-recent-games-mode-icon--app { object-fit: cover; border-radius: 0.55rem; }
 .clash-crown-score { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: clamp(0.08rem, 0.3vw, 0.14rem); color: var(--color-ink-muted); }
 .clash-crown-score strong { min-width: 0; color: var(--color-ink); font-size: clamp(0.68rem, 1.8vw, 0.76rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1; text-align: center; white-space: nowrap; }
 /* Fluid like the hourly weather glyphs (text-[clamp(...)] in HourGlyphStrip) rather than a
