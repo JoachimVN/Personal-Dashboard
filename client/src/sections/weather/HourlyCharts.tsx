@@ -42,8 +42,14 @@ function HourAxisLabels({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
       {hours.map((hour, i) => {
         const shown = i % step === 0;
         const shownOnMobile = i % (step * 2) === 0;
+        const classNames = ['flex-1', 'text-center'];
+        if (!shown) {
+          classNames.push('invisible');
+        } else if (!shownOnMobile) {
+          classNames.push('invisible', 'sm:visible');
+        }
         return (
-          <span key={hour.time} className={`flex-1 text-center ${!shown ? 'invisible' : !shownOnMobile ? 'invisible sm:visible' : ''}`}>
+          <span key={hour.time} className={classNames.join(' ')}>
             {hour.hourLabel}
           </span>
         );
@@ -367,7 +373,14 @@ function formatDayDate(date: string): string {
 /** "Today · 30 Jul" / "Tomorrow · 31 Jul" / "Wed · 2 Aug" — index 0/1 get the relative name,
  * further days fall back to `days`' weekday label. */
 function dayHeading(date: string, index: number, days: WeatherData['days']): string {
-  const relative = index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : days.find((day) => day.date === date)?.dayLabel;
+  let relative: string | undefined;
+  if (index === 0) {
+    relative = 'Today';
+  } else if (index === 1) {
+    relative = 'Tomorrow';
+  } else {
+    relative = days.find((day) => day.date === date)?.dayLabel;
+  }
   const formatted = formatDayDate(date);
   return relative ? `${relative} · ${formatted}` : formatted;
 }
