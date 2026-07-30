@@ -151,6 +151,15 @@ export function slotArt(slot: CommandCenterSlot): string | undefined {
   return undefined;
 }
 
+/** Same art as `slotArt`, but suppressed for the secondary carousel's arena/league moments — those
+ * render their own left-aligned artwork instead (see ClashRoyaleArenaLeagueSecondary), so painting
+ * the same image again as a faded backdrop would just duplicate it. Hero keeps the backdrop
+ * treatment via `slotArt` directly. */
+export function secondaryArt(slot: CommandCenterSlot): string | undefined {
+  if (slot.render.type === 'clash-royale-moment' && (slot.render.kind === 'arena' || slot.render.kind === 'league')) return undefined;
+  return slotArt(slot);
+}
+
 /** A small service-icon badge next to the kicker on hero/secondary cards, so a card reads
  * unambiguously even before its own art/thumbnail loads (or, for arena/league, when there's no art
  * mapped for that name yet). */
@@ -654,7 +663,7 @@ export function DailyCommandCenter() {
         className={`command-agenda command-panel--${toneFor(activeSecondary)}${isRobloxSecondary ? ' command-agenda--roblox' : ''}`}
         fullCardLink
         style={secondaryPanelStyle}
-        art={slotArt(activeSecondary)}
+        art={secondaryArt(activeSecondary)}
       >
         <SecondaryCarousel
           items={secondarySlots}

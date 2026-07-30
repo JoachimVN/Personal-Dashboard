@@ -1053,6 +1053,16 @@
   height: var(--secondary-carousel-media-size);
 }
 
+/* Arena key art is a tall portrait render, league badges are square — `contain` inside a fixed box
+   handles both without distortion, same pattern as the Clash of Clans league badge below. */
+.command-clash-royale-art-badge {
+  flex-shrink: 0;
+  width: 5.5rem;
+  height: var(--secondary-carousel-media-size);
+  object-fit: contain;
+  filter: drop-shadow(0 3px 6px color-mix(in oklab, var(--color-accent-clash-royale) 30%, transparent));
+}
+
 .command-clash-of-clans-badge {
   display: grid;
   flex-shrink: 0;

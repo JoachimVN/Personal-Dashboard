@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { CommandPanel, HeroPanel, Signal, SecondaryCardBody, aiUsageTiles, heroPropsFor, slotArt, toneFor, weatherPanelStyle } from '../DailyCommandCenter';
+import { CommandPanel, HeroPanel, Signal, SecondaryCardBody, aiUsageTiles, heroPropsFor, secondaryArt, toneFor, weatherPanelStyle } from '../DailyCommandCenter';
 import { buildGalleryData, buildGallerySlots, type GallerySlot } from '../../demo/fixtures/slotGallery';
 
 /**
@@ -127,7 +127,7 @@ export function SlotGallery() {
                 className={`command-agenda command-panel--${toneFor(slot)}`}
                 fullCardLink
                 style={weatherPanelStyle(slot)}
-                art={slotArt(slot)}
+                art={secondaryArt(slot)}
               >
                 {/* Matches the wrapper SecondaryCarousel gives a single item in production — several
                     secondary bodies (e.g. the Roblox icon) size off custom properties this div

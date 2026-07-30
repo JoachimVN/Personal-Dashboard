@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { CommandCenterSlot } from '@personal-dashboard/shared';
-import { CLASH_ROYALE_TROPHY_ICON_URL, clashRoyaleBattleIcon } from '../../../lib/clashRoyale';
+import { pathOfLegendsDisplayLeagueNumber } from '@personal-dashboard/shared';
+import { CLASH_ROYALE_TROPHY_ICON_URL, clashRoyaleArenaArt, clashRoyaleBattleIcon, clashRoyaleLeagueArt } from '../../../lib/clashRoyale';
 import { ClashCrownScore, TrimmedBattleModeIcon } from '../../../widgets/ClashRoyaleWidgets';
 
 /** Crown-score chips for a run of battles — shared by the win-streak and session cards below,
@@ -71,4 +72,22 @@ export function ClashRoyaleBestTrophiesSecondary({ slot }: Readonly<{ slot: Comm
   return <p className="command-clash-of-clans-stat mt-4" aria-label={`${bestTrophies.toLocaleString()} trophies`}>
     <span><img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" aria-hidden />{bestTrophies.toLocaleString()}</span>
   </p>;
+}
+
+/** The key art for a new arena or league promotion, rendered as a regular left-aligned thumbnail —
+ * same layout as the Spotify/Roblox secondary cards — instead of the right-anchored, faded backdrop
+ * treatment those two moments used to get from the panel's own `art` prop (still used for the hero,
+ * see `secondaryArt` in DailyCommandCenter.tsx). */
+export function ClashRoyaleArenaLeagueSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
+  if (slot.render.type !== 'clash-royale-moment' || (slot.render.kind !== 'arena' && slot.render.kind !== 'league')) return null;
+  const { render } = slot;
+  const art = render.kind === 'arena' && render.arenaName
+    ? clashRoyaleArenaArt(render.arenaName)
+    : render.kind === 'league' && render.leagueNumber !== undefined
+      ? clashRoyaleLeagueArt(pathOfLegendsDisplayLeagueNumber(render.leagueNumber))
+      : undefined;
+  return <div className="command-secondary-spotify mt-4">
+    {art && <img src={art} alt="" aria-hidden className="command-clash-royale-art-badge" />}
+    <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+  </div>;
 }
