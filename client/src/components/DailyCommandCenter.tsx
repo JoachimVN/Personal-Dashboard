@@ -18,7 +18,7 @@ import { latestActivityDay } from '../lib/health';
 import { rampColor } from '../lib/contributions';
 import { formatEventDate } from '../lib/time';
 import { pathOfLegendsDisplayLeagueNumber } from '@personal-dashboard/shared';
-import { CLASH_ROYALE_APP_ICON_URL, clashRoyaleArenaArt, clashRoyaleLeagueArt } from '../lib/clashRoyale';
+import { CLASH_ROYALE_APP_ICON_URL, CLASH_ROYALE_TROPHY_ICON_URL, clashRoyaleArenaArt, clashRoyaleLeagueArt } from '../lib/clashRoyale';
 import {
   CLASH_OF_CLANS_APP_ICON_URL,
   CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL,
@@ -275,7 +275,12 @@ export function Signal({ slot, github, health, roblox, spotify, steam }: Readonl
             </div>
           : slot.render.type === 'sonar-quality-gate'
             ? <div className="mt-1"><QualityGatePill status={slot.render.status} /></div>
-            : <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>}
+            : slot.render.type === 'clash-royale-moment' && slot.render.kind === 'best-trophies' && slot.render.bestTrophies !== undefined
+              ? <span className="command-clash-royale-trophy-tile mt-1" aria-hidden>
+                  <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" />
+                  {slot.render.bestTrophies.toLocaleString()}
+                </span>
+              : <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>}
         {slot.meter !== undefined && (
           <span className={`command-meter${slot.meter <= 15 ? ' command-meter--low' : ''}`}>
             <span style={{ width: `${Math.min(100, Math.max(0, slot.meter))}%` }} />
