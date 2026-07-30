@@ -848,28 +848,18 @@
 }
 
 .command-clash-streak-badge {
-  position: relative;
   display: grid;
   flex-shrink: 0;
-  width: 5.5rem;
-  height: 5.5rem;
-  margin: 0.4rem;
+  width: 4rem;
+  height: 4rem;
   place-items: center;
-  border: 1px solid color-mix(in oklab, var(--color-accent-clash-royale) 32%, var(--color-card-border));
-  border-radius: 1.25rem;
-  background:
-    radial-gradient(120% 120% at 28% 18%, color-mix(in oklab, var(--color-accent-clash-royale) 30%, transparent), transparent 70%),
-    color-mix(in oklab, var(--color-accent-clash-royale) 12%, var(--color-card));
-  /* `.command-agenda` clips at its padding edge, and this badge sits right against it on the
-     left — an offset shadow gets clipped there no matter how small the blur. Centered, small,
-     and a touch more opaque instead, so the glow is fully visible on every side. */
-  box-shadow: 0 0 8px 1px color-mix(in oklab, var(--color-accent-clash-royale) 35%, transparent);
 }
 
 .command-clash-streak-badge .clash-recent-games-mode-icon {
-  width: 4.6rem;
-  height: 4.6rem;
-  filter: drop-shadow(0 3px 5px color-mix(in oklab, var(--color-ink) 30%, transparent));
+  width: 4rem;
+  height: 4rem;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 6px color-mix(in oklab, var(--color-accent-clash-royale) 35%, transparent));
 }
 
 .command-clash-streak-crowns {
