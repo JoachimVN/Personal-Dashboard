@@ -1,4 +1,4 @@
-const COC_API_BASE = 'https://api.clashofclans.com/v1';
+const COC_API_BASE = 'https://cocproxy.royaleapi.dev/v1';
 
 export interface ClashOfClansAuth {
   apiKey: string;
@@ -112,20 +112,12 @@ export function normalizeClashOfClansTag(tag: string): string {
   return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
 }
 
-/** Mirrors clashRoyale.ts's crRequest — the Clash of Clans key is also IP-allowlisted at
- * developer.clashofclans.com, and a 403 here almost always means the server's current public IP
- * has drifted off that allowlist. */
 export async function cocRequest<T>(signal: AbortSignal, apiKey: string, path: string, label: string): Promise<T> {
   const res = await fetch(`${COC_API_BASE}${path}`, {
     signal,
     headers: { Authorization: `Bearer ${apiKey}` },
   });
-  if (res.status === 403) {
-    throw new Error(
-      `Clash of Clans ${label} failed: HTTP 403 — the API key's allowed IP list probably doesn't include this ` +
-        'server\'s current public IP. Check developer.clashofclans.com and update it.',
-    );
-  }
+  if (res.status === 403) throw new Error(`Clash of Clans ${label} failed: HTTP 403`);
   if (!res.ok) throw new Error(`Clash of Clans ${label} failed: HTTP ${res.status}`);
   return (await res.json()) as T;
 }

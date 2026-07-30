@@ -94,8 +94,8 @@ export interface PushedClashRoyaleActivity {
   timestamp: string;
 }
 
-/** The dashboard scheduler has already fetched and validated this data using the home machine's
- * IP-allowlisted Supercell key. Batabiboing receives only the display-safe latest battle summary. */
+/** The dashboard scheduler has already fetched and validated this data using the configured
+ * Supercell key. Batabiboing receives only the display-safe latest battle summary. */
 export function latestClashRoyaleActivity(data: Pick<ClashRoyaleData, 'recentBattles'> | undefined): PushedClashRoyaleActivity | null {
   const battle = data?.recentBattles[0];
   return battle
@@ -266,7 +266,7 @@ interface ClashOfClansActivitySnapshot {
 }
 
 /** Everything the provider's `fetch` needs from Clash of Clans, in one lookup — pulled out so a
- * hiccup here (auth, IP allowlist, network) can be caught in one place without inflating the
+ * hiccup here (auth or network) can be caught in one place without inflating the
  * cognitive complexity of the tick that also handles Epic/Claude/Codex/Clash Royale. Returns null
  * on any failure; the caller then just keeps whatever state it already had. */
 async function fetchClashOfClansActivity(
@@ -311,7 +311,7 @@ async function fetchClashOfClansActivity(
       activeAt,
     };
   } catch (err) {
-    // A Clash of Clans hiccup (auth, IP allowlist, network) should never block the other signals
+    // A Clash of Clans hiccup (auth or network) should never block the other signals
     // this provider pushes every minute.
     console.warn(`[activity-push] Clash of Clans lookup failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     return null;
