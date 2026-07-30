@@ -393,9 +393,6 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
   const winRate = Math.round((record.wins / battleCount) * 100);
   const gamesLabel = `Last ${battleCount} ${battleCount === 1 ? 'game' : 'games'}`;
   const streak = currentStreak(battles);
-  const currentPathLeagueNumber = data.profile.pathOfLegends
-    ? pathOfLegendsDisplayLeagueNumber(data.profile.pathOfLegends.leagueNumber)
-    : undefined;
   return (
     <section className="clash-recent-games">
       <header className="clash-recent-games-header">
@@ -412,15 +409,19 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
       </header>
       <ol className="clash-recent-games-grid" aria-label={`Results of ${gamesLabel.toLowerCase()}, latest first`}>
         {battles.map((battle, index) => (
-          <BattleModeTile key={`${battle.battleTime}-${index}`} battle={battle} index={index} battleCount={battleCount} fallbackPathLeagueNumber={currentPathLeagueNumber} />
+          <BattleModeTile key={`${battle.battleTime}-${index}`} battle={battle} index={index} battleCount={battleCount} />
         ))}
       </ol>
     </section>
   );
 }
 
-function BattleModeTile({ battle, index, battleCount, fallbackPathLeagueNumber }: Readonly<{ battle: ClashRoyaleBattle; index: number; battleCount: number; fallbackPathLeagueNumber?: number }>) {
-  const icon = clashRoyaleBattleIcon(battle, fallbackPathLeagueNumber);
+// No `fallbackPathLeagueNumber` here: Supercell's battle log doesn't reliably carry a historic
+// league per battle, and the player's *current* league is very often a different one than the
+// league these past games were actually played in — better to fall back to a generic icon than
+// to stamp every unresolved Path of Legends game with a league it may never have been played at.
+function BattleModeTile({ battle, index, battleCount }: Readonly<{ battle: ClashRoyaleBattle; index: number; battleCount: number }>) {
+  const icon = clashRoyaleBattleIcon(battle);
   const isModeEmblem = icon.src !== CLASH_ROYALE_BATTLE_ART.trophyRoad;
   const isMergeTactics = `${battle.type} ${battle.modeName ?? ''}`.toLowerCase().includes('merge tactics');
   return (
