@@ -10,9 +10,17 @@ const CHART_H = 34;
  * extreme, bottom = low), sourced from `uvLevel()` so the colors never drift from the gauge. */
 const UV_GRADIENT_STOPS = [11, 8, 6, 3, 0].map((v) => ({ offset: (11 - v) / 11, color: uvLevel(v).color }));
 
+/** Every hour still gets an equal-width slot (for alignment with the chart below), but beyond
+ * 24 hours (the 48h range) only every Nth slot actually draws a glyph/label — otherwise the
+ * 48h view would cram twice as many icons into the same width as the already-tight 24h one. */
+function hourStep(count: number): number {
+  return Math.max(1, Math.ceil(count / 24));
+}
+
 /** Condition glyphs, one per hour slot — rendered once above whichever stat is selected, so
  * switching tabs never changes the card's height and hovering any chart dims the same strip. */
 function HourGlyphStrip({ hours, active }: Readonly<{ hours: WeatherData['hours']; active: number | null }>) {
+  const step = hourStep(hours.length);
   return (
     <div className="mb-2 flex gap-x-0.5 text-[clamp(0.5rem,2vw,1rem)]" aria-hidden>
       {hours.map((hour, i) => (
@@ -20,7 +28,7 @@ function HourGlyphStrip({ hours, active }: Readonly<{ hours: WeatherData['hours'
           key={hour.time}
           className={`min-w-0 flex-1 text-center transition-opacity ${active != null && active !== i ? 'opacity-35' : ''}`}
         >
-          {glyph(hour.symbol)}
+          {i % step === 0 ? glyph(hour.symbol) : null}
         </span>
       ))}
     </div>
@@ -28,13 +36,18 @@ function HourGlyphStrip({ hours, active }: Readonly<{ hours: WeatherData['hours'
 }
 
 function HourAxisLabels({ hours }: Readonly<{ hours: WeatherData['hours'] }>) {
+  const step = hourStep(hours.length);
   return (
     <div className="mt-1 flex justify-between text-[10px] tabular-nums text-ink-faint">
-      {hours.map((hour, i) => (
-        <span key={hour.time} className={`flex-1 text-center ${i % 2 === 1 ? 'invisible sm:visible' : ''}`}>
-          {hour.hourLabel}
-        </span>
-      ))}
+      {hours.map((hour, i) => {
+        const shown = i % step === 0;
+        const shownOnMobile = i % (step * 2) === 0;
+        return (
+          <span key={hour.time} className={`flex-1 text-center ${!shown ? 'invisible' : !shownOnMobile ? 'invisible sm:visible' : ''}`}>
+            {hour.hourLabel}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -409,25 +422,36 @@ export function HourlySection({ data }: Readonly<{ data: WeatherData }>) {
           <ChevronIcon direction="right" />
         </button>
       </div>
-      {clampedIndex === 0 && (
-        <div className="mb-3 flex gap-1.5" role="tablist" aria-label="Hour range">
-          {RANGE_OPTIONS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              role="tab"
-              aria-selected={rangeHours === option}
-              onClick={() => {
-                setRangeHours(option);
-                setActive(null);
-              }}
-              className={`weather-stat-tab ${rangeHours === option ? 'weather-stat-tab--active' : ''}`}
-            >
-              {option}h
-            </button>
-          ))}
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {clampedIndex === 0 && (
+          <motion.div
+            key="range"
+            initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+            animate={{ height: 'auto', opacity: 1, marginBottom: 12 }}
+            exit={{ height: 0, opacity: 0, marginBottom: 0 }}
+            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="flex gap-1.5" role="tablist" aria-label="Hour range">
+              {RANGE_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  role="tab"
+                  aria-selected={rangeHours === option}
+                  onClick={() => {
+                    setRangeHours(option);
+                    setActive(null);
+                  }}
+                  className={`weather-stat-tab ${rangeHours === option ? 'weather-stat-tab--active' : ''}`}
+                >
+                  {option}h
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Hourly stat">
         {HOURLY_TABS.map((tab) => (
           <button
