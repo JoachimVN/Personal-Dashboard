@@ -63,6 +63,15 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
        * see ClashRoyaleBattle.pathOfLegendsLeagueNumber. */
       pathOfLegendsLeagueNumber: z.number().optional(),
     }).optional(),
+    /** Only present for kind 'session' — crown score and result for each battle in the session,
+     * oldest first, mirroring streakCrowns above but covering wins/losses/draws rather than only
+     * wins (a session isn't necessarily an unbroken streak). */
+    sessionCrowns: z.array(z.object({
+      crownsFor: z.number(),
+      crownsAgainst: z.number(),
+      battleTime: z.string(),
+      result: z.enum(['win', 'loss', 'draw']),
+    })).optional(),
   }),
   z.object({
     type: z.literal('clash-of-clans-moment'),

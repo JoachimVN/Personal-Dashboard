@@ -107,11 +107,13 @@ function clashRoyaleSessionCandidate(data: ClashRoyaleData, sessionGapMs: number
   const draws = session.length - wins - losses;
   const record = [wins ? `${wins}W` : undefined, losses ? `${losses}L` : undefined, draws ? `${draws}D` : undefined]
     .filter((part): part is string => Boolean(part)).join('–') || '0W';
+  const sessionCrowns = [...session].reverse()
+    .map((battle) => ({ crownsFor: battle.crownsFor, crownsAgainst: battle.crownsAgainst, battleTime: battle.battleTime, result: battle.result }));
   return {
     id: `clash-royale:session:${latest.battleTime}`, source: 'clash-royale', kind: 'clash-royale', score: wins >= losses ? 26 : 22, shapes: ['tile'],
     kicker: 'Clash Royale', title: `${record} last session`,
     detail: `${session.length} battle${session.length === 1 ? '' : 's'} · ${data.profile.arenaName}`,
-    href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'session' },
+    href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'session', sessionCrowns },
   };
 }
 
