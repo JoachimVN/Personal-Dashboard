@@ -83,7 +83,7 @@ export function WeatherDetail() {
         </WidgetBody>
       </DetailIntro>
 
-      <DetailSectionHeading title="The next 24 hours" detail="Switch stats to see when today's rain, UV, wind or humidity peaks — not just temperature." />
+      <DetailSectionHeading title="Hour by hour" detail="Switch days to look further ahead, and switch stats to see when rain, UV, wind or humidity peaks." />
       <WidgetShell title="Hour by hour">
         <WidgetBody envelope={envelope} offline={offline}>
           {(data) => <HourlySection data={data} />}

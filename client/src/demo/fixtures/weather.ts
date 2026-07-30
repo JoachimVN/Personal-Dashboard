@@ -27,20 +27,32 @@ export function weather(now: Date): WeatherData {
     { base: 'clearsky', precipitationMm: 0, uvIndex: 0, windSpeed: 1.6, humidity: 76, tempDelta: -6 },
     { base: 'clearsky', precipitationMm: 0, uvIndex: 0, windSpeed: 1.5, humidity: 77, tempDelta: -6 },
   ];
-  const hours = hourConditions.map((condition, index) => {
-    const at = new Date(now.getTime() + (index + 1) * 3_600_000);
-    const isDay = at.getTime() >= sunrise.getTime() && at.getTime() <= sunset.getTime();
-    return {
-      time: at.toISOString(),
-      hourLabel: String(at.getHours()).padStart(2, '0'),
-      temperature: 18 + condition.tempDelta,
-      precipitationMm: condition.precipitationMm,
-      uvIndex: isDay ? condition.uvIndex : 0,
-      windSpeed: condition.windSpeed,
-      humidity: condition.humidity,
-      symbol: `${condition.base}_${isDay ? 'day' : 'night'}`,
-    };
-  });
+  // Spans today's remaining hours plus a few days out, hourly near-term then 6-hourly further
+  // out — mirrors what MET actually reports — so the day switcher has something to switch to.
+  const HOUR_SPANS: { hoursFromNow: number; stepHours: number; count: number; baseTemp: number }[] = [
+    { hoursFromNow: 1, stepHours: 1, count: 12, baseTemp: 18 },
+    { hoursFromNow: 13, stepHours: 1, count: 24, baseTemp: 20 },
+    { hoursFromNow: 37, stepHours: 6, count: 4, baseTemp: 17 },
+    { hoursFromNow: 61, stepHours: 6, count: 4, baseTemp: 19 },
+  ];
+  const hours = HOUR_SPANS.flatMap((span, spanIndex) =>
+    Array.from({ length: span.count }, (_unused, i) => {
+      const at = new Date(now.getTime() + (span.hoursFromNow + i * span.stepHours) * 3_600_000);
+      const condition = hourConditions[(spanIndex * 7 + i) % hourConditions.length];
+      const isDay = at.getHours() >= 6 && at.getHours() < 21;
+      return {
+        time: at.toISOString(),
+        date: at.toISOString().slice(0, 10),
+        hourLabel: String(at.getHours()).padStart(2, '0'),
+        temperature: span.baseTemp + condition.tempDelta,
+        precipitationMm: condition.precipitationMm,
+        uvIndex: isDay ? condition.uvIndex : 0,
+        windSpeed: condition.windSpeed,
+        humidity: condition.humidity,
+        symbol: `${condition.base}_${isDay ? 'day' : 'night'}`,
+      };
+    }),
+  );
   return {
     location: { lat: 59.91, lon: 10.75, name: 'Oslo' },
     current: {

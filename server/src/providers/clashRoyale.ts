@@ -2,7 +2,7 @@ import { clashRoyaleSchema, type ClashRoyaleBattle, type ClashRoyaleCard, type C
 import { md5Hex } from '../md5.js';
 import type { Provider } from '../scheduler.js';
 
-const CR_API_BASE = 'https://api.clashroyale.com/v1';
+const CR_API_BASE = 'https://proxy.royaleapi.dev/v1';
 const CLAN_BADGE_MANIFEST_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-data/master/docs/json/alliance_badges.json';
 const CLAN_BADGE_ASSET_BASE_URL = 'https://raw.githubusercontent.com/RoyaleAPI/cr-api-assets/master/badges';
 const CLASH_ROYALE_WIKI_ASSET_URL = 'https://static.wikia.nocookie.net/clashroyale/images';
@@ -69,6 +69,10 @@ interface RawBattle {
   arena?: { name?: string };
   team: RawBattleTeamMember[];
   opponent: RawBattleTeamMember[];
+  /** Raw API league number for this specific battle — only present for `type === 'pathOfLegend'`.
+   * Reflects the league this battle was actually played at, unlike `arena.name` (always the
+   * player's Trophy Road arena, e.g. "Legendary Arena", regardless of Path of Legends league). */
+  leagueNumber?: number;
 }
 
 /** Clash Royale tags are always upper-case and '#'-prefixed; the API rejects anything else. */
@@ -87,22 +91,13 @@ export function toIsoTimestamp(battleTime: string): string {
 }
 
 /** Never throws a message containing the URL — it carries the API key via the Authorization header,
- * but the path itself also encodes the player tag, personal enough to keep out of error text too.
- * A 403 here almost always means the key's IP allowlist doesn't include the server's current
- * public IP (dynamic IPs, or a machine that moves between networks, drift out of it silently) —
- * called out specifically since it's by far the most common failure mode and otherwise looks
- * identical to any other rejected request in the logs. */
+ * but the path itself also encodes the player tag, personal enough to keep out of error text too. */
 async function crRequest<T>(signal: AbortSignal, apiKey: string, path: string, label: string): Promise<T> {
   const res = await fetch(`${CR_API_BASE}${path}`, {
     signal,
     headers: { Authorization: `Bearer ${apiKey}` },
   });
-  if (res.status === 403) {
-    throw new Error(
-      `Clash Royale ${label} failed: HTTP 403 — the API key's allowed IP list probably doesn't include this ` +
-        'server\'s current public IP. Check developer.clashroyale.com and update it (run `curl ifconfig.me` here to get the current one).',
-    );
-  }
+  if (res.status === 403) throw new Error(`Clash Royale ${label} failed: HTTP 403`);
   if (!res.ok) throw new Error(`Clash Royale ${label} failed: HTTP ${res.status}`);
   return (await res.json()) as T;
 }
@@ -126,20 +121,6 @@ function getClanBadgeUrls(): Promise<Map<number, string>> {
     });
   clanBadgeUrls = badgeUrlsRequest;
   return badgeUrlsRequest;
-}
-
-/** One-off convenience log for developer.clashroyale.com's IP allowlist, called once from server
- * startup (not from the polling `fetch()` cycle, so it never fires during provider unit tests or
- * on every 10-minute refresh) — only worth calling when Clash Royale is actually configured.
- * Fetch failures are swallowed; this is a nice-to-have, not something worth failing startup over. */
-export async function logClashRoyalePublicIp(): Promise<void> {
-  try {
-    const res = await fetch('https://api.ipify.org');
-    const ip = await res.text();
-    console.log(`[clash-royale] server's current public IP is ${ip} — keep this on the key's allowlist at developer.clashroyale.com`);
-  } catch {
-    // Best-effort; the provider's own fetch will surface the real failure if the IP is actually wrong.
-  }
 }
 
 /** Wiki card files consistently use the card name without punctuation, followed by `Card`.
@@ -234,6 +215,7 @@ export function mapBattle(battle: RawBattle): ClashRoyaleBattle {
     crownsAgainst: battle.opponent.reduce((sum, m) => sum + m.crowns, 0),
     opponentName: opponent?.name,
     trophyChange: self?.trophyChange,
+    pathOfLegendsLeagueNumber: battle.leagueNumber,
   };
 }
 

@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react';
 import type { CalendarData, CommandCenterSlot } from '@personal-dashboard/shared';
+import { formatEventDate } from '../../../lib/time';
 
 function formatEventDay(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
   if (event.date === today) return event.allDay ? 'Today' : event.startLabel;
-  return new Date(`${event.date}T12:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-  });
+  const day = formatEventDate(event.date, 'long', 'long');
+  return event.allDay ? day : `${day} · ${event.startLabel}`;
 }
 
 export function CalendarAgendaSecondary({ slot, calendar }: Readonly<{ slot: CommandCenterSlot; calendar: CalendarData | undefined }>): ReactNode {

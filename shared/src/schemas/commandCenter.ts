@@ -43,11 +43,10 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
       type: z.string(),
       modeName: z.string().optional(),
       arenaName: z.string().optional(),
+      /** The raw API league number this specific battle was played at (Path of Legends only) —
+       * see ClashRoyaleBattle.pathOfLegendsLeagueNumber. */
+      pathOfLegendsLeagueNumber: z.number().optional(),
     }).optional(),
-    /** Only present for kind 'win-streak' when the player has a Path of Legends season result —
-     * their current, display-adjusted league number, used as a fallback when a Path battle in the
-     * streak doesn't carry its own historic league name. */
-    pathOfLegendsLeagueNumber: z.number().optional(),
   }),
   z.object({
     type: z.literal('clash-of-clans-moment'),

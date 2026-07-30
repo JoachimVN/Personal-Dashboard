@@ -1,7 +1,7 @@
 import type { CalendarData, GmailData, HueData, IMessageData, NewsData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { isWidgetDisabled, WidgetBody } from '../../components/WidgetCard';
-import { relativeTime } from '../../lib/time';
+import { relativeTime, formatEventDate } from '../../lib/time';
 
 function eventMoment(event: CalendarData['events'][number]): string {
   const today = new Date().toLocaleDateString('en-CA');
@@ -11,12 +11,7 @@ function eventMoment(event: CalendarData['events'][number]): string {
   if (event.date === today) return `Today · ${time}`;
   if (event.date === tomorrow) return `Tomorrow · ${time}`;
 
-  const date = new Date(`${event.date}T12:00:00`).toLocaleDateString('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-  return `${date} · ${time}`;
+  return `${formatEventDate(event.date, 'short')} · ${time}`;
 }
 
 function unreadMessages(data: IMessageData): number {

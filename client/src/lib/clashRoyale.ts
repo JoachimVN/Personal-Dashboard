@@ -1,3 +1,5 @@
+import { pathOfLegendsDisplayLeagueNumber, pathOfLegendsLeagueName } from '@personal-dashboard/shared';
+
 /** The game's own app icon — hotlinked the same way as the Steam mark (Wikimedia Commons) and the
  * nav pill's Clash Royale icon (see sections/registry.tsx), which this re-exports for reuse. */
 export const CLASH_ROYALE_APP_ICON_URL = 'https://media.ffycdn.net/eu/supercell/nxaaEWAgbRGADkoAETG8.png';
@@ -95,11 +97,6 @@ export function clashRoyaleLeagueArt(leagueNumber: number): string | undefined {
   return LEAGUE_ART[leagueNumber];
 }
 
-const PATH_OF_LEGENDS_LEAGUE_NAMES = [
-  'Challenger I', 'Challenger II', 'Challenger III', 'Master I', 'Master II',
-  'Master III', 'Champion', 'Grand Champion', 'Royal Champion', 'Ultimate Champion',
-] as const;
-
 const MERGE_TACTICS_LEAGUE_ART: Record<string, string> = {
   bronze1: 'https://static.wikia.nocookie.net/clashroyale/images/4/4c/Bronze1MT.png',
   bronze2: 'https://static.wikia.nocookie.net/clashroyale/images/9/9b/Bronze2MT.png',
@@ -129,24 +126,9 @@ function compactRankName(value: string): string {
   return rankWithDigits.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 }
 
-function pathOfLegendsBattleArt(arenaName: string | undefined): string | undefined {
-  if (!arenaName) return undefined;
-  const normalizedName = arenaName.trim().toLowerCase();
-  const namedLeagueIndex = PATH_OF_LEGENDS_LEAGUE_NAMES.findIndex((name) => name.toLowerCase() === normalizedName);
-  if (namedLeagueIndex >= 0) return clashRoyaleLeagueArt(namedLeagueIndex + 1);
-
-  // Some battle-log versions report the legacy badge number instead of the league name.
-  const match = /^league\s*(\d+)$/i.exec(arenaName.trim());
-  return match ? clashRoyaleLeagueArt(Number(match[1])) : undefined;
-}
-
-/** `fallbackPathLeagueNumber` is the player's current, display-adjusted Path league. Supercell's
- * battle log does not consistently include a historic league label, so it keeps known Path games
- * game-native while a recorded per-battle arena/league always takes precedence. */
 export function clashRoyaleBattleIcon(
-  battle: { type: string; modeName?: string; arenaName?: string },
-  fallbackPathLeagueNumber?: number,
-): { src: string; label: string } {
+  battle: { type: string; modeName?: string; arenaName?: string; pathOfLegendsLeagueNumber?: number },
+): { src: string; label: string; isAppIcon?: boolean } {
   const mode = `${battle.type} ${battle.modeName ?? ''}`
     .replaceAll(/([a-z])([A-Z])/g, '$1 $2')
     .toLowerCase()
@@ -163,8 +145,20 @@ export function clashRoyaleBattleIcon(
     return { src: leagueArt ?? CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Merge Tactics' };
   }
   if (mode.includes('path of legend')) {
-    const leagueArt = pathOfLegendsBattleArt(battle.arenaName) ?? (fallbackPathLeagueNumber === undefined ? undefined : clashRoyaleLeagueArt(fallbackPathLeagueNumber));
-    return { src: leagueArt ?? CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Path of Legends' };
+    // The API reports the league this specific battle was played at (unlike `arenaName`, which is
+    // always the player's Trophy Road arena, e.g. "Legendary Arena", regardless of PoL league) —
+    // so this is exact, not a guess or a stand-in for the player's current league.
+    if (battle.pathOfLegendsLeagueNumber !== undefined) {
+      const displayLeagueNumber = pathOfLegendsDisplayLeagueNumber(battle.pathOfLegendsLeagueNumber);
+      const leagueArt = clashRoyaleLeagueArt(displayLeagueNumber);
+      if (leagueArt) return { src: leagueArt, label: pathOfLegendsLeagueName(battle.pathOfLegendsLeagueNumber) };
+    }
+    // Falls back to the app icon rather than the Trophy Road hammer: Path of Legends is a distinct
+    // ranked mode, so stamping an unresolved game with the ladder's own icon would misrepresent it
+    // as a Trophy Road battle instead of just an "unknown league" Path of Legends one. It's a solid
+    // app-icon tile rather than transparent emblem art, so callers need `isAppIcon` to render it
+    // with `object-fit: cover` (like the nav pill/kicker badge) instead of the shield-art treatment.
+    return { src: CLASH_ROYALE_APP_ICON_URL, label: 'Path of Legends', isAppIcon: true };
   }
   return { src: CLASH_ROYALE_BATTLE_ART.trophyRoad, label: battle.arenaName ?? 'Trophy Road' };
 }

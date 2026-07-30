@@ -202,10 +202,14 @@ function trimmedBattleModeIconUrl(url: string): Promise<string> {
   return request;
 }
 
-export function TrimmedBattleModeIcon({ src }: Readonly<{ src: string }>) {
+/** `isAppIcon` skips the trim/crop pipeline below — that's tuned for transparent battle-mode
+ * emblems, but the app icon is a solid tile meant to be cover-cropped (same as the nav pill and
+ * command-center kicker badge), not letterboxed inside a contain frame. */
+export function TrimmedBattleModeIcon({ src, isAppIcon = false }: Readonly<{ src: string; isAppIcon?: boolean }>) {
   const [trimmedSrc, setTrimmedSrc] = useState(src);
 
   useEffect(() => {
+    if (isAppIcon) return;
     let disposed = false;
     setTrimmedSrc(src);
     trimmedBattleModeIconUrl(src)
@@ -216,9 +220,10 @@ export function TrimmedBattleModeIcon({ src }: Readonly<{ src: string }>) {
         // Keep the original source visible if its host disallows canvas reads.
       });
     return () => { disposed = true; };
-  }, [src]);
+  }, [src, isAppIcon]);
 
-  return <img src={trimmedSrc} alt="" className="clash-recent-games-mode-icon" loading="lazy" decoding="async" />;
+  const className = isAppIcon ? 'clash-recent-games-mode-icon clash-recent-games-mode-icon--app' : 'clash-recent-games-mode-icon';
+  return <img src={isAppIcon ? src : trimmedSrc} alt="" className={className} loading="lazy" decoding="async" />;
 }
 function ClashDeckCardArt({ card, artType }: Readonly<{ card: ClashRoyaleData['currentDeck'][number]; artType: DeckCardArtType }>) {
   if (artType !== 'hero') return <FramedClashRoyaleCardImage card={card} artType={artType} />;
@@ -393,9 +398,6 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
   const winRate = Math.round((record.wins / battleCount) * 100);
   const gamesLabel = `Last ${battleCount} ${battleCount === 1 ? 'game' : 'games'}`;
   const streak = currentStreak(battles);
-  const currentPathLeagueNumber = data.profile.pathOfLegends
-    ? pathOfLegendsDisplayLeagueNumber(data.profile.pathOfLegends.leagueNumber)
-    : undefined;
   return (
     <section className="clash-recent-games">
       <header className="clash-recent-games-header">
@@ -412,15 +414,19 @@ export function ClashRoyaleBattlePulse({ data }: Readonly<{ data: ClashRoyaleDat
       </header>
       <ol className="clash-recent-games-grid" aria-label={`Results of ${gamesLabel.toLowerCase()}, latest first`}>
         {battles.map((battle, index) => (
-          <BattleModeTile key={`${battle.battleTime}-${index}`} battle={battle} index={index} battleCount={battleCount} fallbackPathLeagueNumber={currentPathLeagueNumber} />
+          <BattleModeTile key={`${battle.battleTime}-${index}`} battle={battle} index={index} battleCount={battleCount} />
         ))}
       </ol>
     </section>
   );
 }
 
-function BattleModeTile({ battle, index, battleCount, fallbackPathLeagueNumber }: Readonly<{ battle: ClashRoyaleBattle; index: number; battleCount: number; fallbackPathLeagueNumber?: number }>) {
-  const icon = clashRoyaleBattleIcon(battle, fallbackPathLeagueNumber);
+// No `fallbackPathLeagueNumber` here: Supercell's battle log doesn't reliably carry a historic
+// league per battle, and the player's *current* league is very often a different one than the
+// league these past games were actually played in — better to fall back to a generic icon than
+// to stamp every unresolved Path of Legends game with a league it may never have been played at.
+function BattleModeTile({ battle, index, battleCount }: Readonly<{ battle: ClashRoyaleBattle; index: number; battleCount: number }>) {
+  const icon = clashRoyaleBattleIcon(battle);
   const isModeEmblem = icon.src !== CLASH_ROYALE_BATTLE_ART.trophyRoad;
   const isMergeTactics = `${battle.type} ${battle.modeName ?? ''}`.toLowerCase().includes('merge tactics');
   return (
@@ -429,7 +435,7 @@ function BattleModeTile({ battle, index, battleCount, fallbackPathLeagueNumber }
       aria-label={`Game ${index + 1} of ${battleCount}: ${BATTLE_RESULT_LABELS[battle.result]} in ${icon.label}, ${battle.crownsFor} to ${battle.crownsAgainst} crowns, ${relativeTime(battle.battleTime)}`}
     >
       <span className={`clash-recent-games-mode-icon-frame${isModeEmblem ? ' clash-recent-games-mode-icon-frame--emblem' : ''}${isMergeTactics ? ' clash-recent-games-mode-icon-frame--merge-tactics' : ''}`} aria-hidden>
-        <TrimmedBattleModeIcon src={icon.src} />
+        <TrimmedBattleModeIcon src={icon.src} isAppIcon={icon.isAppIcon} />
       </span>
     </li>
   );
