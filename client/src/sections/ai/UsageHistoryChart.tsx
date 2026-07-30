@@ -9,6 +9,13 @@ const RESET_DROP_PERCENT = 40;
 
 type Metric = 'fiveHourUsedPercent' | 'weeklyUsedPercent' | 'modelWeeklyUsedPercent';
 
+/** Which history-point field carries a given metric's own reported reset deadline — there's no
+ * per-point deadline for modelWeekly, so that metric never gets the session-reset treatment. */
+const RESET_FIELD: Partial<Record<Metric, 'fiveHourResetsAt' | 'weeklyResetsAt'>> = {
+  fiveHourUsedPercent: 'fiveHourResetsAt',
+  weeklyUsedPercent: 'weeklyResetsAt',
+};
+
 interface ChartPoint {
   x: number;
   y: number;
@@ -195,18 +202,28 @@ function addResetAnchor(
 }
 
 /** Splices the synthetic reset/session-start markers (see ChartPoint) into chartPoints in place,
- * one set per known reset timestamp within the visible window. */
+ * one set per known reset timestamp within the visible window.
+ *
+ * `includeSessionStart` gates only the "fresh session began at 0%" marker, not the reset-anchor
+ * itself. That marker is derived by subtracting a full window from a reset deadline — a reliable
+ * guess for the five-hour quota, which genuinely resets on close to a fixed cadence, but not for
+ * the weekly quota: real usage doesn't align to a 7-day grid, so the same subtraction can land
+ * over an hour off the actual reset, drawing a false plateau/decline across a real one. The
+ * reset-anchor itself doesn't have this problem — it uses each sample's own reported deadline
+ * directly, no backdating involved — so it's precise for both metrics. */
 function addSessionResetPoints(
   chartPoints: ChartPoint[],
   points: UsageHistoryPoint[],
+  resetField: 'fiveHourResetsAt' | 'weeklyResetsAt',
   sessionResetsAt: string | undefined,
   sessionWindowMs: number,
+  includeSessionStart: boolean,
   start: number,
   end: number,
   windowMs: number,
 ): void {
   const rawResets = [
-    ...points.map((point) => point.fiveHourResetsAt).filter((reset): reset is string => Boolean(reset)),
+    ...points.map((point) => point[resetField]).filter((reset): reset is string => Boolean(reset)),
     sessionResetsAt,
   ]
     .filter((reset): reset is string => Boolean(reset))
@@ -222,6 +239,7 @@ function addSessionResetPoints(
   const stablePoints = [...chartPoints];
   for (const reset of resets) {
     addResetAnchor(chartPoints, stablePoints, reset, start, end, windowMs);
+    if (!includeSessionStart) continue;
     const sessionStart = reset - sessionWindowMs;
     if (sessionStart <= start || sessionStart > end) continue;
     chartPoints.push({
@@ -258,8 +276,9 @@ function useChartGeometry(
       });
     chartPoints.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     addObservedResetPoints(chartPoints);
-    if (sessionWindowMs) {
-      addSessionResetPoints(chartPoints, points, sessionResetsAt, sessionWindowMs, start, end, windowMs);
+    const resetField = RESET_FIELD[metric];
+    if (sessionWindowMs && resetField) {
+      addSessionResetPoints(chartPoints, points, resetField, sessionResetsAt, sessionWindowMs, metric === 'fiveHourUsedPercent', start, end, windowMs);
     }
     chartPoints.sort((a, b) => Date.parse(a.at) - Date.parse(b.at) || (a.order ?? 0) - (b.order ?? 0));
     return chartPoints.length < 2 ? null : buildGeometry(chartPoints);
