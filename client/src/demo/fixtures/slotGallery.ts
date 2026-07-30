@@ -356,7 +356,7 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
       label: 'clash-of-clans-moment (league)',
       slot: {
         id: 'gallery:clash-of-clans:league', source: 'clash-of-clans', kind: 'clash-of-clans',
-        kicker: 'Clash of Clans', title: 'Titan League 26', detail: '312 trophies',
+        kicker: 'Current league', title: 'Titan League 26', detail: '312 trophies',
         href: '#/clash-of-clans', score: 50,
         render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: 'https://api-assets.clashofclans.com/leaguetiers/125/yIfqSgrhiYRcuMbAPCoeCj1FTmfylCLxnrAljEZc8K0.png', trophies: 312 },
       },

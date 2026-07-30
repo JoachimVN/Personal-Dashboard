@@ -256,6 +256,7 @@ export function Signal({ slot, github, health, roblox, spotify, steam }: Readonl
   const isSonarGate = slot.render.type === 'sonar-quality-gate';
   const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now'
     : slot.source === 'clash-royale' ? `Clash Royale · ${slot.kicker}`
+    : slot.source === 'clash-of-clans' ? `Clash of Clans · ${slot.kicker}`
     : isSonarGate ? 'SonarCloud Quality Gate'
     : slot.kicker;
   const signalTitle = isSonarGate && slot.render.type === 'sonar-quality-gate' ? slot.render.projects[0].name : slot.title;
