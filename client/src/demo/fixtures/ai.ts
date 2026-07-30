@@ -7,7 +7,7 @@ export function aiUsage(now: Date): { claude: AiUsageToolData; codex: AiUsageToo
   const nowMs = now.getTime();
   const isoFrom = (hoursFromNow: number) => new Date(nowMs + hoursFromNow * 3_600_000).toISOString();
 
-  const claudeFiveHour = { usedPercent: 54, resetsAt: isoFrom(2) };
+  const claudeFiveHour = { usedPercent: 96, resetsAt: isoFrom(2) };
   const claudeWeekly = { usedPercent: 61, resetsAt: isoFrom(90) };
   const claude: AiUsageToolData = {
     available: true, fiveHour: claudeFiveHour, weekly: claudeWeekly,
@@ -27,4 +27,3 @@ export function aiUsage(now: Date): { claude: AiUsageToolData; codex: AiUsageToo
 
   return { claude, codex };
 }
-

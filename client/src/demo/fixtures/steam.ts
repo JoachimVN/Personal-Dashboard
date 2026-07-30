@@ -32,7 +32,7 @@ export function steam(now: Date): SteamData {
 
   return {
     profile: { steamId: '76561197960287930', personaName: 'yourname', profileUrl: '#' },
-    currentGame: null,
+    currentGame: games[0],
     library: {
       totalGames: 84,
       totalPlaytimeMinutes: games.reduce((sum, g) => sum + (g.playtimeForeverMinutes ?? 0), 0),
@@ -73,4 +73,3 @@ export function steam(now: Date): SteamData {
     availability: { library: 'available', achievements: 'available', friends: 'available' },
   };
 }
-
