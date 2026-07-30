@@ -181,6 +181,32 @@ function clashOfClansMomentIcon(render: Extract<CommandCenterSlot['render'], { t
   return render.kind === 'raid-weekend' ? CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL : CLASH_OF_CLANS_WAR_ICON_URL;
 }
 
+/** Splits a merged "both tools reset together" ai-usage-tool tile into one tile per tool. The
+ * server intentionally merges Claude+Codex into a single candidate (the ranker only ever seats one
+ * ai-usage slot on the whole board, so merging is how the second tool's reset avoids being silently
+ * dropped) — but on tiles specifically we'd rather show each tool its own card than squeeze both
+ * into one. Secondary/hero keep the merged card as-is; this only runs on the tile rail. Recomputes
+ * title/detail from the live envelope rather than reusing the merged slot's combined strings, since
+ * those describe both tools at once. */
+export function aiUsageTiles(slot: CommandCenterSlot, aiUsage: AiUsageByTool): CommandCenterSlot[] {
+  if (slot.render.type !== 'ai-usage-tool' || slot.render.toolIds.length < 2) return [slot];
+  const { metric } = slot.render;
+  const metricLabel = metric === 'fiveHour' ? '5-hour' : 'weekly';
+  return slot.render.toolIds.map((toolId) => {
+    const data = aiUsage[toolId];
+    const label = toolId === 'claude' ? 'Claude' : 'Codex';
+    const window = metric === 'fiveHour' ? data?.fiveHour : data?.weekly;
+    return {
+      ...slot,
+      id: `${slot.id}:${toolId}`,
+      accent: toolId,
+      title: `${label} usage just reset`,
+      detail: window ? `${Math.round(window.usedPercent)}% of the ${metricLabel} limit` : slot.detail,
+      render: { type: 'ai-usage-tool' as const, toolIds: [toolId], metric },
+    };
+  });
+}
+
 /** The square Steam icon for a tile — the game's library icon for now-playing, the achievement's
  * own icon for achievements — never the wide capsule header used in secondary/hero. */
 function steamIconFor(
@@ -615,7 +641,7 @@ export function DailyCommandCenter() {
       </div>
       <div className="command-layout">
         <HeroPanel hero={ranked.hero} {...heroProps} weather={weather} />
-        <div className="command-signals">{ranked.tiles.map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} spotify={spotify} steam={steam} />)}</div>
+        <div className="command-signals">{ranked.tiles.flatMap((slot) => aiUsageTiles(slot, aiUsage)).map((slot) => <Signal key={slot.id} slot={slot} github={github} health={health} roblox={roblox} spotify={spotify} steam={steam} />)}</div>
       </div>
       {activeSecondary && <CommandPanel
         href={activeSecondary.href}

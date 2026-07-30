@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { CommandPanel, HeroPanel, Signal, SecondaryCardBody, heroPropsFor, slotArt, toneFor } from '../DailyCommandCenter';
+import { CommandPanel, HeroPanel, Signal, SecondaryCardBody, aiUsageTiles, heroPropsFor, slotArt, toneFor } from '../DailyCommandCenter';
 import { buildGalleryData, buildGallerySlots, type GallerySlot } from '../../demo/fixtures/slotGallery';
 
 /**
@@ -106,7 +106,9 @@ export function SlotGallery() {
           {slots.map(({ label, slot }: GallerySlot) => (
             <GalleryCard key={slot.id} label={label}>
               <div className="command-signals">
-                <Signal slot={slot} github={data.github} health={data.health} roblox={data.roblox} spotify={data.spotify} steam={data.steam} />
+                {aiUsageTiles(slot, data.aiUsage).map((tile) => (
+                  <Signal key={tile.id} slot={tile} github={data.github} health={data.health} roblox={data.roblox} spotify={data.spotify} steam={data.steam} />
+                ))}
               </div>
             </GalleryCard>
           ))}
