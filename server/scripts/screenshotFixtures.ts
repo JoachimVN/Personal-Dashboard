@@ -99,7 +99,7 @@ export function weather(now: Date): WeatherData {
       { time: iso(now, 10), hourLabel: '23', temperature: 13, precipitationMm: 0, uvIndex: 0, symbol: 'clearsky_night' },
       { time: iso(now, 11), hourLabel: '00', temperature: 12, precipitationMm: 0, uvIndex: 0, symbol: 'clearsky_night' },
       { time: iso(now, 12), hourLabel: '01', temperature: 12, precipitationMm: 0, uvIndex: 0, symbol: 'clearsky_night' },
-    ],
+    ].map((hour) => ({ ...hour, date: hour.time.slice(0, 10) })),
     days: [
       { date: dateDaysAgo(now, 0), dayLabel: weekday(0), minTemperature: 14, maxTemperature: 20, precipitationMm: 0.4, symbol: 'partlycloudy_day' },
       { date: dateDaysAgo(now, -1), dayLabel: weekday(1), minTemperature: 13, maxTemperature: 22, precipitationMm: 0, symbol: 'clearsky_day' },

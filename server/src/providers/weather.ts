@@ -213,20 +213,6 @@ export function createWeatherProvider(
         symbol: symbolOf(now),
       };
 
-      const hours = series
-        .filter((entry) => entry.data.next_1_hours)
-        .slice(0, 24)
-        .map((entry) => ({
-          time: entry.time,
-          hourLabel: hourFmt.format(new Date(entry.time)),
-          temperature: entry.data.instant.details.air_temperature,
-          precipitationMm: entry.data.next_1_hours?.details?.precipitation_amount ?? 0,
-          uvIndex: entry.data.instant.details.ultraviolet_index_clear_sky,
-          windSpeed: entry.data.instant.details.wind_speed,
-          humidity: entry.data.instant.details.relative_humidity,
-          symbol: symbolOf(entry),
-        }));
-
       const byDate = new Map<string, MetEntry[]>();
       for (const entry of series) {
         const date = dateFmt.format(new Date(entry.time));
@@ -234,6 +220,30 @@ export function createWeatherProvider(
         if (bucket) bucket.push(entry);
         else byDate.set(date, [entry]);
       }
+
+      // Same day window as `days` below, so every day tab in the hourly view has data behind it.
+      const allowedDates = new Set([...byDate.keys()].slice(0, 7));
+
+      const hours = series
+        .map((entry) => ({ entry, date: dateFmt.format(new Date(entry.time)) }))
+        .filter(({ entry, date }) => (entry.data.next_1_hours ?? entry.data.next_6_hours) && allowedDates.has(date))
+        .map(({ entry, date }) => ({
+          time: entry.time,
+          date,
+          hourLabel: hourFmt.format(new Date(entry.time)),
+          temperature: entry.data.instant.details.air_temperature,
+          // Beyond ~48h MET only reports 6-hourly buckets, so this becomes that bucket's total
+          // rather than a true single hour's — the day view is still internally consistent since
+          // a given far-out day is uniformly 6-hourly.
+          precipitationMm:
+            entry.data.next_1_hours?.details?.precipitation_amount ??
+            entry.data.next_6_hours?.details?.precipitation_amount ??
+            0,
+          uvIndex: entry.data.instant.details.ultraviolet_index_clear_sky,
+          windSpeed: entry.data.instant.details.wind_speed,
+          humidity: entry.data.instant.details.relative_humidity,
+          symbol: symbolOf(entry),
+        }));
 
       const days = [...byDate.entries()].slice(0, 7).map(([date, entries]) => {
         const temps = entries.map((entry) => entry.data.instant.details.air_temperature);

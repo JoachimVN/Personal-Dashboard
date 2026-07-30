@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import type { WeatherData } from '@personal-dashboard/shared';
 import { AnimatePresence, motion } from 'motion/react';
 import { deg, glyph, HUMIDITY_COLOR, PRECIP_COLOR, symbolLabel, TEMP_COLOR, uvLevel, UV_COLOR, WIND_COLOR } from '../../lib/weather';
@@ -89,7 +89,7 @@ function HourlyChart({ hours, active, onActiveChange }: Readonly<HourlyChartProp
           viewBox={`0 0 ${CHART_W} ${CHART_H}`}
           preserveAspectRatio="none"
           className="h-32 w-full touch-none"
-          aria-label={`Temperature over the next ${hours.length} hours`}
+          aria-label="Temperature by hour"
           onPointerMove={readNearest}
           onPointerDown={readNearest}
           onPointerLeave={() => onActiveChange(null)}
@@ -161,7 +161,7 @@ function HourlyRainChart({ hours, active, onActiveChange }: Readonly<HourlyChart
   const rainMax = Math.max(...hours.map((h) => h.precipitationMm), 0);
   const totalRain = Math.round(hours.reduce((sum, h) => sum + h.precipitationMm, 0) * 10) / 10;
   const readNearest = (event: React.PointerEvent<Element>) => onActiveChange(nearestHourlyIndex(event, hours.length));
-  let readout = rainMax > 0 ? `${totalRain} mm total over the next ${hours.length} h` : `no rain expected in the next ${hours.length} h`;
+  let readout = rainMax > 0 ? `${totalRain} mm total` : 'no rain expected';
   if (active != null) {
     const hour = hours[active];
     readout = `${hour.hourLabel}:00 · ${symbolLabel(hour.symbol)} · ${hour.precipitationMm.toFixed(1)} mm precipitation`;
@@ -319,16 +319,115 @@ const HOURLY_TABS: { key: HourlyStatKey; label: string }[] = [
 ];
 
 type HourlyStatKey = 'temperature' | 'rain' | 'uv' | 'wind' | 'humidity';
+type RangeHours = 12 | 24 | 48;
 
-/** Today's hour-by-hour, switchable per stat — the daily counterpart to `WeekAheadSection`,
- * so "when will it rain / when's UV highest" has an answer for today, not just the week.
+const RANGE_OPTIONS: RangeHours[] = [12, 24, 48];
+
+function ChevronIcon({ direction }: Readonly<{ direction: 'left' | 'right' }>) {
+  return (
+    <svg aria-hidden viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5">
+      <path d={direction === 'left' ? 'M10 3.5 5.5 8l4.5 4.5' : 'M6 3.5 10.5 8 6 12.5'} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Which dates `hours` actually has data for, in order — same dates `days` covers, just
+ * restricted to the ones with any hourly entries. Index 0 is today, the "from now" page;
+ * indexes beyond that are full future days paged to with the arrows below. */
+function hourlyDates(hours: WeatherData['hours']): string[] {
+  const seen = new Set<string>();
+  const dates: string[] = [];
+  for (const hour of hours) {
+    if (!seen.has(hour.date)) {
+      seen.add(hour.date);
+      dates.push(hour.date);
+    }
+  }
+  return dates;
+}
+
+/** "31 Jul"-style date, parsed at UTC noon so the calendar day never shifts across timezones. */
+function formatDayDate(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+/** "Today · 30 Jul" / "Tomorrow · 31 Jul" / "Wed · 2 Aug" — index 0/1 get the relative name,
+ * further days fall back to `days`' weekday label. */
+function dayHeading(date: string, index: number, days: WeatherData['days']): string {
+  const relative = index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : days.find((day) => day.date === date)?.dayLabel;
+  const formatted = formatDayDate(date);
+  return relative ? `${relative} · ${formatted}` : formatted;
+}
+
+/** Hour-by-hour, split into two ways to look at it: a rolling "from now" window (12/24/48h,
+ * the original feature) on day 0, and — added on top — arrows to page into specific future
+ * days beyond that window, each labeled with its date. Days beyond ~48h out only have 6-hourly
+ * data (MET's own limit), so their charts are sparser but still show the shape of the day.
  * The glyph strip and active-hour hover state live here, above the tab switch, so every
  * stat renders inside the exact same frame and crossfades instead of jumping in height. */
 export function HourlySection({ data }: Readonly<{ data: WeatherData }>) {
   const [stat, setStat] = useState<HourlyStatKey>('temperature');
+  const [rangeHours, setRangeHours] = useState<RangeHours>(24);
+  const [dayIndex, setDayIndex] = useState(0);
   const [active, setActive] = useState<number | null>(null);
+
+  const dates = useMemo(() => hourlyDates(data.hours), [data.hours]);
+  const clampedIndex = Math.min(dayIndex, Math.max(dates.length - 1, 0));
+  const activeDate = dates[clampedIndex];
+  const hours = useMemo(
+    () => (clampedIndex === 0 ? data.hours.slice(0, rangeHours) : data.hours.filter((hour) => hour.date === activeDate)),
+    [data.hours, clampedIndex, rangeHours, activeDate],
+  );
+
+  function goTo(nextIndex: number) {
+    setDayIndex(Math.max(0, Math.min(dates.length - 1, nextIndex)));
+    setActive(null);
+  }
+
   return (
     <div>
+      <div className="mb-3 flex items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => goTo(clampedIndex - 1)}
+          disabled={clampedIndex <= 0}
+          aria-label="Previous day"
+          className="shrink-0 cursor-pointer rounded p-1 text-ink-faint transition hover:bg-track hover:text-ink disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
+        >
+          <ChevronIcon direction="left" />
+        </button>
+        <span className="w-36 shrink-0 text-center text-sm font-semibold tabular-nums">
+          {activeDate ? dayHeading(activeDate, clampedIndex, data.days) : ''}
+        </span>
+        <button
+          type="button"
+          onClick={() => goTo(clampedIndex + 1)}
+          disabled={clampedIndex >= dates.length - 1}
+          aria-label="Next day"
+          className="shrink-0 cursor-pointer rounded p-1 text-ink-faint transition hover:bg-track hover:text-ink disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-ink-faint"
+        >
+          <ChevronIcon direction="right" />
+        </button>
+      </div>
+      {clampedIndex === 0 && (
+        <div className="mb-3 flex gap-1.5" role="tablist" aria-label="Hour range">
+          {RANGE_OPTIONS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="tab"
+              aria-selected={rangeHours === option}
+              onClick={() => {
+                setRangeHours(option);
+                setActive(null);
+              }}
+              className={`weather-stat-tab ${rangeHours === option ? 'weather-stat-tab--active' : ''}`}
+            >
+              {option}h
+            </button>
+          ))}
+        </div>
+      )}
       <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Hourly stat">
         {HOURLY_TABS.map((tab) => (
           <button
@@ -346,25 +445,25 @@ export function HourlySection({ data }: Readonly<{ data: WeatherData }>) {
           </button>
         ))}
       </div>
-      <HourGlyphStrip hours={data.hours} active={active} />
+      <HourGlyphStrip hours={hours} active={active} />
       <AnimatePresence mode="wait">
         <motion.div
-          key={stat}
+          key={`${activeDate}-${clampedIndex === 0 ? rangeHours : 'day'}-${stat}`}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
         >
-          {stat === 'temperature' && <HourlyChart hours={data.hours} active={active} onActiveChange={setActive} />}
-          {stat === 'rain' && <HourlyRainChart hours={data.hours} active={active} onActiveChange={setActive} />}
+          {stat === 'temperature' && <HourlyChart hours={hours} active={active} onActiveChange={setActive} />}
+          {stat === 'rain' && <HourlyRainChart hours={hours} active={active} onActiveChange={setActive} />}
           {stat === 'uv' && (
-            <HourlyLineChart hours={data.hours} valueOf={(h) => h.uvIndex} format={(v) => v.toFixed(1)} unit="" color={UV_COLOR} domain={[0, 11]} verticalGradientStops={UV_GRADIENT_STOPS} active={active} onActiveChange={setActive} />
+            <HourlyLineChart hours={hours} valueOf={(h) => h.uvIndex} format={(v) => v.toFixed(1)} unit="" color={UV_COLOR} domain={[0, 11]} verticalGradientStops={UV_GRADIENT_STOPS} active={active} onActiveChange={setActive} />
           )}
           {stat === 'wind' && (
-            <HourlyLineChart hours={data.hours} valueOf={(h) => h.windSpeed} format={(v) => `${Math.round(v)} m/s`} unit="m/s" color={WIND_COLOR} active={active} onActiveChange={setActive} />
+            <HourlyLineChart hours={hours} valueOf={(h) => h.windSpeed} format={(v) => `${Math.round(v)} m/s`} unit="m/s" color={WIND_COLOR} active={active} onActiveChange={setActive} />
           )}
           {stat === 'humidity' && (
-            <HourlyLineChart hours={data.hours} valueOf={(h) => h.humidity} format={(v) => `${Math.round(v)}%`} unit="%" color={HUMIDITY_COLOR} active={active} onActiveChange={setActive} />
+            <HourlyLineChart hours={hours} valueOf={(h) => h.humidity} format={(v) => `${Math.round(v)}%`} unit="%" color={HUMIDITY_COLOR} active={active} onActiveChange={setActive} />
           )}
         </motion.div>
       </AnimatePresence>

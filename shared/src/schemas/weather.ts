@@ -22,11 +22,14 @@ export const weatherSchema = z.object({
     precipitationMm: z.number().optional(),
     symbol,
   }),
-  /** Next hours (hourly resolution while MET provides it). */
+  /** Hour-by-hour, spanning the same days as `days` below — hourly resolution for roughly the
+   * first 48h (as MET provides it), 6-hourly beyond that. */
   hours: z.array(
     z.object({
       /** ISO timestamp. */
       time: z.string(),
+      /** Date-only string, YYYY-MM-DD in the dashboard timezone — which `days` entry this hour belongs to. */
+      date: z.string(),
       /** Hour label already rendered in the dashboard timezone, e.g. "14". */
       hourLabel: z.string(),
       temperature: z.number(),
