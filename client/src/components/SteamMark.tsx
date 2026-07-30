@@ -1,12 +1,12 @@
-/** A always-colored version of Valve's disc+swirl mark (see sections/registry.tsx's SectionIcon
- * 'steam' case for the source paths) for contexts like the command-center kicker badge, where the
- * nav pill's hover-triggered disc-opacity transition doesn't apply — this renders solid, all the
- * time. Flat brand-blue disc rather than the nav's two-tone gradient; at kicker-badge size (under
- * 1rem) a gradient reads as noise anyway. */
+/** Valve's own disc+swirl mark (see sections/registry.tsx's SectionIcon 'steam' case for the same
+ * paths), always fully colored — for contexts like the command-center kicker badge, where the nav
+ * pill's hover-triggered disc-opacity transition doesn't apply. Shares the `#steam-gradient` def
+ * that `SteamGradientDefs` mounts once near the app root (see App.tsx), so this renders with the
+ * exact same gradient disc as the section card and nav pill rather than a flat approximation. */
 export function SteamMark({ className }: Readonly<{ className?: string }>) {
   return (
     <svg viewBox="0 0 65 65" aria-hidden className={className}>
-      <g transform="translate(0.5 0.5)" fill="var(--color-accent-steam)">
+      <g transform="translate(0.5 0.5)" fill="url(#steam-gradient)">
         <path d="M1.305 41.202C5.259 54.386 17.488 64 31.959 64c17.673 0 32-14.327 32-32s-14.327-32-32-32C15.001 0 1.124 13.193.028 29.874c2.074 3.477 2.879 5.628 1.275 11.328z" />
       </g>
       <g transform="translate(0.5 0.5)" fill="#fff">

@@ -244,6 +244,7 @@ export default function App() {
   if (devTool === 'gallery') {
     return (
       <div className="app-shell min-h-screen text-ink" style={skyFor(skyNow)}>
+        <SteamGradientDefs />
         <BackgroundGlow />
         <SlotGallery />
       </div>
