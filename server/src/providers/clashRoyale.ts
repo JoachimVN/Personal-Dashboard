@@ -69,6 +69,10 @@ interface RawBattle {
   arena?: { name?: string };
   team: RawBattleTeamMember[];
   opponent: RawBattleTeamMember[];
+  /** Raw API league number for this specific battle — only present for `type === 'pathOfLegend'`.
+   * Reflects the league this battle was actually played at, unlike `arena.name` (always the
+   * player's Trophy Road arena, e.g. "Legendary Arena", regardless of Path of Legends league). */
+  leagueNumber?: number;
 }
 
 /** Clash Royale tags are always upper-case and '#'-prefixed; the API rejects anything else. */
@@ -234,6 +238,7 @@ export function mapBattle(battle: RawBattle): ClashRoyaleBattle {
     crownsAgainst: battle.opponent.reduce((sum, m) => sum + m.crowns, 0),
     opponentName: opponent?.name,
     trophyChange: self?.trophyChange,
+    pathOfLegendsLeagueNumber: battle.leagueNumber,
   };
 }
 

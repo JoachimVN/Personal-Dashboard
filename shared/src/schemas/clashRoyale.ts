@@ -24,7 +24,9 @@ export const clashRoyaleBattleSchema = z.object({
   type: z.string(),
   /** Supercell's human-readable game-mode label, when the battle-log response provides one. */
   modeName: z.string().optional(),
-  /** The arena or ranked league recorded with this specific battle, never the player's current one. */
+  /** The arena recorded with this specific battle — always the player's Trophy Road arena (e.g.
+   * "Legendary Arena"), even for a `pathOfLegend` battle. Never the ranked league it was played
+   * in; use `pathOfLegendsLeagueNumber` for that. */
   arenaName: z.string().optional(),
   result: z.enum(['win', 'loss', 'draw']),
   crownsFor: z.number(),
@@ -32,6 +34,11 @@ export const clashRoyaleBattleSchema = z.object({
   opponentName: z.string().optional(),
   /** Absent for battle types (e.g. friendly/challenge) that don't affect the ladder. */
   trophyChange: z.number().optional(),
+  /** Raw API league number this specific `pathOfLegend` battle was played at — the API reports
+   * this per-battle (unlike arenaName), so it reflects the league at the time, not the player's
+   * current one. Apply `pathOfLegendsDisplayLeagueNumber` before any display lookup. Absent for
+   * non-Path-of-Legends battles. */
+  pathOfLegendsLeagueNumber: z.number().optional(),
 });
 
 export type ClashRoyaleBattle = z.infer<typeof clashRoyaleBattleSchema>;

@@ -12,9 +12,9 @@ import { ClashCrownScore, TrimmedBattleModeIcon } from '../../../widgets/ClashRo
  * streak never overflows the carousel's fixed content height. */
 export function ClashRoyaleWinStreakSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
   if (slot.render.type !== 'clash-royale-moment' || slot.render.kind !== 'win-streak') return null;
-  const { streakCrowns, streakBattleMode, pathOfLegendsLeagueNumber } = slot.render;
+  const { streakCrowns, streakBattleMode } = slot.render;
   if (!streakCrowns?.length) return null;
-  const icon = streakBattleMode ? clashRoyaleBattleIcon(streakBattleMode, pathOfLegendsLeagueNumber) : undefined;
+  const icon = streakBattleMode ? clashRoyaleBattleIcon(streakBattleMode) : undefined;
   const shown = streakCrowns.slice(-5);
   const hiddenCount = streakCrowns.length - shown.length;
   return <div className="command-secondary-clash-streak mt-4">

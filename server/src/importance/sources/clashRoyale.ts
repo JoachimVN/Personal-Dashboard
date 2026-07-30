@@ -63,15 +63,17 @@ function clashRoyaleWinStreakCandidate(data: ClashRoyaleData, winStreakMin: numb
   const shapes: Candidate['shapes'] = streak > 10 ? [...allShapes] : ['tile'];
   // The badge shows the mode of the most recent streak win (trophy road / 2v2 / clan wars / merge
   // tactics / Path of Legends league) — same lookup the recent-battles pulse uses client-side.
-  const streakBattleMode = { type: latest.type, modeName: latest.modeName, arenaName: latest.arenaName };
-  const pathOfLegendsLeagueNumber = data.profile.pathOfLegends
-    ? pathOfLegendsDisplayLeagueNumber(data.profile.pathOfLegends.leagueNumber)
-    : undefined;
+  // `pathOfLegendsLeagueNumber` comes from the battle itself, not the player's current league, so
+  // it stays correct even if the player has since been promoted or demoted.
+  const streakBattleMode = {
+    type: latest.type, modeName: latest.modeName, arenaName: latest.arenaName,
+    pathOfLegendsLeagueNumber: latest.pathOfLegendsLeagueNumber,
+  };
   return {
     id: `clash-royale:win-streak:${streak}:${latest.battleTime}`, source: 'clash-royale', kind: 'clash-royale', score: 70, shapes,
     kicker: 'Win streak', title: `${streak} wins in a row`,
     detail,
-    href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'win-streak', streakCrowns, streakBattleMode, pathOfLegendsLeagueNumber },
+    href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'win-streak', streakCrowns, streakBattleMode },
   };
 }
 

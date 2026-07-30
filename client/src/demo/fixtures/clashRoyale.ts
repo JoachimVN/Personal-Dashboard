@@ -25,13 +25,13 @@ export function clashRoyale(now: Date): ClashRoyaleData {
   ];
   const battles: ClashRoyaleData['recentBattles'] = [];
   const ladder = { type: 'PvP', modeName: 'Ladder' };
-  const pathOfLegends = { type: 'pathOfLegend', modeName: 'Path of Legend' };
+  const pathOfLegends = { type: 'pathOfLegend', modeName: 'Path of Legend', pathOfLegendsLeagueNumber: 1 };
   const twoVTwo = { type: '2v2', modeName: '2v2' };
   const clanWar = { type: 'riverRacePvP', modeName: 'CW_Battle_1v1' };
   const mergeTactics = { type: 'mergeTactics', modeName: 'Merge Tactics', arenaName: 'Bronze III' };
   // This is deliberately not round-robin: a real recent history leans toward Trophy Road, with
-  // occasional Path, party, Clan War, and Merge Tactics games mixed in. Path battles omit their
-  // historic arena so the overview reuses the player's current Path of Legends badge.
+  // occasional Path, party, Clan War, and Merge Tactics games mixed in. Each Path battle carries
+  // its own leagueNumber (matching the profile's current league here), same as the real API.
   const battleModes = [
     ladder, twoVTwo, pathOfLegends, ladder, mergeTactics,
     ladder, clanWar, pathOfLegends, ladder, twoVTwo,
