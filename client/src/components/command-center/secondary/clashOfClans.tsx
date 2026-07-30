@@ -22,7 +22,7 @@ function badgeIconUrl(kind: 'war' | 'war-preparation' | 'raid-weekend' | 'league
  * sensibly if it's ever promoted, same as the war-preparation fallback below. */
 export function ClashOfClansMomentSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
   if (slot.render.type !== 'clash-of-clans-moment') return null;
-  const { kind, clanStars, opponentStars, capitalTotalLoot, leagueIconUrl } = slot.render;
+  const { kind, clanStars, opponentStars, capitalTotalLoot, leagueIconUrl, trophies } = slot.render;
   const badgeSrc = badgeIconUrl(kind, leagueIconUrl);
 
   return <div className="command-secondary-clash-of-clans mt-4">
@@ -43,7 +43,12 @@ export function ClashOfClansMomentSecondary({ slot }: Readonly<{ slot: CommandCe
           <span><img src={CLASH_OF_CLANS_CAPITAL_GOLD_ICON_URL} alt="" aria-hidden />{capitalTotalLoot.toLocaleString()}</span>
         </p>
       )}
-      {(kind === 'war-preparation' || kind === 'league') && <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>}
+      {kind === 'league' && trophies !== undefined && (
+        <p className="command-clash-of-clans-stat" aria-label={`${trophies.toLocaleString()} trophies`}>
+          <span>{trophies.toLocaleString()} trophies</span>
+        </p>
+      )}
+      {kind === 'war-preparation' && <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>}
     </div>
   </div>;
 }

@@ -545,6 +545,29 @@
   margin-top: 1.25rem;
 }
 
+/* Spotify's artwork is a fixed rem size shared with the secondary carousel (see
+   .command-secondary-*-artwork below) — hero has more vertical room to spend on it, so these
+   grow past that shared size instead of matching it 1:1. The row's own height switches to auto
+   so it doesn't clip the now-larger artwork against --secondary-carousel-media-size. */
+.command-hero-lead .command-secondary-spotify {
+  height: auto;
+}
+
+.command-hero-lead .command-secondary-spotify-artwork {
+  width: 9rem;
+  height: 9rem;
+}
+
+.command-hero-lead .command-secondary-artist-artwork {
+  width: 8rem;
+  height: 8rem;
+}
+
+.command-hero-lead .command-secondary-track-artwork {
+  width: 7rem;
+  height: 7rem;
+}
+
 /* Arena/league key art, right-anchored and faded into the card rather than stretched full-bleed —
    these are portrait renders and square badges, not wide backdrop crops, so `cover` would distort
    them. Sits behind all other panel children (see the z-index rule below); the panel's own
@@ -910,28 +933,11 @@
   border-radius: 0.85rem;
 }
 
-.command-clash-streak-crowns-row {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.75rem;
-}
-
-/* Community-sourced (see lib/clashRoyale.ts) and noticeably lower-res than the rest of the art on
-   this card — kept small enough that it reads as a mark rather than a blurry hero image. */
-.command-clash-trophy-icon {
-  width: 1.1rem;
-  height: 1.1rem;
-  flex-shrink: 0;
-  object-fit: contain;
-  opacity: 0.9;
-}
-
 .command-clash-streak-crowns {
   display: flex;
   overflow: hidden;
   gap: 0.32rem;
-  margin: 0;
+  margin: 0.75rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -965,21 +971,14 @@
   flex-shrink: 0;
   width: 5.5rem;
   height: 5.5rem;
-  margin: 0.4rem;
   place-items: center;
-  border: 1px solid color-mix(in oklab, var(--color-accent-clash-of-clans) 32%, var(--color-card-border));
-  border-radius: 1.25rem;
-  background:
-    radial-gradient(120% 120% at 28% 18%, color-mix(in oklab, var(--color-accent-clash-of-clans) 30%, transparent), transparent 70%),
-    color-mix(in oklab, var(--color-accent-clash-of-clans) 12%, var(--color-card));
-  box-shadow: 0 0 8px 1px color-mix(in oklab, var(--color-accent-clash-of-clans) 35%, transparent);
 }
 
 .command-clash-of-clans-badge img {
-  width: 3.4rem;
-  height: 3.4rem;
+  width: 5rem;
+  height: 5rem;
   object-fit: contain;
-  filter: drop-shadow(0 3px 5px color-mix(in oklab, var(--color-ink) 30%, transparent));
+  filter: drop-shadow(0 3px 6px color-mix(in oklab, var(--color-ink) 30%, transparent));
 }
 
 .command-clash-of-clans-stat {

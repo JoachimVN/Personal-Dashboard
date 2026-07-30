@@ -15,7 +15,7 @@ import type { AiUsageByTool } from './useCommandCenterData';
 import { AiUsageSecondary, AiUsageTrend } from './secondary/ai';
 import { CalendarAgendaSecondary } from './secondary/calendar';
 import { ClashOfClansMomentSecondary } from './secondary/clashOfClans';
-import { ClashRoyaleSessionSecondary, ClashRoyaleWinStreakSecondary } from './secondary/clashRoyale';
+import { ClashRoyaleBestTrophiesSecondary, ClashRoyaleSessionSecondary, ClashRoyaleWinStreakSecondary } from './secondary/clashRoyale';
 import { AiToolMark, FallbackSecondary } from './secondary/fallback';
 import {
   GithubContributionsSecondary,
@@ -76,7 +76,7 @@ export function SecondaryContent(props: Readonly<{
     case 'steam-now-playing': return SteamNowPlayingSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     case 'steam-achievement': return SteamAchievementSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     case 'roblox-now-playing': return <RobloxNowPlayingSecondary slot={slot} roblox={roblox} />;
-    case 'clash-royale-moment': return ClashRoyaleWinStreakSecondary({ slot }) ?? ClashRoyaleSessionSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
+    case 'clash-royale-moment': return ClashRoyaleWinStreakSecondary({ slot }) ?? ClashRoyaleSessionSecondary({ slot }) ?? ClashRoyaleBestTrophiesSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
     case 'clash-of-clans-moment': return ClashOfClansMomentSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
     default: return <FallbackSecondary slot={slot} />;
   }
@@ -100,6 +100,7 @@ export function heroExtraFor(
     return <>{first && <div className="mt-2"><PrMeta pr={first} /></div>}{overflow}</>;
   }
   if (render.type === 'gmail-threads') return GmailThreadList({ threadIds: render.threadIds, gmail });
+  if (render.type === 'clash-royale-moment' && render.kind === 'best-trophies') return ClashRoyaleBestTrophiesSecondary({ slot: hero });
   if (render.type === 'weather-signal' && render.kind === 'severe' && weather) {
     return <div className="mt-4"><WeatherHourlyRows weather={weather} /></div>;
   }

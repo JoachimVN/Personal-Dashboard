@@ -303,7 +303,7 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
       slot: {
         id: 'gallery:clash-royale:best-trophies', source: 'clash-royale', kind: 'clash-royale', kicker: 'New best',
         title: 'Personal trophy record', detail: '6,214 trophies — a new high', href: '#/clash-royale', score: 50,
-        render: { type: 'clash-royale-moment', kind: 'best-trophies' },
+        render: { type: 'clash-royale-moment', kind: 'best-trophies', bestTrophies: 6214 },
       },
     },
     {
@@ -356,9 +356,9 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
       label: 'clash-of-clans-moment (league)',
       slot: {
         id: 'gallery:clash-of-clans:league', source: 'clash-of-clans', kind: 'clash-of-clans',
-        kicker: 'Legend League', title: 'Legend League', detail: 'Ranked league promotion',
+        kicker: 'Clash of Clans', title: 'Legend League', detail: '5,214 trophies',
         href: '#/clash-of-clans', score: 50,
-        render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: 'https://api-assets.clashofclans.com/leaguetiers/326/abc.png' },
+        render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: 'https://api-assets.clashofclans.com/leaguetiers/326/abc.png', trophies: 5214 },
       },
     },
   ];

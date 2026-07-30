@@ -49,7 +49,7 @@ function leagueCandidate(profile: ClashOfClansData['profile']): Candidate | unde
     kicker: 'Clash of Clans', title: profile.league.name,
     detail: `${profile.trophies.toLocaleString()} trophies`,
     href: playerHref(profile.tag),
-    render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: profile.league.iconUrl },
+    render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: profile.league.iconUrl, trophies: profile.trophies },
   };
 }
 

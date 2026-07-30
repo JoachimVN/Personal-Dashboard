@@ -38,7 +38,8 @@ function clashRoyaleBestTrophiesCandidate(moments: ClashRoyaleMoments): Candidat
   return {
     id: `clash-royale:best-trophies:${moments.newBestTrophies}`, source: 'clash-royale', kind: 'clash-royale', score: 80, shapes: [...allShapes],
     kicker: 'New personal best', title: `${moments.newBestTrophies.toLocaleString()} trophies`,
-    detail: 'Your highest trophy count yet', href: '#/clash-royale', render: { type: 'clash-royale-moment', kind: 'best-trophies' },
+    detail: 'Your highest trophy count yet', href: '#/clash-royale',
+    render: { type: 'clash-royale-moment', kind: 'best-trophies', bestTrophies: moments.newBestTrophies },
   };
 }
 

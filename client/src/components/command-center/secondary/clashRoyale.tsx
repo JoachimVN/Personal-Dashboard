@@ -3,26 +3,22 @@ import type { CommandCenterSlot } from '@personal-dashboard/shared';
 import { CLASH_ROYALE_TROPHY_ICON_URL, clashRoyaleBattleIcon } from '../../../lib/clashRoyale';
 import { ClashCrownScore, TrimmedBattleModeIcon } from '../../../widgets/ClashRoyaleWidgets';
 
-/** Crown-score chips for a run of battles, prefixed with a small trophy mark — shared by the
- * win-streak and session cards below, which differ only in their badge column and which battles
- * they pass in. */
+/** Crown-score chips for a run of battles — shared by the win-streak and session cards below,
+ * which differ only in their badge column and which battles they pass in. */
 function ClashCrownRow({ battles }: Readonly<{ battles: { crownsFor: number; crownsAgainst: number; battleTime: string; result?: 'win' | 'loss' | 'draw' }[] }>): ReactNode {
   const shown = battles.slice(-5);
   const hiddenCount = battles.length - shown.length;
   return (
-    <div className="command-clash-streak-crowns-row">
-      <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" aria-hidden className="command-clash-trophy-icon" />
-      <ol className="command-clash-streak-crowns" aria-label="Crown score for each battle">
-        {hiddenCount > 0 && <li className="command-clash-streak-crowns-overflow">+{hiddenCount}</li>}
-        {shown.map((battle, index) => (
-          <li key={`${battle.battleTime}-${index}`} data-result={battle.result}>
-            <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
-              <ClashCrownScore crownsFor={battle.crownsFor} crownsAgainst={battle.crownsAgainst} />
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
+    <ol className="command-clash-streak-crowns" aria-label="Crown score for each battle">
+      {hiddenCount > 0 && <li className="command-clash-streak-crowns-overflow">+{hiddenCount}</li>}
+      {shown.map((battle, index) => (
+        <li key={`${battle.battleTime}-${index}`} data-result={battle.result}>
+          <div className="clash-battle-score" aria-label={`${battle.crownsFor} to ${battle.crownsAgainst} crowns`}>
+            <ClashCrownScore crownsFor={battle.crownsFor} crownsAgainst={battle.crownsAgainst} />
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -64,4 +60,15 @@ export function ClashRoyaleSessionSecondary({ slot }: Readonly<{ slot: CommandCe
       <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>
     </div>
   </div>;
+}
+
+/** Small icon-plus-number stat row for a new personal best — same treatment as Clash of Clans'
+ * star/capital-gold stats (see secondary/clashOfClans.tsx), just for a trophy count instead. */
+export function ClashRoyaleBestTrophiesSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
+  if (slot.render.type !== 'clash-royale-moment' || slot.render.kind !== 'best-trophies') return null;
+  const { bestTrophies } = slot.render;
+  if (bestTrophies === undefined) return null;
+  return <p className="command-clash-of-clans-stat mt-4" aria-label={`${bestTrophies.toLocaleString()} trophies`}>
+    <span><img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" aria-hidden />{bestTrophies.toLocaleString()}</span>
+  </p>;
 }
