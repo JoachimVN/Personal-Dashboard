@@ -119,7 +119,7 @@ describe('clashRoyaleCandidates', () => {
 
     expect(clashRoyaleCandidates(data, NO_MOMENTS, WIN_STREAK_MIN, SESSION_GAP_MS, FRESH_MS, WIN_STREAK_FRESH_MS, NOW)).toContainEqual(
       expect.objectContaining({
-        kicker: 'Clash Royale', title: '2W–1L last session', detail: '3 battles · Legendary Arena',
+        kicker: 'This session', title: '2W–1L last session', detail: '3 battles · Legendary Arena',
         score: 26, shapes: ['tile'],
       }),
     );

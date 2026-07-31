@@ -37,4 +37,29 @@ describe('githubCandidates', () => {
       id: 'github:recent-contributions', title: '3 contributions this week', shapes: ['tile'],
     }));
   });
+
+  it('surfaces an authored open pull request as a thin-row candidate', () => {
+    const data: GitHubData = {
+      ...quietDay,
+      pullRequests: [
+        { title: 'Add issue counts to Sonar widget', repo: 'Personal-Dashboard', number: 31, url: 'https://example.com/31', role: 'author', draft: false, updatedAt: '2026-07-30T00:00:00Z' },
+      ],
+    };
+
+    expect(githubCandidates(data, 7, 50)).toContainEqual(expect.objectContaining({
+      id: 'github:open-pr:Personal-Dashboard:31', title: 'Add issue counts to Sonar widget',
+      kicker: 'Open pull request', render: { type: 'github-open-prs' },
+    }));
+  });
+
+  it('ignores draft pull requests for the open-PR candidate', () => {
+    const data: GitHubData = {
+      ...quietDay,
+      pullRequests: [
+        { title: 'WIP', repo: 'Personal-Dashboard', number: 32, url: 'https://example.com/32', role: 'author', draft: true, updatedAt: '2026-07-30T00:00:00Z' },
+      ],
+    };
+
+    expect(githubCandidates(data, 7, 50)).not.toContainEqual(expect.objectContaining({ render: { type: 'github-open-prs' } }));
+  });
 });

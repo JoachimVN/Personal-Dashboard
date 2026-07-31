@@ -1,8 +1,7 @@
 // Generates README screenshots against fake, fully-anonymized data (screenshotFixtures.ts): the
 // overview (hero + command center) plus the Spotify, Health, AI usage, and GitHub detail pages.
 // The overview's command-center ranking runs through the *real* scoring code (importance/
-// sources.ts + rank.ts); only two invisible-on-first-paint carousel previews are added to show its
-// affordance. Boots a throwaway
+// sources.ts + rank.ts). Boots a throwaway
 // mock API on :4823, points a scratch Vite client dev server at it, and drives headless Chromium
 // via Playwright to capture each page. Runs both locally (npm run screenshots -w server) and in
 // CI (.github/workflows/screenshots.yml) — Playwright handles browser provisioning on both.
@@ -17,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium, type Page as PlaywrightPage } from 'playwright';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
-import type { CommandCenterSlot, WidgetEnvelope } from '@personal-dashboard/shared';
+import type { WidgetEnvelope } from '@personal-dashboard/shared';
 import { rankCandidates } from '../src/importance/rank.js';
 import {
   aiCandidates,
@@ -27,6 +26,7 @@ import {
   healthCandidates,
   imessageCandidates,
   spotifyCandidates,
+  steamCandidates,
   weatherCandidates,
 } from '../src/importance/sources/index.js';
 import {
@@ -39,6 +39,7 @@ import {
   overviewCalendar,
   overviewGithub,
   overviewHealth,
+  overviewSteam,
   weather,
 } from './screenshotFixtures.js';
 
@@ -122,6 +123,7 @@ async function buildPages(): Promise<Page[]> {
   const overviewCalendarFixture = overviewCalendar(overviewNow);
   const overviewGithubFixture = overviewGithub(overviewNow);
   const overviewHealthFixture = overviewHealth(overviewNow);
+  const overviewSteamFixture = overviewSteam();
   const overviewAiClaudeFixture = overviewAiClaude(overviewNow);
   const overviewAiCodexFixture = overviewAiCodex(overviewNow);
   const healthPageFixture = healthFixture(healthNow);
@@ -141,6 +143,7 @@ async function buildPages(): Promise<Page[]> {
       artistAllTime: false,
       albumAllTime: false,
     }, SPOTIFY_RECENT_PLAYED_MAX_AGE_MS),
+    ...steamCandidates(overviewSteamFixture, 24 * 60 * 60_000),
     ...aiCandidates(
       [
         { id: 'claude', label: 'Claude', data: overviewAiClaudeFixture },
@@ -151,23 +154,11 @@ async function buildPages(): Promise<Page[]> {
     ),
     ...fallbackCandidates({ calendar: 'ready' }),
   ]);
-  const nowPlaying = overviewRanked.secondary.find((slot) => slot.id === 'spotify:now-playing');
-  if (!nowPlaying) throw new Error('Overview screenshot requires the now-playing secondary slot');
-  // The overview capture starts on now-playing, but keeps two synthetic, never-initially-visible
-  // previews so the screenshot demonstrates the carousel affordance without claiming real data.
-  const carouselPreviews: CommandCenterSlot[] = [
-    {
-      id: 'screenshot:carousel:preview-1', source: 'screenshot', kind: 'fallback', score: 0,
-      kicker: 'Preview', title: 'Another useful signal', detail: 'Carousel preview for the README screenshot.',
-      href: '#/personal', render: { type: 'text' },
-    },
-    {
-      id: 'screenshot:carousel:preview-2', source: 'screenshot', kind: 'fallback', score: 0,
-      kicker: 'Preview', title: 'One more useful signal', detail: 'Carousel preview for the README screenshot.',
-      href: '#/personal', render: { type: 'text' },
-    },
-  ];
-  const overviewCommandCenter = { ...overviewRanked, secondary: [nowPlaying, ...carouselPreviews] };
+  const expectedSecondaryIds = ['spotify:now-playing', 'steam:now-playing:730', 'weather:uv'];
+  if (overviewRanked.secondary.map((slot) => slot.id).join(',') !== expectedSecondaryIds.join(',')) {
+    throw new Error('Overview screenshot requires Spotify, Steam, and high-UV secondary cards');
+  }
+  const overviewCommandCenter = overviewRanked;
 
   return [
     {
@@ -176,6 +167,7 @@ async function buildPages(): Promise<Page[]> {
         'command-center': envelope(overviewCommandCenter, overviewNow),
         calendar: envelope(overviewCalendarFixture, overviewNow),
         weather: envelope(overviewWeatherFixture, overviewNow),
+        steam: envelope(overviewSteamFixture, overviewNow),
         github: envelope(overviewGithubFixture, overviewNow),
         health: envelope(overviewHealthFixture, overviewNow),
         spotify: envelope(fixtures.spotifyOverview, overviewNow),

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sonarRatingSchema } from './sonarCloud.js';
 
 export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text') }),
@@ -11,6 +12,21 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('health-rings') }),
   z.object({ type: z.literal('github-contributions') }),
   z.object({ type: z.literal('github-reviews') }),
+  z.object({ type: z.literal('github-open-prs') }),
+  z.object({
+    type: z.literal('sonar-quality-gate'),
+    status: z.enum(['passed', 'failed']),
+    projects: z.array(z.object({
+      key: z.string(),
+      name: z.string(),
+      security: sonarRatingSchema.optional(),
+      reliability: sonarRatingSchema.optional(),
+      maintainability: sonarRatingSchema.optional(),
+      vulnerabilitiesCount: z.number().optional(),
+      bugsCount: z.number().optional(),
+      codeSmellsCount: z.number().optional(),
+    })).min(1),
+  }),
   z.object({ type: z.literal('gmail-threads'), threadIds: z.array(z.string()) }),
   z.object({
     type: z.literal('weather-signal'),
@@ -33,6 +49,8 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
     arenaName: z.string().optional(),
     /** Only present for kind 'league' — looked up against a local league-number->badge table client-side. */
     leagueNumber: z.number().optional(),
+    /** Only present for kind 'best-trophies' — the new personal-best trophy count itself. */
+    bestTrophies: z.number().optional(),
     /** Only present for kind 'win-streak' — crown score for each win in the streak, oldest first,
      * so the card can show the run rather than just a bare count. */
     streakCrowns: z.array(z.object({ crownsFor: z.number(), crownsAgainst: z.number(), battleTime: z.string() })).optional(),
@@ -47,6 +65,15 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
        * see ClashRoyaleBattle.pathOfLegendsLeagueNumber. */
       pathOfLegendsLeagueNumber: z.number().optional(),
     }).optional(),
+    /** Only present for kind 'session' — crown score and result for each battle in the session,
+     * oldest first, mirroring streakCrowns above but covering wins/losses/draws rather than only
+     * wins (a session isn't necessarily an unbroken streak). */
+    sessionCrowns: z.array(z.object({
+      crownsFor: z.number(),
+      crownsAgainst: z.number(),
+      battleTime: z.string(),
+      result: z.enum(['win', 'loss', 'draw']),
+    })).optional(),
   }),
   z.object({
     type: z.literal('clash-of-clans-moment'),
@@ -59,13 +86,16 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
     capitalTotalLoot: z.number().optional(),
     /** Only present for kind 'league' — Supercell's own league-tier art, not a locally-vendored asset. */
     leagueIconUrl: z.string().optional(),
+    /** Only present for kind 'league' — the player's current trophy count, so the card has a real
+     * number to show even when there's no icon (or it fails to load). */
+    trophies: z.number().optional(),
   }),
 ]);
 
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'clash-of-clans', 'transit', 'power', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'sonar', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'clash-of-clans', 'transit', 'power', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

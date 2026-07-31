@@ -32,6 +32,12 @@ export const githubSchema = z.object({
       role: z.enum(['author', 'review-requested']),
       draft: z.boolean(),
       updatedAt: z.string(),
+      /** Source branch. Absent if the detail fetch (a per-PR call beyond the cheap search listing) failed. */
+      branch: z.string().optional(),
+      additions: z.number().optional(),
+      deletions: z.number().optional(),
+      changedFiles: z.number().optional(),
+      commits: z.number().optional(),
     }),
   ),
   issues: z.array(

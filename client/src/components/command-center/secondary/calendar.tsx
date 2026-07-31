@@ -15,8 +15,8 @@ export function CalendarAgendaSecondary({ slot, calendar }: Readonly<{ slot: Com
     .map((id) => calendar?.events.find((event) => event.id === id))
     .filter((event): event is CalendarData['events'][number] => event !== undefined);
   if (!agenda.length) return null;
-  return <div className="command-agenda-list mt-4">
-    {agenda.map((event) => <div key={event.id} className="command-agenda-item">
+  return <div className="command-calendar-agenda mt-4">
+    {agenda.map((event) => <div key={event.id} className="command-calendar-agenda-item">
       <time dateTime={event.start}>{formatEventDay(event)}</time><span>{event.title}</span>
     </div>)}
   </div>;

@@ -16,14 +16,16 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
         detail: 'Dua Lipa', href: '#/spotify', score: 90, render: { type: 'spotify-now-playing' },
       },
       {
-        id: 'roblox:now-playing', source: 'roblox', kind: 'roblox', kicker: 'Roblox', title: 'Jailbreak',
-        detail: 'In game right now', href: 'https://www.roblox.com/home', score: 70,
-        render: { type: 'roblox-now-playing' },
+        id: 'sonar:failed:weekend-project', source: 'sonar', kind: 'sonar', kicker: 'SonarCloud Quality Gate',
+        title: 'weekend-project', detail: 'SonarCloud', href: '#/github', score: 78,
+        render: {
+          type: 'sonar-quality-gate', status: 'failed',
+          projects: [{ key: 'weekend-project', name: 'weekend-project', security: 'B', reliability: 'C', maintainability: 'A', vulnerabilitiesCount: 2, bugsCount: 5, codeSmellsCount: 8 }],
+        },
       },
       {
-        id: 'gmail:threads', source: 'gmail', kind: 'gmail', kicker: 'Inbox', title: '5 unread',
-        detail: 'Newsletter, GitHub review request and 3 more', href: '#/personal', score: 60,
-        render: { type: 'gmail-threads', threadIds: ['t1', 't2', 't4'] },
+        id: 'steam:now-playing:730', source: 'steam', kind: 'steam', kicker: 'Playing now', title: 'Counter-Strike 2',
+        detail: '803h played', href: '#/steam', score: 58, render: { type: 'steam-now-playing', appId: 730 },
       },
     ],
     tiles: [
@@ -36,11 +38,10 @@ export function commandCenter(now: Date, cal: CalendarData, hlth: HealthData): C
         detail: 'personal-dashboard', href: '#/github', score: 75, render: { type: 'github-contributions' },
       },
       {
-        id: 'ai-usage:claude', source: 'ai-usage', kind: 'ai-usage', kicker: 'Claude', title: '54% of 5h window',
-        detail: 'Resets in 2h', href: '#/ai', score: 65, accent: 'claude', meter: 54,
+        id: 'ai-usage:claude', source: 'ai-usage', kind: 'ai-usage', kicker: 'Claude', title: '96% of 5h window',
+        detail: 'Resets in 2h', href: '#/ai', score: 65, accent: 'claude', meter: 96,
         render: { type: 'ai-usage-tool', toolIds: ['claude'], metric: 'fiveHour' },
       },
     ],
   };
 }
-

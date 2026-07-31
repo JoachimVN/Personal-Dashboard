@@ -46,10 +46,10 @@ function leagueCandidate(profile: ClashOfClansData['profile']): Candidate | unde
   if (!profile.league) return undefined;
   return {
     id: `clash-of-clans:league:${profile.league.name}`, source: 'clash-of-clans', kind: 'clash-of-clans', score: 24, shapes: ['tile'],
-    kicker: 'Clash of Clans', title: profile.league.name,
+    kicker: 'Current league', title: profile.league.name,
     detail: `${profile.trophies.toLocaleString()} trophies`,
     href: playerHref(profile.tag),
-    render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: profile.league.iconUrl },
+    render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: profile.league.iconUrl, trophies: profile.trophies },
   };
 }
 

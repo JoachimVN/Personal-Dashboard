@@ -229,11 +229,12 @@ export function healthDayFor(now: Date, daysAgo: number, rng: () => number): Hea
 
 // ── AI usage (Claude / Codex) ────────────────────────────────────────────────────────────────
 
-/** Rolling-window usage climbs after each reset and falls back at the next one. Rather than
- * hand-smoothing the drop itself, this leaves a real gap in the data spanning each reset — the
- * client's chart already renders a spacing gap (>3x the median step) as a dashed line instead of
- * a solid one, exactly the "this just reset" signal a real dashboard shows during a sampling gap,
- * and cleaner than an artificial vertical line ever looks. */
+/** Rolling-window usage climbs after each reset and falls back at the next one. This leaves a
+ * real gap in the data spanning each reset (the client's chart already renders a spacing gap
+ * as a dashed line), but also stamps each point with its own cycle's reset deadline — the same
+ * per-sample field a real provider report carries — so the client's reset-anchor logic can draw
+ * the flat pre-reset hold and vertical drop it draws for real data, instead of a raw diagonal
+ * straight across the gap. */
 export interface SawtoothHistoryOptions {
   resetsAtIso: string;
   periodMs: number;
@@ -242,6 +243,7 @@ export interface SawtoothHistoryOptions {
   peakRange: [number, number];
   rng: () => number;
   field: 'fiveHourUsedPercent' | 'weeklyUsedPercent';
+  resetField: 'fiveHourResetsAt' | 'weeklyResetsAt';
   gapSteps: number;
   now: number;
 }
@@ -254,6 +256,7 @@ export function sawtoothHistory({
   peakRange,
   rng,
   field,
+  resetField,
   gapSteps,
   now,
 }: SawtoothHistoryOptions): AiUsageToolData['history'] {
@@ -271,7 +274,12 @@ export function sawtoothHistory({
     if (msIntoWindow < gapSteps * stepMs) continue;
     const fraction = Math.min(1, msIntoWindow / periodMs);
     const percent = Math.max(0, Math.min(100, fraction * peakFor(cycle) + (rng() - 0.5) * 3));
-    points.push({ at: new Date(t).toISOString(), [field]: Math.round(percent) });
+    const cycleReset = lastReset + periodMs;
+    points.push({
+      at: new Date(t).toISOString(),
+      [field]: Math.round(percent),
+      [resetField]: new Date(cycleReset).toISOString(),
+    });
   }
   return points;
 }
@@ -286,12 +294,12 @@ export function usageHistoryFor(
   const fiveHourPoints = sawtoothHistory({
     resetsAtIso: fiveHour.resetsAt, periodMs: 5 * 3_600_000, spanMs: 24 * 3_600_000,
     stepMs: 15 * 60_000, peakRange: [fiveHour.usedPercent * 0.6, Math.min(100, fiveHour.usedPercent * 1.15)],
-    rng, field: 'fiveHourUsedPercent', gapSteps: 4, now,
+    rng, field: 'fiveHourUsedPercent', resetField: 'fiveHourResetsAt', gapSteps: 4, now,
   });
   const weeklyPoints = sawtoothHistory({
     resetsAtIso: weekly.resetsAt, periodMs: 7 * 86_400_000, spanMs: 7 * 86_400_000,
     stepMs: 3 * 3_600_000, peakRange: [weekly.usedPercent * 0.5, Math.min(100, weekly.usedPercent * 1.1)],
-    rng, field: 'weeklyUsedPercent', gapSteps: 4, now,
+    rng, field: 'weeklyUsedPercent', resetField: 'weeklyResetsAt', gapSteps: 4, now,
   });
   return [...fiveHourPoints, ...weeklyPoints].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }

@@ -110,7 +110,7 @@ describe('clashOfClansCandidates', () => {
     expect(clashOfClansCandidates(data, NOW)).toContainEqual(
       expect.objectContaining({
         source: 'clash-of-clans', kind: 'clash-of-clans', score: 24, shapes: ['tile'],
-        kicker: 'Clash of Clans', title: 'Titan League 26', detail: '4,000 trophies',
+        kicker: 'Current league', title: 'Titan League 26', detail: '4,000 trophies',
         href: 'https://link.clashofclans.com/en?action=OpenPlayerProfile&tag=%23PLAYER1',
       }),
     );

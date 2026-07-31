@@ -4,6 +4,11 @@ import { pathOfLegendsDisplayLeagueNumber, pathOfLegendsLeagueName } from '@pers
  * nav pill's Clash Royale icon (see sections/registry.tsx), which this re-exports for reuse. */
 export const CLASH_ROYALE_APP_ICON_URL = 'https://media.ffycdn.net/eu/supercell/nxaaEWAgbRGADkoAETG8.png';
 
+/** Small trophy mark shown beside a win-streak/session card's crown-score chips — community-hosted
+ * (clashroyale.wiki) and noticeably lower-resolution than the other hotlinked art above, but there's
+ * no better public source for a plain trophy glyph on brand for the game. */
+export const CLASH_ROYALE_TROPHY_ICON_URL = 'https://clashroyale.wiki/wp-content/uploads/2016/03/trophy.png';
+
 /** Battle-mode emblems used by the homepage history. The hammer is the game's normal Trophy Road
  * marker; the mode-specific shields are only used when Supercell identifies that game as 2v2 or
  * Clan Wars. */

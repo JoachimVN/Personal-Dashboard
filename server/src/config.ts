@@ -92,6 +92,8 @@ const configSchema = z.object({
     clashRoyaleWinStreakMin: z.number().int().min(2).default(3),
     /** Gap between two ladder battles, in ms, past which they're treated as separate sessions rather than one streak of play. */
     clashRoyaleSessionGapMs: z.number().int().min(60_000).default(30 * 60_000),
+    /** How long a SonarCloud quality gate transition (just passed/failed) stays eligible to appear on the card. */
+    sonarQualityGateFreshMs: z.number().int().min(60_000).default(24 * 60 * 60_000),
   }).default({
     gmailStaleMs: 24 * 60 * 60_000,
     gmailFreshMs: 30 * 60_000,
@@ -114,6 +116,7 @@ const configSchema = z.object({
     clashRoyaleWinStreakFreshMs: 6 * 60 * 60_000,
     clashRoyaleWinStreakMin: 3,
     clashRoyaleSessionGapMs: 30 * 60_000,
+    sonarQualityGateFreshMs: 24 * 60 * 60_000,
   }),
   steam: z
     .object({

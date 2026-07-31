@@ -9,10 +9,20 @@ import { SectionView } from './sections/SectionView';
 import { PAGE_EXIT, SECTION_GLOW_ENTER, SECTION_GLOW_EXIT, UI_SPRING } from './sections/transitions';
 import { SystemFooter } from './components/SystemFooter';
 import { DailyCommandCenter } from './components/DailyCommandCenter';
+import { SlotGallery } from './components/command-center/SlotGallery';
 import { ThemeToggle } from './components/ThemeToggle';
 
-// Set to true locally when tuning the continuous sky colors. Never enable for normal use.
-const SHOW_SKY_TIME_DEBUGGER = false;
+/**
+ * Dev tools reachable at runtime via `?dev=sky` (tune the continuous sky colors) or `?dev=gallery`
+ * (inspect every What's next hero/tile/secondary render variant at once) — a query param rather
+ * than a source flag so they work on an already-deployed build (including the public demo)
+ * without a rebuild. Neither reveals anything sensitive: the gallery is always synthetic fixture
+ * data, and the sky preview only touches decorative color state.
+ */
+function devToolFromUrl(): 'sky' | 'gallery' | null {
+  const value = new URLSearchParams(window.location.search).get('dev');
+  return value === 'sky' || value === 'gallery' ? value : null;
+}
 
 type SkyStop = {
   minute: number;
@@ -226,9 +236,20 @@ function Overview({ now }: Readonly<{ now: Date }>) {
 export default function App() {
   const route = useHashRoute();
   const now = useCurrentTime();
+  const [devTool] = useState(devToolFromUrl);
   const [skyDebugMinute, setSkyDebugMinute] = useState(() => minuteOfDay(new Date()));
   useDeviceLocation();
-  const skyNow = SHOW_SKY_TIME_DEBUGGER ? timeAtMinute(now, skyDebugMinute) : now;
+  const skyNow = devTool === 'sky' ? timeAtMinute(now, skyDebugMinute) : now;
+
+  if (devTool === 'gallery') {
+    return (
+      <div className="app-shell min-h-screen text-ink" style={skyFor(skyNow)}>
+        <SteamGradientDefs />
+        <BackgroundGlow />
+        <SlotGallery />
+      </div>
+    );
+  }
 
   return (
     <SkyTimeContext.Provider value={skyNow}>
@@ -238,7 +259,7 @@ export default function App() {
     >
       <SteamGradientDefs />
       <BackgroundGlow />
-      {SHOW_SKY_TIME_DEBUGGER && <SkyTimeDebugger minute={skyDebugMinute} onMinuteChange={setSkyDebugMinute} />}
+      {devTool === 'sky' && <SkyTimeDebugger minute={skyDebugMinute} onMinuteChange={setSkyDebugMinute} />}
       <AnimatePresence>
         {route.view === 'section' && (
           <SectionGlow key={route.sectionId} accentVar={sectionById(route.sectionId).accentVar} />
