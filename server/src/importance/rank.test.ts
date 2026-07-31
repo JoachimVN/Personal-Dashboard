@@ -67,4 +67,33 @@ describe('rankCandidates', () => {
     expect(ranked.secondary.map((slot) => slot.id)).toEqual(['spotify']);
     expect(ranked.tiles.map((slot) => slot.id)).toEqual(['health']);
   });
+
+  it('promotes the highest-ranked ordinary signal into hero when no hero moment exists', () => {
+    const fallback: Candidate = {
+      id: 'fallback:horizon', source: 'calendar', kind: 'fallback', score: 1, shapes: ['hero'],
+      kicker: 'Open horizon', title: 'Nothing urgent right now', detail: 'detail', href: '#/', render: { type: 'text' },
+    };
+    const ranked = rankCandidates([
+      fallback,
+      candidate('spotify', 'spotify', 60, ['secondary', 'tile']),
+      candidate('weather', 'weather', 40, ['tile']),
+      candidate('health', 'health', 32, ['tile']),
+    ]);
+
+    expect(ranked.hero.id).toBe('spotify');
+    // weather is tile-only, so with spotify promoted to hero (and no secondary-shaped
+    // candidates left), it's promoted into the now-empty secondary slot instead of staying a tile.
+    expect(ranked.secondary.map((slot) => slot.id)).toEqual(['weather']);
+    expect(ranked.tiles.map((slot) => slot.id)).toEqual(['health']);
+  });
+
+  it('falls back to the horizon card when nothing else is eligible at all', () => {
+    const fallback: Candidate = {
+      id: 'fallback:horizon', source: 'calendar', kind: 'fallback', score: 1, shapes: ['hero'],
+      kicker: 'Open horizon', title: 'Nothing urgent right now', detail: 'detail', href: '#/', render: { type: 'text' },
+    };
+    const ranked = rankCandidates([fallback]);
+
+    expect(ranked.hero.id).toBe('fallback:horizon');
+  });
 });
