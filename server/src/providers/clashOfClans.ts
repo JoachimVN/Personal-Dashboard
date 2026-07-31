@@ -14,6 +14,7 @@ import {
  * high enough; unlike `attacksPerMember` on classic war, GetCapitalRaidSeasons doesn't report the
  * limit directly, only `attacks`/`attackLimit`/`bonusAttackLimit` per member — summed here. */
 const RAID_WEEKEND_DEFAULT_ATTACK_LIMIT = 6;
+const TOP_CONTRIBUTORS_LIMIT = 3;
 
 function mapWar(raw: RawClashOfClansWar | null, playerTag: string): ClashOfClansData['war'] {
   if (raw?.state !== 'preparation' && raw?.state !== 'inWar') return null;
@@ -41,12 +42,18 @@ async function fetchRaidWeekend(signal: AbortSignal, apiKey: string, clanTag: st
   const season = await fetchLatestClashOfClansRaidSeason(signal, apiKey, clanTag);
   if (season?.state !== 'ongoing') return null;
   const member = season.members?.find((candidate) => candidate.tag === playerTag);
+  const topContributors = [...(season.members ?? [])]
+    .sort((a, b) => b.capitalResourcesLooted - a.capitalResourcesLooted)
+    .slice(0, TOP_CONTRIBUTORS_LIMIT)
+    .map((candidate) => ({ name: candidate.name, loot: candidate.capitalResourcesLooted, isYou: candidate.tag === playerTag }));
   return {
     state: 'ongoing',
     endTime: toIsoTimestamp(season.endTime),
     attacksUsed: member?.attacks ?? 0,
     attacksLimit: member ? member.attackLimit + member.bonusAttackLimit : RAID_WEEKEND_DEFAULT_ATTACK_LIMIT,
     capitalTotalLoot: season.capitalTotalLoot,
+    personalLoot: member?.capitalResourcesLooted ?? 0,
+    topContributors,
   };
 }
 
@@ -79,6 +86,7 @@ export function createClashOfClansProvider(auth: ClashOfClansAuth | undefined): 
             : undefined,
           clanTag: player.clan?.tag,
           clanName: player.clan?.name,
+          clanBadgeUrl: player.clan?.badgeUrls?.medium ?? player.clan?.badgeUrls?.large ?? player.clan?.badgeUrls?.small,
         },
         war,
         raidWeekend,

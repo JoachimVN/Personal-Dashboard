@@ -3,8 +3,14 @@ import type { CalendarData } from '@personal-dashboard/shared';
 import type { Candidate } from '../types.js';
 import { allShapes } from './shapes.js';
 
+/** How far out an event can be and still count as "what's next" — beyond this it's noise, not news. */
+const NEAR_HORIZON_MS = 14 * 24 * 60 * 60_000;
+
 export function calendarCandidates(data: CalendarData | undefined, now: number): Candidate[] {
-  const events = data?.events.filter((event) => Date.parse(event.end) >= now) ?? [];
+  const events = data?.events.filter((event) => {
+    const end = Date.parse(event.end);
+    return end >= now && Date.parse(event.start) - now <= NEAR_HORIZON_MS;
+  }) ?? [];
   const next = events[0];
   const agenda = events.slice(1, 5);
   const candidates: Candidate[] = [];

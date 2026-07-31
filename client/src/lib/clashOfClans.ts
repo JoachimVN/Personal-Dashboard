@@ -24,3 +24,6 @@ export const CLASH_OF_CLANS_STAR_ICON_URL = publicAsset('clash-of-clans/star-ico
 
 /** Inline capital-gold icon, used next to a raid weekend's loot total. */
 export const CLASH_OF_CLANS_CAPITAL_GOLD_ICON_URL = publicAsset('clash-of-clans/capital-gold-icon.png');
+
+/** Inline crossed-swords icon, used next to a raid weekend card's "N raid attacks left" title. */
+export const CLASH_OF_CLANS_RAID_ATTACK_ICON_URL = publicAsset('clash-of-clans/raid-attack-icon.png');

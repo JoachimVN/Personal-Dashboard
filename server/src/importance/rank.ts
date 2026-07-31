@@ -25,7 +25,22 @@ export function rankCandidates(candidates: Candidate[]): CommandCenterData {
   const sorted = [...candidates].sort((a, b) => b.score - a.score);
   const usedSources = new Set<string>();
   const usedIds = new Set<string>();
-  const hero = selectSlot(sorted, 'hero', usedSources, usedIds);
+  let hero = selectSlot(sorted, 'hero', usedSources, usedIds);
+  // No real "moment" cleared the hero bar today — rather than show the bland "nothing urgent"
+  // fallback, promote the best ordinary signal (current weather, top track, etc.) into hero. Mirrors
+  // the tile-promotion fallback for an empty secondary carousel below.
+  if (hero.kind === 'fallback') {
+    const promoted = sorted.find((candidate) => (
+      candidate.kind !== 'fallback' && (candidate.shapes.includes('secondary') || candidate.shapes.includes('tile'))
+    ));
+    if (promoted) {
+      usedSources.delete(hero.source);
+      usedIds.delete(hero.id);
+      hero = promoted;
+      usedSources.add(hero.source);
+      usedIds.add(hero.id);
+    }
+  }
   const secondaryCandidates = sorted.filter((candidate) => (
     candidate.id !== hero.id && candidate.kind !== 'fallback' && candidate.shapes.includes('secondary')
   ));

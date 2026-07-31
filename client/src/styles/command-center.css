@@ -505,7 +505,9 @@
   box-shadow: 0 5px 14px color-mix(in oklab, var(--color-accent-clash-royale) 25%, transparent);
 }
 
-.command-clash-royale-trophy-tile {
+/* Icon-plus-tabular-number pill for a tile's one headline stat — shared across games (Clash Royale
+   best trophies, Clash of Clans personal raid loot) rather than duplicated per source. */
+.command-icon-stat-tile {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -516,7 +518,7 @@
   white-space: nowrap;
 }
 
-.command-clash-royale-trophy-tile img {
+.command-icon-stat-tile img {
   width: 1rem;
   height: 1rem;
   object-fit: contain;

@@ -1,6 +1,8 @@
 {
   "calendar": {
-    "allowlist": []
+    "allowlist": [],
+    "holidayIcsUrl": "https://calendar.google.com/calendar/ical/en.norwegian%23holiday%40group.v.calendar.google.com/public/basic.ics",
+    "includeBirthdays": false
   },
   "news": {
     "feeds": [

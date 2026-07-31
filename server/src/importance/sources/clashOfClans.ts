@@ -84,7 +84,7 @@ function warCandidate(war: ClashOfClansData['war'], clanTag: string | undefined,
   };
 }
 
-function raidWeekendCandidate(raidWeekend: ClashOfClansData['raidWeekend'], clanTag: string | undefined, now: number): Candidate | undefined {
+function raidWeekendCandidate(raidWeekend: ClashOfClansData['raidWeekend'], profile: ClashOfClansData['profile'], now: number): Candidate | undefined {
   if (raidWeekend?.state !== 'ongoing') return undefined;
   const msRemaining = Date.parse(raidWeekend.endTime) - now;
   if (msRemaining <= 0) return undefined;
@@ -98,9 +98,17 @@ function raidWeekendCandidate(raidWeekend: ClashOfClansData['raidWeekend'], clan
     id: `clash-of-clans:raid-weekend:${raidWeekend.endTime}:${raidWeekend.attacksUsed}`, source: 'clash-of-clans', kind: 'clash-of-clans',
     score: urgent ? 80 : 50, shapes: urgent ? [...allShapes] : ['secondary', 'tile'],
     kicker: 'Raid weekend', title,
-    detail: `${raidWeekend.capitalTotalLoot.toLocaleString()} capital gold looted so far`,
-    href: clanHref(clanTag),
-    render: { type: 'clash-of-clans-moment', kind: 'raid-weekend', capitalTotalLoot: raidWeekend.capitalTotalLoot },
+    // Generic fallback text (used verbatim only by the tile-detail default) — the tile itself
+    // overrides this with a personal-loot-only render, and secondary/hero use the full render
+    // payload below, so this string only surfaces if a card ever falls through to plain `detail`.
+    detail: `${raidWeekend.personalLoot.toLocaleString()} looted by you · ${raidWeekend.capitalTotalLoot.toLocaleString()} clan total`,
+    href: clanHref(profile.clanTag),
+    render: {
+      type: 'clash-of-clans-moment', kind: 'raid-weekend',
+      capitalTotalLoot: raidWeekend.capitalTotalLoot, personalLoot: raidWeekend.personalLoot,
+      clanName: profile.clanName, clanBadgeUrl: profile.clanBadgeUrl,
+      topContributors: raidWeekend.topContributors,
+    },
   };
 }
 
@@ -108,7 +116,7 @@ export function clashOfClansCandidates(data: ClashOfClansData | undefined, now =
   if (!data) return [];
   return [
     warCandidate(data.war, data.profile.clanTag, now),
-    raidWeekendCandidate(data.raidWeekend, data.profile.clanTag, now),
+    raidWeekendCandidate(data.raidWeekend, data.profile, now),
     leagueCandidate(data.profile),
   ].filter((candidate): candidate is Candidate => candidate !== undefined);
 }

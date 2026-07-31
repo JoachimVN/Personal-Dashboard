@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createHmac } from 'node:crypto';
 
 export interface ServerEnv {
   port: number;
@@ -11,6 +12,7 @@ export interface ServerEnv {
   github?: { token: string; username: string };
   githubIssuesToken?: string;
   icloud?: { username: string; password: string };
+  calendarIcsFeeds: { name: string; url: string }[];
   google?: { clientId: string; clientSecret: string };
   spotify?: { clientId: string; clientSecret: string };
   hue?: { clientId: string; clientSecret: string };
@@ -21,6 +23,32 @@ export interface ServerEnv {
   valorant?: { apiKey: string; name: string; tag: string; region: string };
   sonarCloud?: { token: string; orgKey: string };
   dashboardPush?: { url: string; secret: string };
+}
+
+/**
+ * Public or tokenised calendar subscriptions do not always appear in iCloud's
+ * CalDAV collection list, so keep their URLs in the ignored environment file.
+ */
+export function parseCalendarIcsFeeds(raw = process.env.CALENDAR_ICS_FEEDS): ServerEnv['calendarIcsFeeds'] {
+  if (!raw) return [];
+  try {
+    const entries: unknown = JSON.parse(raw);
+    if (!Array.isArray(entries)) throw new Error('must be a JSON array');
+    return entries.flatMap((entry) => {
+      if (!entry || typeof entry !== 'object') return [];
+      const { name, url } = entry as { name?: unknown; url?: unknown };
+      if (typeof name !== 'string' || !name.trim() || typeof url !== 'string') return [];
+      try {
+        if (new URL(url).protocol !== 'https:') return [];
+      } catch {
+        return [];
+      }
+      return [{ name: name.trim(), url }];
+    });
+  } catch {
+    console.warn('⚠️  CALENDAR_ICS_FEEDS must be a JSON array of HTTPS calendar feeds — skipping.');
+    return [];
+  }
 }
 
 function parseWeather(): ServerEnv['weather'] {
@@ -91,6 +119,26 @@ export function parseDashboardPush(): ServerEnv['dashboardPush'] {
   return { url, secret };
 }
 
+/** Matches Batabiboing's derived token so a feed URL cannot authenticate its push endpoint. */
+export function batabiboingCalendarFeed(
+  pushUrl: string,
+  pushSecret: string,
+): { name: string; url: string } | undefined {
+  try {
+    const url = new URL(pushUrl);
+    let pathname = url.pathname;
+    while (pathname.endsWith('/')) pathname = pathname.slice(0, -1);
+    if (url.protocol !== 'https:' || pathname !== '/api/push') return undefined;
+    const token = createHmac('sha256', pushSecret).update('calendar-feed-v1').digest('base64url');
+    url.pathname = '/api/calendar';
+    url.search = '';
+    url.searchParams.set('token', token);
+    return { name: 'Batabiboing', url: url.toString() };
+  } catch {
+    return undefined;
+  }
+}
+
 export function loadEnv(): ServerEnv {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -99,6 +147,7 @@ export function loadEnv(): ServerEnv {
     );
   }
   const host = process.env.HOST ?? '127.0.0.1';
+  const dashboardPush = parseDashboardPush();
   if (host !== '127.0.0.1' && host !== 'localhost') {
     console.warn(
       `⚠️  HOST=${host} exposes the dashboard WITHOUT authentication on your network. ` +
@@ -124,6 +173,12 @@ export function loadEnv(): ServerEnv {
             password: process.env.ICLOUD_APP_PASSWORD,
           }
         : undefined,
+    calendarIcsFeeds: [
+      ...parseCalendarIcsFeeds(),
+      ...(dashboardPush ? [batabiboingCalendarFeed(dashboardPush.url, dashboardPush.secret)].filter(
+        (feed): feed is { name: string; url: string } => feed !== undefined,
+      ) : []),
+    ],
     google:
       process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
         ? {
@@ -148,6 +203,6 @@ export function loadEnv(): ServerEnv {
     roblox: parseRoblox(),
     valorant: parseValorant(),
     sonarCloud: parseSonarCloud(),
-    dashboardPush: parseDashboardPush(),
+    dashboardPush,
   };
 }
