@@ -9,8 +9,18 @@ const configSchema = z.object({
     .object({
       /** Calendar display names to show; empty = all event calendars. */
       allowlist: z.array(z.string()).default([]),
+      /** Public read-only .ics feed merged in as a synthetic "Holidays" calendar — Apple's
+       * Birthdays/Holidays calendars are synthesized client-side and never exposed over CalDAV,
+       * so there's nothing for `allowlist` to pick up. Unset disables this entirely. Google
+       * publishes one per country, e.g. `en.norwegian#holiday@group.v.calendar.google.com`
+       * (URL-encoded) for Norway. */
+      holidayIcsUrl: z.string().optional(),
+      /** Synthesize a "Birthdays" calendar from iCloud Contacts' BDAY fields over CardDAV — the
+       * only way to get this data, since Apple's own Birthdays calendar is generated client-side
+       * and never exposed over CalDAV either. */
+      includeBirthdays: z.boolean().default(false),
     })
-    .default({ allowlist: [] }),
+    .default({ allowlist: [], includeBirthdays: false }),
   news: z
     .object({
       feeds: z.array(z.object({ name: z.string(), url: z.string() })).default([]),

@@ -186,10 +186,126 @@ function monthGridRange(now: Date, dateFmt: DateFormatter): { start: Date; end: 
   return { start, end };
 }
 
+/**
+ * Apple's Birthdays and Holidays calendars are synthesized client-side (from Contacts, and from a
+ * bundled regional feed respectively) and never show up as CalDAV collections — `fetchCalendars()`
+ * genuinely never returns them, confirmed by listing this account's calendars directly. A public
+ * .ics subscription feed (e.g. Google's per-country holiday calendars) is the only practical way to
+ * get holidays into the dashboard; failures here are swallowed so a slow/unreachable third-party
+ * feed never takes down the user's own calendar data.
+ */
+async function fetchHolidayEvents(
+  url: string,
+  rangeStart: Date,
+  rangeEnd: Date,
+  dateFmt: DateFormatter,
+  timeFmt: DateFormatter,
+  signal: AbortSignal,
+): Promise<CalendarEvent[]> {
+  try {
+    const res = await fetch(url, { signal });
+    if (!res.ok) throw new Error(`holiday feed responded ${res.status}`);
+    const data = await res.text();
+    return eventsForCalendarObject(data, 'Holidays', rangeStart, rangeEnd, dateFmt, timeFmt);
+  } catch (err) {
+    console.warn('⚠️  Could not fetch holiday calendar feed — skipping.', err);
+    return [];
+  }
+}
+
+/** A contact's `BDAY` field, month/day always known — year only when the contact recorded one. */
+export function parseVCardBirthday(
+  data: string | undefined,
+): { name: string; month: number; day: number; year?: number } | undefined {
+  if (!data) return undefined;
+  const lines = data.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').split(/\r\n|\n/);
+
+  const bdayLine = lines.find((line) => /^BDAY[;:]/i.test(line));
+  if (!bdayLine) return undefined;
+  const value = bdayLine.slice(bdayLine.indexOf(':') + 1).trim();
+  const match = value.match(/^(\d{4}|--)-?(\d{2})-?(\d{2})$/);
+  if (!match) return undefined;
+  const [, yearPart, monthPart, dayPart] = match;
+  const month = Number(monthPart);
+  const day = Number(dayPart);
+  if (!month || !day) return undefined;
+
+  const fnLine = lines.find((line) => /^FN:/i.test(line));
+  const name = fnLine?.slice(3).trim();
+  if (!name) return undefined;
+
+  return { name, month, day, year: yearPart === '--' ? undefined : Number(yearPart) };
+}
+
+/**
+ * Apple's Birthdays calendar is synthesized on-device from the Contacts app — it's not a CalDAV
+ * collection either, but unlike Holidays there's no substitute public feed: the data only exists
+ * in this account's own address book, reachable over CardDAV (a separate protocol/endpoint from
+ * the CalDAV used for events) with the same iCloud app-password credentials.
+ */
+async function fetchBirthdayEvents(
+  auth: { username: string; password: string },
+  race: <T>(promise: Promise<T>) => Promise<T>,
+  rangeStart: Date,
+  rangeEnd: Date,
+  timezone: string,
+  dateFmt: DateFormatter,
+): Promise<CalendarEvent[]> {
+  try {
+    const client = await race(
+      createDAVClient({
+        serverUrl: 'https://contacts.icloud.com',
+        credentials: { username: auth.username, password: auth.password },
+        authMethod: 'Basic',
+        defaultAccountType: 'carddav',
+      }),
+    );
+    const addressBooks = await race(client.fetchAddressBooks());
+    const vcardGroups = await Promise.all(
+      addressBooks.map((addressBook) => race(client.fetchVCards({ addressBook }))),
+    );
+
+    const events: CalendarEvent[] = [];
+    const startYear = rangeStart.getUTCFullYear() - 1;
+    const endYear = rangeEnd.getUTCFullYear() + 1;
+    for (const vcard of vcardGroups.flat()) {
+      const birthday = parseVCardBirthday(vcard.data);
+      if (!birthday) continue;
+      const { name, month, day, year } = birthday;
+
+      for (let occurrenceYear = startYear; occurrenceYear <= endYear; occurrenceYear += 1) {
+        const start = wallTimeToInstant(new Date(Date.UTC(occurrenceYear, month - 1, day)), timezone);
+        if (start < rangeStart || start >= rangeEnd) continue;
+        const end = wallTimeToInstant(new Date(Date.UTC(occurrenceYear, month - 1, day + 1)), timezone);
+        const age = year !== undefined ? occurrenceYear - year : undefined;
+        events.push({
+          id: `birthday:${vcard.url}:${occurrenceYear}`,
+          title: `${name}'s birthday`,
+          calendar: 'Birthdays',
+          allDay: true,
+          location: undefined,
+          description: age !== undefined && age > 0 ? `Turns ${age}` : undefined,
+          start: start.toISOString(),
+          end: end.toISOString(),
+          date: dateFmt.format(start),
+          startLabel: 'all day',
+          endLabel: '',
+        });
+      }
+    }
+    return events;
+  } catch (err) {
+    console.warn('⚠️  Could not fetch birthdays from Contacts — skipping.', err);
+    return [];
+  }
+}
+
 export function createCalendarProvider(
   auth: { username: string; password: string } | undefined,
   allowlist: string[],
   timezone: string,
+  holidayIcsUrl?: string,
+  includeBirthdays = false,
 ): Provider<CalendarData> {
   const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone });
   const timeFmt = new Intl.DateTimeFormat('en-GB', {
@@ -244,6 +360,16 @@ export function createCalendarProvider(
         return objects.flatMap((object) =>
           eventsForCalendarObject(object.data, calendarName, rangeStart, rangeEnd, dateFmt, timeFmt));
       }));
+      if (holidayIcsUrl && (allowlist.length === 0 || allowlist.includes('Holidays'))) {
+        eventGroups.push(
+          await fetchHolidayEvents(holidayIcsUrl, rangeStart, rangeEnd, dateFmt, timeFmt, signal),
+        );
+      }
+      if (includeBirthdays && (allowlist.length === 0 || allowlist.includes('Birthdays'))) {
+        eventGroups.push(
+          await fetchBirthdayEvents(auth, race, rangeStart, rangeEnd, timezone, dateFmt),
+        );
+      }
       const events = eventGroups.flat();
 
       events.sort((a, b) => a.start.localeCompare(b.start));
