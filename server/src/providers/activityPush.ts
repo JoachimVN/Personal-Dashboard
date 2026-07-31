@@ -202,12 +202,28 @@ function extractClashOfClansCounters(player: RawClashOfClansPlayer): ClashOfClan
   };
 }
 
+export interface PushedClashOfClansCounterActivity {
+  type: 'warStars' | 'attackWins' | 'clanCapitalContributions' | 'donations';
+  delta: number;
+  timestamp: string;
+}
+
+/** Priority when several counters tick up in the same 60s poll — a war attack is already covered
+ * in more detail by `latestClashOfClansAttack`, so it ranks first here mainly so a tie doesn't lose
+ * it to a less interesting counter; then a multiplayer win, then capital gold, then troop
+ * donations, from most to least noteworthy. */
+const COUNTER_ACTIVITY_PRIORITY: (keyof ClashOfClansCounters)[] = ['warStars', 'attackWins', 'clanCapitalContributions', 'donations'];
+
 /** `donations`/`attackWins` reset each season and `clanCapitalContributions`/`warStars` never do,
  * but the same rule handles both: only an *increase* is activity. A drop is a season reset, not
  * evidence of nothing happening — trophies aren't in this set at all, since they move from being
  * defended against while offline just as easily as from a player's own attacks. */
-function clashOfClansCountersIncreased(previous: ClashOfClansCounters, current: ClashOfClansCounters): boolean {
-  return (Object.keys(current) as (keyof ClashOfClansCounters)[]).some((key) => current[key] > previous[key]);
+function detectClashOfClansCounterActivity(
+  previous: ClashOfClansCounters,
+  current: ClashOfClansCounters,
+): PushedClashOfClansCounterActivity | undefined {
+  const type = COUNTER_ACTIVITY_PRIORITY.find((key) => current[key] > previous[key]);
+  return type ? { type, delta: current[type] - previous[type], timestamp: new Date().toISOString() } : undefined;
 }
 
 export interface PushedClashOfClansMilestone {
@@ -262,6 +278,7 @@ interface ClashOfClansActivitySnapshot {
   milestones: PushedClashOfClansMilestone[];
   newMilestoneBaseline: ClashOfClansMilestoneBaseline;
   counters: ClashOfClansCounters;
+  counterActivity: PushedClashOfClansCounterActivity | undefined;
   activeAt: string | undefined;
 }
 
@@ -284,9 +301,8 @@ async function fetchClashOfClansActivity(
 
     // Cheap, single-fetch signals first, so a later failure (war/raid lookups) never loses them.
     const counters = extractClashOfClansCounters(player);
-    const activeAt = previous.counters && clashOfClansCountersIncreased(previous.counters, counters)
-      ? new Date().toISOString()
-      : undefined;
+    const counterActivity = previous.counters ? detectClashOfClansCounterActivity(previous.counters, counters) : undefined;
+    const activeAt = counterActivity?.timestamp;
 
     // No baseline yet means this is the first tick ever — seed silently rather than reporting
     // every existing TH level/league/trophy record as a fresh "milestone" on startup.
@@ -308,6 +324,7 @@ async function fetchClashOfClansActivity(
       milestones,
       newMilestoneBaseline,
       counters,
+      counterActivity,
       activeAt,
     };
   } catch (err) {
@@ -419,6 +436,7 @@ export function createActivityPushProvider(
           clashRoyale: latestClashRoyaleActivity(clashRoyale.success ? clashRoyale.data : undefined),
           clashOfClans: cocActivity?.attack ?? null,
           clashOfClansRaidAttack: cocActivity?.raidAttack ?? null,
+          clashOfClansCounterActivity: cocActivity?.counterActivity ?? null,
           clashOfClansLastActiveAt,
           clashOfClansMilestones: cocActivity?.milestones ?? [],
         }),

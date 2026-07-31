@@ -284,6 +284,46 @@ describe('createActivityPushProvider Clash of Clans', () => {
     fetchMock.mockRestore();
   });
 
+  it('reports which counter increased, and ranks a war attack over a donation on a tied tick', async () => {
+    const fetchMock = mockCocApi({ player: basePlayer() });
+    const provider = createActivityPushProvider(push, () => undefined, auth);
+    await provider.fetch(new AbortController().signal, false);
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === push.url) return jsonResponse({ ok: true });
+      if (url.includes('/players/')) return jsonResponse(basePlayer({ donations: 150, warStars: 103 }));
+      if (url.includes('/currentwar')) return jsonResponse({}, 404);
+      if (url.includes('/capitalraidseasons')) return jsonResponse({ items: [] });
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    await provider.fetch(new AbortController().signal, false);
+
+    expect(pushBody(fetchMock, 1).clashOfClansCounterActivity).toEqual({ type: 'warStars', delta: 3, timestamp: expect.any(String) });
+    fetchMock.mockRestore();
+  });
+
+  it('omits clashOfClansCounterActivity once reported, until a counter increases again', async () => {
+    const fetchMock = mockCocApi({ player: basePlayer() });
+    const provider = createActivityPushProvider(push, () => undefined, auth);
+    await provider.fetch(new AbortController().signal, false);
+
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === push.url) return jsonResponse({ ok: true });
+      if (url.includes('/players/')) return jsonResponse(basePlayer({ donations: 150 }));
+      if (url.includes('/currentwar')) return jsonResponse({}, 404);
+      if (url.includes('/capitalraidseasons')) return jsonResponse({ items: [] });
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    await provider.fetch(new AbortController().signal, false);
+    await provider.fetch(new AbortController().signal, false);
+
+    expect(pushBody(fetchMock, 1).clashOfClansCounterActivity).toEqual({ type: 'donations', delta: 50, timestamp: expect.any(String) });
+    expect(pushBody(fetchMock, 2).clashOfClansCounterActivity).toBeNull();
+    fetchMock.mockRestore();
+  });
+
   it('does not treat a seasonal counter reset as activity', async () => {
     const fetchMock = mockCocApi({ player: basePlayer({ donations: 500 }) });
     const provider = createActivityPushProvider(push, () => undefined, auth);
