@@ -190,12 +190,12 @@ function monthGridRange(now: Date, dateFmt: DateFormatter): { start: Date; end: 
  * Apple's Birthdays and Holidays calendars are synthesized client-side (from Contacts, and from a
  * bundled regional feed respectively) and never show up as CalDAV collections — `fetchCalendars()`
  * genuinely never returns them, confirmed by listing this account's calendars directly. A public
- * .ics subscription feed (e.g. Google's per-country holiday calendars) is the only practical way to
- * get holidays into the dashboard; failures here are swallowed so a slow/unreachable third-party
- * feed never takes down the user's own calendar data.
+ * .ics subscription feed is the practical way to get those sources, and also covers
+ * third-party subscriptions that iCloud does not expose over CalDAV. Failures here are
+ * swallowed so a slow/unreachable third-party feed never takes down the user's own calendar data.
  */
-async function fetchHolidayEvents(
-  url: string,
+async function fetchIcsFeedEvents(
+  feed: { name: string; url: string },
   rangeStart: Date,
   rangeEnd: Date,
   dateFmt: DateFormatter,
@@ -203,12 +203,12 @@ async function fetchHolidayEvents(
   signal: AbortSignal,
 ): Promise<CalendarEvent[]> {
   try {
-    const res = await fetch(url, { signal });
-    if (!res.ok) throw new Error(`holiday feed responded ${res.status}`);
+    const res = await fetch(feed.url, { signal });
+    if (!res.ok) throw new Error(`feed responded ${res.status}`);
     const data = await res.text();
-    return eventsForCalendarObject(data, 'Holidays', rangeStart, rangeEnd, dateFmt, timeFmt);
+    return eventsForCalendarObject(data, feed.name, rangeStart, rangeEnd, dateFmt, timeFmt);
   } catch (err) {
-    console.warn('⚠️  Could not fetch holiday calendar feed — skipping.', err);
+    console.warn(`⚠️  Could not fetch ${feed.name} calendar feed — skipping.`, err);
     return [];
   }
 }
@@ -306,6 +306,7 @@ export function createCalendarProvider(
   timezone: string,
   holidayIcsUrl?: string,
   includeBirthdays = false,
+  icsFeeds: { name: string; url: string }[] = [],
 ): Provider<CalendarData> {
   const dateFmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone });
   const timeFmt = new Intl.DateTimeFormat('en-GB', {
@@ -320,9 +321,9 @@ export function createCalendarProvider(
     schema: calendarSchema,
     refreshMs: 5 * 60_000,
     timeoutMs: 30_000,
-    isConfigured: () => auth !== undefined,
+    isConfigured: () => auth !== undefined || holidayIcsUrl !== undefined || icsFeeds.length > 0,
     async fetch(signal) {
-      if (!auth) throw new Error('calendar is not configured');
+      if (!auth && !holidayIcsUrl && icsFeeds.length === 0) throw new Error('calendar is not configured');
 
       // tsdav can't take an AbortSignal; reject on abort so the scheduler's
       // timeout still lands (the underlying request is simply left behind).
@@ -333,39 +334,43 @@ export function createCalendarProvider(
       });
       const race = <T>(promise: Promise<T>) => Promise.race([promise, aborted]);
 
-      const client = await race(
-        createDAVClient({
-          serverUrl: 'https://caldav.icloud.com',
-          credentials: { username: auth.username, password: auth.password },
-          authMethod: 'Basic',
-          defaultAccountType: 'caldav',
-        }),
-      );
-
       const { start: rangeStart, end: rangeEnd } = monthGridRange(new Date(), dateFmt);
-
-      const calendars = (await race(client.fetchCalendars())).filter((calendar) => {
-        const name = text(calendar.displayName as string | undefined);
-        const holdsEvents =
-          !calendar.components || calendar.components.includes('VEVENT');
-        return holdsEvents && (allowlist.length === 0 || allowlist.includes(name));
-      });
-
-      const eventGroups = await Promise.all(calendars.map(async (calendar) => {
-        const calendarName = text(calendar.displayName as string | undefined) || 'Calendar';
-        const objects = await race(client.fetchCalendarObjects({
-          calendar,
-          timeRange: { start: rangeStart.toISOString(), end: rangeEnd.toISOString() },
-        }));
-        return objects.flatMap((object) =>
-          eventsForCalendarObject(object.data, calendarName, rangeStart, rangeEnd, dateFmt, timeFmt));
-      }));
+      const eventGroups: CalendarEvent[][] = [];
+      if (auth) {
+        const client = await race(
+          createDAVClient({
+            serverUrl: 'https://caldav.icloud.com',
+            credentials: { username: auth.username, password: auth.password },
+            authMethod: 'Basic',
+            defaultAccountType: 'caldav',
+          }),
+        );
+        const calendars = (await race(client.fetchCalendars())).filter((calendar) => {
+          const name = text(calendar.displayName as string | undefined);
+          const holdsEvents =
+            !calendar.components || calendar.components.includes('VEVENT');
+          return holdsEvents && (allowlist.length === 0 || allowlist.includes(name));
+        });
+        eventGroups.push(...await Promise.all(calendars.map(async (calendar) => {
+          const calendarName = text(calendar.displayName as string | undefined) || 'Calendar';
+          const objects = await race(client.fetchCalendarObjects({
+            calendar,
+            timeRange: { start: rangeStart.toISOString(), end: rangeEnd.toISOString() },
+          }));
+          return objects.flatMap((object) =>
+            eventsForCalendarObject(object.data, calendarName, rangeStart, rangeEnd, dateFmt, timeFmt));
+        })));
+      }
       if (holidayIcsUrl && (allowlist.length === 0 || allowlist.includes('Holidays'))) {
         eventGroups.push(
-          await fetchHolidayEvents(holidayIcsUrl, rangeStart, rangeEnd, dateFmt, timeFmt, signal),
+          await fetchIcsFeedEvents({ name: 'Holidays', url: holidayIcsUrl }, rangeStart, rangeEnd, dateFmt, timeFmt, signal),
         );
       }
-      if (includeBirthdays && (allowlist.length === 0 || allowlist.includes('Birthdays'))) {
+      const selectedIcsFeeds = icsFeeds.filter((feed) => allowlist.length === 0 || allowlist.includes(feed.name));
+      eventGroups.push(...await Promise.all(selectedIcsFeeds.map((feed) =>
+        fetchIcsFeedEvents(feed, rangeStart, rangeEnd, dateFmt, timeFmt, signal),
+      )));
+      if (auth && includeBirthdays && (allowlist.length === 0 || allowlist.includes('Birthdays'))) {
         eventGroups.push(
           await fetchBirthdayEvents(auth, race, rangeStart, rangeEnd, timezone, dateFmt),
         );

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseVCardBirthday } from './calendar.js';
+import { batabiboingCalendarFeed, parseCalendarIcsFeeds } from '../env.js';
 
 describe('parseVCardBirthday', () => {
   it('parses a dashed BDAY with a known year', () => {
@@ -29,5 +30,34 @@ describe('parseVCardBirthday', () => {
 
   it('returns undefined for missing data', () => {
     expect(parseVCardBirthday(undefined)).toBeUndefined();
+  });
+});
+
+describe('parseCalendarIcsFeeds', () => {
+  it('keeps named HTTPS subscriptions and skips invalid entries', () => {
+    expect(parseCalendarIcsFeeds(JSON.stringify([
+      { name: 'Batabiboing', url: 'https://batabiboing.vercel.app/api/calendar/example' },
+      { name: '', url: 'https://example.com/empty-name.ics' },
+      { name: 'Insecure', url: 'http://example.com/feed.ics' },
+    ]))).toEqual([
+      { name: 'Batabiboing', url: 'https://batabiboing.vercel.app/api/calendar/example' },
+    ]);
+  });
+
+  it('returns no subscriptions for malformed configuration', () => {
+    expect(parseCalendarIcsFeeds('{')).toEqual([]);
+  });
+});
+
+describe('batabiboingCalendarFeed', () => {
+  it('derives a scoped feed URL from the existing dashboard push configuration', () => {
+    const feed = batabiboingCalendarFeed('https://batabiboing.vercel.app/api/push', 'push-secret');
+    expect(feed?.name).toBe('Batabiboing');
+    expect(feed?.url).toMatch(/^https:\/\/batabiboing\.vercel\.app\/api\/calendar\?token=/);
+    expect(feed?.url).not.toContain('push-secret');
+  });
+
+  it('does not derive a feed from a non-push route', () => {
+    expect(batabiboingCalendarFeed('https://batabiboing.vercel.app/api/other', 'push-secret')).toBeUndefined();
   });
 });

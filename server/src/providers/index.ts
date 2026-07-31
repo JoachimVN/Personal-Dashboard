@@ -88,6 +88,7 @@ export function createProviders(
           env.timezone,
           config.calendar.holidayIcsUrl,
           config.calendar.includeBirthdays,
+          env.calendarIcsFeeds,
         ),
         createGmailProvider(env.google),
         createGitHubProvider(env.github, githubSnapshot),
