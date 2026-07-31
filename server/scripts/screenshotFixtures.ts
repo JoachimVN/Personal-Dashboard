@@ -12,6 +12,7 @@ import type {
   GmailData,
   HealthData,
   SpotifyData,
+  SteamData,
   WeatherData,
 } from '@personal-dashboard/shared';
 import {
@@ -83,17 +84,17 @@ export function weather(now: Date): WeatherData {
   return {
     location: { lat: 40.71, lon: -74.01, name: 'New York' },
     current: {
-      temperature: 18, windSpeed: 2.6, windDirectionDeg: 224, humidity: 58, uvIndex: 4.2,
+      temperature: 18, windSpeed: 2.6, windDirectionDeg: 224, humidity: 58, uvIndex: 8.2,
       precipitationMm: 0, symbol: 'partlycloudy_day',
     },
     hours: [
-      { time: iso(now, 1), hourLabel: '14', temperature: 18, precipitationMm: 0, uvIndex: 4.2, symbol: 'partlycloudy_day' },
-      { time: iso(now, 2), hourLabel: '15', temperature: 19, precipitationMm: 0, uvIndex: 4.6, symbol: 'clearsky_day' },
-      { time: iso(now, 3), hourLabel: '16', temperature: 19, precipitationMm: 0, uvIndex: 3.8, symbol: 'clearsky_day' },
-      { time: iso(now, 4), hourLabel: '17', temperature: 17, precipitationMm: 0.1, uvIndex: 2.4, symbol: 'fair_day' },
-      { time: iso(now, 5), hourLabel: '18', temperature: 16, precipitationMm: 0.3, uvIndex: 1.5, symbol: 'lightrain' },
-      { time: iso(now, 6), hourLabel: '19', temperature: 15, precipitationMm: 0.8, uvIndex: 0.7, symbol: 'rain' },
-      { time: iso(now, 7), hourLabel: '20', temperature: 14, precipitationMm: 0.4, uvIndex: 0.2, symbol: 'lightrain' },
+      { time: iso(now, 1), hourLabel: '14', temperature: 18, precipitationMm: 0, uvIndex: 8.2, symbol: 'partlycloudy_day' },
+      { time: iso(now, 2), hourLabel: '15', temperature: 19, precipitationMm: 0, uvIndex: 8.8, symbol: 'clearsky_day' },
+      { time: iso(now, 3), hourLabel: '16', temperature: 19, precipitationMm: 0, uvIndex: 8.1, symbol: 'clearsky_day' },
+      { time: iso(now, 4), hourLabel: '17', temperature: 17, precipitationMm: 0, uvIndex: 6.4, symbol: 'fair_day' },
+      { time: iso(now, 5), hourLabel: '18', temperature: 16, precipitationMm: 0, uvIndex: 4.1, symbol: 'fair_day' },
+      { time: iso(now, 6), hourLabel: '19', temperature: 15, precipitationMm: 0, uvIndex: 1.7, symbol: 'fair_day' },
+      { time: iso(now, 7), hourLabel: '20', temperature: 14, precipitationMm: 0, uvIndex: 0.2, symbol: 'fair_day' },
       { time: iso(now, 8), hourLabel: '21', temperature: 14, precipitationMm: 0, uvIndex: 0, symbol: 'partlycloudy_night' },
       { time: iso(now, 9), hourLabel: '22', temperature: 13, precipitationMm: 0, uvIndex: 0, symbol: 'fair_night' },
       { time: iso(now, 10), hourLabel: '23', temperature: 13, precipitationMm: 0, uvIndex: 0, symbol: 'clearsky_night' },
@@ -101,7 +102,7 @@ export function weather(now: Date): WeatherData {
       { time: iso(now, 12), hourLabel: '01', temperature: 12, precipitationMm: 0, uvIndex: 0, symbol: 'clearsky_night' },
     ].map((hour) => ({ ...hour, date: hour.time.slice(0, 10) })),
     days: [
-      { date: dateDaysAgo(now, 0), dayLabel: weekday(0), minTemperature: 14, maxTemperature: 20, precipitationMm: 0.4, symbol: 'partlycloudy_day' },
+      { date: dateDaysAgo(now, 0), dayLabel: weekday(0), minTemperature: 14, maxTemperature: 20, precipitationMm: 0, maxUvIndex: 8.8, symbol: 'partlycloudy_day' },
       { date: dateDaysAgo(now, -1), dayLabel: weekday(1), minTemperature: 13, maxTemperature: 22, precipitationMm: 0, symbol: 'clearsky_day' },
       { date: dateDaysAgo(now, -2), dayLabel: weekday(2), minTemperature: 15, maxTemperature: 24, precipitationMm: 0, symbol: 'clearsky_day' },
       { date: dateDaysAgo(now, -3), dayLabel: weekday(3), minTemperature: 16, maxTemperature: 21, precipitationMm: 2.8, symbol: 'rainshowers_day' },
@@ -141,9 +142,7 @@ export function overviewCalendar(now: Date): CalendarData {
 export function overviewGithub(now: Date): GitHubData {
   return {
     activity: [], issues: [],
-    pullRequests: [
-      { title: 'Add importance scoring to the command center', repo: 'yourname/personal-dashboard', number: 42, url: '#', role: 'author', draft: false, updatedAt: iso(now, -2) },
-    ],
+    pullRequests: [],
     contributions: {
       total: 512,
       days: [
@@ -157,6 +156,26 @@ export function overviewGithub(now: Date): GitHubData {
       ],
     },
     repoHealth: [],
+  };
+}
+
+export function overviewSteam(): SteamData {
+  const currentGame = {
+    appId: 730,
+    name: 'Counter-Strike 2',
+    headerUrl: 'https://cdn.akamai.steamstatic.com/steam/apps/730/header.jpg',
+    playtimeForeverMinutes: 48_200,
+  };
+  return {
+    profile: { steamId: '00000000000000000', personaName: 'yourname', profileUrl: '#' },
+    currentGame,
+    library: null,
+    recentlyPlayed: [currentGame],
+    achievements: null,
+    friendsInGame: [],
+    playtimeHistory: [],
+    friendsLeaderboard: { status: 'unavailable', entries: [] },
+    availability: { library: 'unavailable', achievements: 'unavailable', friends: 'unavailable' },
   };
 }
 
