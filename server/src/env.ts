@@ -126,7 +126,9 @@ export function batabiboingCalendarFeed(
 ): { name: string; url: string } | undefined {
   try {
     const url = new URL(pushUrl);
-    if (url.protocol !== 'https:' || url.pathname.replace(/\/+$/, '') !== '/api/push') return undefined;
+    let pathname = url.pathname;
+    while (pathname.endsWith('/')) pathname = pathname.slice(0, -1);
+    if (url.protocol !== 'https:' || pathname !== '/api/push') return undefined;
     const token = createHmac('sha256', pushSecret).update('calendar-feed-v1').digest('base64url');
     url.pathname = '/api/calendar';
     url.search = '';

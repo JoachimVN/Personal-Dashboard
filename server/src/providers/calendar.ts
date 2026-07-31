@@ -223,7 +223,7 @@ export function parseVCardBirthday(
   const bdayLine = lines.find((line) => /^BDAY[;:]/i.test(line));
   if (!bdayLine) return undefined;
   const value = bdayLine.slice(bdayLine.indexOf(':') + 1).trim();
-  const match = value.match(/^(\d{4}|--)-?(\d{2})-?(\d{2})$/);
+  const match = /^(\d{4}|--)-?(\d{2})-?(\d{2})$/.exec(value);
   if (!match) return undefined;
   const [, yearPart, monthPart, dayPart] = match;
   const month = Number(monthPart);
