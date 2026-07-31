@@ -21,6 +21,7 @@ import { pathOfLegendsDisplayLeagueNumber } from '@personal-dashboard/shared';
 import { CLASH_ROYALE_APP_ICON_URL, CLASH_ROYALE_TROPHY_ICON_URL, clashRoyaleArenaArt, clashRoyaleLeagueArt } from '../lib/clashRoyale';
 import {
   CLASH_OF_CLANS_APP_ICON_URL,
+  CLASH_OF_CLANS_CAPITAL_GOLD_ICON_URL,
   CLASH_OF_CLANS_RAID_WEEKEND_ICON_URL,
   CLASH_OF_CLANS_WAR_ICON_URL,
 } from '../lib/clashOfClans';
@@ -318,9 +319,18 @@ function signalDetailFor(
   }
   if (slot.render.type === 'sonar-quality-gate') return <div className="mt-1"><QualityGatePill status={slot.render.status} /></div>;
   if (slot.render.type === 'clash-royale-moment' && slot.render.kind === 'best-trophies' && slot.render.bestTrophies !== undefined) {
-    return <span className="command-clash-royale-trophy-tile mt-1" aria-hidden>
+    return <span className="command-icon-stat-tile mt-1" aria-hidden>
       <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" />
       {slot.render.bestTrophies.toLocaleString()}
+    </span>;
+  }
+  // Tile is narrow and unlabeled — only ever show this player's own loot here, never the clan
+  // total, so a bare number can't be misread as personal (secondary/hero show both, clearly
+  // labeled, in ClashOfClansMomentSecondary).
+  if (slot.render.type === 'clash-of-clans-moment' && slot.render.kind === 'raid-weekend' && slot.render.personalLoot !== undefined) {
+    return <span className="command-icon-stat-tile mt-1" aria-label={`${slot.render.personalLoot.toLocaleString()} capital gold looted by you`}>
+      <img src={CLASH_OF_CLANS_CAPITAL_GOLD_ICON_URL} alt="" aria-hidden />
+      {slot.render.personalLoot.toLocaleString()}
     </span>;
   }
   return <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>;

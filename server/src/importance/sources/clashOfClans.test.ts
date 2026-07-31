@@ -83,13 +83,13 @@ describe('clashOfClansCandidates', () => {
       ...baseline,
       raidWeekend: {
         state: 'ongoing', endTime: new Date(NOW + 3 * 60 * 60_000).toISOString(),
-        attacksUsed: 4, attacksLimit: 6, capitalTotalLoot: 12_345,
+        attacksUsed: 4, attacksLimit: 6, capitalTotalLoot: 12_345, personalLoot: 1_800,
       },
     };
     expect(clashOfClansCandidates(data, NOW)).toContainEqual(
       expect.objectContaining({
         score: 80, shapes: ['hero', 'secondary', 'tile'],
-        kicker: 'Raid weekend', title: '2 raid attacks left', detail: '12,345 capital gold looted so far',
+        kicker: 'Raid weekend', title: '2 raid attacks left', detail: '1,800 looted by you · 12,345 clan total',
       }),
     );
   });
@@ -97,7 +97,10 @@ describe('clashOfClansCandidates', () => {
   it('does not surface a raid weekend that has ended', () => {
     const data: ClashOfClansData = {
       ...baseline,
-      raidWeekend: { state: 'ended', endTime: new Date(NOW - 60_000).toISOString(), attacksUsed: 6, attacksLimit: 6, capitalTotalLoot: 50_000 },
+      raidWeekend: {
+        state: 'ended', endTime: new Date(NOW - 60_000).toISOString(),
+        attacksUsed: 6, attacksLimit: 6, capitalTotalLoot: 50_000, personalLoot: 9_000,
+      },
     };
     expect(clashOfClansCandidates(data, NOW)).toEqual([]);
   });

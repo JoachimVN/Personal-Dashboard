@@ -350,7 +350,15 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
         id: 'gallery:clash-of-clans:raid-weekend', source: 'clash-of-clans', kind: 'clash-of-clans',
         kicker: 'Raid weekend', title: 'Capital raids ongoing', detail: 'Ends Monday morning',
         href: '#/clash-of-clans', score: 50,
-        render: { type: 'clash-of-clans-moment', kind: 'raid-weekend', capitalTotalLoot: 124_500 },
+        render: {
+          type: 'clash-of-clans-moment', kind: 'raid-weekend', capitalTotalLoot: 124_500, personalLoot: 8_200,
+          clanName: 'DefenderDoobie',
+          topContributors: [
+            { name: 'Alex', loot: 32_400, isYou: false },
+            { name: 'Sam', loot: 28_100, isYou: true },
+            { name: 'Jordan', loot: 21_950, isYou: false },
+          ],
+        },
       },
     },
     {

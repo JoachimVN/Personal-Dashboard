@@ -20,7 +20,13 @@ export const clashOfClansRaidWeekendSchema = z.object({
   endTime: z.string(),
   attacksUsed: z.number(),
   attacksLimit: z.number(),
+  /** Whole-clan total loot for the season, not this player's own — see `personalLoot` for that. */
   capitalTotalLoot: z.number(),
+  /** This player's own capital gold looted so far this raid weekend. */
+  personalLoot: z.number(),
+  /** Highest-looting clanmates this season, ranked descending — empty if the clan has no raid
+   * history yet or Supercell's response didn't include a members list. */
+  topContributors: z.array(z.object({ name: z.string(), loot: z.number(), isYou: z.boolean() })).default([]),
 });
 
 export type ClashOfClansRaidWeekend = z.infer<typeof clashOfClansRaidWeekendSchema>;
@@ -41,6 +47,9 @@ export const clashOfClansSchema = z.object({
     }).optional(),
     clanTag: z.string().optional(),
     clanName: z.string().optional(),
+    /** Supercell's own clan badge art — used as a banner when a card shows clan-wide info
+     * (e.g. raid weekend contributors) alongside this player's own numbers. */
+    clanBadgeUrl: z.string().optional(),
   }),
   /** Absent when not currently in a war (private war log, or between wars). */
   war: clashOfClansWarSchema.nullable(),

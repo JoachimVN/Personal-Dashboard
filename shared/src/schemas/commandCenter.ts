@@ -82,8 +82,17 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
     /** Only present for kind 'war' — the war-wide tally, not this player's own stars. */
     clanStars: z.number().optional(),
     opponentStars: z.number().optional(),
-    /** Only present for kind 'raid-weekend'. */
+    /** Only present for kind 'raid-weekend' — whole-clan total for the season, not this player's own.
+     * Only shown on secondary/hero cards, alongside `clanName`/`clanBadgeUrl` — tiles show
+     * `personalLoot` alone so a narrow card never implies the clan total is this player's. */
     capitalTotalLoot: z.number().optional(),
+    /** Only present for kind 'raid-weekend' — this player's own loot, distinct from the clan total above. */
+    personalLoot: z.number().optional(),
+    /** Only present for kind 'raid-weekend' on secondary/hero — clan banner shown next to the clan total. */
+    clanName: z.string().optional(),
+    clanBadgeUrl: z.string().optional(),
+    /** Only present for kind 'raid-weekend' on secondary/hero — highest-looting clanmates this season. */
+    topContributors: z.array(z.object({ name: z.string(), loot: z.number(), isYou: z.boolean() })).optional(),
     /** Only present for kind 'league' — Supercell's own league-tier art, not a locally-vendored asset. */
     leagueIconUrl: z.string().optional(),
     /** Only present for kind 'league' — the player's current trophy count, so the card has a real

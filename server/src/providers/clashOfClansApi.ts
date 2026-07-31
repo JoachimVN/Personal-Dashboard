@@ -28,7 +28,10 @@ export interface RawClashOfClansPlayer {
    * ClashOfClansData for that reason, only kept here for the activity-push milestone baseline. */
   leagueTier?: { id: number; name: string; iconUrls?: { small?: string; large?: string } };
   builderBaseLeague?: { name: string };
-  clan?: { tag: string; name: string };
+  /** `badgeUrls` is a documented field on GetPlayer's abbreviated `clan` object but unverified
+   * against a live response by this codebase — worth checking the first time a raid-weekend card's
+   * clan banner looks wrong. */
+  clan?: { tag: string; name: string; badgeUrls?: { small?: string; medium?: string; large?: string } };
 }
 
 export interface RawClashOfClansAttack {
@@ -86,17 +89,20 @@ export interface RawClashOfClansRaidLogEntry {
 
 export interface RawClashOfClansRaidSeasonMember {
   tag: string;
+  name: string;
   attacks: number;
   attackLimit: number;
   bonusAttackLimit: number;
+  capitalResourcesLooted: number;
 }
 
 /**
  * `state`/`endTime`/`capitalTotalLoot`/`members` are documented GetCapitalRaidSeasons fields, but —
  * like the extra war fields above — unverified against a live response by this codebase before the
- * command-center raid-weekend event was added. `members[].attacks`/`attackLimit`/`bonusAttackLimit`
- * are assumed to report this player's own attack usage for the season; worth re-checking the first
- * time a raid-weekend card looks wrong.
+ * command-center raid-weekend event was added. `members[].attacks`/`attackLimit`/`bonusAttackLimit`/
+ * `capitalResourcesLooted`/`name` are assumed to report this player's own attack usage and loot for
+ * the season (and each member's display name for the contributors list); worth re-checking the
+ * first time a raid-weekend card looks wrong.
  */
 export interface RawClashOfClansRaidSeason {
   state: string;
