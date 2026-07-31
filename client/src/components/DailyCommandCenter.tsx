@@ -262,6 +262,15 @@ function signalMark(
   if (slot.render.type === 'clash-of-clans-moment') {
     return <img src={clashOfClansMomentIcon(slot.render)} alt="" aria-hidden className="command-clash-of-clans-tile-icon" />;
   }
+  return fallbackSignalMark(slot, health, activityDay, roblox);
+}
+
+function fallbackSignalMark(
+  slot: CommandCenterSlot,
+  health: HealthData | undefined,
+  activityDay: ReturnType<typeof latestActivityDay> | undefined,
+  roblox: RobloxData | undefined,
+): ReactNode {
   if (slot.render.type === 'health-rings' && health && activityDay) {
     return <CompactActivityRings
       activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
@@ -290,17 +299,46 @@ function signalMark(
   return <span className="command-signal-dot" aria-hidden />;
 }
 
+function signalKickerFor(slot: CommandCenterSlot, isSonarGate: boolean): string {
+  if (slot.source === 'roblox') return 'Roblox · Playing now';
+  if (slot.source === 'clash-royale') return `Clash Royale · ${slot.kicker}`;
+  if (slot.source === 'clash-of-clans') return `Clash of Clans · ${slot.kicker}`;
+  return isSonarGate ? 'SonarCloud Quality Gate' : slot.kicker;
+}
+
+function signalDetailFor(
+  slot: CommandCenterSlot,
+  contributionDays: GitHubData['contributions']['days'] | undefined,
+  maxContributions: number,
+): ReactNode {
+  if (contributionDays?.length) {
+    return <div className="command-contribution-squares" aria-label="Contributions over the last seven days">
+      {contributionDays.map((day) => <span key={day.date} aria-hidden style={{ backgroundColor: rampColor(day.count, maxContributions) }} />)}
+    </div>;
+  }
+  if (slot.render.type === 'sonar-quality-gate') return <div className="mt-1"><QualityGatePill status={slot.render.status} /></div>;
+  if (slot.render.type === 'clash-royale-moment' && slot.render.kind === 'best-trophies' && slot.render.bestTrophies !== undefined) {
+    return <span className="command-clash-royale-trophy-tile mt-1" aria-hidden>
+      <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" />
+      {slot.render.bestTrophies.toLocaleString()}
+    </span>;
+  }
+  return <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>;
+}
+
+function shouldHideHeroDetail(hero: CommandCenterData['hero'], extra: ReactNode): boolean {
+  if (!extra) return false;
+  if (hero.render.type === 'gmail-threads' || hero.render.type === 'sonar-quality-gate') return true;
+  return hero.render.type === 'clash-royale-moment' && hero.render.kind === 'best-trophies';
+}
+
 export function Signal({ slot, github, health, roblox, spotify, steam }: Readonly<{ slot: CommandCenterSlot; github: GitHubData | undefined; health: HealthData | undefined; roblox: RobloxData | undefined; spotify: SpotifyData | undefined; steam: SteamData | undefined }>) {
   const contributionDays = slot.render.type === 'github-contributions'
     ? github?.contributions.days.slice(-7)
     : undefined;
   const maxContributions = Math.max(...(github?.contributions.days.map((day) => day.count) ?? []), 1);
   const isSonarGate = slot.render.type === 'sonar-quality-gate';
-  const signalKicker = slot.source === 'roblox' ? 'Roblox · Playing now'
-    : slot.source === 'clash-royale' ? `Clash Royale · ${slot.kicker}`
-    : slot.source === 'clash-of-clans' ? `Clash of Clans · ${slot.kicker}`
-    : isSonarGate ? 'SonarCloud Quality Gate'
-    : slot.kicker;
+  const signalKicker = signalKickerFor(slot, isSonarGate);
   const signalTitle = isSonarGate && slot.render.type === 'sonar-quality-gate' ? slot.render.projects[0].name : slot.title;
   const weatherAccentStyle = slot.render.type === 'weather-signal'
     ? ({ '--signal-color': WEATHER_KIND_COLOR[slot.render.kind] } as CSSProperties)
@@ -311,18 +349,7 @@ export function Signal({ slot, github, health, roblox, spotify, steam }: Readonl
       <div className="min-w-0">
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{signalKicker}</p>
         <p className="mt-1 truncate text-sm font-semibold text-ink">{signalTitle}</p>
-        {contributionDays?.length
-          ? <div className="command-contribution-squares" aria-label="Contributions over the last seven days">
-              {contributionDays.map((day) => <span key={day.date} aria-hidden style={{ backgroundColor: rampColor(day.count, maxContributions) }} />)}
-            </div>
-          : slot.render.type === 'sonar-quality-gate'
-            ? <div className="mt-1"><QualityGatePill status={slot.render.status} /></div>
-            : slot.render.type === 'clash-royale-moment' && slot.render.kind === 'best-trophies' && slot.render.bestTrophies !== undefined
-              ? <span className="command-clash-royale-trophy-tile mt-1" aria-hidden>
-                  <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" />
-                  {slot.render.bestTrophies.toLocaleString()}
-                </span>
-              : <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>}
+        {signalDetailFor(slot, contributionDays, maxContributions)}
         {slot.meter !== undefined && (
           <span className={`command-meter${slot.meter <= 15 ? ' command-meter--low' : ''}`}>
             <span style={{ width: `${Math.min(100, Math.max(0, slot.meter))}%` }} />
@@ -523,12 +550,7 @@ export function HeroPanel({
                 )}
                 {!event.location && !event.description && <p>{hero.detail}</p>}
               </div>
-            ) : (
-              (hero.render.type === 'gmail-threads' || hero.render.type === 'sonar-quality-gate'
-                || (hero.render.type === 'clash-royale-moment' && hero.render.kind === 'best-trophies')) && extra
-                ? null
-                : <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{hero.detail}</p>
-            )}
+            ) : !shouldHideHeroDetail(hero, extra) && <p className="mt-2 line-clamp-2 text-sm text-ink-muted">{hero.detail}</p>}
           </div>
         </div>
       )}

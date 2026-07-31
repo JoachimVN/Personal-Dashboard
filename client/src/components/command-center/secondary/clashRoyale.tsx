@@ -81,11 +81,12 @@ export function ClashRoyaleBestTrophiesSecondary({ slot }: Readonly<{ slot: Comm
 export function ClashRoyaleArenaLeagueSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
   if (slot.render.type !== 'clash-royale-moment' || (slot.render.kind !== 'arena' && slot.render.kind !== 'league')) return null;
   const { render } = slot;
-  const art = render.kind === 'arena' && render.arenaName
-    ? clashRoyaleArenaArt(render.arenaName)
-    : render.kind === 'league' && render.leagueNumber !== undefined
-      ? clashRoyaleLeagueArt(pathOfLegendsDisplayLeagueNumber(render.leagueNumber))
-      : undefined;
+  let art: string | undefined;
+  if (render.kind === 'arena' && render.arenaName) {
+    art = clashRoyaleArenaArt(render.arenaName);
+  } else if (render.kind === 'league' && render.leagueNumber !== undefined) {
+    art = clashRoyaleLeagueArt(pathOfLegendsDisplayLeagueNumber(render.leagueNumber));
+  }
   return <div className="command-secondary-spotify mt-4">
     {art && <img src={art} alt="" aria-hidden className="command-clash-royale-art-badge" />}
     <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>

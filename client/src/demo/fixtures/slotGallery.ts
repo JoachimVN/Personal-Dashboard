@@ -93,11 +93,12 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
     artists: SpotifyData['topArtists']['shortTerm'] | SpotifyData['allTime']['artists'],
   ): GallerySlot => {
     const artist = artists[0]!;
+    const timeframeLabel = timeframe === 'allTime' ? 'All time' : `Last ${timeframe} term`;
     return {
       label: `spotify-artist (${timeframe})`,
       slot: {
         id: `gallery:spotify-artist:${timeframe}`, source: 'spotify', kind: 'spotify',
-        kicker: `Top artist · ${timeframe === 'allTime' ? 'All time' : `Last ${timeframe} term`}`,
+        kicker: `Top artist · ${timeframeLabel}`,
         title: artist.name, detail: 'Your most-played artist for this stretch', href: '#/spotify', score: 50,
         render: { type: 'spotify-artist', artistId: artist.id ?? artist.name, timeframe },
       },
