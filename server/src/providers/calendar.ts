@@ -237,6 +237,43 @@ export function parseVCardBirthday(
   return { name, month, day, year: yearPart === '--' ? undefined : Number(yearPart) };
 }
 
+/** Every occurrence of one contact's birthday that falls within the requested range. */
+function birthdayEventsForContact(
+  vcard: { url: string; data?: string },
+  rangeStart: Date,
+  rangeEnd: Date,
+  timezone: string,
+  dateFmt: DateFormatter,
+): CalendarEvent[] {
+  const birthday = parseVCardBirthday(vcard.data);
+  if (!birthday) return [];
+  const { name, month, day, year } = birthday;
+
+  const events: CalendarEvent[] = [];
+  const startYear = rangeStart.getUTCFullYear() - 1;
+  const endYear = rangeEnd.getUTCFullYear() + 1;
+  for (let occurrenceYear = startYear; occurrenceYear <= endYear; occurrenceYear += 1) {
+    const start = wallTimeToInstant(new Date(Date.UTC(occurrenceYear, month - 1, day)), timezone);
+    if (start < rangeStart || start >= rangeEnd) continue;
+    const end = wallTimeToInstant(new Date(Date.UTC(occurrenceYear, month - 1, day + 1)), timezone);
+    const age = year !== undefined ? occurrenceYear - year : undefined;
+    events.push({
+      id: `birthday:${vcard.url}:${occurrenceYear}`,
+      title: `${name}'s birthday`,
+      calendar: 'Birthdays',
+      allDay: true,
+      location: undefined,
+      description: age !== undefined && age > 0 ? `Turns ${age}` : undefined,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      date: dateFmt.format(start),
+      startLabel: 'all day',
+      endLabel: '',
+    });
+  }
+  return events;
+}
+
 /**
  * Apple's Birthdays calendar is synthesized on-device from the Contacts app — it's not a CalDAV
  * collection either, but unlike Holidays there's no substitute public feed: the data only exists
@@ -265,35 +302,9 @@ async function fetchBirthdayEvents(
       addressBooks.map((addressBook) => race(client.fetchVCards({ addressBook }))),
     );
 
-    const events: CalendarEvent[] = [];
-    const startYear = rangeStart.getUTCFullYear() - 1;
-    const endYear = rangeEnd.getUTCFullYear() + 1;
-    for (const vcard of vcardGroups.flat()) {
-      const birthday = parseVCardBirthday(vcard.data);
-      if (!birthday) continue;
-      const { name, month, day, year } = birthday;
-
-      for (let occurrenceYear = startYear; occurrenceYear <= endYear; occurrenceYear += 1) {
-        const start = wallTimeToInstant(new Date(Date.UTC(occurrenceYear, month - 1, day)), timezone);
-        if (start < rangeStart || start >= rangeEnd) continue;
-        const end = wallTimeToInstant(new Date(Date.UTC(occurrenceYear, month - 1, day + 1)), timezone);
-        const age = year !== undefined ? occurrenceYear - year : undefined;
-        events.push({
-          id: `birthday:${vcard.url}:${occurrenceYear}`,
-          title: `${name}'s birthday`,
-          calendar: 'Birthdays',
-          allDay: true,
-          location: undefined,
-          description: age !== undefined && age > 0 ? `Turns ${age}` : undefined,
-          start: start.toISOString(),
-          end: end.toISOString(),
-          date: dateFmt.format(start),
-          startLabel: 'all day',
-          endLabel: '',
-        });
-      }
-    }
-    return events;
+    return vcardGroups
+      .flat()
+      .flatMap((vcard) => birthdayEventsForContact(vcard, rangeStart, rangeEnd, timezone, dateFmt));
   } catch (err) {
     console.warn('⚠️  Could not fetch birthdays from Contacts — skipping.', err);
     return [];
