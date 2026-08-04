@@ -39,9 +39,20 @@ interface ChartPoint {
   observedReset?: boolean;
 }
 
+const WEEK_MS = 7 * 24 * 60 * 60_000;
+
+/** Beyond a week, a weekday name alone repeats (multiple Mondays), so the date carries the
+ * disambiguating info instead. */
 function timeLabel(iso: string, windowMs: number): string {
+  let dateOptions: Intl.DateTimeFormatOptions = {};
+  if (windowMs > WEEK_MS) {
+    dateOptions = { month: 'short', day: 'numeric' };
+  } else if (windowMs > 24 * 60 * 60_000) {
+    dateOptions = { weekday: 'short' };
+  }
+
   return new Intl.DateTimeFormat(undefined, {
-    ...(windowMs > 24 * 60 * 60_000 ? { weekday: 'short' as const } : {}),
+    ...dateOptions,
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(iso));
@@ -478,7 +489,7 @@ export function UsageSparkline({
   if (!geometry) return null;
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-6 w-full overflow-visible" aria-hidden>
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-20 w-full overflow-visible" aria-hidden>
       {geometry.gapPath && (
         <path
           d={geometry.gapPath}

@@ -13,6 +13,8 @@ import { AiNews } from './AiNews';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 
 const DAY_MS = 24 * 60 * 60_000;
+const WEEK_MS = 7 * DAY_MS;
+const MONTH_MS = 30 * DAY_MS;
 
 /** Fallback for when the account-wide quota (behind a flaky, tightly rate-limited endpoint) isn't available. */
 function TokenRow({ label, tokens }: Readonly<{ label: string; tokens: number }>) {
@@ -126,9 +128,9 @@ function ToolCard({
                 <UsageHistoryChart
                   points={data.history}
                   metric="fiveHourUsedPercent"
-                  windowMs={DAY_MS}
+                  windowMs={WEEK_MS}
                   color={fastColor}
-                  caption="5-hour window · last 24 h"
+                  caption="5-hour window · last 7 d"
                   sessionResetsAt={data.fiveHour.resetsAt}
                   sessionWindowMs={FIVE_HOUR_MS}
                 />
@@ -137,9 +139,9 @@ function ToolCard({
                 <UsageHistoryChart
                   points={data.history}
                   metric="weeklyUsedPercent"
-                  windowMs={WEEKLY_MS}
+                  windowMs={MONTH_MS}
                   color={color}
-                  caption="Weekly window · last 7 d"
+                  caption="Weekly window · last 30 d"
                   sessionResetsAt={data.weekly.resetsAt}
                   sessionWindowMs={WEEKLY_MS}
                 />

@@ -445,10 +445,15 @@ export class SpotifyHistoryStore {
         const albumIds = new Set(editions.map((a) => a.id));
         const groupTracks = allTracks.filter((t) => t.albumId && albumIds.has(t.albumId));
         // Prefer the edition whose own name has no edition suffix (the base release) as the
-        // display record; fall back to whichever edition has been played the most.
-        const canonical =
-          editions.find((a) => canonicalTitle(a.name) === a.name) ??
-          editions.slice().sort((a, b) => (albumPlayCounts.get(b.id) ?? 0) - (albumPlayCounts.get(a.id) ?? 0))[0];
+        // display record, then whichever has been played the most. Spotify sometimes catalogs the
+        // exact same release under two distinct ids (e.g. a regional duplicate) with no edition
+        // suffix to break the tie on either count — id is the final, deterministic tiebreaker so
+        // the pick can't flip between calls just because unordered SQL rows came back in a
+        // different order (that flip was firing false "new favorite album" signals).
+        const canonicalPool = editions.filter((a) => canonicalTitle(a.name) === a.name);
+        const canonical = (canonicalPool.length > 0 ? canonicalPool : editions)
+          .slice()
+          .sort((a, b) => (albumPlayCounts.get(b.id) ?? 0) - (albumPlayCounts.get(a.id) ?? 0) || a.id.localeCompare(b.id))[0];
         return {
           canonical,
           playCount: groupTracks.reduce((sum, t) => sum + t.playCount, 0),
@@ -501,9 +506,12 @@ export class SpotifyHistoryStore {
     return [...groups.values()]
       .map((editions) => {
         const playCount = editions.reduce((sum, t) => sum + t.playCount, 0);
-        const canonical =
-          editions.find((t) => canonicalTitle(t.track) === t.track) ??
-          editions.slice().sort(byPlayCountDesc)[0];
+        // Same deterministic tiebreak as the album grouping above (see canonicalPool there) — id
+        // as the final fallback so the pick can't flip between calls on unordered SQL rows.
+        const canonicalPool = editions.filter((t) => canonicalTitle(t.track) === t.track);
+        const canonical = (canonicalPool.length > 0 ? canonicalPool : editions)
+          .slice()
+          .sort((a, b) => byPlayCountDesc(a, b) || a.id.localeCompare(b.id))[0];
         return { ...canonical, playCount, verified: editions.some((t) => t.verified) ? true : undefined };
       })
       .filter((track) => track.playCount > 0)
