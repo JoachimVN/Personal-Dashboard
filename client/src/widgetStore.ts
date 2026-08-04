@@ -3,6 +3,7 @@ import { WEATHER_LOCATION_UPDATED_EVENT } from './useDeviceLocation';
 
 const MIN_POLL_MS = 15_000;
 const MAX_POLL_MS = 300_000;
+const FETCH_TIMEOUT_MS = 60_000;
 
 export interface WidgetSnapshot<T> {
   envelope: WidgetEnvelope<T> | null;
@@ -61,14 +62,20 @@ function schedulePoll(id: string, record: WidgetRecord): void {
 }
 
 async function fetchIntoRecord(id: string, record: WidgetRecord, init?: RequestInit): Promise<void> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(`/api/widgets/${id}${init ? '/refresh' : ''}`, init);
+    const res = await fetch(`/api/widgets/${id}${init ? '/refresh' : ''}`, {
+      ...init,
+      signal: controller.signal,
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const envelope = await res.json() as WidgetEnvelope<unknown>;
     setSnapshot(record, { ...record.snapshot, envelope, offline: false });
   } catch {
     setSnapshot(record, { ...record.snapshot, offline: true });
   } finally {
+    window.clearTimeout(timeout);
     schedulePoll(id, record);
   }
 }

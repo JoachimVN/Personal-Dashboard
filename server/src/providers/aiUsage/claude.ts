@@ -252,6 +252,7 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
         if (settled) return;
         settled = true;
         clearTimeout(sendUsage);
+        clearTimeout(sendEnter);
         clearTimeout(timeout);
         clearTimeout(settleTimer);
         try {
@@ -262,7 +263,17 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
         if (error) reject(error);
         else resolve(result ?? terminal);
       };
-      const sendUsage = setTimeout(() => pty.write('/usage\r'), 2_000);
+      // Writing '/usage\r' in one chunk races the CLI's own keystroke handling: Enter can submit
+      // before the slash-command autocomplete has finished registering the typed text, leaving the
+      // session stuck on the suggestions dropdown (never rendering the Usage screen) until the hard
+      // timeout below fires. Giving the dropdown a moment to settle before Enter avoids that race.
+      let sendEnter: NodeJS.Timeout | undefined;
+      const sendUsage = setTimeout(() => {
+        pty.write('/usage');
+        sendEnter = setTimeout(() => {
+          if (!settled) pty.write('\r');
+        }, 500);
+      }, 2_000);
       const timeout = setTimeout(() => finish(undefined, new Error('Claude Usage screen timed out')), 35_000);
       pty.onData((chunk) => {
         terminal += chunk;
