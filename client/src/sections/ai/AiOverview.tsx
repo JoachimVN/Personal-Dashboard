@@ -59,6 +59,8 @@ function ToolRow({
                 color={fastColor}
                 resetsAt={data.fiveHour?.resetsAt}
                 windowMs={FIVE_HOUR_MS}
+                history={data.history}
+                metric="fiveHourUsedPercent"
               />
               <UsageLane
                 label="week"
@@ -67,6 +69,8 @@ function ToolRow({
                 color={color}
                 resetsAt={data.weekly?.resetsAt}
                 windowMs={WEEKLY_MS}
+                history={data.history}
+                metric="weeklyUsedPercent"
               />
               {data.modelWeekly && (
                 <UsageLane
@@ -76,6 +80,8 @@ function ToolRow({
                   color={modelColor}
                   resetsAt={data.modelWeekly.resetsAt}
                   windowMs={WEEKLY_MS}
+                  history={data.history}
+                  metric="modelWeeklyUsedPercent"
                 />
               )}
             </div>

@@ -97,6 +97,8 @@ function ToolCard({
                   tokens={data.tokens?.fiveHour}
                   color={fastColor}
                   windowMs={FIVE_HOUR_MS}
+                  history={data.history}
+                  metric="fiveHourUsedPercent"
                 />
               ) : (
                 <WindowUnavailable label="5 hours" status={data.fiveHourStatus} tokens={data.tokens?.fiveHour} color={fastColor} />
@@ -108,6 +110,8 @@ function ToolCard({
                   tokens={data.tokens?.weekly}
                   color={color}
                   windowMs={WEEKLY_MS}
+                  history={data.history}
+                  metric="weeklyUsedPercent"
                 />
               ) : (
                 <WindowUnavailable label="Weekly" status={data.weeklyStatus} tokens={data.tokens?.weekly} color={color} />
@@ -118,6 +122,8 @@ function ToolCard({
                   limit={data.modelWeekly}
                   color={modelColor}
                   windowMs={WEEKLY_MS}
+                  history={data.history}
+                  metric="modelWeeklyUsedPercent"
                 />
               )}
               {/* Each trend is gated on its window being currently enforced, so a lifted
