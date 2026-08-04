@@ -1,20 +1,12 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
-import type { AiUsageToolData, UsageHistoryPoint } from '@personal-dashboard/shared';
+import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { AnimatedNumber } from '../../components/AnimatedNumber';
 import { formatCompactNumber } from '../../lib/format';
 
 export const FIVE_HOUR_MS = 5 * 60 * 60_000;
 export const WEEKLY_MS = 7 * 24 * 60 * 60_000;
-const RESET_DRIFT_MS = 5 * 60_000;
-
-export type UsageMetric = 'fiveHourUsedPercent' | 'weeklyUsedPercent' | 'modelWeeklyUsedPercent';
-
-const RESET_FIELD: Partial<Record<UsageMetric, 'fiveHourResetsAt' | 'weeklyResetsAt'>> = {
-  fiveHourUsedPercent: 'fiveHourResetsAt',
-  weeklyUsedPercent: 'weeklyResetsAt',
-};
 
 export type RateLimit = NonNullable<AiUsageToolData['fiveHour']>;
 
@@ -33,101 +25,8 @@ export function paceElapsedPercent(resetsAt: string, durationMs: number) {
   return Math.max(0, Math.min(100, (elapsedMs / durationMs) * 100));
 }
 
-interface UsageTrend {
-  headline: string;
-  status: string;
-}
-
-function pointLabel(points: number) {
-  return `${points} pt${points === 1 ? '' : 's'}`;
-}
-
-function durationLabel(durationMs: number) {
-  const minutes = Math.max(1, Math.round(durationMs / 60_000));
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.round((minutes / 60) * 10) / 10;
-  return `${hours} h`;
-}
-
-function elapsedAt(point: UsageHistoryPoint, resetsAt: string, windowMs: number) {
-  const remainingMs = Date.parse(resetsAt) - Date.parse(point.at);
-  return Math.max(0, Math.min(100, ((windowMs - remainingMs) / windowMs) * 100));
-}
-
-/** Finds a useful comparison rather than restating the arithmetic behind the pace marker.
- * A previous allowance window is only compared at a similarly elapsed point. If the dashboard
- * has not seen a completed comparable window, the marker falls back to the latest same-window
- * reading, which is still actual behaviour rather than a linear-time assumption. */
-function usageTrend({
-  history,
-  metric,
-  resetsAt,
-  usedPercent,
-  elapsedPercent,
-  windowMs,
-}: {
-  history: UsageHistoryPoint[];
-  metric: UsageMetric | undefined;
-  resetsAt: string;
-  usedPercent: number;
-  elapsedPercent: number;
-  windowMs: number;
-}): UsageTrend {
-  const resetField = metric && RESET_FIELD[metric];
-  const currentReset = Date.parse(resetsAt);
-
-  if (!metric || !resetField || Number.isNaN(currentReset)) {
-    return { headline: 'Window progress', status: `${Math.round(elapsedPercent)}% of this window has elapsed` };
-  }
-
-  const readings = history.flatMap((point) => {
-    const percent = point[metric];
-    const reset = point[resetField];
-    if (percent === undefined || !reset) return [];
-    const resetAt = Date.parse(reset);
-    if (Number.isNaN(resetAt)) return [];
-    return [{ point, percent, reset, resetAt }];
-  });
-
-  const priorReset = readings
-    .filter(({ resetAt }) => resetAt < currentReset - RESET_DRIFT_MS)
-    .reduce<number | undefined>((latest, { resetAt }) => latest === undefined || resetAt > latest ? resetAt : latest, undefined);
-
-  if (priorReset !== undefined) {
-    const closest = readings
-      .filter(({ resetAt }) => Math.abs(resetAt - priorReset) < RESET_DRIFT_MS)
-      .map((reading) => ({ ...reading, elapsedPercent: elapsedAt(reading.point, reading.reset, windowMs) }))
-      .sort((a, b) => Math.abs(a.elapsedPercent - elapsedPercent) - Math.abs(b.elapsedPercent - elapsedPercent))[0];
-    // A distant sample would make "at this point" misleading after a prolonged outage.
-    if (closest && Math.abs(closest.elapsedPercent - elapsedPercent) <= 15) {
-      const delta = Math.round(usedPercent - closest.percent);
-      return {
-        headline: 'Same point last window',
-        status: delta === 0
-          ? 'Same usage as your last window'
-          : delta > 0
-            ? `${pointLabel(delta)} more used than last window`
-            : `${pointLabel(-delta)} less used than last window`,
-      };
-    }
-  }
-
-  const latest = readings
-    .filter(({ resetAt, point }) => Math.abs(resetAt - currentReset) < RESET_DRIFT_MS && Date.parse(point.at) < Date.now() - 60_000)
-    .sort((a, b) => Date.parse(b.point.at) - Date.parse(a.point.at))[0];
-  if (latest) {
-    const delta = Math.round(usedPercent - latest.percent);
-    return {
-      headline: `Last checked ${durationLabel(Date.now() - Date.parse(latest.point.at))} ago`,
-      status: delta === 0
-        ? 'No usage change since then'
-        : delta > 0
-          ? `${pointLabel(delta)} used since then`
-          : `${pointLabel(-delta)} less used since then`,
-    };
-  }
-
-  return { headline: 'Window progress', status: `${Math.round(elapsedPercent)}% of this window has elapsed` };
+function paceLabel(percent: number, pace: number) {
+  return `${Math.round(percent)}% used · ${Math.round(pace)}% elapsed`;
 }
 
 /** Floats above (or, near the top of the viewport, below) the marker. Rendered via a portal to
@@ -135,7 +34,7 @@ function usageTrend({
  * with `overflow-hidden` (see SectionCard), which would silently clip a tooltip positioned inside
  * that tree. Position comes from a live `getBoundingClientRect()` on the marker, so it tracks the
  * marker's actual screen position regardless of layout. */
-function PaceTooltip({ anchorRect, trend }: Readonly<{ anchorRect: DOMRect; trend: UsageTrend }>) {
+function PaceTooltip({ anchorRect, percent, pace }: Readonly<{ anchorRect: DOMRect; percent: number; pace: number }>) {
   const gap = 8;
   // Not enough room to sit above without clipping against the top of the viewport — flip below.
   const placeBelow = anchorRect.top < 72;
@@ -148,8 +47,7 @@ function PaceTooltip({ anchorRect, trend }: Readonly<{ anchorRect: DOMRect; tren
       className="glass pointer-events-none fixed z-50 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] leading-tight"
       style={{ left, top, transform: `translate(-50%, ${placeBelow ? '0' : '-100%'})` }}
     >
-      <p className="font-semibold tabular-nums text-ink">{trend.headline}</p>
-      <p className="tabular-nums text-ink-muted">{trend.status}</p>
+      <p className="font-semibold tabular-nums text-ink">{paceLabel(percent, pace)}</p>
     </div>,
     document.body,
   );
@@ -161,7 +59,7 @@ function PaceTooltip({ anchorRect, trend }: Readonly<{ anchorRect: DOMRect; tren
  * stays visible against both the colored fill and the bare track, and drawn taller than the bar so
  * it reads as a tick mark rather than blending into the bar's edge. The hit target is widened past
  * the visible 3px line so it's actually hoverable/tappable. */
-function PaceMarker({ pace, trend }: Readonly<{ pace: number; trend: UsageTrend }>) {
+function PaceMarker({ pace, percent }: Readonly<{ pace: number; percent: number }>) {
   const ref = useRef<HTMLButtonElement>(null);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
 
@@ -173,7 +71,7 @@ function PaceMarker({ pace, trend }: Readonly<{ pace: number; trend: UsageTrend 
       <button
         ref={ref}
         type="button"
-        aria-label={`${trend.headline} · ${trend.status}`}
+        aria-label={paceLabel(percent, pace)}
         onMouseEnter={show}
         onMouseLeave={hide}
         onFocus={show}
@@ -186,7 +84,7 @@ function PaceMarker({ pace, trend }: Readonly<{ pace: number; trend: UsageTrend 
           style={{ backgroundColor: 'var(--color-ink)', opacity: 0.85, boxShadow: '0 0 0 1.5px var(--color-canvas)' }}
         />
       </button>
-      {anchorRect && <PaceTooltip anchorRect={anchorRect} trend={trend} />}
+      {anchorRect && <PaceTooltip anchorRect={anchorRect} percent={percent} pace={pace} />}
     </>
   );
 }
@@ -198,12 +96,10 @@ function UsageBar({
   percent,
   color,
   pace,
-  trend,
 }: Readonly<{
   percent: number;
   color: string;
   pace?: number;
-  trend?: UsageTrend;
 }>) {
   return (
     <div className="relative h-1.5">
@@ -215,7 +111,7 @@ function UsageBar({
           style={{ backgroundColor: color }}
         />
       </div>
-      {pace !== undefined && trend && <PaceMarker pace={pace} trend={trend} />}
+      {pace !== undefined && <PaceMarker pace={pace} percent={percent} />}
     </div>
   );
 }
@@ -226,19 +122,14 @@ export function UsageMeter({
   color,
   windowMs,
   tokens,
-  history,
-  metric,
 }: Readonly<{
   label: string;
   limit: RateLimit;
   color: string;
   windowMs: number;
   tokens?: number;
-  history: UsageHistoryPoint[];
-  metric: UsageMetric;
 }>) {
   const pace = paceElapsedPercent(limit.resetsAt, windowMs);
-  const trend = usageTrend({ history, metric, resetsAt: limit.resetsAt, usedPercent: limit.usedPercent, elapsedPercent: pace, windowMs });
 
   return (
     <div>
@@ -248,7 +139,7 @@ export function UsageMeter({
           <AnimatedNumber value={limit.usedPercent} suffix="%" />
         </span>
       </div>
-      <UsageBar percent={limit.usedPercent} color={color} pace={pace} trend={trend} />
+      <UsageBar percent={limit.usedPercent} color={color} pace={pace} />
       <p className="mt-1 text-[11px] text-ink-faint">
         Resets {resetLabel(limit.resetsAt)}
         {tokens !== undefined && ` · ${formatCompactNumber(tokens)} tokens`}
@@ -267,8 +158,6 @@ export function UsageLane({
   color,
   resetsAt,
   windowMs,
-  history = [],
-  metric,
 }: Readonly<{
   label: string;
   value: string;
@@ -276,13 +165,8 @@ export function UsageLane({
   color: string;
   resetsAt?: string;
   windowMs?: number;
-  history?: UsageHistoryPoint[];
-  metric?: UsageMetric;
 }>) {
   const pace = resetsAt && windowMs ? paceElapsedPercent(resetsAt, windowMs) : undefined;
-  const trend = pace !== undefined && resetsAt && windowMs
-    ? usageTrend({ history, metric, resetsAt, usedPercent: percent ?? 0, elapsedPercent: pace, windowMs })
-    : undefined;
   return (
     <div>
       <div className="mb-1 flex items-baseline justify-between text-xs text-ink-muted">
@@ -291,7 +175,7 @@ export function UsageLane({
           {value}
         </span>
       </div>
-      {percent !== undefined && <UsageBar percent={percent} color={color} pace={pace} trend={trend} />}
+      {percent !== undefined && <UsageBar percent={percent} color={color} pace={pace} />}
     </div>
   );
 }
