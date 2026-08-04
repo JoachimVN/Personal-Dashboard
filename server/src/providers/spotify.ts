@@ -407,6 +407,17 @@ export function createSpotifyProvider(
               }
             : null;
 
+        // Spotify occasionally returns a 200 with an empty item list for one time_range while the
+        // others are fully populated (observed for long_term). Treat that as a missed update, not
+        // a real "you have no history" state, so a single flaky response can't wipe out previously
+        // good data — it'll self-heal on the next refresh.
+        const freshArtistsShort = topData?.artistsShort.map(mapArtist);
+        const freshArtistsMedium = topData?.artistsMedium.map(mapArtist);
+        const freshArtistsLong = topData?.artistsLong.map(mapArtist);
+        const freshTracksShort = topData?.tracksShort.map(mapTrack);
+        const freshTracksMedium = topData?.tracksMedium.map(mapTrack);
+        const freshTracksLong = topData?.tracksLong.map(mapTrack);
+
         const snapshot = {
           nowPlaying,
           recentlyPlayed: recent
@@ -416,14 +427,14 @@ export function createSpotifyProvider(
               }))
             : previousSnapshot?.recentlyPlayed ?? [],
           topArtists: {
-            shortTerm: topData?.artistsShort.map(mapArtist) ?? previousSnapshot?.topArtists.shortTerm ?? [],
-            mediumTerm: topData?.artistsMedium.map(mapArtist) ?? previousSnapshot?.topArtists.mediumTerm ?? [],
-            longTerm: topData?.artistsLong.map(mapArtist) ?? previousSnapshot?.topArtists.longTerm ?? [],
+            shortTerm: freshArtistsShort?.length ? freshArtistsShort : previousSnapshot?.topArtists.shortTerm ?? [],
+            mediumTerm: freshArtistsMedium?.length ? freshArtistsMedium : previousSnapshot?.topArtists.mediumTerm ?? [],
+            longTerm: freshArtistsLong?.length ? freshArtistsLong : previousSnapshot?.topArtists.longTerm ?? [],
           },
           topTracks: {
-            shortTerm: topData?.tracksShort.map(mapTrack) ?? previousSnapshot?.topTracks.shortTerm ?? [],
-            mediumTerm: topData?.tracksMedium.map(mapTrack) ?? previousSnapshot?.topTracks.mediumTerm ?? [],
-            longTerm: topData?.tracksLong.map(mapTrack) ?? previousSnapshot?.topTracks.longTerm ?? [],
+            shortTerm: freshTracksShort?.length ? freshTracksShort : previousSnapshot?.topTracks.shortTerm ?? [],
+            mediumTerm: freshTracksMedium?.length ? freshTracksMedium : previousSnapshot?.topTracks.mediumTerm ?? [],
+            longTerm: freshTracksLong?.length ? freshTracksLong : previousSnapshot?.topTracks.longTerm ?? [],
           },
           allTime: await historyStore.getAllTime(),
         };
