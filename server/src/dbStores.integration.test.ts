@@ -62,6 +62,25 @@ describeDatabase('Postgres stores', () => {
     expect((await new SpotifyHistoryStore(database).getAllTime(10, 0)).tracks[0]).toMatchObject({ id: 'track-1', playCount: 1 });
   }, 20_000);
 
+  it('picks the same canonical album/track deterministically when editions tie on name and play count', async () => {
+    const trackFor = (id: string, albumId: string, albumName: string) => ({
+      id, name: 'Duplicate Song', artists: [{ id: 'artist-dup', name: 'Duplicate Artist' }],
+      album: { id: albumId, name: albumName },
+    });
+    // Spotify can catalog the exact same release under two ids with no edition suffix to break the
+    // tie — insertion order used to decide which id "won" as canonical (see store.ts), which made
+    // the pick flip between refreshes. Recording the b-then-a order here should still land on the
+    // lexicographically-smaller id, matching the a-then-b order below.
+    const history = new SpotifyHistoryStore(database);
+    await history.recordPlays([
+      { playedAt: '2026-07-13T12:00:00.000Z', track: trackFor('track-z', 'album-z', 'Duplicate Album') },
+      { playedAt: '2026-07-13T12:01:00.000Z', track: trackFor('track-a', 'album-a', 'Duplicate Album') },
+    ]);
+    const result = await new SpotifyHistoryStore(database).getAllTime(10, 0);
+    expect(result.albums[0]).toMatchObject({ id: 'album-a', playCount: 2 });
+    expect(result.tracks[0]).toMatchObject({ id: 'track-a', playCount: 2 });
+  });
+
   it('stores discovered top-list tracks without treating affinity as a play', async () => {
     const history = new SpotifyHistoryStore(database);
     const discovered = { id: 'track-top', name: 'Top song', artists: [{ id: 'artist-top', name: 'Top artist' }], album: { id: 'album-top', name: 'Top album' } };
