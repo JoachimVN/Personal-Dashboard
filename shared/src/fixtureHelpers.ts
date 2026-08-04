@@ -248,6 +248,10 @@ export interface SawtoothHistoryOptions {
   now: number;
 }
 
+function sigmoid(x: number): number {
+  return 1 / (1 + Math.exp(-x));
+}
+
 export function sawtoothHistory({
   resetsAtIso,
   periodMs,
@@ -266,13 +270,38 @@ export function sawtoothHistory({
     if (!peaks.has(cycle)) peaks.set(cycle, peakRange[0] + rng() * (peakRange[1] - peakRange[0]));
     return peaks.get(cycle)!;
   };
+  // Real usage accumulates in bursts of activity (a coding session) separated by idle stretches
+  // (asleep, in a meeting), not a smooth ramp — a straight line to the peak reads as obviously
+  // synthetic. Each cycle gets its own 3-5 burst schedule (center + share of the eventual peak);
+  // summing sigmoids around each center gives a monotonic staircase that's flat between bursts
+  // and rises quickly through one, while still landing near peakFor(cycle) by the reset.
+  const burstSchedules = new Map<number, { center: number; weight: number }[]>();
+  const burstsFor = (cycle: number) => {
+    let schedule = burstSchedules.get(cycle);
+    if (!schedule) {
+      const count = 3 + Math.floor(rng() * 3);
+      const weights = Array.from({ length: count }, () => 0.3 + rng() * 0.7);
+      const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+      schedule = weights
+        .map((weight, i) => ({ center: i === 0 ? rng() * 0.4 : rng(), weight: weight / totalWeight }))
+        .sort((a, b) => a.center - b.center);
+      burstSchedules.set(cycle, schedule);
+    }
+    return schedule;
+  };
+  const BURST_STEEPNESS = 22;
+
   const points: AiUsageToolData['history'] = [];
   for (let t = now - spanMs; t <= now; t += stepMs) {
     const cycle = Math.ceil((resetsAt - t) / periodMs);
     const lastReset = resetsAt - cycle * periodMs;
     const msIntoWindow = t - lastReset;
     if (msIntoWindow < gapSteps * stepMs) continue;
-    const fraction = Math.min(1, msIntoWindow / periodMs);
+    const progress = msIntoWindow / periodMs;
+    const fraction = Math.min(
+      1,
+      burstsFor(cycle).reduce((sum, burst) => sum + burst.weight * sigmoid((progress - burst.center) * BURST_STEEPNESS), 0),
+    );
     const percent = Math.max(0, Math.min(100, fraction * peakFor(cycle) + (rng() - 0.5) * 3));
     const cycleReset = lastReset + periodMs;
     points.push({
@@ -291,13 +320,15 @@ export function usageHistoryFor(
   now: number,
 ): AiUsageToolData['history'] {
   const rng = mulberry32(seed);
+  // Spans match the client's own chart windows (AiDetail.tsx: fiveHour trend is WEEK_MS, weekly
+  // trend is MONTH_MS) — a shorter span here leaves most of the chart's visible window empty.
   const fiveHourPoints = sawtoothHistory({
-    resetsAtIso: fiveHour.resetsAt, periodMs: 5 * 3_600_000, spanMs: 24 * 3_600_000,
+    resetsAtIso: fiveHour.resetsAt, periodMs: 5 * 3_600_000, spanMs: 7 * 86_400_000,
     stepMs: 15 * 60_000, peakRange: [fiveHour.usedPercent * 0.6, Math.min(100, fiveHour.usedPercent * 1.15)],
     rng, field: 'fiveHourUsedPercent', resetField: 'fiveHourResetsAt', gapSteps: 4, now,
   });
   const weeklyPoints = sawtoothHistory({
-    resetsAtIso: weekly.resetsAt, periodMs: 7 * 86_400_000, spanMs: 7 * 86_400_000,
+    resetsAtIso: weekly.resetsAt, periodMs: 7 * 86_400_000, spanMs: 30 * 86_400_000,
     stepMs: 3 * 3_600_000, peakRange: [weekly.usedPercent * 0.5, Math.min(100, weekly.usedPercent * 1.1)],
     rng, field: 'weeklyUsedPercent', resetField: 'weeklyResetsAt', gapSteps: 4, now,
   });
