@@ -320,6 +320,59 @@ async function refreshTopData(get: SpotifyGet, historyStore: SpotifyHistoryStore
   return topData;
 }
 
+function pickTopList<T>(fresh: T[] | undefined, previous: T[] | undefined): T[] {
+  return fresh?.length ? fresh : previous ?? [];
+}
+
+async function recordRecentPlays(recent: RecentlyPlayed, historyStore: SpotifyHistoryStore): Promise<void> {
+  const recentPlays = recent.items
+    .map((entry) => {
+      const track = toPlayedTrackInput(entry.track);
+      return track ? { playedAt: entry.played_at, track } : undefined;
+    })
+    .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
+  await historyStore.recordPlays(recentPlays);
+}
+
+function buildSnapshot(
+  current: CurrentlyPlaying | null,
+  recent: RecentlyPlayed | null | undefined,
+  previousSnapshot: SpotifyData | undefined,
+  topData: TopData | undefined,
+  allTime: SpotifyData['allTime'],
+): SpotifyData {
+  const nowPlaying = current?.item
+    ? {
+        ...mapTrack(current.item),
+        isPlaying: current.is_playing,
+        progressMs: current.progress_ms,
+        durationMs: current.item.duration_ms ?? null,
+      }
+    : null;
+
+  // Spotify occasionally returns a 200 with an empty item list for one time_range while the
+  // others are fully populated (observed for long_term). Treat that as a missed update, not
+  // a real "you have no history" state, so a single flaky response can't wipe out previously
+  // good data — it'll self-heal on the next refresh.
+  return {
+    nowPlaying,
+    recentlyPlayed: recent
+      ? recent.items.map((entry) => ({ ...mapTrack(entry.track), playedAt: entry.played_at }))
+      : previousSnapshot?.recentlyPlayed ?? [],
+    topArtists: {
+      shortTerm: pickTopList<SpotifyData['topArtists']['shortTerm'][number]>(topData?.artistsShort.map(mapArtist), previousSnapshot?.topArtists.shortTerm),
+      mediumTerm: pickTopList<SpotifyData['topArtists']['mediumTerm'][number]>(topData?.artistsMedium.map(mapArtist), previousSnapshot?.topArtists.mediumTerm),
+      longTerm: pickTopList<SpotifyData['topArtists']['longTerm'][number]>(topData?.artistsLong.map(mapArtist), previousSnapshot?.topArtists.longTerm),
+    },
+    topTracks: {
+      shortTerm: pickTopList<SpotifyData['topTracks']['shortTerm'][number]>(topData?.tracksShort.map(mapTrack), previousSnapshot?.topTracks.shortTerm),
+      mediumTerm: pickTopList<SpotifyData['topTracks']['mediumTerm'][number]>(topData?.tracksMedium.map(mapTrack), previousSnapshot?.topTracks.mediumTerm),
+      longTerm: pickTopList<SpotifyData['topTracks']['longTerm'][number]>(topData?.tracksLong.map(mapTrack), previousSnapshot?.topTracks.longTerm),
+    },
+    allTime,
+  };
+}
+
 export function createSpotifyProvider(
   oauth: { clientId: string; clientSecret: string } | undefined,
   snapshotStore: SpotifySnapshotStore,
@@ -347,6 +400,39 @@ export function createSpotifyProvider(
     return Math.min(untilPlaybackEnd, untilRecentReconciliation);
   };
 
+  // Recent history is reconciled independently every 15 minutes (see nextRecentReconciliationAt).
+  const fetchRecentIfDue = async (get: SpotifyGet): Promise<RecentlyPlayed | null | undefined> => {
+    if (Date.now() < nextRecentReconciliationAt) return undefined;
+    const recent = await get<RecentlyPlayed>('/me/player/recently-played?limit=50');
+    nextRecentReconciliationAt = Date.now() + RECENT_RECONCILIATION_MS;
+    return recent;
+  };
+
+  const refreshTopDataIfDue = async (get: SpotifyGet): Promise<boolean> => {
+    if (topDataFetchedAt === 0) topDataFetchedAt = await snapshotStore.getTopDataFetchedAt();
+    if (topDataFetchedAt !== 0 && Date.now() - topDataFetchedAt < TOP_DATA_REFRESH_MS) return false;
+    topData = await refreshTopData(get, historyStore);
+    topDataFetchedAt = Date.now();
+    return true;
+  };
+
+  // Playback state goes stale immediately: replaying an old track as "Now playing" is
+  // misleading. The longer-lived listening data remains useful during the cooldown.
+  // allTime is a pure local DB read with no Spotify API dependency, so recompute it fresh
+  // even while rate-limited — no reason to keep serving a stale all-time leaderboard just
+  // because live playback data can't be fetched right now.
+  const handleFetchError = async (error: unknown): Promise<SpotifyData> => {
+    const lastGoodSnapshot = await snapshotStore.getSnapshot();
+    const rateLimitedUntil = await snapshotStore.getRateLimitedUntil();
+    nextAttemptNotBefore = isRateLimitError(error)
+      ? Math.max(rateLimitedUntil, Date.now() + MIN_PLAYBACK_CHECK_MS)
+      : Date.now() + FAILURE_RETRY_MS;
+    if (lastGoodSnapshot && isRateLimitError(error)) {
+      return { ...lastGoodSnapshot, nowPlaying: null, allTime: await historyStore.getAllTime() };
+    }
+    throw error;
+  };
+
   return {
     id: 'spotify',
     schema: spotifySchema,
@@ -362,102 +448,22 @@ export function createSpotifyProvider(
       try {
         const bearer = await accessToken(oauth, signal);
         const previousSnapshot = await snapshotStore.getSnapshot();
-
-        const get = createSpotifyGet(
-          bearer,
-          signal,
-          snapshotStore,
-          () => accessToken(oauth, signal, true),
-        );
+        const get = createSpotifyGet(bearer, signal, snapshotStore, () => accessToken(oauth, signal, true));
 
         // Playback is checked at the expected track end (with a low-frequency idle guard).
-        // Recent history is reconciled independently every 15 minutes.
         const current = await get<CurrentlyPlaying>('/me/player/currently-playing');
-        const shouldReconcileRecent = Date.now() >= nextRecentReconciliationAt;
-        const recent = shouldReconcileRecent
-          ? await get<RecentlyPlayed>('/me/player/recently-played?limit=50')
-          : undefined;
-        if (shouldReconcileRecent) nextRecentReconciliationAt = Date.now() + RECENT_RECONCILIATION_MS;
+        const recent = await fetchRecentIfDue(get);
+        const topDataRefreshed = await refreshTopDataIfDue(get);
+        if (recent) await recordRecentPlays(recent, historyStore);
 
-        let topDataRefreshed = false;
-        if (topDataFetchedAt === 0) topDataFetchedAt = await snapshotStore.getTopDataFetchedAt();
-        if (topDataFetchedAt === 0 || Date.now() - topDataFetchedAt >= TOP_DATA_REFRESH_MS) {
-          topData = await refreshTopData(get, historyStore);
-          topDataFetchedAt = Date.now();
-          topDataRefreshed = true;
-        }
-
-        if (recent) {
-          const recentPlays = recent.items
-            .map((entry) => {
-              const track = toPlayedTrackInput(entry.track);
-              return track ? { playedAt: entry.played_at, track } : undefined;
-            })
-            .filter((e): e is { playedAt: string; track: PlayedTrackInput } => e !== undefined);
-          await historyStore.recordPlays(recentPlays);
-        }
-
-        const nowPlaying =
-          current?.item
-            ? {
-                ...mapTrack(current.item),
-                isPlaying: current.is_playing,
-                progressMs: current.progress_ms,
-                durationMs: current.item.duration_ms ?? null,
-              }
-            : null;
-
-        // Spotify occasionally returns a 200 with an empty item list for one time_range while the
-        // others are fully populated (observed for long_term). Treat that as a missed update, not
-        // a real "you have no history" state, so a single flaky response can't wipe out previously
-        // good data — it'll self-heal on the next refresh.
-        const freshArtistsShort = topData?.artistsShort.map(mapArtist);
-        const freshArtistsMedium = topData?.artistsMedium.map(mapArtist);
-        const freshArtistsLong = topData?.artistsLong.map(mapArtist);
-        const freshTracksShort = topData?.tracksShort.map(mapTrack);
-        const freshTracksMedium = topData?.tracksMedium.map(mapTrack);
-        const freshTracksLong = topData?.tracksLong.map(mapTrack);
-
-        const snapshot = {
-          nowPlaying,
-          recentlyPlayed: recent
-            ? recent.items.map((entry) => ({
-                ...mapTrack(entry.track),
-                playedAt: entry.played_at,
-              }))
-            : previousSnapshot?.recentlyPlayed ?? [],
-          topArtists: {
-            shortTerm: freshArtistsShort?.length ? freshArtistsShort : previousSnapshot?.topArtists.shortTerm ?? [],
-            mediumTerm: freshArtistsMedium?.length ? freshArtistsMedium : previousSnapshot?.topArtists.mediumTerm ?? [],
-            longTerm: freshArtistsLong?.length ? freshArtistsLong : previousSnapshot?.topArtists.longTerm ?? [],
-          },
-          topTracks: {
-            shortTerm: freshTracksShort?.length ? freshTracksShort : previousSnapshot?.topTracks.shortTerm ?? [],
-            mediumTerm: freshTracksMedium?.length ? freshTracksMedium : previousSnapshot?.topTracks.mediumTerm ?? [],
-            longTerm: freshTracksLong?.length ? freshTracksLong : previousSnapshot?.topTracks.longTerm ?? [],
-          },
-          allTime: await historyStore.getAllTime(),
-        };
+        const snapshot = buildSnapshot(current, recent, previousSnapshot, topData, await historyStore.getAllTime());
         // Best-effort: a dropped snapshot write must not discard the live data already in hand
         // (and must not be mistaken for a rate-limit failure by the catch block below).
         await snapshotStore.setSnapshot(snapshot, topDataRefreshed ? topDataFetchedAt : undefined).catch(() => undefined);
         nextAttemptNotBefore = 0;
         return snapshot;
       } catch (error) {
-        const lastGoodSnapshot = await snapshotStore.getSnapshot();
-        const rateLimitedUntil = await snapshotStore.getRateLimitedUntil();
-        nextAttemptNotBefore = isRateLimitError(error)
-          ? Math.max(rateLimitedUntil, Date.now() + MIN_PLAYBACK_CHECK_MS)
-          : Date.now() + FAILURE_RETRY_MS;
-        // Playback state goes stale immediately: replaying an old track as "Now playing" is
-        // misleading. The longer-lived listening data remains useful during the cooldown.
-        // allTime is a pure local DB read with no Spotify API dependency, so recompute it fresh
-        // even while rate-limited — no reason to keep serving a stale all-time leaderboard just
-        // because live playback data can't be fetched right now.
-        if (lastGoodSnapshot && isRateLimitError(error)) {
-          return { ...lastGoodSnapshot, nowPlaying: null, allTime: await historyStore.getAllTime() };
-        }
-        throw error;
+        return await handleFetchError(error);
       }
     },
   };
