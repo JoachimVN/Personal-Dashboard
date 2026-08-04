@@ -2,7 +2,7 @@ import type { AiUsageToolData } from '@personal-dashboard/shared';
 import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { isWidgetDisabled, WidgetBody } from '../../components/WidgetCard';
-import { UsageLane } from './UsageMeter';
+import { FIVE_HOUR_MS, UsageLane, WEEKLY_MS } from './UsageMeter';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
 import type { ToolIconProps } from './ToolIcons';
@@ -57,12 +57,16 @@ function ToolRow({
                 value={limitLabel(data.fiveHour, data.fiveHourStatus, data.tokens?.fiveHour)}
                 percent={data.fiveHour?.usedPercent}
                 color={fastColor}
+                resetsAt={data.fiveHour?.resetsAt}
+                windowMs={FIVE_HOUR_MS}
               />
               <UsageLane
                 label="week"
                 value={limitLabel(data.weekly, data.weeklyStatus, data.tokens?.weekly)}
                 percent={data.weekly?.usedPercent}
                 color={color}
+                resetsAt={data.weekly?.resetsAt}
+                windowMs={WEEKLY_MS}
               />
               {data.modelWeekly && (
                 <UsageLane
@@ -70,6 +74,8 @@ function ToolRow({
                   value={`${Math.round(data.modelWeekly.usedPercent)}%`}
                   percent={data.modelWeekly.usedPercent}
                   color={modelColor}
+                  resetsAt={data.modelWeekly.resetsAt}
+                  windowMs={WEEKLY_MS}
                 />
               )}
             </div>
