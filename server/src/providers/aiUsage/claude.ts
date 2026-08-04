@@ -247,12 +247,12 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
       });
       let terminal = '';
       let settled = false;
+      let typed = false;
+      let submitted = false;
       let settleTimer: NodeJS.Timeout | undefined;
       const finish = (result?: string, error?: Error) => {
         if (settled) return;
         settled = true;
-        clearTimeout(sendUsage);
-        clearTimeout(sendEnter);
         clearTimeout(timeout);
         clearTimeout(settleTimer);
         try {
@@ -263,31 +263,45 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
         if (error) reject(error);
         else resolve(result ?? terminal);
       };
-      // Writing '/usage\r' in one chunk races the CLI's own keystroke handling: Enter can submit
-      // before the slash-command autocomplete has finished registering the typed text, leaving the
-      // session stuck on the suggestions dropdown (never rendering the Usage screen) until the hard
-      // timeout below fires. Giving the dropdown a moment to settle before Enter avoids that race.
-      let sendEnter: NodeJS.Timeout | undefined;
-      const sendUsage = setTimeout(() => {
-        pty.write('/usage');
-        sendEnter = setTimeout(() => {
-          if (!settled) pty.write('\r');
-        }, 500);
-      }, 2_000);
       const timeout = setTimeout(() => finish(undefined, new Error('Claude Usage screen timed out')), 35_000);
-      pty.onData((chunk) => {
-        terminal += chunk;
+      // The CLI's own render pace (boot, the slash-command autocomplete, and the Usage screen
+      // itself) varies with system load on a machine that's also running everything else this
+      // dashboard polls — a fixed delay before typing or before Enter loses the race under load
+      // (confirmed live: sometimes Enter fired before typing was registered, leaving the session
+      // stuck on the autocomplete dropdown; sometimes the typed text never landed at all within
+      // 35s). Acting only once the terminal has gone genuinely quiet — and verifying each step
+      // actually landed before advancing, retrying if not — adapts to however slow this run
+      // happens to be instead of guessing a fixed number that's sometimes wrong.
+      const advance = () => {
+        const text = stripTerminalControls(terminal);
+        if (!typed) {
+          typed = true;
+          pty.write('/usage');
+          return;
+        }
+        if (!submitted) {
+          if (!text.includes('/usage')) {
+            // Previous write may not have landed yet — retry rather than assume it's lost. Ctrl+U
+            // clears any partial line first, so a slow-but-not-lost echo can't leave "/usage/usage".
+            pty.write('\x15/usage');
+            return;
+          }
+          submitted = true;
+          pty.write('\r');
+          return;
+        }
         // Re-arm on every chunk, not just ones that parse cleanly. The Usage screen redraws in
         // place as data streams in, and a redraw's header line can land in an earlier chunk than
-        // its percentage line; debouncing only on successful parses left a stale timer free to
-        // fire mid-redraw, capturing a header with no digits yet — which the parser reads as an
+        // its percentage line; checking only on successful parses left a stale timer free to fire
+        // mid-redraw, capturing a header with no digits yet — which the parser reads as an
         // explicit "no limit" instead of "still rendering" (see parseClaudeUsageScreen/limitStatus).
-        // Waiting for genuine quiet, then re-checking, avoids freezing on that half-drawn state.
+        const quota = parseClaudeUsageScreen(terminal);
+        if (quota.fiveHour && quota.weekly) finish(terminal);
+      };
+      pty.onData((chunk) => {
+        terminal += chunk;
         clearTimeout(settleTimer);
-        settleTimer = setTimeout(() => {
-          const quota = parseClaudeUsageScreen(terminal);
-          if (quota.fiveHour && quota.weekly) finish(terminal);
-        }, 750);
+        settleTimer = setTimeout(advance, 500);
       });
       pty.onExit(() => {
         // Claude can close immediately after the final screen paint. Use the bytes already
