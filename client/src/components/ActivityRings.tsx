@@ -88,15 +88,22 @@ function RingPaint({
   // `reveal` is the whole ring's raw progress (0 up to totalProgress); this
   // lap only cares about its own clamped 0-1 slice of it.
   const strokeDashoffset = useTransform(reveal, (r) => circumference * (1 - clamp01(r - lapIndex)));
-  // Every lap in an overflow ring shares the SAME rotation (the ring's overall
-  // phase, not a per-lap one). A completed lap is always fully covered by
-  // whatever's painted on top of it, so its own colors are never actually
-  // seen — only the shared rotation matters, and using it uniformly makes the
-  // whole visible ring (peek-through + current lap, wherever the seam falls)
-  // read as one continuous dark→light sweep with no reset at any boundary.
   const capAngle = seamUnderTip ? 0 : Math.asin(Math.min(strokeWidth / 2 / radius, 1)) * (180 / Math.PI);
-  const phaseAngle = phase * 360 + capAngle + 90;
-  const gradient = `conic-gradient(from ${phaseAngle}deg at 50% 50%, ${start} 0deg, ${start} 7deg, ${end} 345deg, ${end} 360deg)`;
+  // Overflow rings lock the gradient's rotation to the LIVE sweep position
+  // (reveal's fractional part — the same value driving the tip's angle),
+  // not the final target phase. The gradient has one hard dark/light seam;
+  // it must always sit under the moving tip. With a rotation fixed to the
+  // final phase, a completed lap's mask sweeps a full 0→360 revolution,
+  // inevitably crossing that fixed seam angle before the tip catches up to
+  // it — "printing" the seam onto the ring, uncovered, until the next lap's
+  // tip sweeps back around to it. Keeping every lap's rotation tied to the
+  // current tip instead means the seam moves with the tip and is never
+  // exposed, at any point during the animation, not just at rest.
+  const gradient = useTransform(reveal, (r) => {
+    const livePhase = seamUnderTip ? r % 1 : phase;
+    const phaseAngle = livePhase * 360 + capAngle + 90;
+    return `conic-gradient(from ${phaseAngle}deg at 50% 50%, ${start} 0deg, ${start} 7deg, ${end} 345deg, ${end} 360deg)`;
+  });
 
   return (
     <>
@@ -117,7 +124,7 @@ function RingPaint({
         />
       </mask>
       <foreignObject x="0" y="0" width="120" height="120" mask={`url(#${maskId})`}>
-        <div style={{ width: 120, height: 120, background: gradient }} />
+        <motion.div style={{ width: 120, height: 120, background: gradient }} />
       </foreignObject>
     </>
   );
