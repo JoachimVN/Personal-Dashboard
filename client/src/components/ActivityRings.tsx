@@ -145,7 +145,7 @@ function RingPaint({
 // arc. Deriving it from the next point keeps the scale right for every ring
 // radius; a small clockwise bias matches the native-looking angle.
 function overflowShadowFilter(tipAngle: number, radius: number, shadowColor: string) {
-  const shadowAngle = tipAngle + Math.PI * 2 * 0.0075;
+  const shadowAngle = tipAngle + Math.PI * 2 * 0.016;
   const shadowDistance = radius * Math.hypot(
     Math.cos(shadowAngle) - Math.cos(tipAngle),
     Math.sin(shadowAngle) - Math.sin(tipAngle),
@@ -156,8 +156,12 @@ function overflowShadowFilter(tipAngle: number, radius: number, shadowColor: str
   ) + (Math.PI / 36);
   const shadowX = shadowDistance * Math.cos(shadowDirection);
   const shadowY = shadowDistance * Math.sin(shadowDirection);
-  const shadowTint = `light-dark(color-mix(in srgb, ${shadowColor} 38%, transparent), color-mix(in srgb, ${shadowColor} 62%, transparent))`;
-  return `drop-shadow(${shadowX}px ${shadowY}px 1.2px ${shadowTint})`;
+  const shadowTint = `light-dark(color-mix(in srgb, ${shadowColor} 48%, transparent), color-mix(in srgb, ${shadowColor} 76%, transparent))`;
+  // The offset above has to clear the blur radius by enough margin that the
+  // Gaussian falloff doesn't wrap back over the tip's trailing (non-edge)
+  // side — too small a gap and the "shadow" shows up faintly on both sides
+  // instead of only the leading one.
+  return `drop-shadow(${shadowX}px ${shadowY}px 0.8px ${shadowTint})`;
 }
 
 // The tip dot is a single element for the whole ring (not one per lap): its
