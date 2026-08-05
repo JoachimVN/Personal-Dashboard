@@ -88,6 +88,14 @@ function RingPaint({
   // `reveal` is the whole ring's raw progress (0 up to totalProgress); this
   // lap only cares about its own clamped 0-1 slice of it.
   const strokeDashoffset = useTransform(reveal, (r) => circumference * (1 - clamp01(r - lapIndex)));
+  // The butt cap below flattens BOTH ends of the arc — the growing tip (where
+  // we want that, to avoid doubling up with OverflowTipCap) and the fixed
+  // start point at angle 0 (where we don't: nothing else rounds it off, so it
+  // reads as a flat edge right at the beginning of the sweep). Round just the
+  // start with a small stationary circle, gated so it only appears once this
+  // lap has actually started revealing — otherwise it'd show as a stray dot
+  // sitting at 0%.
+  const startCapOpacity = useTransform(reveal, (r) => (clamp01(r - lapIndex) > 0 ? 1 : 0));
   const capAngle = seamUnderTip ? 0 : Math.asin(Math.min(strokeWidth / 2 / radius, 1)) * (180 / Math.PI);
   // Overflow rings lock the gradient's rotation to the LIVE sweep position
   // (reveal's fractional part — the same value driving the tip's angle),
@@ -122,6 +130,9 @@ function RingPaint({
           strokeDasharray={circumference}
           style={{ strokeDashoffset }}
         />
+        {seamUnderTip && (
+          <motion.circle cx={60 + radius} cy="60" r={strokeWidth / 2} fill="white" style={{ opacity: startCapOpacity }} />
+        )}
       </mask>
       <foreignObject x="0" y="0" width="120" height="120" mask={`url(#${maskId})`}>
         <motion.div style={{ width: 120, height: 120, background: gradient }} />
