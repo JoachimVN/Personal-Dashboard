@@ -241,9 +241,11 @@ function RingGroup({
     <g transform="rotate(-90 60 60)">
       {outline && <circle cx="60" cy="60" r={ring.radius} fill="none" strokeWidth={strokeWidth + 2} style={{ stroke: 'light-dark(transparent, #090c10)' }} />}
       <circle cx="60" cy="60" r={ring.radius} fill="none" strokeWidth={strokeWidth} style={{ stroke: ring.track }} />
+      {/* index-as-key is safe here: ringLaps only grows/shrinks at the array's
+          tail, so a lap's index is also its stable lap number. */}
       {laps.map((_progress, lapIndex) => (
         <RingPaint
-          key={lapIndex}
+          key={lapIndex} // NOSONAR: typescript:S6479 — index is the lap's real identity, see comment above
           maskId={`${maskIdPrefix}-lap-${lapIndex}-mask`}
           radius={ring.radius}
           strokeWidth={strokeWidth}
