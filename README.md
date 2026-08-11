@@ -454,7 +454,7 @@ the URL:
 
 Three things that reliably go wrong here:
 
-- **The `Bearer ` prefix is part of the header value.** The word `Bearer`, one space, then the token.
+- **The `Bearer` prefix is part of the header value.** The word `Bearer`, one space, then the token.
   A bare token is not a bearer credential and returns `401 unauthorized`. iOS also capitalises the
   first character of a text field, which silently corrupts a token starting with a lowercase letter —
   paste the value rather than typing it.
@@ -479,6 +479,39 @@ that token is the only thing in front of it. It's the one route the service expo
 write `health_days`, but treat the token like any other secret in `server/.env`. Skip this whole
 section if you'd rather keep every ingress on the tailnet — the rolling window above still makes
 outages self-healing.
+
+## GitHub webhook (optional)
+
+The GitHub widget polls, so a push shows up whenever its interval comes round. If you also run the
+always-on ingest service, GitHub can tell it the moment something happens instead.
+
+Set `GITHUB_WEBHOOK_SECRET` on the Railway service to a random string — without it the route isn't
+mounted at all, so an installation that never set one up has no unauthenticated GitHub surface
+sitting there. Then, per repository, **Settings** → **Webhooks** → **Add webhook**:
+
+| field | value |
+| --- | --- |
+| Payload URL | `https://<service>.up.railway.app/api/github/webhook` |
+| Content type | `application/json` — the default `x-www-form-urlencoded` will not work |
+| Secret | the same `GITHUB_WEBHOOK_SECRET` |
+| SSL verification | enabled |
+| Events | *Let me select individual events* |
+
+Tick pushes, pull requests, pull request reviews and review comments, issues, issue comments, branch
+or tag creation and deletion, releases, forks, stars, watches, and repositories. Not *send me
+everything*: on a repo with CI, `check_run` and `workflow_run` fire constantly and change nothing
+the dashboard shows. Those are ignored server-side too (`IGNORED_GITHUB_EVENTS`), so a stray tick
+cannot cause a refresh storm.
+
+The webhook is a **cache-invalidation signal, not a data source**. A verified event is archived
+under `source = 'github-webhook'`, then announced on the `provider_refresh` channel so every
+dashboard re-polls the GitHub API — which already knows how to assemble its own payload. That
+avoids modelling every GitHub event shape, and means the widget updates rather than diverging from
+what the API would say. Requests are acknowledged before the announcement, because GitHub times out
+at 10 seconds and retries.
+
+Webhooks only fire for repositories you administer, so this **supplements** polling rather than
+replacing it; activity on other people's repos still arrives on the usual interval.
 
 ## Stored history
 
