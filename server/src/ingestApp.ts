@@ -38,8 +38,10 @@ export function createIngestApp(options: {
   store: HealthIngestSink;
   timezone: string;
   token: string;
+  /** Announces the write so dashboards refresh now rather than on their next poll. */
+  onIngested?: (dayCount: number) => Promise<void>;
 }): Express {
-  const { store, timezone, token } = options;
+  const { store, timezone, token, onIngested } = options;
   const app = express();
   app.disable('x-powered-by');
   // A 31-day window of numbers is a few KB; nothing legitimate reaching this route is larger.
@@ -72,6 +74,8 @@ export function createIngestApp(options: {
       res.status(503).json({ error: 'ingest-failed' });
       return;
     }
+    // One announcement per request, not per day: a 31-day window is a single event to react to.
+    await onIngested?.(samples.length);
     res.json({ ok: true, days: samples.length });
   });
 

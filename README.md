@@ -415,8 +415,16 @@ The rolling window covers an outage, but the Shortcut still has to name one mach
 fails outright whenever that machine is asleep. Storage is not what goes down — every dashboard
 already shares one Railway Postgres — so `server/src/ingest.ts` runs the ingest route, and nothing
 else, as its own always-on Railway service. Point the Shortcut at it once and it stops caring which
-machine is awake; rows appear on each dashboard at its next `health` poll (up to 5 minutes) rather
-than instantly, since the local `scheduler.refresh('health')` shortcut isn't in the path.
+machine is awake.
+
+The service has no route back to a dashboard — they sit on a tailnet and are usually asleep — so it
+announces each write through the one thing every installation shares, the database. It issues a
+Postgres `NOTIFY` on the `health_ingest` channel and each dashboard holds a matching `LISTEN`,
+refreshing the health and command-center providers on arrival instead of waiting out the 5-minute
+poll. Delivery is a single round trip (~170 ms against Railway), coalesced over a second so a
+31-day window causes one refresh rather than 31. Announcements are best-effort: a failed one costs
+freshness, never the ingest, because the poll still catches up. A dashboard also refreshes whenever
+it subscribes, so one that was asleep or lost its connection picks up whatever it missed on rejoin.
 
 Deploy it as a second service in the **same Railway project** as the Postgres:
 

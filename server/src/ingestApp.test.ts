@@ -16,8 +16,11 @@ class RecordingSink implements HealthIngestSink {
 
 let running: Server | undefined;
 
-async function start(sink: HealthIngestSink): Promise<string> {
-  const app = createIngestApp({ store: sink, timezone: 'Europe/Oslo', token: TOKEN });
+async function start(
+  sink: HealthIngestSink,
+  onIngested?: (dayCount: number) => Promise<void>,
+): Promise<string> {
+  const app = createIngestApp({ store: sink, timezone: 'Europe/Oslo', token: TOKEN, onIngested });
   running = await new Promise<Server>((resolve) => {
     const server = app.listen(0, '127.0.0.1', () => resolve(server));
   });
@@ -133,6 +136,47 @@ describe('createIngestApp', () => {
     expect(JSON.parse(body)).toEqual({ error: 'ingest-failed' });
     expect(body).not.toContain('secret');
     consoleError.mockRestore();
+  });
+
+  it('announces the write once per request, not once per day', async () => {
+    const announced: number[] = [];
+    const baseUrl = await start(new RecordingSink(), async (dayCount) => {
+      announced.push(dayCount);
+    });
+
+    await post(baseUrl, {
+      days: [
+        { date: '2026-08-09', watchSteps: 1 },
+        { date: '2026-08-10', watchSteps: 2 },
+      ],
+    });
+
+    expect(announced).toEqual([2]);
+  });
+
+  it('does not announce a request that stored nothing', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const announced: number[] = [];
+    const record = async (dayCount: number) => {
+      announced.push(dayCount);
+    };
+
+    const rejecting = await start({ ingest: () => Promise.reject(new Error('nope')) }, record);
+    await post(rejecting, { watchSteps: 1 });
+    expect(announced).toEqual([]);
+    consoleError.mockRestore();
+  });
+
+  it('does not announce a rejected or malformed request', async () => {
+    const announced: number[] = [];
+    const baseUrl = await start(new RecordingSink(), async (dayCount) => {
+      announced.push(dayCount);
+    });
+
+    await post(baseUrl, { watchSteps: 1 }, null);
+    await post(baseUrl, { watchSteps: 'lots' });
+
+    expect(announced).toEqual([]);
   });
 
   it('serves an unauthenticated liveness probe for the platform healthcheck', async () => {

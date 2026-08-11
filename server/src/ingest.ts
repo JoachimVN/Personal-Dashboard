@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { createDatabase } from './db/client.js';
 import { migrateDatabase } from './db/migrate.js';
 import { HealthStore } from './healthStore.js';
+import { notifyHealthIngest } from './healthNotify.js';
 import { createIngestApp } from './ingestApp.js';
 
 /**
@@ -46,7 +47,12 @@ try {
   process.exit(1);
 }
 
-const app = createIngestApp({ store: new HealthStore(database), timezone, token });
+const app = createIngestApp({
+  store: new HealthStore(database),
+  timezone,
+  token,
+  onIngested: (dayCount) => notifyHealthIngest(database, dayCount),
+});
 // 0.0.0.0, not loopback: Railway routes external traffic to the container's published port.
 app.listen(port, '0.0.0.0', () => {
   console.log(`[ingest] health ingest listening on 0.0.0.0:${port} (timezone ${timezone})`);

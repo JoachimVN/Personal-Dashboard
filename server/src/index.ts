@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { z } from 'zod';
 import { parseHealthIngestBody } from './healthIngest.js';
+import { listenForHealthIngest, notifyHealthIngest } from './healthNotify.js';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { createDatabase } from './db/client.js';
@@ -161,6 +162,9 @@ app.post('/api/health/ingest', async (req, res) => {
   }
   await scheduler.refresh('health'); // reflect the new samples immediately, not on the next 5-min poll
   await scheduler.refresh('command-center');
+  // This dashboard is already up to date; the announcement is for the other installations, which
+  // only learn about a write through the database they share.
+  await notifyHealthIngest(database, samples.length);
   res.json({ ok: true });
 });
 
@@ -266,6 +270,15 @@ if (env.isProduction) {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
+
+// A Shortcut posting to the always-on ingest service writes straight to the shared database, which
+// this process would otherwise not notice until the health provider's next 5-minute poll.
+await listenForHealthIngest(database, () => {
+  void scheduler.refresh('health');
+  void scheduler.refresh('command-center');
+}).catch((error) => {
+  console.error('[health] ingest announcements unavailable, falling back to polling:', error);
+});
 
 const server = app.listen(env.port, env.host, () => {
   console.log(`Dashboard server on http://${env.host}:${env.port} (${env.timezone})`);
