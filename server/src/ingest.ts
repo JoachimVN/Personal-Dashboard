@@ -4,6 +4,7 @@ import { migrateDatabase } from './db/migrate.js';
 import { HealthStore } from './healthStore.js';
 import { SignalHistoryStore } from './signalHistory.js';
 import { notifyProviderRefresh } from './refreshNotify.js';
+import { describeGithubWebhookEvent, githubActivityPushUrl } from './githubWebhook.js';
 import { createIngestApp } from './ingestApp.js';
 
 /**
@@ -53,6 +54,31 @@ try {
 const githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET || undefined;
 const signalHistory = new SignalHistoryStore(database);
 
+// Optional second hop: relay recognized events to the pushed-activity sink. The dashboards already
+// push other live signals there, but they sleep — sending from here is the first signal that keeps
+// flowing when both machines are off.
+const pushUrl = process.env.DASHBOARD_PUSH_URL;
+const pushSecret = process.env.DASHBOARD_PUSH_SECRET;
+
+async function forwardGithubActivity(eventName: string, payload: unknown): Promise<void> {
+  if (!pushUrl || !pushSecret) return;
+  const activity = describeGithubWebhookEvent(eventName, payload);
+  if (!activity) return; // unrecognized shape — better to send nothing than something wrong
+  try {
+    const response = await fetch(githubActivityPushUrl(pushUrl), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${pushSecret}` },
+      body: JSON.stringify(activity),
+      // GitHub treats a delivery as failed after ~10s and retries it, so this hop must not be
+      // allowed to consume that budget — the event is already archived and announced regardless.
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!response.ok) console.error(`[ingest] activity push rejected the event: ${response.status}`);
+  } catch (error) {
+    console.error('[ingest] could not forward GitHub activity:', error);
+  }
+}
+
 const app = createIngestApp({
   store: new HealthStore(database),
   timezone,
@@ -66,6 +92,7 @@ const app = createIngestApp({
     // GitHub event shape.
     await signalHistory.record('github-webhook', eventName, payload as never);
     await notifyProviderRefresh(database, 'github');
+    await forwardGithubActivity(eventName, payload);
   },
 });
 // 0.0.0.0, not loopback: Railway routes external traffic to the container's published port.

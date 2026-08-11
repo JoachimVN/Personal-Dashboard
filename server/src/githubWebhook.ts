@@ -47,3 +47,95 @@ export const IGNORED_GITHUB_EVENTS = new Set([
 export function shouldRefreshFor(eventName: string | undefined): boolean {
   return Boolean(eventName) && !IGNORED_GITHUB_EVENTS.has(eventName!);
 }
+
+/** One activity line, matching what the pushed-activity consumer renders. */
+export interface GithubActivity {
+  action: string;
+  repo: string;
+  timestamp: string;
+}
+
+interface WebhookPayload {
+  action?: string;
+  ref?: string;
+  ref_type?: string;
+  repository?: { full_name?: string };
+  commits?: unknown[];
+  head_commit?: { timestamp?: string };
+  pull_request?: { number?: number; updated_at?: string };
+  issue?: { number?: number; updated_at?: string };
+  release?: { tag_name?: string; published_at?: string };
+}
+
+const branchOf = (ref: string | undefined) => ref?.replace(/^refs\/heads\//, '') ?? 'a branch';
+
+/**
+ * Maps a raw webhook payload to an activity line. This is the webhook shape, which differs from
+ * the Events API shape `providers/github.ts` already handles — same concepts, different envelope.
+ *
+ * Returns `undefined` for anything unrecognized rather than inventing a line, so a newly subscribed
+ * event type shows nothing instead of something wrong.
+ */
+export function describeGithubWebhookEvent(
+  eventName: string,
+  payload: unknown,
+): GithubActivity | undefined {
+  const p = (payload ?? {}) as WebhookPayload;
+  const repo = p.repository?.full_name;
+  if (!repo) return undefined;
+  const at = (value: string | undefined) => value ?? new Date().toISOString();
+
+  switch (eventName) {
+    case 'push': {
+      const count = p.commits?.length ?? 0;
+      if (count === 0) return undefined; // branch deletions and no-op pushes carry no commits
+      return {
+        action: `pushed ${count} commit${count === 1 ? '' : 's'} to ${branchOf(p.ref)}`,
+        repo,
+        timestamp: at(p.head_commit?.timestamp),
+      };
+    }
+    case 'pull_request':
+      return {
+        action: `${p.action ?? 'updated'} pull request #${p.pull_request?.number ?? '?'}`,
+        repo,
+        timestamp: at(p.pull_request?.updated_at),
+      };
+    case 'issues':
+      return {
+        action: `${p.action ?? 'updated'} issue #${p.issue?.number ?? '?'}`,
+        repo,
+        timestamp: at(p.issue?.updated_at),
+      };
+    case 'issue_comment':
+      return {
+        action: `commented on #${p.issue?.number ?? '?'}`,
+        repo,
+        timestamp: at(p.issue?.updated_at),
+      };
+    case 'create':
+      return {
+        action: `created ${p.ref_type ?? 'ref'} ${p.ref ?? ''}`.trim(),
+        repo,
+        timestamp: at(undefined),
+      };
+    case 'release':
+      return {
+        action: `${p.action ?? 'updated'} release ${p.release?.tag_name ?? ''}`.trim(),
+        repo,
+        timestamp: at(p.release?.published_at),
+      };
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The GitHub activity sink sits alongside the existing push endpoint, so it is derived from
+ * `DASHBOARD_PUSH_URL` rather than configured separately — one URL to keep correct, not two.
+ */
+export function githubActivityPushUrl(pushUrl: string): string {
+  const url = new URL(pushUrl);
+  url.pathname = `${url.pathname.replace(/\/+$/, '')}/github`;
+  return url.toString();
+}
