@@ -170,7 +170,9 @@ function parseUsageWindow(section: string, now: Date) {
   // 12am" (current) — accept the separator as "at", a comma, or nothing so the newer comma format
   // still parses. Without a reset the whole window is dropped, which stalls the interactive probe's
   // "both windows parsed" finish check until it times out and discards an otherwise-complete screen.
-  const datedReset = /Resets\s*([a-z]{3})\s*(\d{1,2})\s*(?:at|,)?\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
+  // The separator is one `[\s,]*` run around an optional literal "at" rather than two `\s*` runs
+  // straddling it — the latter can split a space run two ways, which backtracks super-linearly.
+  const datedReset = /Resets[\s,]*([a-z]{3})[\s,]*(\d{1,2})[\s,]*(?:at[\s,]*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
   const timeOnlyReset = /Resets\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
   if (!used || (!datedReset && !timeOnlyReset)) return undefined;
   const resetsAt = datedReset
