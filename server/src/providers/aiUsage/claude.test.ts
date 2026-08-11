@@ -224,6 +224,27 @@ describe('parseClaudeUsageScreen', () => {
     expect(quota.weeklyStatus).toBe('limited');
   });
 
+  it('parses the newer comma-separated weekly reset format ("Aug 16, 12am")', () => {
+    // Current Claude renders the weekly reset as "Resets Aug 16, 12am" (comma, no "at") while the
+    // 5-hour window stays "Resets 4pm". The older "Aug 16 at 12am" form must keep working too. A
+    // weekly window that fails to parse here stalls the interactive probe's "both windows parsed"
+    // finish check until it times out and discards an otherwise-complete screen.
+    const quota = parseClaudeUsageScreen(
+      `Current session
+      ██████████████████████44% used
+      Resets 4pm (Europe/Oslo)
+
+      Current week (all models)
+      ███6% used
+      Resets Aug 16, 12am (Europe/Oslo)`,
+      new Date(2026, 7, 10, 12, 0),
+    );
+
+    expect(quota.fiveHour?.usedPercent).toBe(44);
+    expect(quota.weekly).toEqual({ usedPercent: 6, resetsAt: new Date(2026, 7, 16, 0, 0).toISOString() });
+    expect(quota.weeklyStatus).toBe('limited');
+  });
+
   it('backdates asOf when the screen reports rate-limited last-known usage instead of a live read', () => {
     const now = new Date(2026, 6, 17, 18, 0);
     const quota = parseClaudeUsageScreen(

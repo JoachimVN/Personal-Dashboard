@@ -12,7 +12,9 @@ import {
   jsonlFiles,
   limit,
   limitStatus,
+  localBinExecutable,
   MONTH_ABBREVIATIONS,
+  ptyProbeEnv,
   recordHistorySafely,
   stripTerminalControls,
   type UsageSnapshot,
@@ -225,15 +227,14 @@ export async function codexInteractiveStatusSnapshot(): Promise<
   Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>
 > {
   try {
-    const localBin = path.join(os.homedir(), '.local/bin');
     await ensurePtySpawnHelper();
     const output = await new Promise<string>((resolve, reject) => {
-      const pty = spawnPty(path.join(localBin, 'codex'), [], {
+      const pty = spawnPty(localBinExecutable('codex'), [], {
         name: 'xterm-256color',
         cols: 160,
         rows: 48,
         cwd: process.cwd(),
-        env: { ...process.env, TERM: 'xterm-256color', PATH: `${localBin}:${process.env.PATH ?? ''}` },
+        env: ptyProbeEnv(process.env),
       });
       let terminal = '';
       let settled = false;
