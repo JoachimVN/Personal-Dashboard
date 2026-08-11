@@ -424,21 +424,47 @@ Deploy it as a second service in the **same Railway project** as the Postgres:
    healthcheck; no build step runs, because the service executes TypeScript through `tsx`.
 2. Variables: `DATABASE_URL` (use the **internal** `postgres.railway.internal` URL — this service
    runs inside Railway, so it doesn't need the public proxy) and `HEALTH_INGEST_TOKEN`, a random
-   string of at least 24 characters. The service refuses to start without both.
+   string of at least 24 characters. The service refuses to start without both, so setting them
+   after the first deploy means redeploying.
 3. Also set `NIXPACKS_INSTALL_CMD=npm ci --omit=dev`. The ingest service needs only `express`,
    `postgres`, `drizzle-orm`, `dotenv`, `zod` and `tsx`; the default `npm ci` additionally pulls in
    Playwright, Vitest and the client's toolchain — roughly 400 packages that only slow the build
    down and give it more ways to fail.
 4. **Settings** → **Networking** → **Generate Domain**.
+5. Confirm the start command is `npm run start:ingest -w server` and not the dashboard's `npm start`,
+   which would try to boot every provider and fail on the credentials this service doesn't have.
 
-Then change the Shortcut's **Get Contents of URL** to
-`POST https://<service>.up.railway.app/api/health/ingest` with a header
-`Authorization: Bearer <HEALTH_INGEST_TOKEN>`.
+Then repoint every Shortcut's **Get Contents of URL** — tap **Show More** to reach the fields below
+the URL:
+
+| field | value |
+| --- | --- |
+| URL | `https://<service>.up.railway.app/api/health/ingest` |
+| Method | `POST` |
+| Headers | Key `Authorization`, Text `Bearer <HEALTH_INGEST_TOKEN>` |
+| Request Body | `JSON`, set to the dictionary as before |
+
+Three things that reliably go wrong here:
+
+- **The `Bearer ` prefix is part of the header value.** The word `Bearer`, one space, then the token.
+  A bare token is not a bearer credential and returns `401 unauthorized`. iOS also capitalises the
+  first character of a text field, which silently corrupts a token starting with a lowercase letter —
+  paste the value rather than typing it.
+- **The path has to end in `/api/health/ingest`.** `/api/health` is the liveness probe: it answers
+  `{"ok":true}` and discards the body, so a Shortcut aimed there appears to succeed while storing
+  nothing. A trailing slash on `/ingest/` is harmless.
+- **Getting `{"error":"unauthorized"}` back means the request arrived**, so the URL and method are
+  already right and only the header is wrong. A network-level failure looks different — iOS reports
+  it as "the network connection was lost".
+
+The phone no longer needs Tailscale up for health posts once this is in place, so the Shortcut also
+works on cellular with the VPN off.
 
 `node-pty` is an **optional** dependency for this reason: it ships prebuilds for macOS and Windows
 but not `linux-x64`, where it falls back to compiling against a Python toolchain the build image
-doesn't have. Only the AI-usage probes import it, and they never run on Linux, so a Linux install
-skips it rather than failing outright.
+doesn't have — `npm ci` dies on a missing Python and takes the whole build with it. Only the AI-usage
+probes import it, and they never run on Linux, so a Linux install skips it rather than failing
+outright.
 
 ⚠️ Unlike the dashboards, this endpoint is on the public internet rather than behind Tailscale, so
 that token is the only thing in front of it. It's the one route the service exposes and it can only
