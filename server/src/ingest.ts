@@ -2,6 +2,8 @@ import 'dotenv/config';
 import { createDatabase } from './db/client.js';
 import { migrateDatabase } from './db/migrate.js';
 import { HealthStore } from './healthStore.js';
+import { SignalHistoryStore } from './signalHistory.js';
+import { notifyProviderRefresh } from './refreshNotify.js';
 import { createIngestApp } from './ingestApp.js';
 
 /**
@@ -46,7 +48,26 @@ try {
   process.exit(1);
 }
 
-const app = createIngestApp({ store: new HealthStore(database), timezone, token });
+// Optional: without it the webhook route is not mounted at all, so a dashboard that never set one
+// up has no unauthenticated GitHub surface sitting there.
+const githubWebhookSecret = process.env.GITHUB_WEBHOOK_SECRET || undefined;
+const signalHistory = new SignalHistoryStore(database);
+
+const app = createIngestApp({
+  store: new HealthStore(database),
+  timezone,
+  token,
+  onIngested: () => notifyProviderRefresh(database, 'health'),
+  githubWebhookSecret,
+  onGithubEvent: async (eventName, payload) => {
+    // Archived under the event name so history is queryable per kind, then announced so dashboards
+    // re-poll the GitHub API. The webhook is a cache-invalidation signal, not the data source: the
+    // provider already knows how to assemble its own payload, and this saves modelling every
+    // GitHub event shape.
+    await signalHistory.record('github-webhook', eventName, payload as never);
+    await notifyProviderRefresh(database, 'github');
+  },
+});
 // 0.0.0.0, not loopback: Railway routes external traffic to the container's published port.
 app.listen(port, '0.0.0.0', () => {
   console.log(`[ingest] health ingest listening on 0.0.0.0:${port} (timezone ${timezone})`);

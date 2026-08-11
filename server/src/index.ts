@@ -3,6 +3,13 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { z } from 'zod';
 import { parseHealthIngestBody } from './healthIngest.js';
+import {
+  EXTERNALLY_WRITTEN_PROVIDER_IDS,
+  listenForProviderRefresh,
+  notifyProviderRefresh,
+} from './refreshNotify.js';
+import { createWidgetEventStream } from './widgetEvents.js';
+import { persistProviderHistory } from './providerHistory.js';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { createDatabase } from './db/client.js';
@@ -45,6 +52,9 @@ for (const provider of providers.all) {
 }
 const signalHistory = new SignalHistoryStore(database);
 scheduler.register(createCommandCenterProvider(scheduler, signalHistory, config));
+// Archive every provider's payload as it settles. Unchanged readings are skipped, and nothing is
+// ever pruned — the point is to accumulate history worth querying later.
+persistProviderHistory(scheduler, signalHistory, config.history.excludeProviders);
 // Recompute the ranking as soon as any source settles, not just on command-center's own timer —
 // otherwise a cold start can snapshot an all-fallback ranking and sit on it for a full cycle.
 // Throttled: with ~15 providers settling independently (some every few seconds), triggering the
@@ -71,6 +81,11 @@ const AI_USAGE_WIDGET_IDS = new Set(['ai-usage-claude', 'ai-usage-codex']);
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
+
+// Pushes "widget X settled" to open dashboards so they read it now instead of on their next poll.
+const widgetEvents = createWidgetEventStream();
+app.get('/api/events', widgetEvents.handler);
+scheduler.onSettled((id) => widgetEvents.broadcast(id));
 
 const locationSchema = z.object({
   lat: z.number().min(-90).max(90),
@@ -161,6 +176,9 @@ app.post('/api/health/ingest', async (req, res) => {
   }
   await scheduler.refresh('health'); // reflect the new samples immediately, not on the next 5-min poll
   await scheduler.refresh('command-center');
+  // This dashboard is already up to date; the announcement is for the other installations, which
+  // only learn about a write through the database they share.
+  await notifyProviderRefresh(database, 'health');
   res.json({ ok: true });
 });
 
@@ -266,6 +284,20 @@ if (env.isProduction) {
     res.sendFile(path.join(clientDist, 'index.html'));
   });
 }
+
+// A Shortcut posting to the always-on ingest service, or a GitHub webhook reaching it, writes to
+// the shared database without this process noticing until that provider's next poll.
+await listenForProviderRefresh(database, (providerId) => {
+  // No id means "you reconnected and may have missed an announcement". Refreshing everything would
+  // kick off expensive probes (the Claude PTY one alone can take 35s), so refresh only the
+  // providers an outside writer can actually change.
+  for (const id of providerId ? [providerId] : EXTERNALLY_WRITTEN_PROVIDER_IDS) {
+    void scheduler.refresh(id);
+  }
+  void scheduler.refresh('command-center');
+}).catch((error) => {
+  console.error('[refresh] announcements unavailable, falling back to polling:', error);
+});
 
 const server = app.listen(env.port, env.host, () => {
   console.log(`Dashboard server on http://${env.host}:${env.port} (${env.timezone})`);

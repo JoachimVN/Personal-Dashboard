@@ -100,9 +100,33 @@ export function refreshWidget(id: string): Promise<void> {
   return record.refreshInFlight;
 }
 
+/**
+ * The server pushes "widget X settled" over SSE, which lets a started widget read the moment its
+ * data changes rather than up to `pollDelay` later. Polling stays as the fallback: EventSource
+ * reconnects on its own, but a stream that never connects (demo build, a proxy that buffers) must
+ * not leave the dashboard frozen.
+ */
+let eventSource: EventSource | undefined;
+
+function connectEvents(): void {
+  if (eventSource || import.meta.env.VITE_DEMO === 'true' || typeof EventSource === 'undefined') return;
+  eventSource = new EventSource('/api/events');
+  eventSource.addEventListener('settled', (event) => {
+    let id: string;
+    try {
+      ({ id } = JSON.parse((event as MessageEvent<string>).data) as { id: string });
+    } catch {
+      return;
+    }
+    const record = records.get(id);
+    if (record?.started) void readWidget(id);
+  });
+}
+
 function start(id: string, record: WidgetRecord): void {
   if (record.started) return;
   record.started = true;
+  connectEvents();
   void readWidget(id);
 }
 

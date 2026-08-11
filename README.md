@@ -415,8 +415,16 @@ The rolling window covers an outage, but the Shortcut still has to name one mach
 fails outright whenever that machine is asleep. Storage is not what goes down — every dashboard
 already shares one Railway Postgres — so `server/src/ingest.ts` runs the ingest route, and nothing
 else, as its own always-on Railway service. Point the Shortcut at it once and it stops caring which
-machine is awake; rows appear on each dashboard at its next `health` poll (up to 5 minutes) rather
-than instantly, since the local `scheduler.refresh('health')` shortcut isn't in the path.
+machine is awake.
+
+The service has no route back to a dashboard — they sit on a tailnet and are usually asleep — so it
+announces each write through the one thing every installation shares, the database. It issues a
+Postgres `NOTIFY` on the `health_ingest` channel and each dashboard holds a matching `LISTEN`,
+refreshing the health and command-center providers on arrival instead of waiting out the 5-minute
+poll. Delivery is a single round trip (~170 ms against Railway), coalesced over a second so a
+31-day window causes one refresh rather than 31. Announcements are best-effort: a failed one costs
+freshness, never the ingest, because the poll still catches up. A dashboard also refreshes whenever
+it subscribes, so one that was asleep or lost its connection picks up whatever it missed on rejoin.
 
 Deploy it as a second service in the **same Railway project** as the Postgres:
 
@@ -424,27 +432,111 @@ Deploy it as a second service in the **same Railway project** as the Postgres:
    healthcheck; no build step runs, because the service executes TypeScript through `tsx`.
 2. Variables: `DATABASE_URL` (use the **internal** `postgres.railway.internal` URL — this service
    runs inside Railway, so it doesn't need the public proxy) and `HEALTH_INGEST_TOKEN`, a random
-   string of at least 24 characters. The service refuses to start without both.
+   string of at least 24 characters. The service refuses to start without both, so setting them
+   after the first deploy means redeploying.
 3. Also set `NIXPACKS_INSTALL_CMD=npm ci --omit=dev`. The ingest service needs only `express`,
    `postgres`, `drizzle-orm`, `dotenv`, `zod` and `tsx`; the default `npm ci` additionally pulls in
    Playwright, Vitest and the client's toolchain — roughly 400 packages that only slow the build
    down and give it more ways to fail.
 4. **Settings** → **Networking** → **Generate Domain**.
+5. Confirm the start command is `npm run start:ingest -w server` and not the dashboard's `npm start`,
+   which would try to boot every provider and fail on the credentials this service doesn't have.
 
-Then change the Shortcut's **Get Contents of URL** to
-`POST https://<service>.up.railway.app/api/health/ingest` with a header
-`Authorization: Bearer <HEALTH_INGEST_TOKEN>`.
+Then repoint every Shortcut's **Get Contents of URL** — tap **Show More** to reach the fields below
+the URL:
+
+| field | value |
+| --- | --- |
+| URL | `https://<service>.up.railway.app/api/health/ingest` |
+| Method | `POST` |
+| Headers | Key `Authorization`, Text `Bearer <HEALTH_INGEST_TOKEN>` |
+| Request Body | `JSON`, set to the dictionary as before |
+
+Three things that reliably go wrong here:
+
+- **The `Bearer` prefix is part of the header value.** The word `Bearer`, one space, then the token.
+  A bare token is not a bearer credential and returns `401 unauthorized`. iOS also capitalises the
+  first character of a text field, which silently corrupts a token starting with a lowercase letter —
+  paste the value rather than typing it.
+- **The path has to end in `/api/health/ingest`.** `/api/health` is the liveness probe: it answers
+  `{"ok":true}` and discards the body, so a Shortcut aimed there appears to succeed while storing
+  nothing. A trailing slash on `/ingest/` is harmless.
+- **Getting `{"error":"unauthorized"}` back means the request arrived**, so the URL and method are
+  already right and only the header is wrong. A network-level failure looks different — iOS reports
+  it as "the network connection was lost".
+
+The phone no longer needs Tailscale up for health posts once this is in place, so the Shortcut also
+works on cellular with the VPN off.
 
 `node-pty` is an **optional** dependency for this reason: it ships prebuilds for macOS and Windows
 but not `linux-x64`, where it falls back to compiling against a Python toolchain the build image
-doesn't have. Only the AI-usage probes import it, and they never run on Linux, so a Linux install
-skips it rather than failing outright.
+doesn't have — `npm ci` dies on a missing Python and takes the whole build with it. Only the AI-usage
+probes import it, and they never run on Linux, so a Linux install skips it rather than failing
+outright.
 
 ⚠️ Unlike the dashboards, this endpoint is on the public internet rather than behind Tailscale, so
 that token is the only thing in front of it. It's the one route the service exposes and it can only
 write `health_days`, but treat the token like any other secret in `server/.env`. Skip this whole
 section if you'd rather keep every ingress on the tailnet — the rolling window above still makes
 outages self-healing.
+
+## GitHub webhook (optional)
+
+The GitHub widget polls, so a push shows up whenever its interval comes round. If you also run the
+always-on ingest service, GitHub can tell it the moment something happens instead.
+
+Set `GITHUB_WEBHOOK_SECRET` on the Railway service to a random string — without it the route isn't
+mounted at all, so an installation that never set one up has no unauthenticated GitHub surface
+sitting there. Then, per repository, **Settings** → **Webhooks** → **Add webhook**:
+
+| field | value |
+| --- | --- |
+| Payload URL | `https://<service>.up.railway.app/api/github/webhook` |
+| Content type | `application/json` — the default `x-www-form-urlencoded` will not work |
+| Secret | the same `GITHUB_WEBHOOK_SECRET` |
+| SSL verification | enabled |
+| Events | *Let me select individual events* |
+
+Tick pushes, pull requests, pull request reviews and review comments, issues, issue comments, branch
+or tag creation and deletion, releases, forks, stars, watches, and repositories. Not *send me
+everything*: on a repo with CI, `check_run` and `workflow_run` fire constantly and change nothing
+the dashboard shows. Those are ignored server-side too (`IGNORED_GITHUB_EVENTS`), so a stray tick
+cannot cause a refresh storm.
+
+The webhook is a **cache-invalidation signal, not a data source**. A verified event is archived
+under `source = 'github-webhook'`, then announced on the `provider_refresh` channel so every
+dashboard re-polls the GitHub API — which already knows how to assemble its own payload. That
+avoids modelling every GitHub event shape, and means the widget updates rather than diverging from
+what the API would say. Requests are acknowledged before the announcement, because GitHub times out
+at 10 seconds and retries.
+
+Webhooks only fire for repositories you administer, so this **supplements** polling rather than
+replacing it; activity on other people's repos still arrives on the usual interval.
+
+## Stored history
+
+Every provider's payload is archived to `signal_history` as it settles, so the dashboard
+accumulates a queryable record instead of only ever holding the latest reading in memory. Two
+things keep that from being wasteful:
+
+- **Unchanged readings are not written.** `SignalHistoryStore.record` compares against the current
+  value first, so a provider polling every minute that only moves twice a day costs two rows, not
+  1440.
+- **Only `ready` envelopes are recorded.** A failed fetch leaves the last good payload in the cache
+  — that is what `stale` means — and re-recording it would forge an observation that never happened.
+
+**Nothing is ever pruned.** The history is the point; no retention window applies to this table.
+
+`command-center` and `activity-push` are excluded by default, holding no data of their own: the
+first is derived from the other providers, the second is a delivery mechanism. Change that list
+under `history.excludeProviders` in `server/config.json`; existing rows are left alone.
+
+⚠️ **Privacy**: this includes the Gmail and iMessage payloads, which carry subjects and message
+previews. They are stored indefinitely in your Railway Postgres — a step beyond the server-side
+cache the iMessage widget already keeps. Add `"gmail"` and `"imessage"` to `history.excludeProviders`
+if you would rather they stayed in memory.
+
+Query it with `select value from signal_history where source = 'clash-royale' order by recorded_at`.
 
 ## Arranging widgets
 

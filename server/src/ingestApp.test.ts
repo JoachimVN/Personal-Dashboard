@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import type { HealthIngest } from '@personal-dashboard/shared';
@@ -5,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createIngestApp, tokenMatches, type HealthIngestSink } from './ingestApp.js';
 
 const TOKEN = 'test-token-that-is-long-enough';
+const WEBHOOK_SECRET = 'webhook-secret-long-enough-1234';
 
 class RecordingSink implements HealthIngestSink {
   readonly received: { sample: HealthIngest; today: string }[] = [];
@@ -16,12 +18,31 @@ class RecordingSink implements HealthIngestSink {
 
 let running: Server | undefined;
 
-async function start(sink: HealthIngestSink): Promise<string> {
-  const app = createIngestApp({ store: sink, timezone: 'Europe/Oslo', token: TOKEN });
+async function listen(app: ReturnType<typeof createIngestApp>): Promise<string> {
   running = await new Promise<Server>((resolve) => {
     const server = app.listen(0, '127.0.0.1', () => resolve(server));
   });
   return `http://127.0.0.1:${(running.address() as AddressInfo).port}`;
+}
+
+async function start(
+  sink: HealthIngestSink,
+  onIngested?: (dayCount: number) => Promise<void>,
+): Promise<string> {
+  return listen(createIngestApp({ store: sink, timezone: 'Europe/Oslo', token: TOKEN, onIngested }));
+}
+
+function postWebhook(baseUrl: string, event: string, payload: unknown, secret = WEBHOOK_SECRET) {
+  const body = JSON.stringify(payload);
+  return fetch(`${baseUrl}/api/github/webhook`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-github-event': event,
+      'x-hub-signature-256': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`,
+    },
+    body,
+  });
 }
 
 // `null` means "send no Authorization header" — `undefined` would fall back to the default token.
@@ -133,6 +154,113 @@ describe('createIngestApp', () => {
     expect(JSON.parse(body)).toEqual({ error: 'ingest-failed' });
     expect(body).not.toContain('secret');
     consoleError.mockRestore();
+  });
+
+  it('announces the write once per request, not once per day', async () => {
+    const announced: number[] = [];
+    const baseUrl = await start(new RecordingSink(), async (dayCount) => {
+      announced.push(dayCount);
+    });
+
+    await post(baseUrl, {
+      days: [
+        { date: '2026-08-09', watchSteps: 1 },
+        { date: '2026-08-10', watchSteps: 2 },
+      ],
+    });
+
+    expect(announced).toEqual([2]);
+  });
+
+  it('does not announce a request that stored nothing', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const announced: number[] = [];
+    const record = async (dayCount: number) => {
+      announced.push(dayCount);
+    };
+
+    const rejecting = await start({ ingest: () => Promise.reject(new Error('nope')) }, record);
+    await post(rejecting, { watchSteps: 1 });
+    expect(announced).toEqual([]);
+    consoleError.mockRestore();
+  });
+
+  it('does not announce a rejected or malformed request', async () => {
+    const announced: number[] = [];
+    const baseUrl = await start(new RecordingSink(), async (dayCount) => {
+      announced.push(dayCount);
+    });
+
+    await post(baseUrl, { watchSteps: 1 }, null);
+    await post(baseUrl, { watchSteps: 'lots' });
+
+    expect(announced).toEqual([]);
+  });
+
+  it('accepts a correctly signed GitHub event and hands it on', async () => {
+    const seen: { event: string; payload: unknown }[] = [];
+    const app = createIngestApp({
+      store: new RecordingSink(),
+      timezone: 'Europe/Oslo',
+      token: TOKEN,
+      githubWebhookSecret: WEBHOOK_SECRET,
+      onGithubEvent: async (event, payload) => {
+        seen.push({ event, payload });
+      },
+    });
+    const baseUrl = await listen(app);
+
+    const response = await postWebhook(baseUrl, 'push', { ref: 'refs/heads/main' });
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]).toEqual({ event: 'push', payload: { ref: 'refs/heads/main' } });
+  });
+
+  it('rejects a GitHub event whose signature does not match', async () => {
+    const seen: string[] = [];
+    const app = createIngestApp({
+      store: new RecordingSink(),
+      timezone: 'Europe/Oslo',
+      token: TOKEN,
+      githubWebhookSecret: WEBHOOK_SECRET,
+      onGithubEvent: async (event) => {
+        seen.push(event);
+      },
+    });
+    const baseUrl = await listen(app);
+
+    const response = await postWebhook(baseUrl, 'push', { ref: 'refs/heads/main' }, 'wrong-secret');
+
+    expect(response.status).toBe(401);
+    expect(seen).toEqual([]);
+  });
+
+  it('acknowledges CI chatter without acting on it, so redeliveries are not queued', async () => {
+    const seen: string[] = [];
+    const app = createIngestApp({
+      store: new RecordingSink(),
+      timezone: 'Europe/Oslo',
+      token: TOKEN,
+      githubWebhookSecret: WEBHOOK_SECRET,
+      onGithubEvent: async (event) => {
+        seen.push(event);
+      },
+    });
+    const baseUrl = await listen(app);
+
+    const response = await postWebhook(baseUrl, 'check_run', { action: 'completed' });
+
+    expect(response.status).toBe(200);
+    expect(seen).toEqual([]);
+  });
+
+  it('leaves the webhook route unmounted when no secret is configured', async () => {
+    const baseUrl = await start(new RecordingSink());
+
+    const response = await postWebhook(baseUrl, 'push', { ref: 'refs/heads/main' });
+
+    expect(response.status).toBe(404);
   });
 
   it('serves an unauthenticated liveness probe for the platform healthcheck', async () => {

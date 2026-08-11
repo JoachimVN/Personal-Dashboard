@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import type { HealthIngest } from '@personal-dashboard/shared';
 import { parseHealthIngestBody } from './healthIngest.js';
+import { shouldRefreshFor, verifyGithubSignature, type RawBodyRequest } from './githubWebhook.js';
 import { todayInZone } from './providers/health.js';
 
 /**
@@ -38,12 +39,27 @@ export function createIngestApp(options: {
   store: HealthIngestSink;
   timezone: string;
   token: string;
+  /** Announces the write so dashboards refresh now rather than on their next poll. */
+  onIngested?: (dayCount: number) => Promise<void>;
+  /** Secret shared with GitHub's webhook. Omit to leave `/api/github/webhook` unmounted. */
+  githubWebhookSecret?: string;
+  /** Called for a verified GitHub event worth reacting to, with the event name and its payload. */
+  onGithubEvent?: (eventName: string, payload: unknown) => Promise<void>;
 }): Express {
-  const { store, timezone, token } = options;
+  const { store, timezone, token, onIngested, githubWebhookSecret, onGithubEvent } = options;
   const app = express();
   app.disable('x-powered-by');
-  // A 31-day window of numbers is a few KB; nothing legitimate reaching this route is larger.
-  app.use(express.json({ limit: '64kb' }));
+  // A 31-day window of numbers is a few KB, but a GitHub push event with many commits is larger.
+  // `verify` keeps the raw bytes: the webhook signature is over exactly what GitHub sent, and
+  // re-serializing the parsed body would not reproduce it.
+  app.use(
+    express.json({
+      limit: '2mb',
+      verify: (req, _res, buf) => {
+        (req as RawBodyRequest).rawBody = buf;
+      },
+    }),
+  );
 
   // Liveness probe for Railway's healthcheck. Unauthenticated and says nothing about the data.
   app.get('/api/health', (_req, res) => {
@@ -72,8 +88,29 @@ export function createIngestApp(options: {
       res.status(503).json({ error: 'ingest-failed' });
       return;
     }
+    // One announcement per request, not per day: a 31-day window is a single event to react to.
+    await onIngested?.(samples.length);
     res.json({ ok: true, days: samples.length });
   });
+
+  if (githubWebhookSecret) {
+    app.post('/api/github/webhook', async (req, res) => {
+      if (!verifyGithubSignature((req as RawBodyRequest).rawBody, req.get('x-hub-signature-256'), githubWebhookSecret)) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+      }
+      const eventName = req.get('x-github-event');
+      // Acknowledge before doing anything: GitHub times out at 10s and retries, and a slow
+      // announcement should not turn one push into a queue of redeliveries.
+      res.json({ ok: true, event: eventName ?? null });
+      if (!shouldRefreshFor(eventName)) return;
+      try {
+        await onGithubEvent?.(eventName!, req.body);
+      } catch (error) {
+        console.error('[ingest] failed to handle GitHub event:', error);
+      }
+    });
+  }
 
   // Malformed JSON never reaches the route — express.json() rejects it first. Answer in JSON
   // instead of the default HTML error page, which echoes the body back in its message.
