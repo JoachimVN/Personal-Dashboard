@@ -425,11 +425,20 @@ Deploy it as a second service in the **same Railway project** as the Postgres:
 2. Variables: `DATABASE_URL` (use the **internal** `postgres.railway.internal` URL — this service
    runs inside Railway, so it doesn't need the public proxy) and `HEALTH_INGEST_TOKEN`, a random
    string of at least 24 characters. The service refuses to start without both.
-3. **Settings** → **Networking** → **Generate Domain**.
+3. Also set `NIXPACKS_INSTALL_CMD=npm ci --omit=dev`. The ingest service needs only `express`,
+   `postgres`, `drizzle-orm`, `dotenv`, `zod` and `tsx`; the default `npm ci` additionally pulls in
+   Playwright, Vitest and the client's toolchain — roughly 400 packages that only slow the build
+   down and give it more ways to fail.
+4. **Settings** → **Networking** → **Generate Domain**.
 
 Then change the Shortcut's **Get Contents of URL** to
 `POST https://<service>.up.railway.app/api/health/ingest` with a header
 `Authorization: Bearer <HEALTH_INGEST_TOKEN>`.
+
+`node-pty` is an **optional** dependency for this reason: it ships prebuilds for macOS and Windows
+but not `linux-x64`, where it falls back to compiling against a Python toolchain the build image
+doesn't have. Only the AI-usage probes import it, and they never run on Linux, so a Linux install
+skips it rather than failing outright.
 
 ⚠️ Unlike the dashboards, this endpoint is on the public internet rather than behind Tailscale, so
 that token is the only thing in front of it. It's the one route the service exposes and it can only
