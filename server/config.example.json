@@ -31,5 +31,8 @@
   },
   "widgets": {
     "hue": { "enabled": false }
+  },
+  "history": {
+    "excludeProviders": ["command-center", "activity-push"]
   }
 }

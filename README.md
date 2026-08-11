@@ -480,6 +480,31 @@ write `health_days`, but treat the token like any other secret in `server/.env`.
 section if you'd rather keep every ingress on the tailnet — the rolling window above still makes
 outages self-healing.
 
+## Stored history
+
+Every provider's payload is archived to `signal_history` as it settles, so the dashboard
+accumulates a queryable record instead of only ever holding the latest reading in memory. Two
+things keep that from being wasteful:
+
+- **Unchanged readings are not written.** `SignalHistoryStore.record` compares against the current
+  value first, so a provider polling every minute that only moves twice a day costs two rows, not
+  1440.
+- **Only `ready` envelopes are recorded.** A failed fetch leaves the last good payload in the cache
+  — that is what `stale` means — and re-recording it would forge an observation that never happened.
+
+**Nothing is ever pruned.** The history is the point; no retention window applies to this table.
+
+`command-center` and `activity-push` are excluded by default, holding no data of their own: the
+first is derived from the other providers, the second is a delivery mechanism. Change that list
+under `history.excludeProviders` in `server/config.json`; existing rows are left alone.
+
+⚠️ **Privacy**: this includes the Gmail and iMessage payloads, which carry subjects and message
+previews. They are stored indefinitely in your Railway Postgres — a step beyond the server-side
+cache the iMessage widget already keeps. Add `"gmail"` and `"imessage"` to `history.excludeProviders`
+if you would rather they stayed in memory.
+
+Query it with `select value from signal_history where source = 'clash-royale' order by recorded_at`.
+
 ## Arranging widgets
 
 The Personal section's widget cards can be reordered: open **Personal** → **Arrange** (top-right), then drag a card to its new position. The order is saved server-side (`server/.data/layout.json`, gitignored) and shared across every device that reaches this dashboard.

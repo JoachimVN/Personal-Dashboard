@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { parseHealthIngestBody } from './healthIngest.js';
 import { listenForHealthIngest, notifyHealthIngest } from './healthNotify.js';
 import { createWidgetEventStream } from './widgetEvents.js';
+import { persistProviderHistory } from './providerHistory.js';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { createDatabase } from './db/client.js';
@@ -47,6 +48,9 @@ for (const provider of providers.all) {
 }
 const signalHistory = new SignalHistoryStore(database);
 scheduler.register(createCommandCenterProvider(scheduler, signalHistory, config));
+// Archive every provider's payload as it settles. Unchanged readings are skipped, and nothing is
+// ever pruned — the point is to accumulate history worth querying later.
+persistProviderHistory(scheduler, signalHistory, config.history.excludeProviders);
 // Recompute the ranking as soon as any source settles, not just on command-center's own timer —
 // otherwise a cold start can snapshot an all-fallback ranking and sit on it for a full cycle.
 // Throttled: with ~15 providers settling independently (some every few seconds), triggering the
