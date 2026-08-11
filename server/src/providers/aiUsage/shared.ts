@@ -1,5 +1,6 @@
 import { chmod, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
+import os from 'node:os';
 import path from 'node:path';
 import type { AiUsageToolData, UsageHistoryPoint } from '@personal-dashboard/shared';
 import { isUsageReset, type UsageHistoryStore } from '../../usageHistory.js';
@@ -61,6 +62,26 @@ export async function ensurePtySpawnHelper(): Promise<void> {
   if (process.platform !== 'darwin') return;
   const packageRoot = path.resolve(path.dirname(require.resolve('node-pty')), '..');
   await chmod(path.join(packageRoot, 'prebuilds', `darwin-${process.arch}`, 'spawn-helper'), 0o755).catch(() => undefined);
+}
+
+/** The interactive AI-usage probes shell out to a CLI installed under `~/.local/bin`. node-pty on
+ * Windows does no PATHEXT resolution, so the `.exe` extension has to be explicit or the spawn fails
+ * with "File not found" — which the probes swallow, leaving the widget stuck on remembered data. */
+export function localBinExecutable(name: string): string {
+  const exe = process.platform === 'win32' ? `${name}.exe` : name;
+  return path.join(os.homedir(), '.local/bin', exe);
+}
+
+/** Prepend `~/.local/bin` to the child's PATH using the OS path delimiter, and normalize away the
+ * Windows `Path`/`PATH` casing split (spreading `process.env` keeps its OS casing, so reading `.PATH`
+ * on Windows — where the key is `Path` — silently drops the real PATH). Sets TERM for the PTY too. */
+export function ptyProbeEnv(baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const localBin = path.join(os.homedir(), '.local/bin');
+  const basePath = baseEnv.PATH ?? baseEnv.Path ?? '';
+  const env: NodeJS.ProcessEnv = { ...baseEnv, TERM: 'xterm-256color' };
+  delete env.Path;
+  env.PATH = `${localBin}${path.delimiter}${basePath}`;
+  return env;
 }
 
 /** A slow or hung DB write must never block returning an already-successful live read (see the

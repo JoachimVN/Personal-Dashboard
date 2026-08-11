@@ -5,6 +5,13 @@
 `status` — `offline` means the dashboard's own server is unreachable, not that a given provider
 failed.
 
+On top of that poll, `widgetStore.ts` opens one `EventSource` on `/api/events` and reads a widget as
+soon as the server says it settled, so data appears on arrival instead of up to `pollDelay` later.
+The stream carries only the widget id — the client reuses its own `readWidget` path so there is one
+way to read a widget rather than two that can disagree. Polling stays as the fallback and is not
+suppressed when the stream is up: EventSource reconnects on its own, but a stream that never
+connects at all (the demo build, or a proxy that buffers) must not leave the dashboard frozen.
+
 `components/WidgetCard.tsx` has two layers:
 - `WidgetBody` is the `loading/disabled/error/ready` rendering state machine for **one** envelope.
 - `WidgetShell` is just the card chrome (border, header, badge slot) with no envelope logic.

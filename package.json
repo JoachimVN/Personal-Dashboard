@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "description": "Personal dashboard — life, GitHub, and AI usage at a glance",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "workspaces": [
     "shared",
     "server",

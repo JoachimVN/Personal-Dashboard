@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { POWER_AREAS } from '@personal-dashboard/shared';
 import { z } from 'zod';
+import { DERIVED_PROVIDER_IDS } from './providerHistory.js';
 
 const configSchema = z.object({
   calendar: z
@@ -165,6 +166,17 @@ const configSchema = z.object({
     .default({ reposRoot: {} }),
   /** Per-widget on/off switch, keyed by provider id (e.g. "hue"). Absent id or `enabled: true` = on. Explicit `enabled: false` hides the widget entirely, distinct from "not configured". */
   widgets: z.record(z.string(), z.object({ enabled: z.boolean() })).default({}),
+  history: z
+    .object({
+      /**
+       * Provider ids whose payloads are NOT archived to `signal_history`. Everything else is kept
+       * forever — nothing prunes this table. Defaults to the two providers that hold no data of
+       * their own: `command-center` (derived from the others) and `activity-push` (a delivery
+       * mechanism). Add an id here to stop archiving it; existing rows are left alone.
+       */
+      excludeProviders: z.array(z.string()).default(DERIVED_PROVIDER_IDS),
+    })
+    .default({ excludeProviders: DERIVED_PROVIDER_IDS }),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

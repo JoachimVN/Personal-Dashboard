@@ -10,7 +10,9 @@ import {
   ensurePtySpawnHelper,
   jsonlFiles,
   limit,
+  localBinExecutable,
   MONTH_ABBREVIATIONS,
+  ptyProbeEnv,
   recordHistorySafely,
   stripTerminalControls,
   WS,
@@ -164,7 +166,13 @@ function staleBannerAgeMs(amount: string, unit: string): number {
 
 function parseUsageWindow(section: string, now: Date) {
   const used = /(\d{1,3}(?:\.\d{1,2})?)%\s*used/i.exec(section);
-  const datedReset = /Resets\s*([a-z]{3})\s*(\d{1,2})\s*at\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
+  // The weekly window's reset renders either as "Resets Aug 16 at 12am" (older) or "Resets Aug 16,
+  // 12am" (current) — accept the separator as "at", a comma, or nothing so the newer comma format
+  // still parses. Without a reset the whole window is dropped, which stalls the interactive probe's
+  // "both windows parsed" finish check until it times out and discards an otherwise-complete screen.
+  // The separator is one `[\s,]*` run around an optional literal "at" rather than two `\s*` runs
+  // straddling it — the latter can split a space run two ways, which backtracks super-linearly.
+  const datedReset = /Resets[\s,]*([a-z]{3})[\s,]*(\d{1,2})[\s,]*(?:at[\s,]*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
   const timeOnlyReset = /Resets\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i.exec(section);
   if (!used || (!datedReset && !timeOnlyReset)) return undefined;
   const resetsAt = datedReset
@@ -234,16 +242,15 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
 
 export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
   try {
-    const localBin = path.join(os.homedir(), '.local/bin');
     const { CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, ...cleanEnv } = process.env;
     await ensurePtySpawnHelper();
     const output = await new Promise<string>((resolve, reject) => {
-      const pty = spawnPty(path.join(localBin, 'claude'), [], {
+      const pty = spawnPty(localBinExecutable('claude'), [], {
         name: 'xterm-256color',
         cols: 160,
         rows: 48,
         cwd: process.cwd(),
-        env: { ...cleanEnv, TERM: 'xterm-256color', PATH: `${localBin}:${cleanEnv.PATH ?? ''}` },
+        env: ptyProbeEnv(cleanEnv),
       });
       let terminal = '';
       let settled = false;
@@ -406,9 +413,20 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
         claudeTokenTotals(), claudeInteractiveUsageSnapshot(), claudeTranscriptUsageSnapshot(),
       ]);
       const observedQuota = liveQuota.asOf ? liveQuota : transcriptQuota;
-      const previousQuota = observedQuota.asOf ? rememberedQuota : rememberedQuota ?? await loadRememberedQuota();
+      // Always make the last-known-good baseline available for backfill — in-memory if we have it,
+      // otherwise the shared Postgres snapshot. The old code only loaded the snapshot when the
+      // observation had *no* `asOf`, so a partial-but-timestamped read (e.g. a transcript that carries
+      // the 5-hour window but not weekly — common on Windows where the live probe under-renders) would
+      // skip the baseline entirely and leave the missing window blank forever after a fresh start.
+      const previousQuota = rememberedQuota ?? await loadRememberedQuota();
       const quota = retainKnownClaudeQuota(observedQuota, previousQuota);
-      if (observedQuota.asOf) rememberedQuota = observedQuota;
+      // Remember the *merged* quota, not the raw observation: a live read that captured one window
+      // but not the other (common when the Usage screen is scraped mid-render, especially on Windows
+      // conpty) still stamps `asOf`. Storing the raw partial here would drop the still-valid other
+      // window from the baseline, so the next equally-partial read has nothing to backfill from and
+      // that window vanishes for good. Persisting the merged result keeps each window alive until it
+      // is either refreshed or genuinely past its reset (retainKnownClaudeQuota already gates on that).
+      if (observedQuota.asOf) rememberedQuota = quota;
       const snapshot: UsageSnapshot = {
         available: Boolean(quota.asOf || tokenTotals.fiveHour || tokenTotals.weekly),
         fiveHour: quota.fiveHour,
