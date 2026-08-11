@@ -6,11 +6,9 @@ const W = 100;
 const H = 32;
 /** Mirrors the server's command-center reset threshold for provider reports above zero. */
 const RESET_DROP_PERCENT = 40;
-/** The provider's reset-deadline text only has minute-level granularity, so the same
- * still-open window's deadline can render a minute apart between two ~15-min-spaced polls
- * (e.g. "5:19pm" vs "5:20pm") — pure rounding jitter. This must stay well under the shortest
- * realistic gap between two genuinely different resets, or it'll merge them into one and drop
- * a real reset's anchor entirely. */
+/** Fixed floor added on top of groupResetReadings' poll-gap-scaled tolerance, so back-to-back
+ * polls with a near-zero gap still absorb the provider's minute-level rounding on the deadline
+ * text (e.g. "5:19pm" vs "5:20pm" for the same still-open window). */
 const RESET_DRIFT_MS = 5 * 60_000;
 
 type Metric = 'fiveHourUsedPercent' | 'weeklyUsedPercent' | 'modelWeeklyUsedPercent';
@@ -181,21 +179,39 @@ function addObservedResetPoints(chartPoints: ChartPoint[], knownResets: number[]
   }
 }
 
-/** Collapse reset readings that land within RESET_DRIFT_MS of each other (they're the same
- * still-ongoing window's deadline rounding differently between polls, not separate resets),
- * keeping the latest of each. Deliberately NOT sessionWindowMs (the full 5h/7d window): two
- * genuinely distinct, consecutive resets routinely land under one window apart — a back-to-back
- * session starting shortly after the previous one resets — and a full-window threshold would
- * merge them into one, silently dropping the earlier reset's anchor from the chart. */
-function clusterResets(rawResets: number[]): number[] {
+/** Groups poll-ordered reset-deadline readings into one entry per real reset. A still-open
+ * window's reported deadline isn't necessarily fixed — Claude's five-hour cadence only jitters by
+ * rounding, but Codex's rolling weekly window drifts forward roughly in step with real elapsed
+ * time between polls (ongoing usage keeps pushing the deadline out), so a whole day of ~15-minute
+ * polls can each report a "new" deadline tens of minutes later than the last, all still describing
+ * the same not-yet-triggered reset. Sorting by value first (as a plain proximity cluster would)
+ * loses which reading came from which poll, so a slow multi-hour drift reads as dozens of distinct
+ * close-together resets instead of one.
+ *
+ * Reading order here is poll time, not reset value: treat consecutive readings as the same event
+ * as long as the deadline didn't move much faster than real time passed — observed drift ran up to
+ * ~1.9x the poll gap on real data (usage during the interval pushes the deadline out further than
+ * the interval itself), so 3x leaves headroom while staying far below a genuine next-session jump
+ * (hours for the five-hour metric, days for weekly). Capped at half the session window as a hard
+ * ceiling so an unusually long polling outage can never merge two genuinely distinct resets just
+ * because the gap between them was large. A jump beyond that — the deadline lurching far ahead, or
+ * snapping back after the window actually elapsed — means this reading belongs to a new reset.
+ * Keeps the most recently reported deadline for each event, since that's the freshest estimate. */
+function groupResetReadings(readings: Array<{ at: number; reset: number }>, sessionWindowMs: number): number[] {
   const resets: number[] = [];
-  for (const reset of rawResets) {
-    if (resets.length && reset - resets.at(-1)! < RESET_DRIFT_MS) {
-      resets[resets.length - 1] = reset;
+  let current: { at: number; reset: number } | undefined;
+  for (const reading of readings) {
+    const tolerance = current
+      ? Math.min((reading.at - current.at) * 3 + RESET_DRIFT_MS, sessionWindowMs / 2)
+      : 0;
+    if (current && Math.abs(reading.reset - current.reset) <= tolerance) {
+      current = reading;
     } else {
-      resets.push(reset);
+      if (current) resets.push(current.reset);
+      current = reading;
     }
   }
+  if (current) resets.push(current.reset);
   return resets;
 }
 
@@ -211,7 +227,16 @@ function addResetAnchor(
 ): void {
   if (reset <= start || reset > end) return;
   const observedZero = stablePoints.some((point) => Date.parse(point.at) === reset && point.percent === 0);
-  const prior = stablePoints.findLast((point) => Date.parse(point.at) < reset);
+  // Not findLast: stablePoints isn't time-sorted (addObservedResetPoints appends its synthetic
+  // duplicates at the array's tail, out of chronological order relative to their own `at`), so
+  // walking by array position can return a duplicate from an unrelated, older event instead of
+  // the true most-recent real sample before this reset. Find it by timestamp explicitly.
+  const prior = stablePoints.reduce<ChartPoint | undefined>((closest, point) => {
+    const t = Date.parse(point.at);
+    if (t >= reset) return closest;
+    if (!closest || t > Date.parse(closest.at)) return point;
+    return closest;
+  }, undefined);
   // Usage can't be sampled between the last real reading and the reset, but a rate limit holds
   // the value flat until it lapses — anchor the plateau at whatever was last reported (not just
   // an exact 100% cap), so e.g. a last reading of 99% holds level instead of interpolating a
@@ -238,27 +263,31 @@ function addResetAnchor(
   }
 }
 
-/** Resolves the known reset deadlines for one metric, clustering close-together reports of the
- * same still-ongoing window into a single event (see clusterResets). Empty for a metric with no
+/** Resolves the known reset deadlines for one metric, grouping poll-ordered reports of the same
+ * still-ongoing window into a single event (see groupResetReadings). Empty for a metric with no
  * resetField (modelWeekly) — those fall back entirely to addObservedResetPoints' heuristic. */
 function computeKnownResets(
   points: UsageHistoryPoint[],
   resetField: 'fiveHourResetsAt' | 'weeklyResetsAt' | undefined,
   sessionResetsAt: string | undefined,
   sessionWindowMs: number | undefined,
+  now: number,
 ): number[] {
   if (!resetField || !sessionWindowMs) return [];
-  const rawResets = [
-    ...points.map((point) => point[resetField]).filter((reset): reset is string => Boolean(reset)),
-    sessionResetsAt,
-  ]
-    .filter((reset): reset is string => Boolean(reset))
-    .map((reset) => Date.parse(reset))
-    .filter((reset) => Number.isFinite(reset))
-    .sort((a, b) => a - b);
-  // The provider's reported reset deadline can drift a little from poll to poll (it reflects the
-  // live rolling window, not a fixed boundary); collapse those into one event per real reset.
-  return clusterResets(rawResets);
+  const readings = points
+    .map((point) => ({ at: Date.parse(point.at), reset: Date.parse(point[resetField] ?? '') }))
+    .filter((reading) => Number.isFinite(reading.at) && Number.isFinite(reading.reset))
+    // A rolling window's own deadline can never be more than one window past when it was polled
+    // (it was already partway through the window) — a reading claiming otherwise is corrupt
+    // (observed: a bad Claude CLI snapshot reporting a five-hour reset 24h out) and would
+    // otherwise get accepted as a lone, unmergeable "reset", anchoring a fake plateau on the chart.
+    .filter((reading) => reading.reset - reading.at <= sessionWindowMs + RESET_DRIFT_MS);
+  if (sessionResetsAt) {
+    const reset = Date.parse(sessionResetsAt);
+    if (Number.isFinite(reset)) readings.push({ at: now, reset });
+  }
+  readings.sort((a, b) => a.at - b.at);
+  return groupResetReadings(readings, sessionWindowMs);
 }
 
 /** Splices the synthetic reset/session-start markers (see ChartPoint) into chartPoints in place,
@@ -323,7 +352,7 @@ function useChartGeometry(
       });
     chartPoints.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
     const resetField = RESET_FIELD[metric];
-    const resets = computeKnownResets(points, resetField, sessionResetsAt, sessionWindowMs);
+    const resets = computeKnownResets(points, resetField, sessionResetsAt, sessionWindowMs, end);
     addObservedResetPoints(chartPoints, resets);
     if (sessionWindowMs && resetField) {
       addSessionResetPoints(chartPoints, resets, sessionWindowMs, metric === 'fiveHourUsedPercent', start, end, windowMs);
@@ -372,14 +401,18 @@ export function UsageHistoryChart({
   const readNearest = (event: React.PointerEvent<SVGSVGElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * W;
+    // sessionStart markers exist purely to anchor the "rise from zero" line geometry, not as a
+    // hover target — they sit exactly at a reset boundary where a real sample is also nearby, and
+    // being pixel-closer than that real sample would silently report 0% instead of its actual
+    // value. Fall back to the full set only in the degenerate case where nothing else qualifies.
+    const candidates = chartPoints.filter((point) => !point.sessionStart);
+    const pool = candidates.length ? candidates : chartPoints;
     setHovered(
       // On an exact tie (e.g. the synthetic pre-reset duplicate and the flagged real sample
       // that follows it share the drop's x-coordinate), prefer the later point: chartPoints is
       // sorted with the reset-flagged sample after its synthetic predecessor, so `<=` surfaces
       // the reset instead of silently reporting the stale pre-reset value.
-      chartPoints.reduce((best, point) =>
-        Math.abs(point.x - x) <= Math.abs(best.x - x) ? point : best,
-      ),
+      pool.reduce((best, point) => (Math.abs(point.x - x) <= Math.abs(best.x - x) ? point : best)),
     );
   };
 
