@@ -409,6 +409,34 @@ single day: send `{ "days": [ ... ] }` where each entry is the dictionary above 
 run after an outage backfills the gap automatically; e.g. always sending the last 7 days makes any
 outage shorter than a week self-healing.
 
+#### Always-on ingest (optional)
+
+The rolling window covers an outage, but the Shortcut still has to name one machine, and the post
+fails outright whenever that machine is asleep. Storage is not what goes down — every dashboard
+already shares one Railway Postgres — so `server/src/ingest.ts` runs the ingest route, and nothing
+else, as its own always-on Railway service. Point the Shortcut at it once and it stops caring which
+machine is awake; rows appear on each dashboard at its next `health` poll (up to 5 minutes) rather
+than instantly, since the local `scheduler.refresh('health')` shortcut isn't in the path.
+
+Deploy it as a second service in the **same Railway project** as the Postgres:
+
+1. **New** → **GitHub Repo** → this repo. The tracked `railway.json` supplies the start command and
+   healthcheck; no build step runs, because the service executes TypeScript through `tsx`.
+2. Variables: `DATABASE_URL` (use the **internal** `postgres.railway.internal` URL — this service
+   runs inside Railway, so it doesn't need the public proxy) and `HEALTH_INGEST_TOKEN`, a random
+   string of at least 24 characters. The service refuses to start without both.
+3. **Settings** → **Networking** → **Generate Domain**.
+
+Then change the Shortcut's **Get Contents of URL** to
+`POST https://<service>.up.railway.app/api/health/ingest` with a header
+`Authorization: Bearer <HEALTH_INGEST_TOKEN>`.
+
+⚠️ Unlike the dashboards, this endpoint is on the public internet rather than behind Tailscale, so
+that token is the only thing in front of it. It's the one route the service exposes and it can only
+write `health_days`, but treat the token like any other secret in `server/.env`. Skip this whole
+section if you'd rather keep every ingress on the tailnet — the rolling window above still makes
+outages self-healing.
+
 ## Arranging widgets
 
 The Personal section's widget cards can be reordered: open **Personal** → **Arrange** (top-right), then drag a card to its new position. The order is saved server-side (`server/.data/layout.json`, gitignored) and shared across every device that reaches this dashboard.

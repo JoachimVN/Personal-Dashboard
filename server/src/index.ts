@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { z } from 'zod';
-import { healthIngestBatchSchema, healthIngestSchema } from '@personal-dashboard/shared';
+import { parseHealthIngestBody } from './healthIngest.js';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { createDatabase } from './db/client.js';
@@ -150,16 +150,12 @@ app.post('/api/hue/scenes/:id', async (req, res) => {
 // Same trust model as the rest of the dashboard: loopback + `tailscale serve`, no separate auth.
 // Accepts either a single day sample or `{ days: [...] }` covering a multi-day window.
 app.post('/api/health/ingest', async (req, res) => {
-  const isBatch = typeof req.body === 'object' && req.body !== null && 'days' in req.body;
-  const parsed = isBatch
-    ? healthIngestBatchSchema.safeParse(req.body)
-    : healthIngestSchema.safeParse(req.body);
-  if (!parsed.success) {
+  const samples = parseHealthIngestBody(req.body);
+  if (!samples) {
     res.status(400).json({ error: 'invalid-health-sample' });
     return;
   }
   const today = todayInZone(env.timezone);
-  const samples = 'days' in parsed.data ? parsed.data.days : [parsed.data];
   for (const sample of samples) {
     await providers.health.ingest(sample, today);
   }
