@@ -4,6 +4,7 @@ import express from 'express';
 import { z } from 'zod';
 import { parseHealthIngestBody } from './healthIngest.js';
 import { listenForHealthIngest, notifyHealthIngest } from './healthNotify.js';
+import { createWidgetEventStream } from './widgetEvents.js';
 import { loadConfig } from './config.js';
 import { loadEnv } from './env.js';
 import { createDatabase } from './db/client.js';
@@ -72,6 +73,11 @@ const AI_USAGE_WIDGET_IDS = new Set(['ai-usage-claude', 'ai-usage-codex']);
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
+
+// Pushes "widget X settled" to open dashboards so they read it now instead of on their next poll.
+const widgetEvents = createWidgetEventStream();
+app.get('/api/events', widgetEvents.handler);
+scheduler.onSettled((id) => widgetEvents.broadcast(id));
 
 const locationSchema = z.object({
   lat: z.number().min(-90).max(90),
