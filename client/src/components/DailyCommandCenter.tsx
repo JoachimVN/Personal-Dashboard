@@ -32,6 +32,10 @@ import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { GitHubMark } from './GitHubMark';
 import { SteamMark } from './SteamMark';
+import { CalendarMark } from './CalendarMark';
+import { MailMark } from './MailMark';
+import { NewsMark } from './NewsMark';
+import { MessageMark } from './MessageMark';
 import { heroExtraFor, heroLeadFor, SecondaryContent } from './command-center/SecondaryContent';
 import { AiToolMark } from './command-center/secondary/fallback';
 import { QualityGatePill } from './command-center/secondary/sonar';
@@ -286,8 +290,23 @@ function fallbackSignalMark(
       {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
     </span>;
   }
-  if (slot.source === 'github' && slot.render.type === 'github-contributions') {
+  if (slot.kind === 'github') {
     return <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />;
+  }
+  if (slot.kind === 'sonar') {
+    return <img src={publicAsset('sonarqube/icon.svg')} alt="" aria-hidden className="h-[1.1rem] w-[1.1rem] shrink-0" />;
+  }
+  if (slot.kind === 'gmail') {
+    return <MailMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
+  }
+  if (slot.kind === 'calendar') {
+    return <CalendarMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
+  }
+  if (slot.kind === 'news') {
+    return <NewsMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
+  }
+  if (slot.kind === 'imessage') {
+    return <MessageMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
   }
   if (slot.render.type === 'weather-signal') {
     return <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
