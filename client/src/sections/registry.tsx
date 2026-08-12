@@ -224,10 +224,25 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
     return <CalendarMark className="h-5 w-5" accentColor={accent} />;
   }
     case 'health': {
+    /* The nav pill stays a plain currentColor heart (matching its monochrome siblings); the
+       overview header shows Apple's own Health app icon (white ground) so it reads correctly
+       at a glance. */
+    if (monochrome) {
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
+          <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
+        </svg>
+      );
+    }
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
-        <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
-      </svg>
+      <img
+        src={publicAsset('health/icon-light.svg')}
+        alt=""
+        aria-hidden
+        className="health-app-icon h-5 w-5 rounded-[0.3rem] object-cover"
+        loading="lazy"
+        decoding="async"
+      />
     );
   }
     case 'steam': {
