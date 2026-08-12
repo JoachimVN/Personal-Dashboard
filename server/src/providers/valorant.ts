@@ -260,7 +260,7 @@ function mapStoredMatch(match: RawStoredMatch): ValorantMatch {
   };
 }
 
-function mergeMatches(...groups: ValorantMatch[][]): ValorantMatch[] {
+export function mergeMatches(...groups: ValorantMatch[][]): ValorantMatch[] {
   const byId = new Map<string, ValorantMatch>();
   for (const match of groups.flat()) {
     const existing = byId.get(match.matchId);
