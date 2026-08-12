@@ -120,17 +120,24 @@ export interface ValorantModeOption {
 }
 
 /** Sorted by frequency (most-played mode first) rather than alphabetically, so Competitive/Unrated
- * naturally lead for most accounts without hardcoding a priority list of Riot's queue names. */
+ * naturally lead for most accounts without hardcoding a priority list of Riot's queue names.
+ * Grouped case-insensitively — HenrikDev has been observed returning both "Unknown" and "unknown"
+ * for the same underlying queue, which would otherwise split into two near-identical tabs. */
 export function modeOptions(matches: ValorantMatch[]): ValorantModeOption[] {
-  const byMode = new Map<string, ValorantMatch[]>();
+  const byMode = new Map<string, { mode: string; matches: ValorantMatch[] }>();
   for (const match of matches) {
-    const list = byMode.get(match.mode) ?? [];
-    list.push(match);
-    byMode.set(match.mode, list);
+    const key = match.mode.toLowerCase();
+    const bucket = byMode.get(key);
+    if (!bucket) {
+      byMode.set(key, { mode: match.mode, matches: [match] });
+      continue;
+    }
+    bucket.matches.push(match);
+    if (bucket.mode === key && match.mode !== key) bucket.mode = match.mode;
   }
   return [
     { id: 'all', label: 'All modes', matches },
-    ...[...byMode.entries()].sort((a, b) => b[1].length - a[1].length).map(([mode, modeMatches]) => ({ id: mode, label: mode, matches: modeMatches })),
+    ...[...byMode.values()].sort((a, b) => b.matches.length - a.matches.length).map(({ mode, matches: modeMatches }) => ({ id: mode, label: mode, matches: modeMatches })),
   ];
 }
 
@@ -142,7 +149,10 @@ export interface AgentSummary {
 
 export function agentSummaries(matches: ValorantMatch[]): AgentSummary[] {
   const agents = new Map<string, AgentSummary>();
-  for (const match of matches) {
+  // A blank agentName marks a sparse, stats-free match backfilled from Riot's data-export archive
+  // (see server/scripts/backfillValorantHistory.ts) — it has no agent to attribute, so it must not
+  // dominate the pool ranking the way thousands of them would if grouped under one bucket.
+  for (const match of matches.filter((match) => match.agentName !== '')) {
     const summary = agents.get(match.agentName) ?? { name: match.agentName, iconUrl: match.agentIconUrl, matches: [] };
     summary.matches.push(match);
     agents.set(match.agentName, summary);
