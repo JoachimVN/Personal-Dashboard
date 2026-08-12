@@ -39,6 +39,7 @@ import { MessageMark } from './MessageMark';
 import { heroExtraFor, heroLeadFor, SecondaryContent } from './command-center/SecondaryContent';
 import { AiToolMark } from './command-center/secondary/fallback';
 import { QualityGatePill } from './command-center/secondary/sonar';
+import { SonarWordmark } from './SonarWordmark';
 import { useRobloxArtPalette } from './command-center/useRobloxArtPalette';
 import { useCommandCenterData, type AiUsageByTool } from './command-center/useCommandCenterData';
 import '../sections/spotify/spotify.css';
@@ -191,6 +192,18 @@ function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
     return <span className="command-kicker-badge command-kicker-badge--glyph" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
   }
   return null;
+}
+
+/** The hero/secondary kicker line's content — normally the badge plus plain `slot.kicker` text,
+ * but SonarCloud's own wordmark reads better than repeating its name as text, so that source
+ * swaps in the logo (the wordmark's arc doubles as the badge) ahead of the "Quality Gate" text
+ * the kicker string carries. The sr-only span keeps "SonarCloud" in the accessible name, since
+ * the wordmark image itself is decorative (aria-hidden). */
+function KickerLabel({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
+  if (slot.render.type === 'sonar-quality-gate') {
+    return <><span className="sr-only">SonarCloud</span><SonarWordmark className="command-kicker-wordmark" /> Quality Gate</>;
+  }
+  return <><KickerBadge slot={slot} />{slot.kicker}</>;
 }
 
 /** Which badge illustrates a Clash of Clans moment card — war and raid weekend get their own
@@ -558,7 +571,7 @@ export function HeroPanel({
       art={slotArt(hero)}
       style={weatherPanelStyle(hero)}
     >
-      <p className="command-label"><KickerBadge slot={hero} />{hero.kicker}</p>
+      <p className="command-label"><KickerLabel slot={hero} /></p>
       {lead ?? (
         <div className="mt-5 flex items-start gap-4">
           <div className="min-w-0">
@@ -669,7 +682,7 @@ export function SecondaryCardBody(props: Readonly<{
 }>) {
   const { slot } = props;
   return <>
-    {slot.render.type !== 'roblox-now-playing' && <div className="command-agenda-heading"><p className="command-label"><KickerBadge slot={slot} />{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>}
+    {slot.render.type !== 'roblox-now-playing' && <div className="command-agenda-heading"><p className="command-label"><KickerLabel slot={slot} /></p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>}
     <SecondaryContent {...props} />
   </>;
 }
