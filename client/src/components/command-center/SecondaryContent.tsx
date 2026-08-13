@@ -34,6 +34,7 @@ import { GmailThreadList, GmailThreadsSecondary } from './secondary/gmail';
 import { HealthRingsSecondary } from './secondary/health';
 import { RobloxNowPlayingSecondary } from './secondary/roblox';
 import { QualityGatePill, SonarQualityGateSecondary, SonarRatingBadges } from './secondary/sonar';
+import { SonarWordmark } from '../SonarWordmark';
 import {
   SpotifyAlbumSecondary,
   SpotifyArtistSecondary,
@@ -115,7 +116,7 @@ export function heroExtraFor(
       <QualityGatePill status={render.status} />
       <div className="mt-4"><SonarRatingBadges project={first} /></div>
       {rest.length > 0 && <div className="command-agenda-list mt-4">
-        {rest.map((project) => <div key={project.key} className="command-agenda-item"><span className="command-agenda-lead">SonarCloud</span><span>{project.name}</span></div>)}
+        {rest.map((project) => <div key={project.key} className="command-agenda-item"><SonarWordmark className="command-agenda-lead mr-2.5 inline-block h-[1.05rem] w-auto shrink-0 align-baseline" /><span>{project.name}</span></div>)}
       </div>}
     </div>;
   }

@@ -32,9 +32,14 @@ import { sectionHref } from '../router';
 import { ActivityRings, CompactActivityRings } from './ActivityRings';
 import { GitHubMark } from './GitHubMark';
 import { SteamMark } from './SteamMark';
+import { CalendarMark } from './CalendarMark';
+import { MailMark } from './MailMark';
+import { NewsMark } from './NewsMark';
+import { MessageMark } from './MessageMark';
 import { heroExtraFor, heroLeadFor, SecondaryContent } from './command-center/SecondaryContent';
 import { AiToolMark } from './command-center/secondary/fallback';
 import { QualityGatePill } from './command-center/secondary/sonar';
+import { SonarWordmark } from './SonarWordmark';
 import { useRobloxArtPalette } from './command-center/useRobloxArtPalette';
 import { useCommandCenterData, type AiUsageByTool } from './command-center/useCommandCenterData';
 import '../sections/spotify/spotify.css';
@@ -189,6 +194,18 @@ function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
   return null;
 }
 
+/** The hero/secondary kicker line's content — normally the badge plus plain `slot.kicker` text,
+ * but SonarCloud's own wordmark reads better than repeating its name as text, so that source
+ * swaps in the logo (the wordmark's arc doubles as the badge) ahead of the "Quality Gate" text
+ * the kicker string carries. The sr-only span keeps "SonarCloud" in the accessible name, since
+ * the wordmark image itself is decorative (aria-hidden). */
+function KickerLabel({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
+  if (slot.render.type === 'sonar-quality-gate') {
+    return <><span className="sr-only">SonarCloud</span><SonarWordmark className="command-kicker-wordmark" /> Quality Gate</>;
+  }
+  return <><KickerBadge slot={slot} />{slot.kicker}</>;
+}
+
 /** Which badge illustrates a Clash of Clans moment card — war and raid weekend get their own
  * in-game icon (war preparation reuses the war icon, since it's the same event just before it's
  * actionable); league uses the player's own current league-tier art straight from Supercell's API
@@ -286,8 +303,23 @@ function fallbackSignalMark(
       {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
     </span>;
   }
-  if (slot.source === 'github' && slot.render.type === 'github-contributions') {
+  if (slot.kind === 'github') {
     return <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />;
+  }
+  if (slot.kind === 'sonar') {
+    return <img src={publicAsset('sonarqube/icon.svg')} alt="" aria-hidden className="h-[1.1rem] w-[1.1rem] shrink-0" />;
+  }
+  if (slot.kind === 'gmail') {
+    return <MailMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
+  }
+  if (slot.kind === 'calendar') {
+    return <CalendarMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
+  }
+  if (slot.kind === 'news') {
+    return <NewsMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
+  }
+  if (slot.kind === 'imessage') {
+    return <MessageMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
   }
   if (slot.render.type === 'weather-signal') {
     return <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
@@ -539,7 +571,7 @@ export function HeroPanel({
       art={slotArt(hero)}
       style={weatherPanelStyle(hero)}
     >
-      <p className="command-label"><KickerBadge slot={hero} />{hero.kicker}</p>
+      <p className="command-label"><KickerLabel slot={hero} /></p>
       {lead ?? (
         <div className="mt-5 flex items-start gap-4">
           <div className="min-w-0">
@@ -650,7 +682,7 @@ export function SecondaryCardBody(props: Readonly<{
 }>) {
   const { slot } = props;
   return <>
-    {slot.render.type !== 'roblox-now-playing' && <div className="command-agenda-heading"><p className="command-label"><KickerBadge slot={slot} />{slot.kicker}</p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>}
+    {slot.render.type !== 'roblox-now-playing' && <div className="command-agenda-heading"><p className="command-label"><KickerLabel slot={slot} /></p><span className="command-agenda-link" aria-hidden>Open section <span>↗</span></span></div>}
     <SecondaryContent {...props} />
   </>;
 }

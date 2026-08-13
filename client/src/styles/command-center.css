@@ -583,6 +583,16 @@
   line-height: 1;
 }
 
+/* SonarCloud's kicker swaps the badge+text pair for its own wordmark — sized off the label's
+   cap-height rather than the square badge box, since it's a wide logotype, not an icon. */
+.command-kicker-wordmark {
+  display: inline-block;
+  height: 0.95rem;
+  width: auto;
+  margin: 0 0.9rem 0 0;
+  vertical-align: baseline;
+}
+
 /* Reused secondary bodies (Spotify/Steam/Roblox/Clash cards) size their artwork and rows off
    --secondary-carousel-media-size/-content-height, which the carousel wrapper normally defines —
    this stands in for that wrapper when those same components render as the hero's lead content,

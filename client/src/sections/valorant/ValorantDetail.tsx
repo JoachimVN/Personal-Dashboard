@@ -20,6 +20,7 @@ import {
   performancePeriods,
   recentRecord,
   recentSpotlightMatches,
+  winRateMatches,
 } from '../../widgets/ValorantWidgets';
 import { DetailSectionHeading } from '../DetailIntro';
 import './valorant.css';
@@ -144,8 +145,9 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
   const actWinRate = actGames !== undefined && actGames > 0 && actWins !== undefined ? Math.round((actWins / actGames) * 100) : undefined;
 
   const careerMatches = data.history.matches;
-  const careerRecord = recentRecord(careerMatches);
-  const careerWinRate = careerMatches.length > 0 ? Math.round((careerRecord.wins / careerMatches.length) * 100) : undefined;
+  const careerRateMatches = winRateMatches(careerMatches);
+  const careerRecord = recentRecord(careerRateMatches);
+  const careerWinRate = careerRateMatches.length > 0 ? Math.round((careerRecord.wins / careerRateMatches.length) * 100) : undefined;
   const careerKd = killDeathRatio(careerMatches);
   const careerHsPercent = aggregateHeadshotRate(careerMatches);
   const careerTopAgent = agentSummaries(careerMatches)[0];
@@ -221,7 +223,7 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
             winRate={careerWinRate}
             kd={careerKd}
             hsPercent={careerHsPercent}
-            games={careerMatches.length}
+            games={careerRateMatches.length}
             topAgent={careerTopAgent}
           />
         </div>

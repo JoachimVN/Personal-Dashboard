@@ -80,6 +80,35 @@
   background: color-mix(in oklab, var(--accent) 7%, var(--color-card));
   transition: background 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
 }
+
+/* Sections whose glyph is the service's own logo (not a hand-drawn stand-in) drop the chip —
+   the mark itself fills the header frame, same treatment as .valorant-overview-mark /
+   .clash-royale-overview-mark. Hand-drawn glyphs (ai/weather/personal) keep the box. */
+.section-card-header--github .section-icon,
+.section-card-header--spotify .section-icon,
+.section-card-header--steam .section-icon,
+.section-card-header--health .section-icon {
+  border: none;
+  background: none;
+  box-shadow: none;
+}
+
+.section-card-header--github .section-icon svg,
+.section-card-header--spotify .section-icon svg,
+.section-card-header--spotify .section-icon img,
+.section-card-header--steam .section-icon svg,
+.section-card-header--health .section-icon img {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Health's icon is a square app-icon image like Clash Royale's — the Tailwind rounded-[0.3rem] on
+   it is a fixed 4.8px that reads far squarer once scaled up to 2rem; match Clash Royale's actual
+   corner ratio (0.55rem radius on its 2.3rem mark, ~24%) at this icon's size instead. */
+.section-card-header--health .section-icon img {
+  border-radius: 0.48rem;
+}
+
 .section-arrow {
   transition: color 220ms ease, background 220ms ease, transform 350ms cubic-bezier(.2,.8,.2,1);
 }
@@ -114,6 +143,15 @@
     box-shadow:
       0 8px 20px color-mix(in oklab, var(--accent) 14%, transparent),
       inset 0 1px 0 light-dark(rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.08));
+  }
+
+  .dashboard-section-card:hover .section-card-header--github .section-icon,
+  .dashboard-section-card:hover .section-card-header--spotify .section-icon,
+  .dashboard-section-card:hover .section-card-header--steam .section-icon,
+  .dashboard-section-card:hover .section-card-header--health .section-icon {
+    border: none;
+    background: none;
+    box-shadow: none;
   }
 
   .dashboard-section-card:hover .section-arrow {

@@ -1,5 +1,6 @@
 import { useId, type ComponentType, type CSSProperties } from 'react';
 import { GitHubMark } from '../components/GitHubMark';
+import { CalendarMark } from '../components/CalendarMark';
 import { CLASH_ROYALE_APP_ICON_URL } from '../lib/clashRoyale';
 import { publicAsset } from '../lib/publicAsset';
 import { AiOverview } from './ai/AiOverview';
@@ -220,19 +221,28 @@ export function SectionIcon({ id, monochrome = false }: Readonly<{ id: SectionId
   }
     case 'personal': {
     const accent = monochrome ? 'currentColor' : 'var(--accent)';
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3.25" y="5" width="17.5" height="15.5" rx="3" />
-        <path d="M8 3v3.4M16 3v3.4M3.25 10h17.5" />
-        <rect x="13.5" y="13" width="4" height="4" rx="1" fill={accent} stroke="none" />
-      </svg>
-    );
+    return <CalendarMark className="h-5 w-5" accentColor={accent} />;
   }
     case 'health': {
+    /* The nav pill stays a plain currentColor heart (matching its monochrome siblings); the
+       overview header shows Apple's own Health app icon (white ground) so it reads correctly
+       at a glance. */
+    if (monochrome) {
+      return (
+        <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
+          <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
+        </svg>
+      );
+    }
     return (
-      <svg viewBox="0 0 24 24" aria-hidden className="h-5 w-5" fill="currentColor">
-        <path d="M12 20.4 3.7 12.1a5.1 5.1 0 0 1 7.2-7.2L12 6l1.1-1.1a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
-      </svg>
+      <img
+        src={publicAsset('health/icon-light.svg')}
+        alt=""
+        aria-hidden
+        className="health-app-icon h-5 w-5 rounded-[0.3rem] object-cover"
+        loading="lazy"
+        decoding="async"
+      />
     );
   }
     case 'steam': {

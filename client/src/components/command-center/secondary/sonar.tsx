@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { CommandCenterSlot } from '@personal-dashboard/shared';
+import { SonarWordmark } from '../../SonarWordmark';
 import { RatingBadge } from '../../../widgets/SonarCloudWidgets';
 
 type SonarRender = Extract<CommandCenterSlot['render'], { type: 'sonar-quality-gate' }>;
@@ -45,7 +46,7 @@ export function SonarQualityGateSecondary({ slot }: Readonly<{ slot: CommandCent
         <div className="command-agenda-list mt-4">
           {rest.map((project) => (
             <div key={project.key} className="command-agenda-item">
-              <span className="command-agenda-lead">SonarCloud</span><span>{project.name}</span>
+              <SonarWordmark className="command-agenda-lead mr-2.5 inline-block h-[1.05rem] w-auto shrink-0 align-baseline" /><span>{project.name}</span>
             </div>
           ))}
         </div>

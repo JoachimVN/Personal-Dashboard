@@ -21,6 +21,9 @@ server/.data
 # Start from server/config.example.json — a missing config.json just uses defaults.
 server/config.json
 
+# scripts/backfillValorantHistory.ts --apply dumps the previous cache row here before overwriting.
+server/.valorant-history-backup-*.json
+
 # Logs & OS noise
 *.log
 .DS_Store

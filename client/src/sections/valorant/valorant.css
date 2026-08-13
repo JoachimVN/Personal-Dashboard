@@ -366,6 +366,7 @@
 .valorant-match-row[data-result='loss'] { background: linear-gradient(90deg, color-mix(in srgb, var(--valorant-loss) 4%, transparent), transparent 72%), color-mix(in oklab, var(--color-track) 25%, transparent); }
 .valorant-agent-icon { width: 2.4rem; height: 2.4rem; border-radius: 0.6rem; background: var(--color-track); object-fit: cover; }
 .valorant-match-main { min-width: 0; }
+.valorant-match-main:first-child { grid-column: 1 / -1; }
 .valorant-match-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
 .valorant-match-title-row p { overflow: hidden; margin: 0; color: var(--color-ink); font-size: 0.82rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .valorant-match-title-row time { flex: 0 0 auto; color: var(--color-ink-faint); font-size: 0.62rem; }

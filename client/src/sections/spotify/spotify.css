@@ -12,6 +12,13 @@
   }
 }
 
+/* Gotham is Spotify's old brand face (pre-2015 Circular rebrand) — a commercial font we can't
+   ship, so this only renders as true Gotham if it's already installed as a system font; otherwise
+   it falls through to a similar geometric sans before the site's default stack. */
+.dashboard-section-card--spotify {
+  font-family: Gotham, 'Gotham SSm', Montserrat, 'Century Gothic', Inter, ui-sans-serif, sans-serif;
+}
+
 /* Small range toggle in the top-artists/tracks card headers. */
 .spotify-range-toggle {
   display: inline-flex;
