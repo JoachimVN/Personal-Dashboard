@@ -61,6 +61,7 @@ interface RawComponent {
 interface RawMeasure {
   metric: string;
   value?: string;
+  periods?: Array<{ value?: string }>;
 }
 
 interface RawQualityGateCondition {
@@ -119,6 +120,11 @@ export function parseLanguages(distribution: string | undefined): string[] {
     .map((key) => LANGUAGE_NAMES[key] ?? key.toUpperCase());
 }
 
+/** Overall measures use `value`; new-code measures use the current entry in `periods`. */
+export function measureValue(measure: RawMeasure): string | undefined {
+  return measure.value ?? measure.periods?.at(-1)?.value;
+}
+
 async function fetchProjectDetails(signal: AbortSignal, token: string, component: RawComponent): Promise<SonarProject> {
   const [qualityGate, measures] = await Promise.all([
     sonarRequest<RawQualityGateStatus>(
@@ -135,7 +141,7 @@ async function fetchProjectDetails(signal: AbortSignal, token: string, component
     ).catch(() => ({ component: undefined })),
   ]);
 
-  const byMetric = new Map((measures.component?.measures ?? []).map((m) => [m.metric, m.value]));
+  const byMetric = new Map((measures.component?.measures ?? []).map((measure) => [measure.metric, measureValue(measure)]));
   const status = qualityGate.projectStatus?.status;
 
   return {
