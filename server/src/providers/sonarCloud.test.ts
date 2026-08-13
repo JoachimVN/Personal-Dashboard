@@ -74,7 +74,14 @@ describe('createSonarCloudProvider', () => {
       ],
       [
         'qualitygates/project_status?projectKey=old-repo',
-        () => jsonResponse({ projectStatus: { status: 'ERROR' } }),
+        () => jsonResponse({
+          projectStatus: {
+            status: 'ERROR',
+            conditions: [
+              { status: 'ERROR', metricKey: 'new_coverage', comparator: 'LT', errorThreshold: '80', actualValue: '62.5' },
+            ],
+          },
+        }),
       ],
       [
         'qualitygates/project_status?projectKey=new-repo',
@@ -104,6 +111,11 @@ describe('createSonarCloudProvider', () => {
                 { metric: 'vulnerabilities', value: '2' },
                 { metric: 'bugs', value: '1' },
                 { metric: 'code_smells', value: '17' },
+                { metric: 'new_violations', value: '0' },
+                { metric: 'new_coverage', value: '86.2' },
+                { metric: 'new_duplicated_lines_density', value: '1.1' },
+                { metric: 'new_security_hotspots', value: '2' },
+                { metric: 'new_security_hotspots_reviewed', value: '100' },
               ],
             },
           }),
@@ -127,8 +139,24 @@ describe('createSonarCloudProvider', () => {
       vulnerabilitiesCount: 2,
       bugsCount: 1,
       codeSmellsCount: 17,
+      newIssuesCount: 0,
+      newCoveragePercent: 86.2,
+      newDuplicationsPercent: 1.1,
+      newHotspotsCount: 2,
+      newHotspotsReviewedPercent: 100,
     });
-    expect(oldRepo).toMatchObject({ qualityGateStatus: 'failed', linesOfCode: 500, security: 'C' });
+    expect(oldRepo).toMatchObject({
+      qualityGateStatus: 'failed',
+      qualityGateConditions: [{
+        metricKey: 'new_coverage',
+        status: 'failed',
+        comparator: 'LT',
+        errorThreshold: '80',
+        actualValue: '62.5',
+      }],
+      linesOfCode: 500,
+      security: 'C',
+    });
     fetchMock.mockRestore();
   });
 });

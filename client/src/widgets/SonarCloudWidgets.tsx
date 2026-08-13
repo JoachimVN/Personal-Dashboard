@@ -8,6 +8,89 @@ const RATING_COLOR: Record<SonarRating, string> = {
   E: 'light-dark(#b91c1c, #fb7185)',
 };
 
+const QUALITY_GATE_METRIC_LABELS: Record<string, string> = {
+  new_violations: 'New issues',
+  new_reliability_rating: 'New reliability rating',
+  new_security_rating: 'New security rating',
+  new_maintainability_rating: 'New maintainability rating',
+  new_sqale_rating: 'New maintainability rating',
+  new_security_hotspots_reviewed: 'New hotspots reviewed',
+  new_coverage: 'New-code coverage',
+  new_duplicated_lines_density: 'New-code duplication',
+  reliability_rating: 'Reliability rating',
+  security_rating: 'Security rating',
+  sqale_rating: 'Maintainability rating',
+  security_hotspots_reviewed: 'Hotspots reviewed',
+  coverage: 'Coverage',
+  duplicated_lines_density: 'Duplication',
+};
+
+const PERCENT_METRICS = new Set([
+  'new_security_hotspots_reviewed',
+  'new_coverage',
+  'new_duplicated_lines_density',
+  'security_hotspots_reviewed',
+  'coverage',
+  'duplicated_lines_density',
+]);
+
+function formatQualityGateValue(metricKey: string, value: string | undefined): string {
+  if (value === undefined) return 'unknown';
+  if (metricKey.endsWith('_rating')) {
+    const ratingIndex = Number(value);
+    if (Number.isInteger(ratingIndex) && ratingIndex >= 1 && ratingIndex <= 5) {
+      return (['A', 'B', 'C', 'D', 'E'] as const)[ratingIndex - 1] ?? value;
+    }
+    return value;
+  }
+  if (!PERCENT_METRICS.has(metricKey)) return value;
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? `${numericValue.toFixed(1)}%` : value;
+}
+
+function qualityGateRequirement(metricKey: string, comparator: string, threshold: string | undefined): string | undefined {
+  if (threshold === undefined) return undefined;
+  const formattedThreshold = formatQualityGateValue(metricKey, threshold);
+  if (comparator === 'GT') return `requires ≤ ${formattedThreshold}`;
+  if (comparator === 'LT') return `requires ≥ ${formattedThreshold}`;
+  if (comparator === 'NE') return `requires ${formattedThreshold}`;
+  if (comparator === 'EQ') return `must differ from ${formattedThreshold}`;
+  return `threshold ${formattedThreshold}`;
+}
+
+function qualityGateConditionText(condition: NonNullable<SonarProject['qualityGateConditions']>[number]): string {
+  const label = QUALITY_GATE_METRIC_LABELS[condition.metricKey] ?? condition.metricKey.replaceAll('_', ' ');
+  const actual = formatQualityGateValue(condition.metricKey, condition.actualValue);
+  const requirement = qualityGateRequirement(condition.metricKey, condition.comparator, condition.errorThreshold);
+  return requirement ? `${label}: ${actual} · ${requirement}` : `${label}: ${actual}`;
+}
+
+function NewCodeSummary({ project }: Readonly<{ project: SonarProject }>) {
+  const items: string[] = [];
+  if (project.newIssuesCount !== undefined) {
+    items.push(`${project.newIssuesCount} new issue${project.newIssuesCount === 1 ? '' : 's'}`);
+  }
+  if (project.newCoveragePercent !== undefined) items.push(`${project.newCoveragePercent.toFixed(1)}% coverage`);
+  if (project.newDuplicationsPercent !== undefined) items.push(`${project.newDuplicationsPercent.toFixed(1)}% duplication`);
+  if (project.newHotspotsCount === 0) {
+    items.push('No new hotspots');
+  } else if (project.newHotspotsCount !== undefined && project.newHotspotsReviewedPercent !== undefined) {
+    items.push(`${project.newHotspotsReviewedPercent.toFixed(0)}% of ${project.newHotspotsCount} hotspots reviewed`);
+  } else if (project.newHotspotsCount !== undefined) {
+    items.push(`${project.newHotspotsCount} new hotspot${project.newHotspotsCount === 1 ? '' : 's'}`);
+  } else if (project.newHotspotsReviewedPercent !== undefined) {
+    items.push(`${project.newHotspotsReviewedPercent.toFixed(0)}% hotspots reviewed`);
+  }
+
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-4 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-(--color-card-border) pt-3 text-xs text-ink-faint">
+      <span className="font-semibold uppercase tracking-[0.1em] text-ink-muted">New code</span>
+      {items.map((item) => <span key={item}>· {item}</span>)}
+    </div>
+  );
+}
+
 export function RatingBadge({ rating, label, value, issueCount }: Readonly<{ rating?: SonarRating; label: string; value?: string; issueCount?: number }>) {
   return (
     <div className="flex flex-col items-center justify-center gap-1">
@@ -51,6 +134,7 @@ function formatLoc(loc: number | undefined): string {
 
 export function SonarProjectCard({ project }: Readonly<{ project: SonarProject }>) {
   const { lastAnalysis } = project;
+  const failedConditions = project.qualityGateConditions?.filter((condition) => condition.status === 'failed') ?? [];
   return (
     <a
       href={`https://sonarcloud.io/project/overview?id=${encodeURIComponent(project.key)}`}
@@ -89,6 +173,16 @@ export function SonarProjectCard({ project }: Readonly<{ project: SonarProject }
               </>
             )}
           </p>
+          {failedConditions.length > 0 && (
+            <div className="mt-3 rounded-xl border border-red-500/20 bg-red-500/5 px-3 py-2 text-xs text-ink-muted">
+              <p className="font-semibold text-red-700 dark:text-red-300">Why it failed</p>
+              <ul className="mt-1 space-y-0.5">
+                {failedConditions.map((condition) => (
+                  <li key={`${condition.metricKey}:${condition.errorThreshold ?? ''}`}>{qualityGateConditionText(condition)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="mt-4 grid grid-cols-3 gap-3 border-t border-(--color-card-border) pt-4 sm:grid-cols-5">
             <RatingBadge rating={project.security} label="Security" issueCount={project.vulnerabilitiesCount} />
             <RatingBadge rating={project.reliability} label="Reliability" issueCount={project.bugsCount} />
@@ -99,6 +193,7 @@ export function SonarProjectCard({ project }: Readonly<{ project: SonarProject }
                 Analysis mode can't run tests). Re-add once that's wired up. */}
             <RatingBadge label="Duplications" value={project.duplicationsPercent !== undefined ? `${project.duplicationsPercent.toFixed(1)}%` : '0.0%'} />
           </div>
+          <NewCodeSummary project={project} />
         </>
       ) : (
         <p className="mt-2 text-xs text-ink-faint">No analysis yet</p>
