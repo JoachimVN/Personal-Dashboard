@@ -318,6 +318,14 @@ function addSessionResetPoints(
     if (!includeSessionStart) continue;
     const sessionStart = reset - sessionWindowMs;
     if (sessionStart <= start || sessionStart > end) continue;
+    // When resets run back-to-back at the normal cadence (the common case for the five-hour
+    // metric), backdating a full window from this reset lands exactly on the *previous* reset,
+    // which already got its own zero-anchor pair from that earlier loop iteration. Pushing a
+    // second, duplicate zero here doesn't add information — it splits buildGeometry's run right
+    // after the real reset, which quietly drops the gap-dash guard for whatever comes next and
+    // draws a misleading solid "smooth accumulation" line across what was actually an unsampled
+    // gap (e.g. no usage until well after the reset, then a jump).
+    if (resets.some((other) => other !== reset && Math.abs(other - sessionStart) <= RESET_DRIFT_MS)) continue;
     chartPoints.push({
       x: ((sessionStart - start) / windowMs) * W,
       y: H,
