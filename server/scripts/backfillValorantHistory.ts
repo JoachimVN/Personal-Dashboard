@@ -133,7 +133,9 @@ export function toSparseMatch(row: RiotExportRow): ValorantMatch {
   const startedAt = `${row.game_start_time_utc.replace(' ', 'T')}Z`;
   const endedAt = `${row.game_end_time_utc.replace(' ', 'T')}Z`;
   const durationSeconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000));
-  const result = row.game_outcome === 'Win' ? 'win' : row.game_outcome === 'Loss' ? 'loss' : 'draw';
+  let result: 'win' | 'loss' | 'draw' = 'draw';
+  if (row.game_outcome === 'Win') result = 'win';
+  else if (row.game_outcome === 'Loss') result = 'loss';
   return valorantMatchSchema.parse({
     matchId: row.game_id,
     map: '',
