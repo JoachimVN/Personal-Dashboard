@@ -65,6 +65,9 @@ function qualityGateConditionText(condition: NonNullable<SonarProject['qualityGa
   return requirement ? `${label}: ${actual} · ${requirement}` : `${label}: ${actual}`;
 }
 
+/** Flip to true to bring back the "New code" line under each project card. */
+const SHOW_NEW_CODE_SUMMARY: boolean = false;
+
 function NewCodeSummary({ project }: Readonly<{ project: SonarProject }>) {
   const items: string[] = [];
   if (project.newIssuesCount !== undefined) {
@@ -193,7 +196,7 @@ export function SonarProjectCard({ project }: Readonly<{ project: SonarProject }
                 Analysis mode can't run tests). Re-add once that's wired up. */}
             <RatingBadge label="Duplications" value={project.duplicationsPercent !== undefined ? `${project.duplicationsPercent.toFixed(1)}%` : '0.0%'} />
           </div>
-          <NewCodeSummary project={project} />
+          {SHOW_NEW_CODE_SUMMARY && <NewCodeSummary project={project} />}
         </>
       ) : (
         <p className="mt-2 text-xs text-ink-faint">No analysis yet</p>
