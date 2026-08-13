@@ -59,7 +59,7 @@ const configSchema = z.object({
       /** Minimum percentage away from the personal baseline before it becomes a signal. */
       baselineDeviationPercent: z.number().positive().default(15),
     })
-    .default({ stepGoal: 10_000, moveGoalKcal: 290, exerciseGoalMinutes: 30, standGoalHours: 12, baselineWindowDays: 7, baselineDeviationPercent: 15 }),
+    .default({ stepGoal: 10_000, moveGoalKcal: 300, exerciseGoalMinutes: 30, standGoalHours: 12, baselineWindowDays: 7, baselineDeviationPercent: 15 }),
   commandCenter: z.object({
     /** How old the newest unread thread's message must be before the inbox is deprioritized as ignored, not urgent. */
     gmailStaleMs: z.number().int().min(60_000).default(24 * 60 * 60_000),
