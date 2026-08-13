@@ -75,12 +75,13 @@ interface RawMatchTeam {
   rounds: { won: number; lost: number };
 }
 
-interface RawMatch {
+export interface RawMatch {
   metadata: {
     match_id: string;
     map: { name: string };
     queue: { name: string };
     started_at: string;
+    game_length_in_ms?: number;
     season?: { short?: string };
   };
   teams: RawMatchTeam[];
@@ -205,6 +206,9 @@ export function mapMatch(match: RawMatch, puuid: string): ValorantMatch | undefi
     map: match.metadata.map.name,
     mode: match.metadata.queue?.name ?? 'Unknown',
     startedAt: match.metadata.started_at,
+    ...(match.metadata.game_length_in_ms === undefined
+      ? {}
+      : { durationSeconds: Math.round(match.metadata.game_length_in_ms / 1000) }),
     result,
     roundsWon: myTeam?.rounds.won,
     roundsLost: myTeam?.rounds.lost,
@@ -363,7 +367,21 @@ export function createValorantProvider(auth: ValorantAuth | undefined, historySt
         }
       }
 
-      const historyMatches = mergeMatches(storedHistory?.matches ?? [], recentMatches);
+      let historyMatches = mergeMatches(storedHistory?.matches ?? [], recentMatches);
+      const storedById = new Map((storedHistory?.matches ?? []).map((match) => [match.matchId, match]));
+      const hasUnpersistedRecentDetails = recentMatches.some((match) => {
+        const stored = storedById.get(match.matchId);
+        return !stored || stored.agentName === '';
+      });
+      if (historyStore && storedHistory && hasUnpersistedRecentDetails) {
+        storedHistory = await historyStore.set({
+          matches: historyMatches,
+          totalMatchesAvailable: Math.max(storedHistory.totalMatchesAvailable, historyMatches.length),
+          nextPage: storedHistory.nextPage,
+          sourceVersion: storedHistory.sourceVersion,
+        });
+        historyMatches = storedHistory.matches;
+      }
       const data: ValorantData = {
         profile: {
           name: account.name,

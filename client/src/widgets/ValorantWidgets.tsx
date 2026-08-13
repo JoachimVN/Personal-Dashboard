@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ValorantData, ValorantMatch } from '@personal-dashboard/shared';
+import { isValorantWinRateEligibleMode, type ValorantData, type ValorantMatch } from '@personal-dashboard/shared';
 import { relativeTime } from '../lib/time';
 
 export const RESULT_LABELS: Record<ValorantMatch['result'], string> = {
@@ -26,6 +26,11 @@ export function headshotRate(match: ValorantMatch): number {
   return totalShots === 0 ? 0 : Math.round((match.headshots / totalShots) * 100);
 }
 
+export function formatMatchDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.round(seconds / 60)}m`;
+}
+
 export function recentRecord(matches: ValorantMatch[]) {
   return matches.reduce((record, match) => {
     if (match.result === 'win') record.wins += 1;
@@ -33,6 +38,10 @@ export function recentRecord(matches: ValorantMatch[]) {
     else record.draws += 1;
     return record;
   }, { wins: 0, losses: 0, draws: 0 });
+}
+
+export function winRateMatches(matches: ValorantMatch[]): ValorantMatch[] {
+  return matches.filter((match) => isValorantWinRateEligibleMode(match.mode));
 }
 
 export function currentStreak(matches: ValorantMatch[]): { result: ValorantMatch['result']; length: number } | undefined {
@@ -200,8 +209,9 @@ export function ValorantProfile({ data, compact = false }: Readonly<{ data: Valo
 }
 
 export function ValorantStats({ data }: Readonly<{ data: ValorantData }>) {
-  const record = recentRecord(data.recentMatches);
-  const recordSummary = data.recentMatches.length === 0 ? '—' : [record.wins, record.losses, record.draws || undefined].filter((v): v is number => v !== undefined).join('–');
+  const recentRateMatches = winRateMatches(data.recentMatches);
+  const record = recentRecord(recentRateMatches);
+  const recordSummary = recentRateMatches.length === 0 ? '—' : [record.wins, record.losses, record.draws || undefined].filter((v): v is number => v !== undefined).join('–');
   const seasonWinRate = data.currentSeason && data.currentSeason.games > 0 ? Math.round((data.currentSeason.wins / data.currentSeason.games) * 100) : undefined;
   return (
     <div className="valorant-stats-grid">
@@ -248,13 +258,14 @@ export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange, se
   };
 
   const matches = selectedMode.matches;
-  const record = recentRecord(matches);
-  const winRate = matches.length === 0 ? undefined : Math.round((record.wins / matches.length) * 100);
+  const eligibleMatches = winRateMatches(matches);
+  const record = recentRecord(eligibleMatches);
+  const winRate = eligibleMatches.length === 0 ? undefined : Math.round((record.wins / eligibleMatches.length) * 100);
   const acs = averageCombatScore(matches);
   const agents = agentSummaries(matches).slice(0, 5);
   const loadedCount = history.matches.length;
   const coverage = `${formatNumber(Math.max(loadedCount, history.totalMatchesAvailable))} matches captured`;
-  const recordDetail = [`${record.wins}W`, `${record.losses}L`, record.draws > 0 ? `${record.draws}D` : undefined]
+  const recordDetail = eligibleMatches.length === 0 ? undefined : [`${eligibleMatches.length} counted`, `${record.wins}W`, `${record.losses}L`, record.draws > 0 ? `${record.draws}D` : undefined]
     .filter((value): value is string => value !== undefined)
     .join(' · ');
 
@@ -294,14 +305,17 @@ export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange, se
           </div>
           <ol className="valorant-agent-pool">
             {agents.map((agent) => {
-              const agentRecord = recentRecord(agent.matches);
-              const agentWinRate = Math.round((agentRecord.wins / agent.matches.length) * 100);
+              const eligibleAgentMatches = winRateMatches(agent.matches);
+              const agentRecord = recentRecord(eligibleAgentMatches);
+              const agentWinRate = eligibleAgentMatches.length === 0
+                ? undefined
+                : Math.round((agentRecord.wins / eligibleAgentMatches.length) * 100);
               return (
                 <li key={agent.name}>
                   {agent.iconUrl && <img src={agent.iconUrl} alt="" aria-hidden loading="lazy" decoding="async" />}
                   <div>
                     <p>{agent.name}</p>
-                    <span>{agent.matches.length} matches · {agentWinRate}% win rate</span>
+                    <span>{agent.matches.length} matches · {agentWinRate === undefined ? '—' : `${agentWinRate}%`} win rate</span>
                   </div>
                   <strong>{averageCombatScore(agent.matches) ?? '—'} <small>ACS</small></strong>
                 </li>
@@ -316,9 +330,10 @@ export function ValorantPerformance({ data, selectedPeriodId, onPeriodChange, se
 }
 
 export function ValorantMatchPulse({ data }: Readonly<{ data: ValorantData }>) {
-  if (data.recentMatches.length === 0) return <p className="text-sm text-ink-faint">Play a match to start a fresh form readout.</p>;
-  const record = recentRecord(data.recentMatches);
-  const streak = currentStreak(data.recentMatches);
+  const matches = winRateMatches(data.recentMatches);
+  if (matches.length === 0) return <p className="text-sm text-ink-faint">Play a team mode to start a fresh form readout.</p>;
+  const record = recentRecord(matches);
+  const streak = currentStreak(matches);
   let streakLabel = 'No streak yet';
   if (streak) {
     streakLabel = `${streak.length}${STREAK_RESULT_LABELS[streak.result]} streak`;
@@ -333,7 +348,7 @@ export function ValorantMatchPulse({ data }: Readonly<{ data: ValorantData }>) {
         <span className={`valorant-streak-badge${streakModifier(streak?.result)}`}>{streakLabel}</span>
       </div>
       <ol className="valorant-form-strip" aria-label="Results of recent matches">
-        {data.recentMatches.slice(0, 10).reverse().map((match, index) => <li key={`${match.matchId}-${index}`} data-result={match.result}>{match.result.charAt(0).toUpperCase()}</li>)}
+        {matches.slice(0, 10).reverse().map((match, index) => <li key={`${match.matchId}-${index}`} data-result={match.result}>{match.result.charAt(0).toUpperCase()}</li>)}
       </ol>
     </div>
   );
@@ -385,23 +400,27 @@ export function ValorantMatchLog({ data, selectedPeriodId, selectedModeId, onMod
         <p className="text-sm text-ink-faint">No matches for this mode yet.</p>
       ) : (
         <ol className="valorant-match-log">
-          {matches.map((match, index) => (
-            <li key={`${match.matchId}-${index}`} className="valorant-match-row" data-result={match.result}>
-              {match.agentIconUrl && <img src={match.agentIconUrl} alt={match.agentName} className="valorant-agent-icon" loading="lazy" decoding="async" />}
-              <div className="valorant-match-main">
-                <div className="valorant-match-title-row">
-                  <p>{match.map}{match.roundsWon !== undefined && match.roundsLost !== undefined ? ` · ${match.roundsWon}-${match.roundsLost}` : ''}</p>
-                  <time dateTime={match.startedAt}>{relativeTime(match.startedAt)}</time>
+          {matches.map((match, index) => {
+            const hasCombatStats = match.agentName !== '';
+            return (
+              <li key={`${match.matchId}-${index}`} className="valorant-match-row" data-result={match.result}>
+                {match.agentIconUrl && <img src={match.agentIconUrl} alt={match.agentName} className="valorant-agent-icon" loading="lazy" decoding="async" />}
+                <div className="valorant-match-main">
+                  <div className="valorant-match-title-row">
+                    <p>{match.map}{match.roundsWon !== undefined && match.roundsLost !== undefined ? ` · ${match.roundsWon}-${match.roundsLost}` : ''}</p>
+                    <time dateTime={match.startedAt}>{relativeTime(match.startedAt)}</time>
+                  </div>
+                  <div className="valorant-match-meta">
+                    <span>{match.mode}</span>
+                    <span>{RESULT_LABELS[match.result]}</span>
+                    {match.durationSeconds !== undefined && <span>{formatMatchDuration(match.durationSeconds)}</span>}
+                    {hasCombatStats && <span>{kda(match)} KDA</span>}
+                    {hasCombatStats && <span>{headshotRate(match)}% HS</span>}
+                  </div>
                 </div>
-                <div className="valorant-match-meta">
-                  <span>{match.mode}</span>
-                  <span>{RESULT_LABELS[match.result]}</span>
-                  <span>{kda(match)} KDA</span>
-                  <span>{headshotRate(match)}% HS</span>
-                </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>

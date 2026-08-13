@@ -1,5 +1,5 @@
 // One-off import: merges Riot's official "download your data" Valorant match-history export
-// (game_id/mode/outcome/timestamps only — no map, agent, or per-match stats) into the archive
+// (game_id/mode/outcome/timestamps and duration, but no map, agent, or combat stats) into the archive
 // ValorantHistoryStore already builds from HenrikDev's paginated stored-match API. The export is
 // Riot-authoritative and goes back to account creation, so it fills win/loss/count gaps that
 // HenrikDev's slow, rate-limited backfill hasn't reached yet — but it can never supply the fields
@@ -24,25 +24,13 @@
 import 'dotenv/config';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { valorantMatchSchema, type ValorantMatch } from '@personal-dashboard/shared';
 import { createDatabase } from '../src/db/client.js';
 import { ValorantHistoryStore } from '../src/valorantHistory.js';
 import { mergeMatches } from '../src/providers/valorant.js';
 
 const MATCH_HISTORY_CACHE_VERSION = 3;
-
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  console.error('Set DATABASE_URL in server/.env first.');
-  process.exit(1);
-}
-
-const apply = process.argv.includes('--apply');
-const fileArg = process.argv.find((arg, i) => i >= 2 && !arg.startsWith('--'));
-if (!fileArg) {
-  console.error('Usage: tsx scripts/backfillValorantHistory.ts <path-to-valorant_match_history_uc.json> [--apply]');
-  process.exit(1);
-}
 
 interface RiotExportRow {
   game_id: string;
@@ -103,13 +91,10 @@ function actShortFor(startedAt: string): string | undefined {
 }
 
 /** Riot's raw queue-id strings only get mapped to HenrikDev's real display name where the match
- * dates corroborate it (e.g. Hurm's earliest match is days after Team Deathmatch's actual launch,
- * Ggteam runs continuously since Escalation shipped). Where dates don't confirm a guess — Onefa's
- * matches predate "All Random One Site" by years, Snowball's one match is mid-year not the winter
- * Snowball Fight event — the raw id is passed through rather than mislabeled. Skirmish2V2/Newmap
- * get a cosmetic space only, not merged into a named mode, since that would assert an equivalence
- * the dates don't fully back up. */
-function mapMode(gameType: string, gameMode: string): string {
+ * dates or HenrikDev's own mode identifiers corroborate it. Skirmish2V2/Newmap get a cosmetic
+ * space only, not merged into a named mode, since that would assert an equivalence the available
+ * evidence does not fully support. */
+export function mapMode(gameType: string, gameMode: string): string {
   switch (gameType) {
     case 'Ranked': return 'Competitive';
     case 'Unrated': return 'Unrated';
@@ -118,6 +103,12 @@ function mapMode(gameType: string, gameMode: string): string {
     case 'Swiftplay': return 'Swiftplay';
     case 'Ggteam': return 'Escalation';
     case 'Hurm': return 'Team Deathmatch';
+    // HenrikDev's own API changelog records its `snowball` filter being renamed to
+    // `snowballfight`; Riot launched the mode in December 2020 and rotated it again from May 2021.
+    case 'Snowball': return 'Snowball Fight';
+    // Riot's February 2026 patch notes name the live mode All Random One Site; its internal name
+    // was VALARAM, and the export's lone match falls inside that release window.
+    case 'Valaram': return 'All Random One Site';
     // "onefa" ~ "one [agent] for all" — Replication puts every player on the same agent. Matches
     // run 2021-05-21 through 2022-11-02, lining up with Replication's real shelving (~v6.01, Nov
     // 2022); not Riot-confirmed, but etymology + the end date corroborate each other.
@@ -138,14 +129,17 @@ function mapMode(gameType: string, gameMode: string): string {
   }
 }
 
-function toSparseMatch(row: RiotExportRow): ValorantMatch {
+export function toSparseMatch(row: RiotExportRow): ValorantMatch {
   const startedAt = `${row.game_start_time_utc.replace(' ', 'T')}Z`;
+  const endedAt = `${row.game_end_time_utc.replace(' ', 'T')}Z`;
+  const durationSeconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000));
   const result = row.game_outcome === 'Win' ? 'win' : row.game_outcome === 'Loss' ? 'loss' : 'draw';
   return valorantMatchSchema.parse({
     matchId: row.game_id,
     map: '',
     mode: mapMode(row.game_type, row.game_mode),
     startedAt,
+    durationSeconds,
     result,
     agentName: '',
     score: 0,
@@ -164,6 +158,13 @@ function toSparseMatch(row: RiotExportRow): ValorantMatch {
 }
 
 async function main() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error('Set DATABASE_URL in server/.env first.');
+
+  const apply = process.argv.includes('--apply');
+  const fileArg = process.argv.find((arg, i) => i >= 2 && !arg.startsWith('--'));
+  if (!fileArg) throw new Error('Usage: tsx scripts/backfillValorantHistory.ts <path-to-valorant_match_history_uc.json> [--apply]');
+
   const filePath = resolve(fileArg!);
   const rows = JSON.parse(readFileSync(filePath, 'utf8')) as RiotExportRow[];
   console.log(`Parsed ${rows.length} matches from ${filePath}`);
@@ -211,9 +212,11 @@ async function main() {
   console.log('If the dashboard server is currently running, it will pick this up on its next scheduled Valorant refresh.');
 }
 
-try {
-  await main();
-} catch (err) {
-  console.error('✗ Backfill failed:', (err as Error).message);
-  process.exitCode = 1;
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  try {
+    await main();
+  } catch (err) {
+    console.error('✗ Backfill failed:', (err as Error).message);
+    process.exitCode = 1;
+  }
 }

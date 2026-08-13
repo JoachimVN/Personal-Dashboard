@@ -5,6 +5,8 @@ export const valorantMatchSchema = z.object({
   map: z.string(),
   mode: z.string(),
   startedAt: z.string(),
+  /** Match duration when supplied by HenrikDev or derivable from Riot's export timestamps. */
+  durationSeconds: z.number().int().nonnegative().optional(),
   result: z.enum(['win', 'loss', 'draw']),
   roundsWon: z.number().optional(),
   roundsLost: z.number().optional(),
@@ -28,6 +30,30 @@ export const valorantMatchSchema = z.object({
 });
 
 export type ValorantMatch = z.infer<typeof valorantMatchSchema>;
+
+/** Modes whose outcome represents a meaningful team win/loss. Custom sessions, tutorials, the
+ * Range, free-for-all Deathmatch, and unidentified queues remain visible in history but must not
+ * distort win-rate summaries. An allowlist keeps future internal/utility modes excluded until
+ * their result semantics are understood. */
+const VALORANT_WIN_RATE_MODES = new Set([
+  'all random one site',
+  'competitive',
+  'escalation',
+  'new map',
+  'replication',
+  'skirmish 2v2',
+  'skirmish: ascension 1v1',
+  'skirmish: ascension 2v2',
+  'snowball fight',
+  'spike rush',
+  'swiftplay',
+  'team deathmatch',
+  'unrated',
+]);
+
+export function isValorantWinRateEligibleMode(mode: string): boolean {
+  return VALORANT_WIN_RATE_MODES.has(mode.trim().toLowerCase());
+}
 
 export const valorantSchema = z.object({
   profile: z.object({

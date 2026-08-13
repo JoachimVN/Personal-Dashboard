@@ -11,6 +11,7 @@ const rawMatch = {
     map: { name: 'Ascent' },
     queue: { name: 'Competitive' },
     started_at: '2026-07-21T18:00:00.000Z',
+    game_length_in_ms: 1_466_000,
   },
   teams: [{ team_id: 'red', won: true, rounds: { won: 13, lost: 8 } }],
   players: [{
@@ -83,6 +84,7 @@ describe('Valorant provider history', () => {
 
     expect(historyStore.set).toHaveBeenCalledWith(expect.objectContaining({ totalMatchesAvailable: 250 }));
     expect(data.history.currentActShort).toBe('e10a2');
+    expect(data.recentMatches[0]?.durationSeconds).toBe(1_466);
     expect(data.history.matches).toHaveLength(2);
     expect(data.history.matches).toContainEqual(expect.objectContaining({
       agentName: 'Sova',
@@ -94,7 +96,7 @@ describe('Valorant provider history', () => {
     fetchMock.mockRestore();
   });
 
-  it('uses a fresh local archive without requesting stored history again', async () => {
+  it('persists rich recent matches into a fresh local archive without requesting stored history again', async () => {
     const historyStore = {
       get: vi.fn().mockResolvedValue({
         matches: [],
@@ -102,7 +104,7 @@ describe('Valorant provider history', () => {
         fetchedAt: new Date().toISOString(),
         sourceVersion: 3,
       }),
-      set: vi.fn(),
+      set: vi.fn().mockImplementation(async (value) => ({ ...value, fetchedAt: new Date().toISOString() })),
       setSnapshot: vi.fn().mockResolvedValue(undefined),
     };
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -120,7 +122,9 @@ describe('Valorant provider history', () => {
     const provider = createValorantProvider({ apiKey: 'key', name: 'Synthetic', tag: 'VAL', region: 'eu' }, historyStore as never);
     const data = await provider.fetch(new AbortController().signal, false);
 
-    expect(historyStore.set).not.toHaveBeenCalled();
+    expect(historyStore.set).toHaveBeenCalledWith(expect.objectContaining({
+      matches: [expect.objectContaining({ matchId: 'match-1', agentName: 'Omen' })],
+    }));
     expect(data.history.totalMatchesAvailable).toBe(42);
     expect(data.history.matches).toHaveLength(1);
     fetchMock.mockRestore();
