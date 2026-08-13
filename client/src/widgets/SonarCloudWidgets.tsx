@@ -9,16 +9,20 @@ const RATING_COLOR: Record<SonarRating, string> = {
 };
 
 export function RatingBadge({ rating, label, value, issueCount }: Readonly<{ rating?: SonarRating; label: string; value?: string; issueCount?: number }>) {
-  const color = rating ? RATING_COLOR[rating] : 'var(--color-ink-faint)';
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span
-        className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
-        style={{ background: rating ? color : 'var(--color-track)', color: rating ? undefined : 'var(--color-ink-faint)' }}
-      >
-        {rating ?? '–'}
-      </span>
-      <span className="text-sm font-semibold tabular-nums text-ink">{value ?? '–'}</span>
+    <div className="flex flex-col items-center justify-center gap-1">
+      <div className="flex h-7 items-center justify-center">
+        {rating ? (
+          <span
+            className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
+            style={{ background: RATING_COLOR[rating] }}
+          >
+            {rating}
+          </span>
+        ) : (
+          <span className="text-sm font-semibold tabular-nums text-ink">{value ?? '–'}</span>
+        )}
+      </div>
       <span className="text-center text-[9px] font-semibold uppercase tracking-[0.1em] text-ink-faint">{label}</span>
       {issueCount !== undefined && (
         <span className="text-[10px] tabular-nums text-ink-faint">
