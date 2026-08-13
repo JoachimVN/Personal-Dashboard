@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSonarCloudProvider, parseLanguages, toRating } from './sonarCloud.js';
+import { createSonarCloudProvider, measureValue, parseLanguages, toRating } from './sonarCloud.js';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -33,6 +33,17 @@ describe('parseLanguages', () => {
 
   it('is empty for an undefined distribution', () => {
     expect(parseLanguages(undefined)).toEqual([]);
+  });
+});
+
+describe('measureValue', () => {
+  it('reads overall values directly and new-code values from the current period', () => {
+    expect(measureValue({ metric: 'coverage', value: '82.1' })).toBe('82.1');
+    expect(measureValue({ metric: 'new_coverage', periods: [{ value: '77.4' }] })).toBe('77.4');
+  });
+
+  it('is undefined when Sonar returns no measure value', () => {
+    expect(measureValue({ metric: 'new_coverage', periods: [] })).toBeUndefined();
   });
 });
 
@@ -74,7 +85,14 @@ describe('createSonarCloudProvider', () => {
       ],
       [
         'qualitygates/project_status?projectKey=old-repo',
-        () => jsonResponse({ projectStatus: { status: 'ERROR' } }),
+        () => jsonResponse({
+          projectStatus: {
+            status: 'ERROR',
+            conditions: [
+              { status: 'ERROR', metricKey: 'new_coverage', comparator: 'LT', errorThreshold: '80', actualValue: '62.5' },
+            ],
+          },
+        }),
       ],
       [
         'qualitygates/project_status?projectKey=new-repo',
@@ -104,6 +122,11 @@ describe('createSonarCloudProvider', () => {
                 { metric: 'vulnerabilities', value: '2' },
                 { metric: 'bugs', value: '1' },
                 { metric: 'code_smells', value: '17' },
+                { metric: 'new_violations', periods: [{ value: '0' }] },
+                { metric: 'new_coverage', periods: [{ value: '86.2' }] },
+                { metric: 'new_duplicated_lines_density', periods: [{ value: '1.1' }] },
+                { metric: 'new_security_hotspots', periods: [{ value: '2' }] },
+                { metric: 'new_security_hotspots_reviewed', periods: [{ value: '100' }] },
               ],
             },
           }),
@@ -127,8 +150,24 @@ describe('createSonarCloudProvider', () => {
       vulnerabilitiesCount: 2,
       bugsCount: 1,
       codeSmellsCount: 17,
+      newIssuesCount: 0,
+      newCoveragePercent: 86.2,
+      newDuplicationsPercent: 1.1,
+      newHotspotsCount: 2,
+      newHotspotsReviewedPercent: 100,
     });
-    expect(oldRepo).toMatchObject({ qualityGateStatus: 'failed', linesOfCode: 500, security: 'C' });
+    expect(oldRepo).toMatchObject({
+      qualityGateStatus: 'failed',
+      qualityGateConditions: [{
+        metricKey: 'new_coverage',
+        status: 'failed',
+        comparator: 'LT',
+        errorThreshold: '80',
+        actualValue: '62.5',
+      }],
+      linesOfCode: 500,
+      security: 'C',
+    });
     fetchMock.mockRestore();
   });
 });

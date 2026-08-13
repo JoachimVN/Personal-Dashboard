@@ -60,10 +60,9 @@ export function github(now: Date): GitHubData {
 export function sonarCloud(now: Date): SonarCloudData {
   return {
     projects: [
-      { key: 'yourname_personal-dashboard', name: 'personal-dashboard', visibility: 'public', lastAnalysis: iso(now, -3), qualityGateStatus: 'passed', linesOfCode: 18420, languages: ['TypeScript', 'CSS'], security: 'A', reliability: 'A', maintainability: 'A', hotspotsReviewedPercent: 100, coveragePercent: 78.4, duplicationsPercent: 1.2, vulnerabilitiesCount: 0, bugsCount: 0, codeSmellsCount: 12 },
-      { key: 'yourname_weekend-project', name: 'weekend-project', visibility: 'public', lastAnalysis: iso(now, -26), qualityGateStatus: 'failed', linesOfCode: 3120, languages: ['TypeScript'], security: 'B', reliability: 'C', maintainability: 'A', hotspotsReviewedPercent: 60, coveragePercent: 42.1, duplicationsPercent: 4.6, vulnerabilitiesCount: 2, bugsCount: 5, codeSmellsCount: 8 },
+      { key: 'yourname_personal-dashboard', name: 'personal-dashboard', visibility: 'public', lastAnalysis: iso(now, -3), qualityGateStatus: 'passed', linesOfCode: 18420, languages: ['TypeScript', 'CSS'], security: 'A', reliability: 'A', maintainability: 'A', hotspotsReviewedPercent: 100, coveragePercent: 78.4, duplicationsPercent: 1.2, vulnerabilitiesCount: 0, bugsCount: 0, codeSmellsCount: 12, newIssuesCount: 0, newCoveragePercent: 86.2, newDuplicationsPercent: 0.4, newHotspotsCount: 0, newHotspotsReviewedPercent: 100 },
+      { key: 'yourname_weekend-project', name: 'weekend-project', visibility: 'public', lastAnalysis: iso(now, -26), qualityGateStatus: 'failed', qualityGateConditions: [{ metricKey: 'new_coverage', status: 'failed', comparator: 'LT', errorThreshold: '80', actualValue: '42.1' }, { metricKey: 'new_duplicated_lines_density', status: 'failed', comparator: 'GT', errorThreshold: '3', actualValue: '4.6' }], linesOfCode: 3120, languages: ['TypeScript'], security: 'B', reliability: 'C', maintainability: 'A', hotspotsReviewedPercent: 60, coveragePercent: 42.1, duplicationsPercent: 4.6, vulnerabilitiesCount: 2, bugsCount: 5, codeSmellsCount: 8, newIssuesCount: 3, newCoveragePercent: 42.1, newDuplicationsPercent: 4.6, newHotspotsCount: 2, newHotspotsReviewedPercent: 50 },
       { key: 'yourname_dotfiles', name: 'dotfiles', visibility: 'public', lastAnalysis: iso(now, -14 * 24), qualityGateStatus: 'none', linesOfCode: 640, languages: ['Shell'], duplicationsPercent: 0 },
     ],
   };
 }
-

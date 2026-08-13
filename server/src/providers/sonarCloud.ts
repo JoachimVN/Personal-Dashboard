@@ -14,6 +14,11 @@ const MEASURE_KEYS = [
   'vulnerabilities',
   'bugs',
   'code_smells',
+  'new_violations',
+  'new_coverage',
+  'new_duplicated_lines_density',
+  'new_security_hotspots',
+  'new_security_hotspots_reviewed',
 ].join(',');
 
 /** Sonar's language keys aren't display names; only the ones likely to show up in this user's
@@ -56,6 +61,22 @@ interface RawComponent {
 interface RawMeasure {
   metric: string;
   value?: string;
+  periods?: Array<{ value?: string }>;
+}
+
+interface RawQualityGateCondition {
+  metricKey: string;
+  status: string;
+  comparator: string;
+  errorThreshold?: string;
+  actualValue?: string;
+}
+
+interface RawQualityGateStatus {
+  projectStatus?: {
+    status?: string;
+    conditions?: RawQualityGateCondition[];
+  };
 }
 
 class SonarHttpError extends Error {
@@ -99,9 +120,14 @@ export function parseLanguages(distribution: string | undefined): string[] {
     .map((key) => LANGUAGE_NAMES[key] ?? key.toUpperCase());
 }
 
+/** Overall measures use `value`; new-code measures use the current entry in `periods`. */
+export function measureValue(measure: RawMeasure): string | undefined {
+  return measure.value ?? measure.periods?.at(-1)?.value;
+}
+
 async function fetchProjectDetails(signal: AbortSignal, token: string, component: RawComponent): Promise<SonarProject> {
   const [qualityGate, measures] = await Promise.all([
-    sonarRequest<{ projectStatus?: { status?: string } }>(
+    sonarRequest<RawQualityGateStatus>(
       signal,
       token,
       `/qualitygates/project_status?projectKey=${encodeURIComponent(component.key)}`,
@@ -115,7 +141,7 @@ async function fetchProjectDetails(signal: AbortSignal, token: string, component
     ).catch(() => ({ component: undefined })),
   ]);
 
-  const byMetric = new Map((measures.component?.measures ?? []).map((m) => [m.metric, m.value]));
+  const byMetric = new Map((measures.component?.measures ?? []).map((measure) => [measure.metric, measureValue(measure)]));
   const status = qualityGate.projectStatus?.status;
 
   return {
@@ -124,6 +150,16 @@ async function fetchProjectDetails(signal: AbortSignal, token: string, component
     visibility: component.visibility,
     lastAnalysis: component.analysisDateAllBranches,
     qualityGateStatus: qualityGateStatus(status),
+    qualityGateConditions: qualityGate.projectStatus?.conditions?.flatMap((condition) => {
+      if (condition.status !== 'OK' && condition.status !== 'ERROR') return [];
+      return [{
+        metricKey: condition.metricKey,
+        status: condition.status === 'OK' ? 'passed' as const : 'failed' as const,
+        comparator: condition.comparator,
+        errorThreshold: condition.errorThreshold,
+        actualValue: condition.actualValue,
+      }];
+    }),
     linesOfCode: byMetric.has('ncloc') ? Number(byMetric.get('ncloc')) : undefined,
     languages: parseLanguages(byMetric.get('ncloc_language_distribution')),
     security: toRating(byMetric.get('security_rating')),
@@ -135,6 +171,11 @@ async function fetchProjectDetails(signal: AbortSignal, token: string, component
     vulnerabilitiesCount: byMetric.has('vulnerabilities') ? Number(byMetric.get('vulnerabilities')) : undefined,
     bugsCount: byMetric.has('bugs') ? Number(byMetric.get('bugs')) : undefined,
     codeSmellsCount: byMetric.has('code_smells') ? Number(byMetric.get('code_smells')) : undefined,
+    newIssuesCount: byMetric.has('new_violations') ? Number(byMetric.get('new_violations')) : undefined,
+    newCoveragePercent: byMetric.has('new_coverage') ? Number(byMetric.get('new_coverage')) : undefined,
+    newDuplicationsPercent: byMetric.has('new_duplicated_lines_density') ? Number(byMetric.get('new_duplicated_lines_density')) : undefined,
+    newHotspotsCount: byMetric.has('new_security_hotspots') ? Number(byMetric.get('new_security_hotspots')) : undefined,
+    newHotspotsReviewedPercent: byMetric.has('new_security_hotspots_reviewed') ? Number(byMetric.get('new_security_hotspots_reviewed')) : undefined,
   };
 }
 
