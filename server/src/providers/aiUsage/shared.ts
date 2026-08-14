@@ -1,4 +1,4 @@
-import { chmod, readdir } from 'node:fs/promises';
+import { access, chmod, constants, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -64,12 +64,44 @@ export async function ensurePtySpawnHelper(): Promise<void> {
   await chmod(path.join(packageRoot, 'prebuilds', `darwin-${process.arch}`, 'spawn-helper'), 0o755).catch(() => undefined);
 }
 
-/** The interactive AI-usage probes shell out to a CLI installed under `~/.local/bin`. node-pty on
- * Windows does no PATHEXT resolution, so the `.exe` extension has to be explicit or the spawn fails
- * with "File not found" — which the probes swallow, leaving the widget stuck on remembered data. */
-export function localBinExecutable(name: string): string {
+function localBinExecutable(name: string): string {
   const exe = process.platform === 'win32' ? `${name}.exe` : name;
   return path.join(os.homedir(), '.local/bin', exe);
+}
+
+/** Windows extensions conpty can spawn from a bare file path. A `.cmd`/`.bat` shim is deliberately
+ * not accepted: it only runs through `cmd.exe`, which node-pty would have to be handed instead. */
+const WINDOWS_EXECUTABLE_EXTENSIONS = ['.exe', '.com'];
+
+/**
+ * The interactive AI-usage probes shell out to a CLI, and node-pty on Windows does no PATH or
+ * PATHEXT resolution — it needs the full path to a directly-spawnable file, or the spawn fails with
+ * "File not found", which the probes swallow, leaving the widget stuck on remembered data.
+ *
+ * `~/.local/bin` is where Claude Code's own installer lands, so it stays the first place to look,
+ * but assuming every CLI follows that convention is what left Codex's `/status` fallback dead on
+ * Windows: its installer puts `codex.exe` under `%LOCALAPPDATA%\Programs\OpenAI\Codex\bin` and only
+ * adds *that* to PATH, so the probe spawned a path that has never existed and failed instantly —
+ * indistinguishable, from the widget's side, from "no newer data", for as long as the local session
+ * log stayed quiet. So search PATH as well before giving up.
+ */
+export async function resolveProbeExecutable(name: string): Promise<string> {
+  const searchPath = [
+    path.join(os.homedir(), '.local/bin'),
+    ...(process.env.PATH ?? process.env.Path ?? '').split(path.delimiter),
+  ];
+  const extensions = process.platform === 'win32' ? WINDOWS_EXECUTABLE_EXTENSIONS : [''];
+  for (const directory of searchPath) {
+    if (!directory) continue;
+    for (const extension of extensions) {
+      const candidate = path.join(directory, `${name}${extension}`);
+      const executable = await access(candidate, constants.X_OK).then(() => true, () => false);
+      if (executable) return candidate;
+    }
+  }
+  // Nothing found — hand back the conventional location so the caller fails the same way it always
+  // has (a spawn error the probe already handles) rather than on an empty path.
+  return localBinExecutable(name);
 }
 
 /** Prepend `~/.local/bin` to the child's PATH using the OS path delimiter, and normalize away the

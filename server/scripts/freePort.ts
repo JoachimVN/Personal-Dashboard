@@ -2,25 +2,48 @@
 // dashboard's port so a leftover process from a previous session can never silently keep
 // serving stale env/code while a new `npm run dev` looks like it started fine.
 import 'dotenv/config';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 
 const port = Number(process.env.PORT ?? 4821);
+const isWindows = process.platform === 'win32';
 
-function pidsOnPort(port: number): number[] {
+function run(command: string, args: string[]): string {
   try {
-    const out = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, { encoding: 'utf8' });
-    return out.split('\n').map((line) => Number(line.trim())).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-function commandFor(pid: number): string {
-  try {
-    return execSync(`ps -o command= -p ${pid}`, { encoding: 'utf8' }).trim();
+    return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch {
     return '';
   }
+}
+
+function pidsOnPort(port: number): number[] {
+  if (isWindows) {
+    // netstat is always present; `lsof` is not. Rows are five whitespace-separated columns:
+    //   TCP    127.0.0.1:4822    0.0.0.0:0    LISTENING    12345
+    // Compare the local address's port as a column rather than searching the raw line, so a
+    // foreign address or a pid that happens to contain the same digits can't match.
+    const rows = run('netstat', ['-ano', '-p', 'tcp']).split('\n');
+    const pids = rows
+      .map((line) => line.trim().split(/\s+/))
+      .filter((columns) => columns.length === 5 && columns[3] === 'LISTENING')
+      // IPv4 renders as `127.0.0.1:4822`, IPv6 as `[::]:4822` — both end in `:<port>`.
+      .filter((columns) => columns[1].endsWith(`:${port}`))
+      .map((columns) => Number(columns[4]))
+      .filter(Boolean);
+    return [...new Set(pids)];
+  }
+  const out = run('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN']);
+  return out.split('\n').map((line) => Number(line.trim())).filter(Boolean);
+}
+
+function commandFor(pid: number): string {
+  if (isWindows) {
+    return run('powershell', [
+      '-NoProfile',
+      '-Command',
+      `(Get-CimInstance Win32_Process -Filter "ProcessId=${pid}").CommandLine`,
+    ]).trim();
+  }
+  return run('ps', ['-o', 'command=', '-p', String(pid)]).trim();
 }
 
 for (const pid of pidsOnPort(port)) {

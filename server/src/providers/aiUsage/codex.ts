@@ -12,10 +12,10 @@ import {
   jsonlFiles,
   limit,
   limitStatus,
-  localBinExecutable,
   MONTH_ABBREVIATIONS,
   ptyProbeEnv,
   recordHistorySafely,
+  resolveProbeExecutable,
   stripTerminalControls,
   type UsageSnapshot,
 } from './shared.js';
@@ -228,8 +228,9 @@ export async function codexInteractiveStatusSnapshot(): Promise<
 > {
   try {
     await ensurePtySpawnHelper();
-    const output = await new Promise<string>((resolve, reject) => {
-      const pty = spawnPty(localBinExecutable('codex'), [], {
+    const executable = await resolveProbeExecutable('codex');
+    const output = await new Promise<string>((resolve) => {
+      const pty = spawnPty(executable, [], {
         name: 'xterm-256color',
         cols: 160,
         rows: 48,
@@ -238,23 +239,33 @@ export async function codexInteractiveStatusSnapshot(): Promise<
       });
       let terminal = '';
       let settled = false;
+      let exited = false;
       let settleTimer: NodeJS.Timeout | undefined;
-      const finish = (result?: string, error?: Error) => {
+      const finish = (result?: string) => {
         if (settled) return;
         settled = true;
         clearInterval(nudgeStatus);
         clearTimeout(timeout);
         clearTimeout(settleTimer);
-        try {
-          pty.kill();
-        } catch {
-          // The process may already have exited after rendering the status panel.
+        // Killing a PTY whose process already exited is worse than a no-op on Windows: conpty's
+        // kill forks a helper that calls AttachConsole on the dead pid, which throws
+        // "AttachConsole failed" straight to stderr and leaves the conpty handle open for the
+        // helper's full 5s timeout.
+        if (!exited) {
+          try {
+            pty.kill();
+          } catch {
+            // The process may already have exited after rendering the status panel.
+          }
         }
-        if (error) reject(error);
-        else resolve(result ?? terminal);
+        resolve(result ?? terminal);
       };
       const nudgeStatus = setInterval(() => pty.write('/status\r'), 4_000);
-      const timeout = setTimeout(() => finish(undefined, new Error('Codex status panel timed out')), 50_000);
+      // Resolve with whatever the panel painted rather than rejecting. Parsing an incomplete capture
+      // yields the same "unknown" the error path did when nothing rendered, but keeps a panel that
+      // landed just before the CLI gave up — and a discarded read here costs a full fallback cooldown
+      // of staleness, since the local session log has nothing newer to fall back to.
+      const timeout = setTimeout(() => finish(), 50_000);
       pty.onData((chunk) => {
         terminal += chunk;
         if (/Weekly\s*limit\s*:/i.test(terminal)) {
@@ -262,8 +273,9 @@ export async function codexInteractiveStatusSnapshot(): Promise<
           settleTimer = setTimeout(() => finish(terminal), 750);
         }
       });
-      pty.onExit(({ exitCode }) => {
-        if (!settled) finish(undefined, new Error(`Codex exited before status rendered (${exitCode})`));
+      pty.onExit(() => {
+        exited = true;
+        if (!settled) finish();
       });
     });
     return parseCodexStatusScreen(output);

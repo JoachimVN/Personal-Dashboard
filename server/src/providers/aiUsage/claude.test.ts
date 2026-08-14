@@ -173,15 +173,12 @@ describe('parseClaudeUsageScreen', () => {
     expect(quota.weeklyStatus).toBe('unknown');
   });
 
-  it('keeps a redraw with headers but no quota values unknown', () => {
-    // The interactive screen redraws in place as data streams in. If a capture is cut off right
-    // after a fresh redraw's headers land but before their percentage/reset lines do, both windows
-    // read as an explicit "no limit" even though an earlier, complete redraw in the same buffer had
-    // real numbers — parseClaudeUsageScreen always anchors to the *last* header occurrence (see
-    // latestScreen) so it can't fall back to that earlier, fully-rendered report on its own.
-    // This is why claudeInteractiveUsageSnapshot's settle timer must re-arm on every chunk rather
-    // than only on chunks that parse cleanly: only waiting for genuine quiet keeps this scenario
-    // from ever reaching parseClaudeUsageScreen in the first place.
+  it('falls back to an earlier complete redraw when the final one has headers but no values yet', () => {
+    // The interactive screen redraws in place as data streams in, so a capture cut off right after
+    // a fresh redraw's headers land — but before their percentage/reset lines do — leaves bare
+    // headers as the last render. Those headers are not a report: reading only them would make both
+    // windows look like an explicit "no limit". The complete render earlier in the same buffer is
+    // seconds old and real, so it wins over reporting nothing.
     const quota = parseClaudeUsageScreen(
       `Current session
       5% used
@@ -198,8 +195,28 @@ describe('parseClaudeUsageScreen', () => {
       new Date(2026, 6, 21, 16, 26),
     );
 
-    expect(quota.fiveHourStatus).toBe('unknown');
-    expect(quota.weeklyStatus).toBe('unknown');
+    expect(quota.fiveHour?.usedPercent).toBe(5);
+    expect(quota.weekly?.usedPercent).toBe(11);
+    expect(quota.fiveHourStatus).toBe('limited');
+    expect(quota.weeklyStatus).toBe('limited');
+  });
+
+  it('recovers the weekly window when the final Windows conpty redraw drops characters mid-line', () => {
+    // Captured live on Windows: the closing redraw lost enough characters that "Current week (all
+    // models)" arrived as "wek (all models)" and "42% used Resets Aug 16" as "42Aug16". Reading only
+    // that render leaves weekly unparsed, which stalls the interactive probe's "both windows parsed"
+    // check for its full 35s timeout and then serves a days-old transcript instead — the actual
+    // cause of both AI usage widgets sitting on "as of 2 d ago" while refresh appeared to do nothing.
+    const quota = parseClaudeUsageScreen(
+      'Current session█████▌11%usedResets 7pm (Europe/Oslo)Current week (all models)█████████████████████42%used Resets Aug 16, 12am (Europe/Oslo)'
+      + " +50% weekly limits promo through Aug 19What's contributing to your limits usage?"
+      + 'Current session█████▌ 11%usedResets7pm(Europe/Oslo)wek (all models)████████████████42Aug16, 12am (Europe/Oslo)',
+      new Date(2026, 7, 14, 14, 27),
+    );
+
+    expect(quota.fiveHour?.usedPercent).toBe(11);
+    expect(quota.weekly).toEqual({ usedPercent: 42, resetsAt: new Date(2026, 7, 16, 0, 0).toISOString() });
+    expect(quota.weeklyStatus).toBe('limited');
   });
 
   it('parses the current Usage screen layout', () => {
