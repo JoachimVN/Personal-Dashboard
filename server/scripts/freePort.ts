@@ -17,13 +17,17 @@ function run(command: string, args: string[]): string {
 
 function pidsOnPort(port: number): number[] {
   if (isWindows) {
-    // netstat is always present; `lsof` is not. Lines look like:
+    // netstat is always present; `lsof` is not. Rows are five whitespace-separated columns:
     //   TCP    127.0.0.1:4822    0.0.0.0:0    LISTENING    12345
+    // Compare the local address's port as a column rather than searching the raw line, so a
+    // foreign address or a pid that happens to contain the same digits can't match.
     const rows = run('netstat', ['-ano', '-p', 'tcp']).split('\n');
     const pids = rows
-      .filter((line) => /\s+LISTENING\s+/.test(line))
-      .filter((line) => new RegExp(`[:.]${port}\\s`).test(line))
-      .map((line) => Number(line.trim().split(/\s+/).at(-1)))
+      .map((line) => line.trim().split(/\s+/))
+      .filter((columns) => columns.length === 5 && columns[3] === 'LISTENING')
+      // IPv4 renders as `127.0.0.1:4822`, IPv6 as `[::]:4822` — both end in `:<port>`.
+      .filter((columns) => columns[1].endsWith(`:${port}`))
+      .map((columns) => Number(columns[4]))
       .filter(Boolean);
     return [...new Set(pids)];
   }

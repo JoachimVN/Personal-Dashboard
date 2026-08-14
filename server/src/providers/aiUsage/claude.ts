@@ -196,7 +196,7 @@ function screenRenders(text: string): string[] {
   while ((match = headerRegex.exec(text))) {
     indices.push(match.index);
   }
-  return indices.length === 0 ? [text] : indices.reverse().map((index) => text.slice(index));
+  return indices.length === 0 ? [text] : indices.toReversed().map((index) => text.slice(index));
 }
 
 type UsageWindows = Pick<ClaudeQuota, 'fiveHour' | 'weekly' | 'modelWeekly'>;
