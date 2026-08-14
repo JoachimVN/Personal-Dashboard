@@ -10,9 +10,9 @@ import {
   ensurePtySpawnHelper,
   jsonlFiles,
   limit,
-  localBinExecutable,
   MONTH_ABBREVIATIONS,
   ptyProbeEnv,
+  resolveProbeExecutable,
   recordHistorySafely,
   stripTerminalControls,
   WS,
@@ -184,18 +184,39 @@ function parseUsageWindow(section: string, now: Date) {
 /**
  * The interactive Usage screen renders in place, redrawing the same header lines with updated
  * numbers as data comes in (e.g. an approximate figure first, then a corrected one once local
- * sessions finish scanning). The captured PTY stream is append-only, so an earlier, stale render
- * of "Current session" is still sitting in the buffer alongside the final one — parse only from
- * the last occurrence onward so a non-global `.exec` can't latch onto superseded numbers.
+ * sessions finish scanning). The captured PTY stream is append-only, so every render is still
+ * sitting in the buffer, oldest first — yield them newest-first so a caller can prefer the most
+ * recent numbers (a non-global `.exec` would otherwise latch onto superseded ones) while still
+ * having the earlier renders to fall back on when the newest is incomplete.
  */
-function latestScreen(text: string): string {
+function screenRenders(text: string): string[] {
   const headerRegex = new RegExp(`Current${WS}session`, 'gi');
-  let lastIndex: number | undefined;
+  const indices: number[] = [];
   let match: RegExpExecArray | null;
   while ((match = headerRegex.exec(text))) {
-    lastIndex = match.index;
+    indices.push(match.index);
   }
-  return lastIndex === undefined ? text : text.slice(lastIndex);
+  return indices.length === 0 ? [text] : indices.reverse().map((index) => text.slice(index));
+}
+
+type UsageWindows = Pick<ClaudeQuota, 'fiveHour' | 'weekly' | 'modelWeekly'>;
+
+/** Extract whichever quota windows one render of the screen carries. */
+function parseUsageWindows(text: string, now: Date): UsageWindows {
+  // Terminal cursor updates can erase visual spaces from the captured stream, so accept both
+  // the readable UI labels and their compact `Currentsession` / `Currentweek(allmodels)` form.
+  const sessionMatch = new RegExp(String.raw`Current${WS}session([\s\S]*?)(?=${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}|$)`, 'i').exec(text);
+  const weeklyMatch = new RegExp(String.raw`${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}([\s\S]*)`, 'i').exec(text);
+  const modelMatch = new RegExp(
+    String.raw`${CURRENT_WEEK}${WS}(?!${ALL_MODELS_CLOSE})([^)]+)\)([\s\S]*?)(?=${CURRENT_WEEK}|What's${WS}contributing|$)`,
+    'i',
+  ).exec(text);
+  const modelLimit = modelMatch ? parseUsageWindow(modelMatch[2], now) : undefined;
+  return {
+    fiveHour: parseUsageWindow(sessionMatch?.[1] ?? '', now),
+    weekly: parseUsageWindow(weeklyMatch?.[1] ?? '', now),
+    modelWeekly: modelLimit && modelMatch ? { ...modelLimit, model: modelMatch[1].trim() } : undefined,
+  };
 }
 
 /**
@@ -205,27 +226,31 @@ function latestScreen(text: string): string {
  */
 /** Parse Claude Code's current multiline interactive Usage screen. */
 export function parseClaudeUsageScreen(screen: string, now = new Date()): ClaudeQuota {
-  const text = latestScreen(stripTerminalControls(screen));
-  // Terminal cursor updates can erase visual spaces from the captured stream, so accept both
-  // the readable UI labels and their compact `Currentsession` / `Currentweek(allmodels)` form.
-  const sessionMatch = new RegExp(String.raw`Current${WS}session([\s\S]*?)(?=${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}|$)`, 'i').exec(text);
-  const weeklyMatch = new RegExp(String.raw`${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}([\s\S]*)`, 'i').exec(text);
-  const fiveHour = parseUsageWindow(sessionMatch?.[1] ?? '', now);
-  const week = parseUsageWindow(weeklyMatch?.[1] ?? '', now);
-  const modelMatch = new RegExp(
-    String.raw`${CURRENT_WEEK}${WS}(?!${ALL_MODELS_CLOSE})([^)]+)\)([\s\S]*?)(?=${CURRENT_WEEK}|What's${WS}contributing|$)`,
-    'i',
-  ).exec(text);
-  const modelLimit = modelMatch ? parseUsageWindow(modelMatch[2], now) : undefined;
-  const modelWeekly = modelLimit && modelMatch ? { ...modelLimit, model: modelMatch[1].trim() } : undefined;
-  const hasQuotaReport = Boolean(fiveHour || week || modelWeekly);
+  const text = stripTerminalControls(screen);
+  // Take each window from the newest render that actually produced it, rather than anchoring the
+  // whole parse to the last render alone. That anchoring loses a complete report whenever the final
+  // redraw is garbled — routine on Windows conpty, where cursor-positioning updates drop characters
+  // mid-line ("Current week (all models)" arriving as "wek (all models)", "42% used Resets Aug 16"
+  // as "42Aug16"). The mangled text reads as a missing weekly window, which stalls the interactive
+  // probe's "both windows parsed" finish check until it times out — 35s of waiting that ends by
+  // discarding a perfectly good render sitting a few hundred bytes earlier in the same buffer, and
+  // falling back to a transcript report that can be days old.
+  const windows: UsageWindows = {};
+  for (const render of screenRenders(text)) {
+    const parsed = parseUsageWindows(render, now);
+    windows.fiveHour ??= parsed.fiveHour;
+    windows.weekly ??= parsed.weekly;
+    windows.modelWeekly ??= parsed.modelWeekly;
+    if (windows.fiveHour && windows.weekly && windows.modelWeekly) break;
+  }
+  const hasQuotaReport = Boolean(windows.fiveHour || windows.weekly || windows.modelWeekly);
   const staleBanner = STALE_USAGE_BANNER.exec(text);
   const staleAgeMs = staleBanner ? staleBannerAgeMs(staleBanner[1], staleBanner[2]) : 0;
   const asOf = hasQuotaReport ? new Date(now.getTime() - staleAgeMs).toISOString() : undefined;
   return {
-    fiveHour,
-    weekly: week,
-    modelWeekly,
+    fiveHour: windows.fiveHour,
+    weekly: windows.weekly,
+    modelWeekly: windows.modelWeekly,
     // Status is per-window, not per-report: whether *that window's own header* rendered at all,
     // not whether some other window (e.g. session) happened to parse. Otherwise a 5-hour reading
     // that lands fine would mark a weekly window that simply failed to capture this tick as an
@@ -234,8 +259,8 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
     // A header without its percentage and reset time is a partial terminal redraw, not proof that
     // Claude removed a limit. Reporting it as unlimited replaces a valid cached quota with a
     // misleading green label; retain the known reading until a complete screen arrives instead.
-    fiveHourStatus: fiveHour ? 'limited' : 'unknown',
-    weeklyStatus: week ? 'limited' : 'unknown',
+    fiveHourStatus: windows.fiveHour ? 'limited' : 'unknown',
+    weeklyStatus: windows.weekly ? 'limited' : 'unknown',
     asOf,
   };
 }
@@ -244,8 +269,9 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
   try {
     const { CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, ...cleanEnv } = process.env;
     await ensurePtySpawnHelper();
-    const output = await new Promise<string>((resolve, reject) => {
-      const pty = spawnPty(localBinExecutable('claude'), [], {
+    const executable = await resolveProbeExecutable('claude');
+    const output = await new Promise<string>((resolve) => {
+      const pty = spawnPty(executable, [], {
         name: 'xterm-256color',
         cols: 160,
         rows: 48,
@@ -254,23 +280,34 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
       });
       let terminal = '';
       let settled = false;
+      let exited = false;
       let typed = false;
       let submitted = false;
       let settleTimer: NodeJS.Timeout | undefined;
-      const finish = (result?: string, error?: Error) => {
+      const finish = (result?: string) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
         clearTimeout(settleTimer);
-        try {
-          pty.kill();
-        } catch {
-          // The process may already have exited after rendering the Usage screen.
+        // Killing a PTY whose process already exited is worse than a no-op on Windows: conpty's
+        // kill forks a helper that calls AttachConsole on the dead pid, which throws
+        // "AttachConsole failed" straight to stderr and leaves the conpty handle open for the
+        // helper's full 5s timeout.
+        if (!exited) {
+          try {
+            pty.kill();
+          } catch {
+            // The process may already have exited after rendering the Usage screen.
+          }
         }
-        if (error) reject(error);
-        else resolve(result ?? terminal);
+        resolve(result ?? terminal);
       };
-      const timeout = setTimeout(() => finish(undefined, new Error('Claude Usage screen timed out')), 35_000);
+      // Resolve with whatever was captured rather than rejecting: a screen that rendered the 5-hour
+      // window but never the weekly one still carries a real reading, and retainKnownClaudeQuota
+      // backfills the rest from the last known-good report. Rejecting discarded both and left the
+      // provider on a transcript report that can be days old — a timeout is a partial read, not
+      // proof that nothing was read.
+      const timeout = setTimeout(() => finish(), 35_000);
       // The CLI's own render pace (boot, the slash-command autocomplete, and the Usage screen
       // itself) varies with system load on a machine that's also running everything else this
       // dashboard polls — a fixed delay before typing or before Enter loses the race under load
@@ -311,6 +348,7 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
         settleTimer = setTimeout(advance, 500);
       });
       pty.onExit(() => {
+        exited = true;
         // Claude can close immediately after the final screen paint. Use the bytes already
         // delivered rather than discarding a complete report solely because the PTY closed first.
         if (!settled) finish(terminal);
