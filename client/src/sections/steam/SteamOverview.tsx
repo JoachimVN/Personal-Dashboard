@@ -97,7 +97,8 @@ function ShelfGame({ entry }: Readonly<{ entry: ShelfEntry }>) {
 function SteamHomeDashboard({ data }: Readonly<{ data: SteamData }>) {
   if (data.availability.library !== 'available' || !data.library) return null;
 
-  const recentGames = [...data.recentlyPlayed].sort((a, b) => (b.playtimeRecentMinutes ?? 0) - (a.playtimeRecentMinutes ?? 0));
+  // Steam's own API already orders this by most-recently-played, not most-played-recently.
+  const recentGames = data.recentlyPlayed;
   const recentIds = new Set(recentGames.map((game) => game.appId));
   const shelf: ShelfEntry[] = [
     ...recentGames.map((game) => ({ game, source: 'recent' as const })),
@@ -173,7 +174,7 @@ export function SteamOverview() {
 
 function SteamOverviewContent({ data }: Readonly<{ data: SteamData }>) {
   const overviewRef = useRef<HTMLDivElement>(null);
-  const recent = [...data.recentlyPlayed].sort((a, b) => (b.playtimeRecentMinutes ?? 0) - (a.playtimeRecentMinutes ?? 0))[0];
+  const recent = data.recentlyPlayed[0];
   const featured = data.currentGame ?? recent ?? data.library?.mostPlayed[0];
 
   useEffect(() => {
