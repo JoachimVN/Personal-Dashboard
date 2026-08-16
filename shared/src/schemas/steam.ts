@@ -10,6 +10,10 @@ export const steamGameSchema = z.object({
   playtimeForeverMinutes: z.number().optional(),
   /** Minutes played in Steam's own trailing "recent" window (currently ~2 weeks). */
   playtimeRecentMinutes: z.number().optional(),
+  /** Converted from GetOwnedGames' rtime_last_played (Unix seconds) — the only Steam field that
+   * reports true last-played recency. GetRecentlyPlayedGames has no equivalent, which is why the
+   * server cross-references this to reorder `recentlyPlayed` correctly (see orderByRecency). */
+  lastPlayedAt: z.string().optional(),
 });
 
 export type SteamGame = z.infer<typeof steamGameSchema>;
