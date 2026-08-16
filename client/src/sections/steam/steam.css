@@ -71,39 +71,6 @@
 }
 .steam-leaderboard-period { margin-bottom: 1rem; }
 
-/* Now-playing hero: the game's header art, blurred and dimmed, behind the existing content. A
-   negative margin here would expand the box (including its bottom edge) past what space-y-*
-   gap utilities account for on the next sibling, bleeding the backdrop into it — so this stays
-   flush with the natural content box instead of the "bleed" trick. */
-.steam-hero {
-  position: relative;
-  isolation: isolate;
-  border-radius: 1rem;
-  overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--color-accent-steam) 17%, var(--color-card-border));
-  background: color-mix(in oklab, var(--color-accent-steam) 7%, var(--color-card));
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
-}
-.steam-hero-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: blur(28px) saturate(1.3);
-  transform: scale(1.15);
-  opacity: 0.5;
-}
-.steam-hero-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    linear-gradient(105deg, color-mix(in oklab, var(--color-card) 76%, transparent), color-mix(in oklab, var(--color-card) 24%, transparent)),
-    linear-gradient(135deg, color-mix(in oklab, var(--color-accent-steam) 30%, transparent), transparent 70%);
-}
-
 .steam-live-dot {
   width: 0.42rem;
   height: 0.42rem;
@@ -111,6 +78,151 @@
   border-radius: 999px;
   background: var(--color-accent-steam);
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent-steam) 18%, transparent);
+}
+
+/* "Steam activity" intro hero band: profile + tracked game + library stats on the left, the
+   tracked game's header art as a rounded inset poster on the right (see .steam-signal-art).
+   Padding lives on the copy column (.steam-signal-copy) and as margin on the art itself, rather
+   than on this panel, so each side controls its own inset independently — the detail-signal-panel
+   default padding is zeroed out here to make that possible. The same art also runs blurred behind
+   the whole panel (.steam-signal-backdrop), same recipe as the old .steam-hero, so the copy side
+   keeps the game's atmosphere instead of sitting on a flat glass background next to it. */
+.steam-signal-panel {
+  position: relative;
+  isolation: isolate;
+  padding: 0;
+  overflow: hidden;
+}
+.steam-signal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(32px) saturate(1.3);
+  transform: scale(1.15);
+  opacity: 0.5;
+}
+.steam-signal-backdrop-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(105deg, color-mix(in oklab, var(--color-card) 80%, transparent), color-mix(in oklab, var(--color-card) 42%, transparent)),
+    linear-gradient(135deg, color-mix(in oklab, var(--color-accent-steam) 26%, transparent), transparent 70%);
+}
+.steam-signal-body {
+  display: flex;
+  flex-direction: column;
+  /* Referenced by .steam-signal-art's width calc() below, so the two stay in lockstep without
+     relying on `aspect-ratio` deriving a size from a flex-stretched dimension — that combination
+     (aspect-ratio + auto main size + stretch-derived cross size, no intrinsic content since the
+     art is an absolutely-positioned image) is a real cross-browser trouble spot and collapsed to
+     zero size for at least one engine when tried here. Plain calc() from a fixed value is inert. */
+  --steam-signal-h: 15rem;
+}
+@media (min-width: 1024px) {
+  .steam-signal-body {
+    flex-direction: row;
+    align-items: stretch;
+    /* min-height, not height — the copy column can still grow taller if its content ever needs
+       it (long names wrapping, etc.); the art's width just calc()'s off the nominal value above,
+       not the actual rendered height, so a slight overflow only nudges its aspect ratio a hair. */
+    min-height: var(--steam-signal-h);
+  }
+}
+.steam-signal-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1.1rem;
+  padding: 1.25rem 1.35rem;
+}
+@media (min-width: 1024px) {
+  .steam-signal-copy {
+    width: 21rem;
+    flex: 0 0 auto;
+  }
+}
+/* A rounded, inset poster rather than a hard bleed to the panel's own edges — margins pull it off
+   all four sides so its own border-radius actually reads instead of getting swallowed by the
+   panel's corner clip. Mobile: full width minus side margins, a fixed height (not derived) —
+   plain, always-safe flex stretch, object-fit: cover absorbs any ratio mismatch. Desktop:
+   stretches to the row's height (minus its own vertical margins) via flex, and width is calc()'d
+   from that same nominal height at Steam's own header-art ratio (~2.14:1, rounded to 2:1) — an
+   explicit, deterministic size rather than one the browser has to derive, so shrinking
+   .steam-signal-body's height shrinks this in proportion automatically without the fragile
+   aspect-ratio-from-stretch pattern flagged above. */
+.steam-signal-art {
+  position: relative;
+  isolation: isolate;
+  height: 10rem;
+  margin: 0.9rem;
+  border-radius: 1rem;
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgb(0 0 0 / 0.22);
+}
+@media (min-width: 1024px) {
+  .steam-signal-art {
+    height: auto;
+    width: calc(var(--steam-signal-h) * 2 - 3.6rem);
+    flex: 0 0 auto;
+    margin: 0.9rem 0.9rem 0.9rem auto;
+  }
+}
+.steam-signal-art-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.steam-signal-art-fallback {
+  background: var(--color-track);
+}
+
+/* Achievement highlights' "Tracking X" line, given a header-art strip so the tracked game reads
+   as a game and not just a text label — same recipe as .steam-hero, scaled down to a single row. */
+.steam-tracking-banner {
+  position: relative;
+  isolation: isolate;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.85rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--color-accent-steam) 17%, var(--color-card-border));
+  background: color-mix(in oklab, var(--color-accent-steam) 7%, var(--color-card));
+}
+.steam-tracking-banner-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(20px) saturate(1.3);
+  transform: scale(1.2);
+  opacity: 0.4;
+}
+.steam-tracking-banner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(105deg, color-mix(in oklab, var(--color-card) 78%, transparent), color-mix(in oklab, var(--color-card) 30%, transparent)),
+    linear-gradient(135deg, color-mix(in oklab, var(--color-accent-steam) 26%, transparent), transparent 70%);
+}
+.steam-tracking-banner-thumb {
+  width: 3.6rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  border-radius: 0.55rem;
+  object-fit: cover;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+}
+.steam-tracking-banner-thumb--fallback {
+  background: var(--color-track);
 }
 
 /* Overview card: a library pulse plus a small, image-led shelf gives the homepage more useful
