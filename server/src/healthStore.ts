@@ -46,13 +46,21 @@ export class HealthStore {
     const defined = Object.fromEntries(
       Object.entries(sample).filter(([, value]) => value !== undefined),
     ) as HealthIngest;
+    // Mirrors the `steps` derivation in the ON CONFLICT branch below — a device total takes
+    // priority over a plain `steps` value there, and a brand-new row (no conflict, so that branch
+    // never runs) needs the same rule applied up front or it would insert `steps` as null even
+    // when a device count was actually given.
+    const derivedSteps =
+      defined.watchSteps !== undefined || defined.phoneSteps !== undefined
+        ? Math.max(defined.watchSteps ?? 0, defined.phoneSteps ?? 0)
+        : (defined.steps ?? null);
     const sql = this.database.client;
     const [row] = await sql<HealthDayRow[]>`
       insert into health_days (
         date, steps, watch_steps, phone_steps, active_energy_kcal, exercise_minutes,
         stand_hours, heart_rate, resting_heart_rate, walking_heart_rate, blood_oxygen_percent
       ) values (
-        ${date}, ${defined.steps ?? null}, ${defined.watchSteps ?? null}, ${defined.phoneSteps ?? null},
+        ${date}, ${derivedSteps}, ${defined.watchSteps ?? null}, ${defined.phoneSteps ?? null},
         ${defined.activeEnergyKcal ?? null}, ${defined.exerciseMinutes ?? null}, ${defined.standHours ?? null},
         ${defined.heartRate ?? null}, ${defined.restingHeartRate ?? null}, ${defined.walkingHeartRate ?? null},
         ${defined.bloodOxygenPercent ?? null}
