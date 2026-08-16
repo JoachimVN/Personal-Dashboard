@@ -40,7 +40,9 @@ export class HealthStore {
 
   /** Upsert an additive sample while preserving independently reported device totals. */
   async ingest(sample: HealthIngest, today: string): Promise<HealthDay> {
-    const date = sample.date ?? today;
+    // `??` only catches null/undefined — a Shortcut date-format step that comes back empty still
+    // posts a defined `""`, which would otherwise create a permanent phantom row keyed on "".
+    const date = sample.date || today;
     const defined = Object.fromEntries(
       Object.entries(sample).filter(([, value]) => value !== undefined),
     ) as HealthIngest;
