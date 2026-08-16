@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import type { SteamData } from '@personal-dashboard/shared';
 import { relativeTime } from '../../lib/time';
-import { accent } from './shared';
+import { accent, findTrackedGame } from './shared';
 
 /** Rarity tier for a global-unlock percent, echoed as both text and color — never color alone. */
 function rarityTier(percent: number): { label: string; color: string } {
@@ -62,22 +63,48 @@ export function SteamAchievementsWidget({ data }: Readonly<{ data: SteamData }>)
   );
 }
 
+/** Header art for the tracked game — looked up by appId across the payload's game lists, since
+ * achievements only carry the id/name, not art. Falls back to a plain fill if art 404s or the
+ * game isn't in any list the client already has (shouldn't happen, but art is never load-bearing). */
+function TrackedGameBanner({ data, appId, gameName }: Readonly<{ data: SteamData; appId: number; gameName: string }>) {
+  const game = findTrackedGame(data, appId);
+  const [artFailed, setArtFailed] = useState(false);
+  const hasArt = Boolean(game?.headerUrl) && !artFailed;
+  return (
+    <div className="steam-tracking-banner">
+      {hasArt && (
+        <img aria-hidden src={game!.headerUrl} alt="" className="steam-tracking-banner-backdrop" onError={() => setArtFailed(true)} />
+      )}
+      <div className="steam-tracking-banner-scrim" />
+      <div className="relative flex items-center gap-3">
+        {hasArt ? (
+          <img src={game!.headerUrl} alt="" className="steam-tracking-banner-thumb" onError={() => setArtFailed(true)} />
+        ) : (
+          <div aria-hidden className="steam-tracking-banner-thumb steam-tracking-banner-thumb--fallback" />
+        )}
+        <div className="min-w-0">
+          <p className="steam-eyebrow">Tracking</p>
+          <p className="truncate text-sm font-semibold text-ink">{gameName}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Rarest unlocked achievements plus the "most other players have this, you don't yet" locked
  * showcase — both computed server-side from Steam's global unlock-rate data. */
 export function SteamAchievementShowcase({ data }: Readonly<{ data: SteamData }>) {
   if (data.availability.achievements !== 'available' || !data.achievements) {
     return <p className="text-sm text-ink-faint">No achievement highlights for the tracked game right now.</p>;
   }
-  const { gameName, rarest, nextEasiest } = data.achievements;
+  const { appId, gameName, rarest, nextEasiest } = data.achievements;
   if (rarest.length === 0 && nextEasiest.length === 0) {
     return <p className="text-sm text-ink-faint">No global rarity data for this game's achievements yet.</p>;
   }
 
   return (
     <div className="space-y-5">
-      <p className="text-xs text-ink-faint">
-        Tracking <span className="font-medium text-ink-muted">{gameName}</span>
-      </p>
+      <TrackedGameBanner data={data} appId={appId} gameName={gameName} />
       {rarest.length > 0 && (
         <div>
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">Rarest unlocks</p>

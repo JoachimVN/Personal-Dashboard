@@ -4,6 +4,7 @@ import {
   createSteamProvider,
   mapGame,
   mergeAchievements,
+  orderByRecency,
   pickTrackedGame,
   steamHeaderUrl,
   steamIconUrl,
@@ -61,6 +62,32 @@ describe('mapGame', () => {
       playtimeForeverMinutes: 120,
       playtimeRecentMinutes: 30,
     });
+  });
+});
+
+describe('orderByRecency', () => {
+  it('re-sorts by true last-played time from the library, overriding playtime-biased Steam order', () => {
+    // Steam's GetRecentlyPlayedGames lists Palworld first because it has more playtime_2weeks,
+    // even though Hades was actually played more recently (this was the reported bug: the tracked
+    // game stayed "Palworld" even after switching games).
+    const recentlyPlayed = [
+      mapGame({ appid: 1, name: 'Palworld', playtime_forever: 1000, playtime_2weeks: 660 }),
+      mapGame({ appid: 2, name: 'Hades', playtime_forever: 200, playtime_2weeks: 30 }),
+    ];
+    const libraryGames = [
+      mapGame({ appid: 1, name: 'Palworld', playtime_forever: 1000, rtime_last_played: 1_700_000_000 }),
+      mapGame({ appid: 2, name: 'Hades', playtime_forever: 200, rtime_last_played: 1_700_100_000 }),
+    ];
+    const ordered = orderByRecency(recentlyPlayed, libraryGames);
+    expect(ordered.map((g) => g.name)).toEqual(['Hades', 'Palworld']);
+  });
+
+  it('keeps Steam\'s original order for entries with no matching library data', () => {
+    const recentlyPlayed = [
+      mapGame({ appid: 1, name: 'A', playtime_forever: 10 }),
+      mapGame({ appid: 2, name: 'B', playtime_forever: 20 }),
+    ];
+    expect(orderByRecency(recentlyPlayed, [])).toEqual(recentlyPlayed);
   });
 });
 

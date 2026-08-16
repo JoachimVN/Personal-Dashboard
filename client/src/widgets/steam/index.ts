@@ -6,5 +6,5 @@
 export { SteamAchievementsWidget, SteamAchievementShowcase } from './achievements';
 export { SteamFriendsLeaderboard, SteamFriendsWidget } from './friends';
 export { SteamGameList, SteamLibraryStats, SteamRecentGames } from './library';
-export { SteamNowPlaying } from './nowPlaying';
+export { SteamActivityHero } from './nowPlaying';
 export { SteamPlaytimeTrend } from './playtimeTrend';

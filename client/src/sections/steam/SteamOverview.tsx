@@ -3,6 +3,7 @@ import type { SteamAchievement, SteamData, SteamGame } from '@personal-dashboard
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
+import { findTrackedGame } from '../../widgets/steam/shared';
 import './steam.css';
 
 function formatHours(minutes: number): string {
@@ -59,17 +60,7 @@ function AchievementBadge({ achievement }: Readonly<{ achievement: SteamAchievem
 /** Looks up the tracked achievement game's square icon across every game list the overview
  * already has in hand, rather than growing the achievements payload with a duplicate field. */
 function findTrackedGameIcon(data: SteamData, appId: number): string | undefined {
-  const pools: SteamGame[][] = [
-    data.currentGame ? [data.currentGame] : [],
-    data.recentlyPlayed,
-    data.library?.mostPlayed ?? [],
-    data.library?.allGames ?? [],
-  ];
-  for (const pool of pools) {
-    const match = pool.find((game) => game.appId === appId)?.iconUrl;
-    if (match) return match;
-  }
-  return undefined;
+  return findTrackedGame(data, appId)?.iconUrl;
 }
 
 type ShelfEntry = { game: SteamGame; source: 'recent' | 'all-time' };
@@ -176,6 +167,10 @@ function SteamOverviewContent({ data }: Readonly<{ data: SteamData }>) {
   const overviewRef = useRef<HTMLDivElement>(null);
   const recent = data.recentlyPlayed[0];
   const featured = data.currentGame ?? recent ?? data.library?.mostPlayed[0];
+  let featuredLabel: string | undefined;
+  if (data.currentGame) featuredLabel = 'Playing now';
+  else if (recent) featuredLabel = 'Recently played';
+  else if (data.library?.mostPlayed[0]) featuredLabel = 'Most played';
 
   useEffect(() => {
     const card = overviewRef.current?.closest<HTMLElement>('.dashboard-section-card--steam');
@@ -198,6 +193,7 @@ function SteamOverviewContent({ data }: Readonly<{ data: SteamData }>) {
 
   return (
     <div ref={overviewRef} className="steam-overview space-y-4">
+      {featuredLabel && <span className="steam-eyebrow -mt-3 mb-1">{featuredLabel}</span>}
       <SteamHomeDashboard data={data} />
     </div>
   );

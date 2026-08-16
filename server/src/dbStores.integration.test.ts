@@ -40,6 +40,14 @@ describeDatabase('Postgres stores', () => {
     });
   });
 
+  it('falls back to today when a sample posts a blank date instead of omitting it', async () => {
+    const store = new HealthStore(database);
+    await store.ingest({ date: '', watchSteps: 1_442 }, '2026-07-13');
+    const snapshot = await store.snapshot('2026-07-13');
+    expect(snapshot.today).toMatchObject({ date: '2026-07-13', steps: 1_442 });
+    expect(snapshot.history).toHaveLength(1);
+  });
+
   it('deduplicates usage samples and retains the last good snapshot', async () => {
     const store = new UsageHistoryStore(database, 15 * 60_000);
     const asOf = new Date(Date.now() - 60_000).toISOString();

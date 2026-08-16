@@ -4,47 +4,30 @@ import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import {
   SteamAchievementShowcase,
   SteamAchievementsWidget,
+  SteamActivityHero,
   SteamFriendsLeaderboard,
   SteamFriendsWidget,
   SteamGameList,
-  SteamLibraryStats,
-  SteamNowPlaying,
   SteamPlaytimeTrend,
   SteamRecentGames,
 } from '../../widgets/steam';
 import { DetailIntro, DetailSectionHeading } from '../DetailIntro';
 import './steam.css';
 
+/** Full-width band below the "Steam activity" title (see DetailIntro's `layout="stacked"`) — the
+ * hero card folds profile, tracked game, and library stats together with the tracked game's art
+ * bleeding to the card's right edge; the playtime trend chart is its own full-width row beneath. */
 function SteamSignals() {
   const { envelope, offline } = useWidget<SteamData>('steam');
   return (
-    <div className="detail-signal-panel">
-      <WidgetBody envelope={envelope} offline={offline}>
-        {(data) => (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              {data.profile.avatarUrl ? (
-                <img src={data.profile.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-              ) : (
-                <div className="h-10 w-10 shrink-0 rounded-full bg-track" />
-              )}
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-ink">{data.profile.personaName}</p>
-                <a
-                  href={data.profile.profileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="truncate text-xs text-ink-faint hover:underline"
-                >
-                  View Steam profile
-                </a>
-              </div>
-            </div>
-            <SteamLibraryStats data={data} />
-          </div>
-        )}
-      </WidgetBody>
-    </div>
+    <WidgetBody envelope={envelope} offline={offline}>
+      {(data) => (
+        <div className="space-y-5">
+          <SteamActivityHero data={data} />
+          <SteamPlaytimeTrend data={data} />
+        </div>
+      )}
+    </WidgetBody>
   );
 }
 
@@ -55,29 +38,12 @@ export function SteamDetail() {
     <div>
       <DetailIntro
         title="Steam activity"
-        description="Your current game, library totals, and achievement progress for whichever game is tracked right now."
+        description="Your current game, playtime trend, library totals, and achievement progress for whichever game is tracked right now."
         accent="var(--color-accent-steam)"
+        layout="stacked"
       >
         <SteamSignals />
       </DetailIntro>
-
-      <DetailSectionHeading title="Current game" />
-      {/* Neutral title — SteamNowPlaying's own kicker ("Playing now"/"Last played"/"Most played") states the actual status. */}
-      <WidgetShell title="Game">
-        <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <SteamNowPlaying data={data} />}
-        </WidgetBody>
-      </WidgetShell>
-
-      <DetailSectionHeading
-        title="Playtime over time"
-        detail="Daily deltas between library snapshots — Steam only reports a cumulative all-time total, not a native day-by-day breakdown."
-      />
-      <WidgetShell title="Playtime">
-        <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <SteamPlaytimeTrend data={data} />}
-        </WidgetBody>
-      </WidgetShell>
 
       <DetailSectionHeading
         title="Recently played and achievements"

@@ -48,6 +48,9 @@ interface RawGame {
   playtime_forever: number;
   playtime_2weeks?: number;
   img_icon_url?: string;
+  /** Only present on GetOwnedGames entries, not GetRecentlyPlayedGames — the true last-played
+   * signal (see orderByRecency below). */
+  rtime_last_played?: number;
 }
 
 interface RawPlayerAchievement {
@@ -124,7 +127,23 @@ export function mapGame(game: RawGame): SteamGame {
     headerUrl: steamHeaderUrl(game.appid),
     playtimeForeverMinutes: game.playtime_forever,
     playtimeRecentMinutes: game.playtime_2weeks,
+    lastPlayedAt: game.rtime_last_played ? unixSecondsToIso(game.rtime_last_played) : undefined,
   };
+}
+
+/** GetRecentlyPlayedGames' order tracks playtime_2weeks, not actual recency — a game played once
+ * early in the window with more total hours than one played five minutes ago still sorts first.
+ * GetOwnedGames' rtime_last_played (carried on `libraryGames`, since include_appinfo pulls it in)
+ * is the real signal, so once the library is available this re-sorts by it; entries with no
+ * matching library data (or no library at all — private/unavailable) keep their relative order,
+ * since Steam's own order is the best fallback signal left. */
+export function orderByRecency(games: SteamGame[], libraryGames: SteamGame[]): SteamGame[] {
+  const lastPlayedByAppId = new Map(
+    libraryGames.filter((g) => g.lastPlayedAt !== undefined).map((g) => [g.appId, g.lastPlayedAt!]),
+  );
+  return [...games]
+    .map((g) => ({ ...g, lastPlayedAt: g.lastPlayedAt ?? lastPlayedByAppId.get(g.appId) }))
+    .sort((a, b) => (b.lastPlayedAt ?? '').localeCompare(a.lastPlayedAt ?? ''));
 }
 
 export function chunkFriendIds(ids: string[], size = FRIEND_SUMMARY_CHUNK_SIZE): string[][] {
@@ -133,12 +152,12 @@ export function chunkFriendIds(ids: string[], size = FRIEND_SUMMARY_CHUNK_SIZE):
   return chunks;
 }
 
-/** Current game if playing, else the first (most recent) recently-played entry, else the
- * most-played library game — labeled the "tracked game" in the UI since Steam doesn't formally
- * guarantee recently-played ordering. The library fallback matters because Steam's
- * "recently played" is a strict last-2-weeks window: someone with a huge library but no play in
- * the last fortnight would otherwise get zero achievement tracking despite having plenty of
- * history to show. */
+/** Current game if playing, else the first entry of `recentlyPlayed` — the caller is expected to
+ * have already run this through orderByRecency, so "first" means true last-played, not Steam's
+ * playtime-biased raw order — else the most-played library game. The library fallback matters
+ * because Steam's "recently played" is a strict last-2-weeks window: someone with a huge library
+ * but no play in the last fortnight would otherwise get zero achievement tracking despite having
+ * plenty of history to show. */
 export function pickTrackedGame(
   currentGame: SteamGame | null,
   recentlyPlayed: SteamGame[],
@@ -588,12 +607,13 @@ export function createSteamProvider(
 
       // Profile failure fails the whole provider — the scheduler retains the last-good snapshot as stale.
       const { profile, currentGame } = await fetchProfile(signal, apiKey, steamId);
-      const recentlyPlayed = await fetchRecentlyPlayed(signal, apiKey, steamId);
+      const rawRecentlyPlayed = await fetchRecentlyPlayed(signal, apiKey, steamId);
 
       const { library, libraryAvailability } = await resolveSteamLibrary(signal, apiKey, steamId, snapshotStore);
 
       if (library) await historyStore?.record(library.totalPlaytimeMinutes);
 
+      const recentlyPlayed = orderByRecency(rawRecentlyPlayed, library?.allGames ?? []);
       const tracked = pickTrackedGame(currentGame, recentlyPlayed, library?.mostPlayed);
       const achievements = tracked
         ? await fetchAchievements(signal, apiKey, steamId, tracked.appId, tracked.name, snapshotStore)

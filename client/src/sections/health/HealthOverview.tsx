@@ -213,10 +213,20 @@ function VitalSparkline({ history, metric, color }: Readonly<{ history: HealthDa
   );
 }
 
+/** Walks backward so a vital missing only from the latest synced day still shows its last known reading. */
+function latestVitalReading(history: HealthDay[], metric: VitalKey): { value: number; date: string } | undefined {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const value = history[i][metric];
+    if (value != null) return { value, date: history[i].date };
+  }
+  return undefined;
+}
+
 function Vitals({ today, history }: Readonly<{ today: HealthDay; history: HealthDay[] }>) {
-  const readings = VITALS.map((vital) => ({ ...vital, value: today[vital.key] })).filter(
-    (vital): vital is (typeof VITALS)[number] & { value: number } => vital.value != null,
-  );
+  const readings = VITALS.map((vital) => {
+    const latest = latestVitalReading(history, vital.key);
+    return latest ? { ...vital, value: latest.value, isStale: latest.date !== today.date } : null;
+  }).filter((vital): vital is (typeof VITALS)[number] & { value: number; isStale: boolean } => vital != null);
   if (readings.length === 0) return null;
   return (
     <div className="rounded-2xl bg-track/25 p-3.5">
@@ -239,7 +249,10 @@ function Vitals({ today, history }: Readonly<{ today: HealthDay; history: Health
           >
             <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: vital.color }} />
             <span className="w-14 shrink-0 text-xs text-ink-muted">{vital.label}</span>
-            <span className="w-16 shrink-0 text-sm font-semibold tabular-nums">
+            <span
+              className={`w-16 shrink-0 text-sm font-semibold tabular-nums ${vital.isStale ? 'text-ink-muted' : ''}`}
+              title={vital.isStale ? 'No reading synced today — showing the last known value' : undefined}
+            >
               {Math.round(vital.value)} <span className="text-[10px] font-medium text-ink-faint">{vital.unit}</span>
             </span>
             <span className="min-w-0 flex-1">
