@@ -358,14 +358,22 @@ export function createActivityPushProvider(
   let stateLoaded: Promise<void> | undefined;
   function ensureClashOfClansStateLoaded(): Promise<void> {
     if (!clashOfClansState) return Promise.resolve();
-    stateLoaded ??= clashOfClansState.get().then((state) => {
-      if (!state) return;
-      lastPushedClashOfClansAttackKey = state.attackKey;
-      lastPushedClashOfClansRaidKey = state.raidKey;
-      clashOfClansMilestoneBaseline = state.milestoneBaseline;
-      clashOfClansCounters = state.counters;
-      clashOfClansLastActiveAt = state.lastActiveAt;
-    });
+    stateLoaded ??= clashOfClansState
+      .get()
+      .then((state) => {
+        if (!state) return;
+        lastPushedClashOfClansAttackKey = state.attackKey;
+        lastPushedClashOfClansRaidKey = state.raidKey;
+        clashOfClansMilestoneBaseline = state.milestoneBaseline;
+        clashOfClansCounters = state.counters;
+        clashOfClansLastActiveAt = state.lastActiveAt;
+      })
+      .catch((err) => {
+        // A DB hiccup here must not block the Claude/Codex/Epic signals this provider pushes
+        // every minute — leave stateLoaded unset so the next tick retries once the DB recovers.
+        console.warn(`[activity-push] Could not load Clash of Clans state: ${err instanceof Error ? err.message : 'unknown error'}`);
+        stateLoaded = undefined;
+      });
     return stateLoaded;
   }
 
