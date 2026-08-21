@@ -76,6 +76,7 @@ const RIOT_CA_CERTIFICATE = [
  * no `rejectUnauthorized: false`, no `checkServerIdentity` override, nothing process-wide. */
 function localRiotRequest<T>(port: number, password: string, requestPath: string, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
+    const credentials = Buffer.from(`riot:${password}`).toString('base64');
     const request = https.request(
       {
         host: '127.0.0.1',
@@ -84,7 +85,7 @@ function localRiotRequest<T>(port: number, password: string, requestPath: string
         signal,
         ca: RIOT_CA_CERTIFICATE,
         headers: {
-          Authorization: `Basic ${Buffer.from(`riot:${password}`).toString('base64')}`,
+          Authorization: `Basic ${credentials}`,
           Accept: 'application/json',
         },
       },
