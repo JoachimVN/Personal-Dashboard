@@ -217,13 +217,20 @@ const COUNTER_ACTIVITY_PRIORITY: (keyof ClashOfClansCounters)[] = ['warStars', '
 /** `donations`/`attackWins` reset each season and `clanCapitalContributions`/`warStars` never do,
  * but the same rule handles both: only an *increase* is activity. A drop is a season reset, not
  * evidence of nothing happening — trophies aren't in this set at all, since they move from being
- * defended against while offline just as easily as from a player's own attacks. */
+ * defended against while offline just as easily as from a player's own attacks.
+ *
+ * `sinceKnownAt` (the previous successful fetch's time, not "now") is used as the event's
+ * timestamp: the counter could have ticked up anywhere in the gap between that fetch and this one,
+ * and normally that gap is ~60s so it makes no visible difference — but after real downtime (the
+ * machine asleep/off for an hour) stamping "now" would claim something that may have happened an
+ * hour ago just happened, which is exactly backwards from what a "last active" timestamp should do. */
 function detectClashOfClansCounterActivity(
   previous: ClashOfClansCounters,
   current: ClashOfClansCounters,
+  sinceKnownAt: string,
 ): PushedClashOfClansCounterActivity | undefined {
   const type = COUNTER_ACTIVITY_PRIORITY.find((key) => current[key] > previous[key]);
-  return type ? { type, delta: current[type] - previous[type], timestamp: new Date().toISOString() } : undefined;
+  return type ? { type, delta: current[type] - previous[type], timestamp: sinceKnownAt } : undefined;
 }
 
 export interface PushedClashOfClansMilestone {
@@ -294,6 +301,7 @@ async function fetchClashOfClansActivity(
     milestoneBaseline: ClashOfClansMilestoneBaseline | undefined;
     attackKey: string | undefined;
     raidKey: string | undefined;
+    lastCheckedAt: string | null;
   },
 ): Promise<ClashOfClansActivitySnapshot | null> {
   try {
@@ -301,7 +309,11 @@ async function fetchClashOfClansActivity(
 
     // Cheap, single-fetch signals first, so a later failure (war/raid lookups) never loses them.
     const counters = extractClashOfClansCounters(player);
-    const counterActivity = previous.counters ? detectClashOfClansCounterActivity(previous.counters, counters) : undefined;
+    // No prior successful fetch to bound the gap against (first run ever) — "now" is the best
+    // available answer, same as before this fix.
+    const counterActivity = previous.counters
+      ? detectClashOfClansCounterActivity(previous.counters, counters, previous.lastCheckedAt ?? new Date().toISOString())
+      : undefined;
     const activeAt = counterActivity?.timestamp;
 
     // No baseline yet means this is the first tick ever — seed silently rather than reporting
@@ -350,6 +362,9 @@ export function createActivityPushProvider(
   let clashOfClansMilestoneBaseline: ClashOfClansMilestoneBaseline | undefined;
   let clashOfClansCounters: ClashOfClansCounters | undefined;
   let clashOfClansLastActiveAt: string | null = null;
+  /** When `clashOfClansCounters` was last confirmed accurate — the honest lower bound for the next
+   * counter-activity event's timestamp (see detectClashOfClansCounterActivity). */
+  let clashOfClansLastCheckedAt: string | null = null;
 
   // Without this, a process restart resets all of the above to undefined, which makes the very
   // next tick treat whatever war attack/raid attack is already on record as brand new — re-stamping
@@ -367,6 +382,7 @@ export function createActivityPushProvider(
         clashOfClansMilestoneBaseline = state.milestoneBaseline;
         clashOfClansCounters = state.counters;
         clashOfClansLastActiveAt = state.lastActiveAt;
+        clashOfClansLastCheckedAt = state.lastCheckedAt ?? null;
       })
       .catch((err) => {
         // A DB hiccup here must not block the Claude/Codex/Epic signals this provider pushes
@@ -395,6 +411,7 @@ export function createActivityPushProvider(
         milestoneBaseline: clashOfClansMilestoneBaseline,
         counters: clashOfClansCounters,
         lastActiveAt: clashOfClansLastActiveAt,
+        lastCheckedAt: clashOfClansLastCheckedAt,
       });
     } catch (err) {
       console.warn(`[activity-push] Could not persist Clash of Clans state: ${err instanceof Error ? err.message : 'unknown error'}`);
@@ -423,11 +440,13 @@ export function createActivityPushProvider(
             milestoneBaseline: clashOfClansMilestoneBaseline,
             attackKey: lastPushedClashOfClansAttackKey,
             raidKey: lastPushedClashOfClansRaidKey,
+            lastCheckedAt: clashOfClansLastCheckedAt,
           })
         : null;
       if (cocActivity) {
         clashOfClansCounters = cocActivity.counters;
         if (cocActivity.activeAt) clashOfClansLastActiveAt = cocActivity.activeAt;
+        clashOfClansLastCheckedAt = new Date().toISOString();
       }
 
       const res = await fetch(push.url, {
