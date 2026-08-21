@@ -41,6 +41,7 @@ import {
   newsCandidates,
   powerCandidates,
   robloxCandidates,
+  rocketLeagueCandidates,
   sonarCandidates,
   spotifyCandidates,
   steamCandidates,
@@ -352,6 +353,7 @@ export function createCommandCenterProvider(
         // what is happening right now.
         ...valorantCandidates(widgetData<ValorantData>(envelopes, 'valorant'), activityPush?.valorantLive),
         ...minecraftCandidates(activityPush?.minecraftLive),
+        ...rocketLeagueCandidates(activityPush?.rocketLeagueLive),
         ...sonarCandidates(sonarCloud, sonarMoments),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),

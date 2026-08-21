@@ -72,7 +72,7 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-export function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'clash-of-clans' | 'valorant' | 'minecraft' | 'claude' | 'codex' {
+export function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'clash-of-clans' | 'valorant' | 'minecraft' | 'rocket-league' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
@@ -85,6 +85,7 @@ export function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' |
   if (slot.source === 'clash-of-clans') return 'clash-of-clans';
   if (slot.source === 'valorant') return 'valorant';
   if (slot.source === 'minecraft') return 'minecraft';
+  if (slot.source === 'rocket-league') return 'rocket-league';
   return 'personal';
 }
 

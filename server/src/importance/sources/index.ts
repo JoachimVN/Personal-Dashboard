@@ -18,6 +18,7 @@ export { minecraftCandidates } from './minecraft.js';
 export { aiNewsCandidates, newsCandidates } from './news.js';
 export { powerCandidates } from './power.js';
 export { robloxCandidates } from './roblox.js';
+export { rocketLeagueCandidates } from './rocketLeague.js';
 export { sonarCandidates } from './sonar.js';
 export { spotifyCandidates, type SpotifyFreshness } from './spotify.js';
 export { steamCandidates } from './steam.js';

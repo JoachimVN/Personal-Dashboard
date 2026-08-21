@@ -24,8 +24,23 @@ export const minecraftLiveSchema = z.object({
   observedAt: z.string(),
 });
 
+/** Rocket League has no API either, but unlike Minecraft it writes its Steam rich presence into
+ * its own log — so this knows the playlist, the arena, the clock and the score, not just that the
+ * game is open. `postmatch` is the scoreboard after the whistle, which goes on reporting the final
+ * score with no clock on it. */
+export const rocketLeagueLiveSchema = z.object({
+  state: z.enum(['menus', 'ingame', 'postmatch']),
+  playlist: z.string().optional(),
+  map: z.string().optional(),
+  goalsFor: z.number().int().nonnegative().optional(),
+  goalsAgainst: z.number().int().nonnegative().optional(),
+  clock: z.string().optional(),
+  startedAt: z.string(),
+  observedAt: z.string(),
+});
+
 /** Status of the sink provider that pushes local-only activity signals (Epic Games Launcher,
- * Claude/Codex session recency) to the status page, plus the two locally-observed game readings it
+ * Claude/Codex session recency) to the status page, plus the locally-observed game readings it
  * takes on the way. Those live here rather than on the `valorant` provider because they have to be
  * re-read every minute to mean anything, and that provider refreshes on a ten-minute cycle against
  * a rate-limited API. */
@@ -34,8 +49,10 @@ export const activityPushSchema = z.object({
   lastPushOk: z.boolean(),
   valorantLive: valorantLiveSchema.nullable().optional(),
   minecraftLive: minecraftLiveSchema.nullable().optional(),
+  rocketLeagueLive: rocketLeagueLiveSchema.nullable().optional(),
 });
 
 export type ActivityPushData = z.infer<typeof activityPushSchema>;
 export type ValorantLiveData = z.infer<typeof valorantLiveSchema>;
 export type MinecraftLiveData = z.infer<typeof minecraftLiveSchema>;
+export type RocketLeagueLiveData = z.infer<typeof rocketLeagueLiveSchema>;

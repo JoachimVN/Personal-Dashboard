@@ -31,6 +31,7 @@
   --color-accent-valorant: light-dark(#c22a3a, #ff4655);
   /* No section of its own: the log-derived "playing now" slot is all there is. */
   --color-accent-minecraft: light-dark(#3d7a2b, #86c95c);
+  --color-accent-rocket-league: light-dark(#0b63c4, #5aa9ff);
 
   /* Brand accents */
   --color-claude: #de7356;

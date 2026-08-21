@@ -169,6 +169,7 @@
 .command-panel--clash-of-clans { --panel-accent: var(--color-accent-clash-of-clans); }
 .command-panel--valorant { --panel-accent: var(--color-accent-valorant); }
 .command-panel--minecraft { --panel-accent: var(--color-accent-minecraft); }
+.command-panel--rocket-league { --panel-accent: var(--color-accent-rocket-league); }
 
 .command-agenda.command-agenda--roblox {
   --panel-accent: var(--color-ink);
@@ -474,6 +475,7 @@
 .command-signal--clash-of-clans { --signal-color: var(--color-accent-clash-of-clans); }
 .command-signal--valorant { --signal-color: var(--color-accent-valorant); }
 .command-signal--minecraft { --signal-color: var(--color-accent-minecraft); }
+.command-signal--rocket-league { --signal-color: var(--color-accent-rocket-league); }
 
 .command-roblox-tile-mark {
   display: grid;
