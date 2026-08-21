@@ -43,7 +43,7 @@ describe('valorantCandidates', () => {
 
   it('calls the launcher the launcher rather than claiming Valorant', () => {
     expect(valorantCandidates(undefined, live({ state: 'riot' }), NOW)[0])
-      .toMatchObject({ kicker: 'Online on Riot', title: 'At the Riot launcher' });
+      .toMatchObject({ kicker: 'Riot', title: 'Online on Riot Launcher', detail: '' });
   });
 
   it('ignores a live reading that has gone stale and falls back to what did happen', () => {

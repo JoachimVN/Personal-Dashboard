@@ -17,6 +17,8 @@ export interface PushedValorantLive {
   /** The queue, once there is a Valorant session to have one. Absent for `riot`. */
   mode?: string;
   map?: string;
+  /** Scenic art for that map, when valorant-api could be reached. */
+  mapArtUrl?: string;
   roundsWon?: number;
   roundsLost?: number;
   partySize?: number;
@@ -198,32 +200,42 @@ const SESSION_STATES: Readonly<Record<string, PushedValorantLive['state']>> = {
   INGAME: 'ingame',
 };
 
-let cachedMapNames: Record<string, string> | undefined;
+export interface ResolvedMap {
+  name: string;
+  /** The wide scenic render valorant-api publishes per map. Only available once the live lookup
+   * has succeeded — the offline fallback table carries names, not art. */
+  artUrl?: string;
+}
 
-async function fetchMapNames(signal: AbortSignal): Promise<Record<string, string>> {
+let cachedMaps: Record<string, ResolvedMap> | undefined;
+
+async function fetchMaps(signal: AbortSignal): Promise<Record<string, ResolvedMap>> {
   const res = await fetch('https://valorant-api.com/v1/maps', { signal });
   if (!res.ok) throw new Error(`valorant-api maps failed: HTTP ${res.status}`);
-  const body = (await res.json()) as { data?: { mapUrl?: string; displayName?: string }[] };
+  const body = (await res.json()) as { data?: { mapUrl?: string; displayName?: string; listViewIcon?: string }[] };
   return Object.fromEntries(
     (body.data ?? [])
-      .filter((entry): entry is { mapUrl: string; displayName: string } => Boolean(entry.mapUrl && entry.displayName))
-      .map((entry) => [entry.mapUrl, entry.displayName]),
+      .filter((entry): entry is { mapUrl: string; displayName: string; listViewIcon?: string } => Boolean(entry.mapUrl && entry.displayName))
+      .map((entry) => [entry.mapUrl, { name: entry.displayName, artUrl: entry.listViewIcon }]),
   );
 }
 
 /** Cached for the life of the process after the first success: the map list changes a couple of
  * times a year, and this runs on every tick. */
-export async function resolveMapName(mapUrl: string, signal: AbortSignal): Promise<string | undefined> {
+export async function resolveMap(mapUrl: string, signal: AbortSignal): Promise<ResolvedMap | undefined> {
   if (!mapUrl) return undefined;
-  if (!cachedMapNames) {
+  if (!cachedMaps) {
     try {
-      cachedMapNames = await fetchMapNames(signal);
+      cachedMaps = await fetchMaps(signal);
     } catch {
       // Offline, or valorant-api is down — the built-in table still names every map that existed
-      // when this shipped, and a codename beats dropping the whole reading.
+      // when this shipped, and a codename beats dropping the whole reading. No art, though.
     }
   }
-  return cachedMapNames?.[mapUrl] ?? MAP_NAMES[mapUrl] ?? mapUrl.split('/').pop();
+  const resolved = cachedMaps?.[mapUrl];
+  if (resolved) return resolved;
+  const name = MAP_NAMES[mapUrl] ?? mapUrl.split('/').pop();
+  return name ? { name } : undefined;
 }
 
 /** Pulls this account's Valorant presence out of the roster the client keeps for every friend.
@@ -291,6 +303,7 @@ export async function readValorantLive(signal: AbortSignal): Promise<PushedValor
     const { presences } = await localRiotRequest<{ presences?: RiotPresence[] }>(port, password, '/chat/v4/presences', signal);
     const observedAt = new Date().toISOString();
     const presence = parseValorantPresence(presences ?? [], session.puuid);
+    const resolvedMap = presence?.mapUrl ? await resolveMap(presence.mapUrl, signal) : undefined;
 
     // Valorant isn't running, but the client it launches from is — worth reporting as its own,
     // weaker state rather than as nothing at all.
@@ -302,7 +315,8 @@ export async function readValorantLive(signal: AbortSignal): Promise<PushedValor
     return {
       state: presence.state,
       mode: QUEUE_NAMES[presence.queueId] ?? 'Valorant',
-      map: presence.mapUrl ? await resolveMapName(presence.mapUrl, signal) : undefined,
+      map: resolvedMap?.name,
+      mapArtUrl: resolvedMap?.artUrl,
       roundsWon: presence.roundsWon,
       roundsLost: presence.roundsLost,
       partySize: presence.partySize,

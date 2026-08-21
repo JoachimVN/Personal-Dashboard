@@ -43,6 +43,17 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('steam-achievement'), appId: z.number(), apiName: z.string() }),
   z.object({ type: z.literal('roblox-now-playing') }),
   z.object({
+    type: z.literal('valorant-slot'),
+    /** Which service mark belongs on the card: the launcher state is Riot-wide, everything else is
+     * Valorant proper. */
+    badge: z.enum(['valorant', 'riot']),
+    /** Wide scenic art (the map) for the hero/secondary backdrop. */
+    artUrl: z.string().optional(),
+    /** Small square art (the agent, the rank badge) for the tile mark. */
+    iconUrl: z.string().optional(),
+  }),
+  z.object({ type: z.literal('minecraft-slot') }),
+  z.object({
     type: z.literal('clash-royale-moment'),
     kind: z.enum(['arena', 'league', 'best-trophies', 'win-streak', 'session']),
     /** Only present for kind 'arena' — looked up against a local name->art table client-side. */

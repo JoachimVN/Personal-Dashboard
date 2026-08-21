@@ -8,6 +8,7 @@ export const valorantLiveSchema = z.object({
   state: z.enum(['riot', 'menus', 'pregame', 'ingame']),
   mode: z.string().optional(),
   map: z.string().optional(),
+  mapArtUrl: z.string().optional(),
   roundsWon: z.number().int().nonnegative().optional(),
   roundsLost: z.number().int().nonnegative().optional(),
   partySize: z.number().int().nonnegative().optional(),

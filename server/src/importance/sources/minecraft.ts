@@ -10,10 +10,10 @@ const LIVE_FRESH_MS = 3 * 60_000;
 function formatSessionLength(ms: number): string {
   const minutes = Math.round(ms / 60_000);
   if (minutes < 1) return 'just started';
-  if (minutes < 60) return `${minutes}m in`;
+  if (minutes < 60) return `for ${minutes}m`;
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
-  return remainder === 0 ? `${hours}h in` : `${hours}h ${remainder}m in`;
+  return remainder === 0 ? `for ${hours}h` : `for ${hours}h ${remainder}m`;
 }
 
 /**
@@ -32,6 +32,6 @@ export function minecraftCandidates(live: MinecraftLiveData | null | undefined, 
   return [{
     id: 'minecraft:live', source: 'minecraft', kind: 'minecraft', score: 60, shapes: [...allShapes],
     kicker: 'Playing now', title: 'Minecraft', detail,
-    href: '#/', render: { type: 'text' },
+    href: '#/', render: { type: 'minecraft-slot' },
   }];
 }

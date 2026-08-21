@@ -152,6 +152,7 @@ export function CommandPanel({
 /** The backdrop art behind hero/secondary Clash Royale cards — only 'arena' and 'league' moments
  * have real art (see lib/clashRoyale.ts); the rest render as plain panels. */
 export function slotArt(slot: CommandCenterSlot): string | undefined {
+  if (slot.render.type === 'valorant-slot') return slot.render.artUrl;
   if (slot.render.type !== 'clash-royale-moment') return undefined;
   if (slot.render.kind === 'arena' && slot.render.arenaName) return clashRoyaleArenaArt(slot.render.arenaName);
   if (slot.render.kind === 'league' && slot.render.leagueNumber !== undefined) {
@@ -187,6 +188,13 @@ function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
   }
   if (slot.render.type === 'roblox-now-playing') {
     return <img src={publicAsset('roblox/icon.svg')} alt="" aria-hidden className="command-kicker-badge" />;
+  }
+  if (slot.render.type === 'valorant-slot') {
+    const mark = slot.render.badge === 'riot' ? 'riot/mark.png' : 'valorant/mark.png';
+    return <img src={publicAsset(mark)} alt="" aria-hidden className="command-kicker-badge" />;
+  }
+  if (slot.render.type === 'minecraft-slot') {
+    return <img src={publicAsset('minecraft/mark.png')} alt="" aria-hidden className="command-kicker-badge" />;
   }
   if (slot.render.type === 'github-contributions' || slot.render.type === 'github-reviews' || slot.render.type === 'github-open-prs') {
     return <GitHubMark className="command-kicker-badge text-(--color-github-mark)" />;
@@ -331,6 +339,14 @@ function fallbackSignalMark(
     const iconUrl = roblox?.presence?.iconUrl;
     if (iconUrl) return <img src={iconUrl} alt="" className="command-roblox-tile-icon" />;
     return <span className="command-roblox-tile-mark" aria-hidden><img src={publicAsset('roblox/icon.svg')} alt="" /></span>;
+  }
+  if (slot.render.type === 'valorant-slot') {
+    if (slot.render.iconUrl) return <img src={slot.render.iconUrl} alt="" aria-hidden className="command-game-tile-icon" />;
+    const mark = slot.render.badge === 'riot' ? 'riot/mark.png' : 'valorant/mark.png';
+    return <img src={publicAsset(mark)} alt="" aria-hidden className="command-game-tile-icon" />;
+  }
+  if (slot.render.type === 'minecraft-slot') {
+    return <img src={publicAsset('minecraft/mark.png')} alt="" aria-hidden className="command-game-tile-icon" />;
   }
   return <span className="command-signal-dot" aria-hidden />;
 }

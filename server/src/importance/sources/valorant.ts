@@ -34,7 +34,7 @@ function inGameCandidate(live: ValorantLiveData): Candidate | undefined {
     kicker: live.idle ? 'In a Valorant match (away)' : 'In a Valorant match',
     title: joinDetail(live.map ?? 'Valorant', score),
     detail: joinDetail(live.mode, partyDetail(live)) || 'Playing now',
-    href: '#/valorant', render: { type: 'text' },
+    href: '#/valorant', render: { type: 'valorant-slot', badge: 'valorant', artUrl: live.mapArtUrl },
   };
 }
 
@@ -44,7 +44,7 @@ function agentSelectCandidate(live: ValorantLiveData): Candidate | undefined {
     id: 'valorant:live:pregame', source: 'valorant', kind: 'valorant', score: 70, shapes: [...allShapes],
     kicker: 'Valorant agent select', title: live.map ?? 'Picking an agent',
     detail: joinDetail(live.mode, partyDetail(live)) || 'Match starting',
-    href: '#/valorant', render: { type: 'text' },
+    href: '#/valorant', render: { type: 'valorant-slot', badge: 'valorant', artUrl: live.mapArtUrl },
   };
 }
 
@@ -54,7 +54,7 @@ function menusCandidate(live: ValorantLiveData): Candidate | undefined {
     id: 'valorant:live:menus', source: 'valorant', kind: 'valorant', score: 48, shapes: ['secondary', 'tile'],
     kicker: live.idle ? 'Away in Valorant' : 'In the Valorant menus', title: 'Between matches',
     detail: joinDetail(live.mode, partyDetail(live)) || 'Valorant is open',
-    href: '#/valorant', render: { type: 'text' },
+    href: '#/valorant', render: { type: 'valorant-slot', badge: 'valorant', artUrl: live.mapArtUrl },
   };
 }
 
@@ -65,8 +65,8 @@ function riotOnlineCandidate(live: ValorantLiveData): Candidate | undefined {
   if (live.state !== 'riot') return undefined;
   return {
     id: 'valorant:live:riot', source: 'valorant', kind: 'valorant', score: 30, shapes: ['tile'],
-    kicker: live.idle ? 'Away on Riot' : 'Online on Riot', title: 'At the Riot launcher',
-    detail: 'Signed in, not in a game', href: '#/valorant', render: { type: 'text' },
+    kicker: 'Riot', title: live.idle ? 'Away on Riot Launcher' : 'Online on Riot Launcher',
+    detail: '', href: '#/valorant', render: { type: 'valorant-slot', badge: 'riot' },
   };
 }
 
@@ -82,7 +82,7 @@ function lastMatchCandidate(data: ValorantData | undefined, now: number): Candid
     score: match.result === 'win' ? 56 : 52, shapes: ['secondary', 'tile'],
     kicker: 'Last Valorant match', title: joinDetail(`${outcome} on ${match.map}`, score),
     detail: joinDetail(match.mode, `${match.kills}/${match.deaths}/${match.assists}`, match.agentName),
-    href: '#/valorant', render: { type: 'text' },
+    href: '#/valorant', render: { type: 'valorant-slot', badge: 'valorant', iconUrl: match.agentIconUrl },
   };
 }
 
@@ -93,7 +93,8 @@ function rankCandidate(data: ValorantData | undefined): Candidate | undefined {
   return {
     id: 'valorant:rank', source: 'valorant', kind: 'valorant', score: 24, shapes: ['tile'],
     kicker: 'Valorant rank', title: data.rank.tierName,
-    detail: joinDetail(`${data.rank.rr} RR`, movement), href: '#/valorant', render: { type: 'text' },
+    detail: joinDetail(`${data.rank.rr} RR`, movement), href: '#/valorant',
+    render: { type: 'valorant-slot', badge: 'valorant', iconUrl: data.rank.tierIconUrl },
   };
 }
 

@@ -477,6 +477,16 @@
 .command-signal--minecraft { --signal-color: var(--color-accent-minecraft); }
 .command-signal--rocket-league { --signal-color: var(--color-accent-rocket-league); }
 
+/* Square art in a tile row — an agent portrait, a rank badge, a game mark. Sized to match the
+   other tile marks so a row of mixed sources still lines up. */
+.command-game-tile-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
 .command-roblox-tile-mark {
   display: grid;
   flex: 0 0 auto;

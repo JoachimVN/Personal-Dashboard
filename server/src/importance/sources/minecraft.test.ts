@@ -9,19 +9,19 @@ describe('minecraftCandidates', () => {
       startedAt: new Date(NOW - 45 * 60_000).toISOString(),
       observedAt: new Date(NOW - 20_000).toISOString(),
     }, NOW);
-    expect(candidate).toMatchObject({ kicker: 'Playing now', title: 'Minecraft', detail: '45m in' });
+    expect(candidate).toMatchObject({ kicker: 'Playing now', title: 'Minecraft', detail: 'for 45m' });
   });
 
   it('spells longer sessions out in hours', () => {
     expect(minecraftCandidates({
       startedAt: new Date(NOW - 154 * 60_000).toISOString(),
       observedAt: new Date(NOW).toISOString(),
-    }, NOW)[0]?.detail).toBe('2h 34m in');
+    }, NOW)[0]?.detail).toBe('for 2h 34m');
 
     expect(minecraftCandidates({
       startedAt: new Date(NOW - 120 * 60_000).toISOString(),
       observedAt: new Date(NOW).toISOString(),
-    }, NOW)[0]?.detail).toBe('2h in');
+    }, NOW)[0]?.detail).toBe('for 2h');
   });
 
   it('drops a stale reading rather than claiming a session that may be over', () => {
