@@ -370,6 +370,62 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
         render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: 'https://api-assets.clashofclans.com/leaguetiers/125/yIfqSgrhiYRcuMbAPCoeCj1FTmfylCLxnrAljEZc8K0.png', trophies: 312 },
       },
     },
+    {
+      label: 'valorant (live: in a match)',
+      slot: {
+        id: 'gallery:valorant:ingame', source: 'valorant', kind: 'valorant', kicker: 'In a Valorant match',
+        title: 'Abyss · 9–7', detail: 'Competitive · 3-stack', href: '#/valorant', score: 74,
+        render: { type: 'text' },
+      },
+    },
+    {
+      label: 'valorant (live: agent select)',
+      slot: {
+        id: 'gallery:valorant:pregame', source: 'valorant', kind: 'valorant', kicker: 'Valorant agent select',
+        title: 'Sunset', detail: 'Unrated · 2-stack', href: '#/valorant', score: 70,
+        render: { type: 'text' },
+      },
+    },
+    {
+      label: 'valorant (live: menus)',
+      slot: {
+        id: 'gallery:valorant:menus', source: 'valorant', kind: 'valorant', kicker: 'In the Valorant menus',
+        title: 'Between matches', detail: 'Competitive', href: '#/valorant', score: 48,
+        render: { type: 'text' },
+      },
+    },
+    {
+      label: 'valorant (live: on the Riot launcher)',
+      slot: {
+        id: 'gallery:valorant:riot', source: 'valorant', kind: 'valorant', kicker: 'Online on Riot',
+        title: 'At the Riot launcher', detail: 'Signed in, not in a game', href: '#/valorant', score: 30,
+        render: { type: 'text' },
+      },
+    },
+    {
+      label: 'valorant (last match)',
+      slot: {
+        id: 'gallery:valorant:last-match', source: 'valorant', kind: 'valorant', kicker: 'Last Valorant match',
+        title: 'Victory on Abyss · 13–6', detail: 'Competitive · 28/11/5 · Jett',
+        href: '#/valorant', score: 56, render: { type: 'text' },
+      },
+    },
+    {
+      label: 'valorant (rank)',
+      slot: {
+        id: 'gallery:valorant:rank', source: 'valorant', kind: 'valorant', kicker: 'Valorant rank',
+        title: 'Diamond 1', detail: '42 RR · +19 RR last game', href: '#/valorant', score: 24,
+        render: { type: 'text' },
+      },
+    },
+    {
+      label: 'minecraft (live: playing now)',
+      slot: {
+        id: 'gallery:minecraft:live', source: 'minecraft', kind: 'minecraft', kicker: 'Playing now',
+        title: 'Minecraft', detail: '45m in', href: '#/', score: 60,
+        render: { type: 'text' },
+      },
+    },
   ];
 
   assertGalleryCoversEveryRenderType(slots);

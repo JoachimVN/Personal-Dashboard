@@ -5,6 +5,8 @@ import {
   type CalendarData,
   type ClashOfClansData,
   type ClashRoyaleData,
+  type ActivityPushData,
+  type ValorantData,
   type GitHubData,
   type GmailData,
   type HealthData,
@@ -35,6 +37,7 @@ import {
   healthCandidates,
   hueCandidates,
   imessageCandidates,
+  minecraftCandidates,
   newsCandidates,
   powerCandidates,
   robloxCandidates,
@@ -42,6 +45,7 @@ import {
   spotifyCandidates,
   steamCandidates,
   transitCandidates,
+  valorantCandidates,
   weatherCandidates,
   type SpotifyFreshness,
 } from '../importance/sources/index.js';
@@ -323,6 +327,7 @@ export function createCommandCenterProvider(
           { changed: [] },
         ),
       ]);
+      const activityPush = widgetData<ActivityPushData>(envelopes, 'activity-push');
       return rankCandidates([
         ...calendarCandidates(calendar, Date.now()),
         ...gmailCandidates(gmail, config.commandCenter.gmailFreshMs, config.commandCenter.gmailStaleMs),
@@ -342,6 +347,11 @@ export function createCommandCenterProvider(
           config.commandCenter.clashRoyaleWinStreakFreshMs,
         ),
         ...clashOfClansCandidates(clashOfClans),
+        // Both live readings ride on the activity-push provider, which re-reads them every minute
+        // (see its schema) — the valorant provider's own ten-minute cycle is far too slow to say
+        // what is happening right now.
+        ...valorantCandidates(widgetData<ValorantData>(envelopes, 'valorant'), activityPush?.valorantLive),
+        ...minecraftCandidates(activityPush?.minecraftLive),
         ...sonarCandidates(sonarCloud, sonarMoments),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),

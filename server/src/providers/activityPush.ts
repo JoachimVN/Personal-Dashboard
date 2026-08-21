@@ -478,7 +478,7 @@ export function createActivityPushProvider(
       commitClashOfClansActivity(cocActivity);
       await persistClashOfClansState();
 
-      return { lastPushedAt: new Date().toISOString(), lastPushOk: true };
+      return { lastPushedAt: new Date().toISOString(), lastPushOk: true, valorantLive, minecraftLive };
     },
   };
 }

@@ -26,6 +26,11 @@
   /* No dedicated section at all (war/raid-weekend events only) — a warmer copper than Clash
      Royale's gold so the two don't read as the same game when seated side by side. */
   --color-accent-clash-of-clans: light-dark(#9a4a1f, #ff9152);
+  /* Lives here rather than in the section's own stylesheet because the command center seats
+     Valorant slots whether or not that section's CSS has been loaded. */
+  --color-accent-valorant: light-dark(#c22a3a, #ff4655);
+  /* No section of its own: the log-derived "playing now" slot is all there is. */
+  --color-accent-minecraft: light-dark(#3d7a2b, #86c95c);
 
   /* Brand accents */
   --color-claude: #de7356;

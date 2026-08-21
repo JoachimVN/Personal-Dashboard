@@ -1,7 +1,6 @@
 /* Same restrained treatment as Clash Royale/Steam — one accent color plus the shared neutral
    `--color-track` panels, not bespoke gradients or borders. */
 :root {
-  --color-accent-valorant: light-dark(#c22a3a, #ff4655);
   --valorant-win: light-dark(#137343, #55dc93);
   --valorant-loss: light-dark(#b53a45, #ff8c98);
   /* The hero rr-delta and the map-art match results sit on a photo rather than the plain

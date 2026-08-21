@@ -7,15 +7,23 @@ import path from 'node:path';
  * games that have already finished, so this is the one source that can say "right now" — it comes
  * from the Riot client running on this machine, not from any web API. */
 export interface PushedValorantLive {
-  /** `menus` covers the lobby, the queue and the post-game screens: Valorant is open, no round is
-   * being played. `pregame` is agent select, `ingame` is a live match. */
-  state: 'menus' | 'pregame' | 'ingame';
-  mode: string;
+  /** `riot` is signed into the Riot client with Valorant not running. That one is Riot-wide rather
+   * than Valorant-specific, since the client is shared with League, so whatever displays it has to
+   * stay honest about meaning "at the launcher" and not "in Valorant".
+   *
+   * The rest are Valorant itself: `menus` covers the lobby, the queue and the post-game screens
+   * (open, no round being played), `pregame` is agent select, `ingame` is a live match. */
+  state: 'riot' | 'menus' | 'pregame' | 'ingame';
+  /** The queue, once there is a Valorant session to have one. Absent for `riot`. */
+  mode?: string;
   map?: string;
   roundsWon?: number;
   roundsLost?: number;
   partySize?: number;
   maxPartySize?: number;
+  /** Riot's own away flag — set in-game when it marks the player idle, and out of game when they
+   * are signed in as away rather than available. */
+  idle?: boolean;
   observedAt: string;
 }
 
@@ -115,9 +123,13 @@ interface RiotPresence {
   puuid?: string;
   product?: string;
   private?: string;
+  /** Chat availability: `chat` available, `away`/`dnd` around but not to be disturbed, `offline`
+   * signed in but appearing offline on purpose. */
+  state?: string;
 }
 
 interface ValorantPrivateBlob {
+  isIdle?: boolean;
   matchPresenceData?: { sessionLoopState?: string; matchMap?: string; queueId?: string };
   partyPresenceData?: { partySize?: number; maxPartySize?: number };
   partyOwnerMatchScoreAllyTeam?: number;
@@ -135,6 +147,7 @@ export interface ValorantPresenceState {
   roundsLost?: number;
   partySize?: number;
   maxPartySize?: number;
+  idle: boolean;
 }
 
 /** Riot's internal codenames, which is what presence reports. Resolved against valorant-api.com at
@@ -240,12 +253,25 @@ export function parseValorantPresence(presences: RiotPresence[], puuid: string):
     roundsLost: isLiveMatch ? blob.partyOwnerMatchScoreEnemyTeam : undefined,
     partySize: blob.partySize ?? blob.partyPresenceData?.partySize,
     maxPartySize: blob.maxPartySize ?? blob.partyPresenceData?.maxPartySize,
+    idle: blob.isIdle === true,
   };
 }
 
-/** Reads the running Riot client for what this account is doing in Valorant right now. Null for
- * every ordinary "nothing to report" case — client closed, signed out, presence not published yet —
- * so the caller can pass the result along verbatim without telling them apart. */
+/** The Riot client publishes a presence of its own, separate from any game's, so this is what is
+ * left to read when Valorant isn't running: signed in, at the launcher. Deliberately returns
+ * undefined for `offline` — that is someone choosing to appear offline, and republishing it as
+ * "online" anywhere else would defeat the point of the setting. */
+export function parseRiotOnline(presences: RiotPresence[], puuid: string): { idle: boolean } | undefined {
+  const mine = presences.find((presence) => presence.puuid === puuid && presence.product === 'riot_client');
+  const state = mine?.state;
+  if (state === undefined || state === '' || state === 'offline') return undefined;
+  return { idle: state === 'away' || state === 'dnd' };
+}
+
+/** Reads the running Riot client for what this account is doing right now: a Valorant session if
+ * there is one, and otherwise just being signed in. Null for every ordinary "nothing to report"
+ * case — client closed, signed out, deliberately appearing offline, presence not published yet — so
+ * the caller can pass the result along verbatim without telling them apart. */
 export async function readValorantLive(signal: AbortSignal): Promise<PushedValorantLive | null> {
   let lockfile: string;
   try {
@@ -263,8 +289,15 @@ export async function readValorantLive(signal: AbortSignal): Promise<PushedValor
     if (!session.puuid) return null;
 
     const { presences } = await localRiotRequest<{ presences?: RiotPresence[] }>(port, password, '/chat/v4/presences', signal);
+    const observedAt = new Date().toISOString();
     const presence = parseValorantPresence(presences ?? [], session.puuid);
-    if (!presence) return null;
+
+    // Valorant isn't running, but the client it launches from is — worth reporting as its own,
+    // weaker state rather than as nothing at all.
+    if (!presence) {
+      const online = parseRiotOnline(presences ?? [], session.puuid);
+      return online ? { state: 'riot', idle: online.idle, observedAt } : null;
+    }
 
     return {
       state: presence.state,
@@ -274,7 +307,8 @@ export async function readValorantLive(signal: AbortSignal): Promise<PushedValor
       roundsLost: presence.roundsLost,
       partySize: presence.partySize,
       maxPartySize: presence.maxPartySize,
-      observedAt: new Date().toISOString(),
+      idle: presence.idle,
+      observedAt,
     };
   } catch (err) {
     // The client shutting down mid-tick is routine, not a fault worth failing the whole push over.
