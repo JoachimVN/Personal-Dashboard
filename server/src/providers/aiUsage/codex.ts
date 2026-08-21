@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, unlink } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
@@ -100,8 +100,12 @@ function readCodexLimits(lines: string[], limits: CodexLimits): void {
  * if it omits a window, the dashboard reports that window as temporarily unlimited instead of
  * showing a stale cap from an older session event.
  */
+function codexSessionsDir(): string {
+  return path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
+}
+
 async function codexSnapshot(): Promise<UsageSnapshot> {
-  const sessionsDir = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
+  const sessionsDir = codexSessionsDir();
   try {
     const files = (await jsonlFiles(sessionsDir)).sort((a, b) => a.localeCompare(b)).slice(-12);
     const latest: CodexLimits = {};
@@ -216,16 +220,46 @@ export function parseCodexStatusScreen(
   };
 }
 
+/** Deletes whatever rollout file(s) the interactive probe's own `codex` process just wrote,
+ * comparing against the sessions dir listing captured right before it was spawned. The probe
+ * exists purely to read the `/status` panel — its transcript has no lasting value — but a `codex`
+ * process is a real Codex session as far as anything else watching this directory is concerned
+ * (e.g. Batabiboing's "coding with Codex" activity signal reads the same directory's newest
+ * mtime), so leaving the file behind falsely reports Codex activity every time this fallback runs. */
+async function cleanupProbeSession(sessionsDir: string, filesBeforeSpawn: Set<string>): Promise<void> {
+  let filesAfterSpawn: string[];
+  try {
+    filesAfterSpawn = await jsonlFiles(sessionsDir);
+  } catch {
+    return;
+  }
+  await Promise.all(
+    filesAfterSpawn
+      .filter((file) => !filesBeforeSpawn.has(file))
+      .map((file) => unlink(file).catch(() => undefined)),
+  );
+}
+
+/** How long the terminal must go without new output before another `/status` is worth sending —
+ * long enough that a quiet stretch reads as "idle at the prompt" rather than "mid-redraw", so a
+ * nudge never lands on top of one still being processed and get echoed back as garbled input
+ * (observed as literal chat text like "status/status" once concatenated). */
+const NUDGE_QUIET_MS = 4_000;
+
 /**
  * Fallback for when the local session log has nothing newer than the cached weekly reset: launch
  * a short-lived interactive `codex` session and read its `/status` panel directly, the same
  * PTY-probe approach used for Claude's `/usage`. Codex boots its configured MCP servers before
- * accepting input (can take 10s+), so nudge `/status` repeatedly rather than guess a fixed delay.
+ * accepting input (can take 10s+), so nudge `/status` repeatedly rather than guess a fixed delay —
+ * but only once the terminal has gone quiet for a beat, not on a blind timer, since sending it
+ * while Codex is still mid-boot/redraw means the next nudge can land on an unfinished input line.
  * Slow, so it's a fallback for the fast local read, never a replacement for it.
  */
 export async function codexInteractiveStatusSnapshot(): Promise<
   Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>
 > {
+  const sessionsDir = codexSessionsDir();
+  const filesBeforeSpawn = new Set(await jsonlFiles(sessionsDir).catch(() => []));
   try {
     await ensurePtySpawnHelper();
     const executable = await resolveProbeExecutable('codex');
@@ -241,6 +275,8 @@ export async function codexInteractiveStatusSnapshot(): Promise<
       let settled = false;
       let exited = false;
       let settleTimer: NodeJS.Timeout | undefined;
+      let lastDataAt = Date.now();
+      let lastNudgeAt = 0;
       const finish = (result?: string) => {
         if (settled) return;
         settled = true;
@@ -260,7 +296,12 @@ export async function codexInteractiveStatusSnapshot(): Promise<
         }
         resolve(result ?? terminal);
       };
-      const nudgeStatus = setInterval(() => pty.write('/status\r'), 4_000);
+      const nudgeStatus = setInterval(() => {
+        const now = Date.now();
+        if (now - lastDataAt < NUDGE_QUIET_MS || now - lastNudgeAt < NUDGE_QUIET_MS) return;
+        lastNudgeAt = now;
+        pty.write('/status\r');
+      }, 500);
       // Resolve with whatever the panel painted rather than rejecting. Parsing an incomplete capture
       // yields the same "unknown" the error path did when nothing rendered, but keeps a panel that
       // landed just before the CLI gave up — and a discarded read here costs a full fallback cooldown
@@ -268,6 +309,7 @@ export async function codexInteractiveStatusSnapshot(): Promise<
       const timeout = setTimeout(() => finish(), 50_000);
       pty.onData((chunk) => {
         terminal += chunk;
+        lastDataAt = Date.now();
         if (/Weekly\s*limit\s*:/i.test(terminal)) {
           clearTimeout(settleTimer);
           settleTimer = setTimeout(() => finish(terminal), 750);
@@ -281,6 +323,8 @@ export async function codexInteractiveStatusSnapshot(): Promise<
     return parseCodexStatusScreen(output);
   } catch {
     return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+  } finally {
+    await cleanupProbeSession(sessionsDir, filesBeforeSpawn);
   }
 }
 
