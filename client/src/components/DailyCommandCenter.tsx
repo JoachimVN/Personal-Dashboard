@@ -300,6 +300,18 @@ function fallbackSignalMark(
   activityDay: ReturnType<typeof latestActivityDay> | undefined,
   roblox: RobloxData | undefined,
 ): ReactNode {
+  return healthSignalMark(slot, health, activityDay)
+    ?? aiSignalMark(slot)
+    ?? serviceSignalMark(slot)
+    ?? gameSignalMark(slot, roblox)
+    ?? <span className="command-signal-dot" aria-hidden />;
+}
+
+function healthSignalMark(
+  slot: CommandCenterSlot,
+  health: HealthData | undefined,
+  activityDay: ReturnType<typeof latestActivityDay> | undefined,
+): ReactNode | undefined {
   if (slot.render.type === 'health-rings' && health && activityDay) {
     return <CompactActivityRings
       activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
@@ -308,12 +320,20 @@ function fallbackSignalMark(
       goals={health.goals}
     />;
   }
+  return undefined;
+}
+
+function aiSignalMark(slot: CommandCenterSlot): ReactNode | undefined {
   if (slot.accent) return <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" />;
   if (slot.render.type === 'ai-usage-tool' && slot.render.toolIds.length > 1) {
     return <span className="flex shrink-0 flex-col items-center gap-0.5">
       {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
     </span>;
   }
+  return undefined;
+}
+
+function serviceSignalMark(slot: CommandCenterSlot): ReactNode | undefined {
   if (slot.kind === 'github') {
     return <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />;
   }
@@ -332,6 +352,10 @@ function fallbackSignalMark(
   if (slot.kind === 'imessage') {
     return <MessageMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
   }
+  return undefined;
+}
+
+function gameSignalMark(slot: CommandCenterSlot, roblox: RobloxData | undefined): ReactNode | undefined {
   if (slot.render.type === 'weather-signal') {
     return <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
   }
@@ -348,7 +372,7 @@ function fallbackSignalMark(
   if (slot.render.type === 'minecraft-slot') {
     return <img src={publicAsset('minecraft/mark.png')} alt="" aria-hidden className="command-game-tile-icon" />;
   }
-  return <span className="command-signal-dot" aria-hidden />;
+  return undefined;
 }
 
 function signalKickerFor(slot: CommandCenterSlot, isSonarGate: boolean): string {

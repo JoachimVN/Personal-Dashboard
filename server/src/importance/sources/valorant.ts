@@ -89,7 +89,11 @@ function lastMatchCandidate(data: ValorantData | undefined, now: number): Candid
 function rankCandidate(data: ValorantData | undefined): Candidate | undefined {
   if (!data || data.rank.tierId === 0) return undefined;
   const change = data.rank.lastChange;
-  const movement = change === 0 ? undefined : `${change > 0 ? '+' : ''}${change} RR last game`;
+  let movement: string | undefined;
+  if (change !== 0) {
+    const sign = change > 0 ? '+' : '';
+    movement = `${sign}${change} RR last game`;
+  }
   return {
     id: 'valorant:rank', source: 'valorant', kind: 'valorant', score: 24, shapes: ['tile'],
     kicker: 'Valorant rank', title: data.rank.tierName,
