@@ -27,6 +27,12 @@ const pushStateSchema = z.object({
   milestoneBaseline: milestoneBaselineSchema.optional(),
   counters: countersSchema.optional(),
   lastActiveAt: z.string().nullable(),
+  /** When the player was last successfully fetched — the newest instant we know `counters` was
+   * still accurate. A counter increase found on the *next* fetch could have happened anywhere
+   * between this and now (Supercell's API has no per-event timestamp for these), so this doubles
+   * as the honest lower bound for that event's timestamp instead of "now", which overstates
+   * freshness by the whole gap after any downtime (see detectClashOfClansCounterActivity). */
+  lastCheckedAt: z.string().nullable().optional(),
 });
 
 export type ClashOfClansPushState = z.infer<typeof pushStateSchema>;
