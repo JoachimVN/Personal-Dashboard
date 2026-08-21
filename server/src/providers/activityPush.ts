@@ -7,6 +7,7 @@ import { activityPushSchema, clashRoyaleSchema, type ActivityPushData, type Clas
 import type { Provider } from '../scheduler.js';
 import { jsonlFiles } from './aiUsage/index.js';
 import { readValorantLive } from './valorantPresence.js';
+import { readMinecraftLive } from './minecraftPresence.js';
 import type { ClashOfClansCounters, ClashOfClansMilestoneBaseline, ClashOfClansStateStore } from '../clashOfClansState.js';
 import {
   currentClashOfClansLeagueWar,
@@ -428,11 +429,12 @@ export function createActivityPushProvider(
     async fetch(signal) {
       if (!push) throw new Error('activity push is not configured');
       if (clashOfClans) await ensureClashOfClansStateLoaded();
-      const [epicRunning, claudeActiveAt, codexActiveAt, valorantLive] = await Promise.all([
+      const [epicRunning, claudeActiveAt, codexActiveAt, valorantLive, minecraftLive] = await Promise.all([
         isProcessRunning('Epic Games Launcher'),
         claudeLastActiveAt(),
         codexLastActiveAt(),
         readValorantLive(signal),
+        readMinecraftLive(),
       ]);
       const clashRoyale = clashRoyaleSchema.safeParse(getClashRoyaleData());
 
@@ -469,6 +471,7 @@ export function createActivityPushProvider(
           clashOfClansLastActiveAt,
           clashOfClansMilestones: cocActivity?.milestones ?? [],
           valorantLive,
+          minecraftLive,
         }),
       });
       if (!res.ok) throw new Error(`activity push failed: HTTP ${res.status}`);
