@@ -1,7 +1,9 @@
 import { open, readdir } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { newestExistingLogFile } from './newestLogFile.js';
 
 /** Minecraft has no local API and no presence of any kind, so this is inferred from the log the
@@ -29,6 +31,7 @@ const SHUTDOWN_MARKER = 'Stopping!';
  * a couple of lines from shutdown hooks. */
 const TAIL_BYTES = 8192;
 const HEAD_BYTES = 512;
+const execFileAsync = promisify(execFile);
 
 type MinecraftActivity = Pick<PushedMinecraftLive, 'activity' | 'destination'> & { index: number };
 
@@ -86,9 +89,25 @@ export function sessionStartedAt(firstLine: string, lastWrite: Date): Date | und
 
 /** Minecraft truncates `latest.log` on every launch, so one file is exactly one session: the first
  * line is the launch and the shutdown marker, if it is there at all, is this session's. */
-export function isSessionRunning(tail: string, lastWrite: Date, now: number): boolean {
+export function isSessionRunning(tail: string, lastWrite: Date, now: number, minecraftProcessRunning = false): boolean {
   if (tail.includes(SHUTDOWN_MARKER)) return false;
-  return now - lastWrite.getTime() <= ACTIVE_WINDOW_MS;
+  return now - lastWrite.getTime() <= ACTIVE_WINDOW_MS || minecraftProcessRunning;
+}
+
+/** Minecraft's Java command line names its client entry point, which distinguishes it from other
+ * Java apps. This is only a fallback for a quiet log; a clean log shutdown still wins. */
+async function isMinecraftProcessRunning(): Promise<boolean> {
+  try {
+    if (process.platform === 'win32') {
+      const command = String.raw`Get-CimInstance Win32_Process -Filter \"Name = 'java.exe' OR Name = 'javaw.exe'\" | Where-Object { $_.CommandLine -match 'net\.minecraft\.client\.main\.Main' } | Select-Object -First 1 -ExpandProperty ProcessId`;
+      const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command]);
+      return stdout.trim() !== '';
+    }
+    await execFileAsync('pgrep', ['-f', 'net.minecraft.client.main.Main']);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Returns the final match for a log pattern. A single latest.log can record several destinations
@@ -181,8 +200,9 @@ export async function readMinecraftLive(): Promise<PushedMinecraftLive | null> {
   if (!newest) return null;
 
   const now = Date.now();
-  // Cheap check first: a log last touched days ago needs no reading at all.
-  if (now - newest.mtime.getTime() > ACTIVE_WINDOW_MS) return null;
+  const logIsQuiet = now - newest.mtime.getTime() > ACTIVE_WINDOW_MS;
+  const minecraftProcessRunning = logIsQuiet && await isMinecraftProcessRunning();
+  if (logIsQuiet && !minecraftProcessRunning) return null;
 
   const handle = await open(newest.file, 'r').catch(() => undefined);
   if (!handle) return null;
@@ -191,7 +211,7 @@ export async function readMinecraftLive(): Promise<PushedMinecraftLive | null> {
     const { size } = await handle.stat();
     const head = await readRange(handle, 0, Math.min(HEAD_BYTES, size));
     const tail = await readRange(handle, Math.max(0, size - TAIL_BYTES), Math.min(TAIL_BYTES, size));
-    if (!isSessionRunning(tail, newest.mtime, now)) return null;
+    if (!isSessionRunning(tail, newest.mtime, now, minecraftProcessRunning)) return null;
 
     const startedAt = sessionStartedAt(head.split('\n')[0] ?? '', newest.mtime);
     if (!startedAt) return null;

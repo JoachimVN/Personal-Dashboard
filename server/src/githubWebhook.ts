@@ -136,6 +136,8 @@ export function describeGithubWebhookEvent(
  */
 export function githubActivityPushUrl(pushUrl: string): string {
   const url = new URL(pushUrl);
-  url.pathname = `${url.pathname.replace(/\/+$/, '')}/github`;
+  let pathname = url.pathname;
+  while (pathname.endsWith('/')) pathname = pathname.slice(0, -1);
+  url.pathname = `${pathname}/github`;
   return url.toString();
 }

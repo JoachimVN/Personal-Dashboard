@@ -15,8 +15,8 @@ describe('minecraftCandidates', () => {
   it('keeps the kind of world separate from the session duration', () => {
     expect(minecraftCandidates({
       startedAt: new Date(NOW - 45 * 60_000).toISOString(), observedAt: new Date(NOW - 20_000).toISOString(),
-      activity: 'singleplayer',
-    }, NOW)[0]).toMatchObject({ title: 'Minecraft', detail: 'for 45m', render: { activity: 'Singleplayer' } });
+      activity: 'singleplayer', destination: 'Realm Seed',
+    }, NOW)[0]).toMatchObject({ title: 'Minecraft', detail: 'for 45m', render: { activity: 'Singleplayer: Realm Seed' } });
     expect(minecraftCandidates({
       startedAt: new Date(NOW - 45 * 60_000).toISOString(), observedAt: new Date(NOW - 20_000).toISOString(),
       activity: 'singleplayer', destination: 'Realm Seed',
