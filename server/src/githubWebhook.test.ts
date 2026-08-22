@@ -120,5 +120,6 @@ describe('githubActivityPushUrl', () => {
   it('derives the GitHub sink as a sibling of the push endpoint', () => {
     expect(githubActivityPushUrl('https://example.com/api/push')).toBe('https://example.com/api/push/github');
     expect(githubActivityPushUrl('https://example.com/api/push/')).toBe('https://example.com/api/push/github');
+    expect(githubActivityPushUrl('https://example.com/api/push///')).toBe('https://example.com/api/push/github');
   });
 });
