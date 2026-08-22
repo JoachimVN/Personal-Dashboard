@@ -277,6 +277,10 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
         rows: 48,
         cwd: process.cwd(),
         env: ptyProbeEnv(cleanEnv),
+        // node-pty's default Windows ConPTY path forks a helper that tries to
+        // AttachConsole to an already-exited CLI process during cleanup. Its
+        // bundled ConPTY implementation avoids that helper and its noisy error.
+        useConptyDll: process.platform === 'win32',
       });
       let terminal = '';
       let settled = false;

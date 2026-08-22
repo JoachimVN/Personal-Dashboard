@@ -3,7 +3,9 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:4822';
+// The dev API listens on IPv4 loopback. Using `localhost` can resolve to IPv6 on
+// Windows, causing Vite's proxy to fail even while the server is healthy on 4822.
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://127.0.0.1:4822';
 
 export default defineConfig({
   plugins: [
@@ -37,6 +39,9 @@ export default defineConfig({
   ],
   server: {
     host: true,
+    // Tailscale Serve forwards the dashboard's HTTPS hostname to this local dev server.
+    // Vite otherwise rejects that Host header before the app or API proxy can respond.
+    allowedHosts: ['desktop-endv2tl.tail619da5.ts.net'],
     proxy: {
       // Dev server only — kept on a different port than the launchd-managed production
       // `npm start` instance (4821) so a dev session never fights it for the port.

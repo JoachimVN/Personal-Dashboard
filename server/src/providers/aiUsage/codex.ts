@@ -236,6 +236,9 @@ export async function codexInteractiveStatusSnapshot(): Promise<
         rows: 48,
         cwd: process.cwd(),
         env: ptyProbeEnv(process.env),
+        // See the Claude probe: on Windows this avoids node-pty's
+        // AttachConsole cleanup helper for short-lived CLI sessions.
+        useConptyDll: process.platform === 'win32',
       });
       let terminal = '';
       let settled = false;
