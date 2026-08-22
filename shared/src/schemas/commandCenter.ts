@@ -51,8 +51,15 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
     artUrl: z.string().optional(),
     /** Small square art (the agent, the rank badge) for the tile mark. */
     iconUrl: z.string().optional(),
+    /** Present for the standing-rank signal only, so compact cards can show progress through the
+     * current tier rather than reducing rank to a static badge. */
+    rank: z.object({
+      rr: z.number().min(0).max(100),
+      lastChange: z.number(),
+    }).optional(),
   }),
-  z.object({ type: z.literal('minecraft-slot') }),
+  z.object({ type: z.literal('minecraft-slot'), activity: z.string().optional() }),
+  z.object({ type: z.literal('rocket-league-slot'), activity: z.string().optional() }),
   z.object({
     type: z.literal('clash-royale-moment'),
     kind: z.enum(['arena', 'league', 'best-trophies', 'win-streak', 'session']),

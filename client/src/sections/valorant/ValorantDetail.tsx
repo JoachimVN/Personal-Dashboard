@@ -1,10 +1,9 @@
 import { useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
-import type { ValorantData, ValorantMatch } from '@personal-dashboard/shared';
+import { valorantMapArt, type ValorantData, type ValorantMatch } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
-import { valorantMapArt } from '../../lib/valorant';
 import { publicAsset } from '../../lib/publicAsset';
 import {
   RESULT_LABELS,

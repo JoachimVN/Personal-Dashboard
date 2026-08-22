@@ -16,6 +16,13 @@ function formatSessionLength(ms: number): string {
   return remainder === 0 ? `for ${hours}h` : `for ${hours}h ${remainder}m`;
 }
 
+function minecraftActivityLabel(live: MinecraftLiveData): string | undefined {
+  if (live.activity === 'singleplayer') return live.destination ?? 'Singleplayer';
+  if (live.activity === 'realm') return live.destination ? `Realm: ${live.destination}` : 'Realm';
+  if (live.activity === 'server') return live.destination ? `Server: ${live.destination}` : 'Multiplayer';
+  return undefined;
+}
+
 /**
  * One candidate, because one is all Minecraft can support: the game publishes no presence and has
  * no local API, so the reading behind this is inferred from its log. Presence and session length
@@ -28,10 +35,11 @@ export function minecraftCandidates(live: MinecraftLiveData | null | undefined, 
   if (Number.isNaN(observedAt) || now - observedAt > LIVE_FRESH_MS) return [];
 
   const startedAt = Date.parse(live.startedAt);
-  const detail = Number.isNaN(startedAt) ? 'Playing now' : formatSessionLength(now - startedAt);
+  const sessionLength = Number.isNaN(startedAt) ? 'Playing now' : formatSessionLength(now - startedAt);
+  const activity = minecraftActivityLabel(live);
   return [{
     id: 'minecraft:live', source: 'minecraft', kind: 'minecraft', score: 60, shapes: [...allShapes],
-    kicker: 'Playing now', title: 'Minecraft', detail,
-    href: '#/', render: { type: 'minecraft-slot' },
+    kicker: 'Playing now', title: 'Minecraft', detail: sessionLength,
+    href: '#/', render: { type: 'minecraft-slot', activity },
   }];
 }

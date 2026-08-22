@@ -37,6 +37,7 @@ import { MailMark } from './MailMark';
 import { NewsMark } from './NewsMark';
 import { MessageMark } from './MessageMark';
 import { heroExtraFor, heroLeadFor, SecondaryContent } from './command-center/SecondaryContent';
+import { ValorantRankProgress } from './command-center/ValorantRankProgress';
 import { AiToolMark } from './command-center/secondary/fallback';
 import { QualityGatePill } from './command-center/secondary/sonar';
 import { SonarWordmark } from './SonarWordmark';
@@ -190,9 +191,12 @@ function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
     return <img src={publicAsset('roblox/icon.svg')} alt="" aria-hidden className="command-kicker-badge" />;
   }
   if (slot.render.type === 'valorant-slot') {
-    const mark = slot.render.badge === 'riot' ? 'riot/mark.png' : 'valorant/mark.png';
-    return <img src={publicAsset(mark)} alt="" aria-hidden className="command-kicker-badge" />;
+    if (slot.render.badge === 'riot') {
+      return <span className="command-kicker-badge command-kicker-badge--riot" aria-hidden><img src={publicAsset('riot/mark.png')} alt="" /></span>;
+    }
+    return <ValorantMark className="command-kicker-badge" />;
   }
+  if (slot.render.type === 'rocket-league-slot') return <img src={publicAsset('rocket-league/icon.png')} alt="" aria-hidden className="command-kicker-badge command-kicker-badge--rocket-league" />;
   if (slot.render.type === 'minecraft-slot') {
     return <img src={publicAsset('minecraft/mark.png')} alt="" aria-hidden className="command-kicker-badge" />;
   }
@@ -203,6 +207,29 @@ function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
     return <span className="command-kicker-badge command-kicker-badge--glyph" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
   }
   return null;
+}
+
+/** The supplied Valorant asset is black on transparent; paint its exact silhouette in Riot red so
+ * it stays legible on the command center's near-black game surfaces. */
+function ValorantMark({ className }: Readonly<{ className: string }>) {
+  const markUrl = publicAsset('valorant/mark.png');
+  return (
+    <span
+      aria-hidden
+      className={`command-valorant-mark ${className}`}
+      style={{
+        backgroundColor: 'var(--color-accent-valorant)',
+        maskImage: `url(${markUrl})`,
+        maskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        maskSize: 'contain',
+        WebkitMaskImage: `url(${markUrl})`,
+        WebkitMaskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        WebkitMaskSize: 'contain',
+      }}
+    />
+  );
 }
 
 /** The hero/secondary kicker line's content — normally the badge plus plain `slot.kicker` text,
@@ -338,7 +365,7 @@ function serviceSignalMark(slot: CommandCenterSlot): ReactNode | undefined {
     return <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />;
   }
   if (slot.kind === 'sonar') {
-    return <img src={publicAsset('sonarqube/icon.svg')} alt="" aria-hidden className="h-[1.1rem] w-[1.1rem] shrink-0" />;
+    return <img src={publicAsset('sonarqube/icon.svg')} alt="" aria-hidden className="command-sonar-tile-icon" />;
   }
   if (slot.kind === 'gmail') {
     return <MailMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
@@ -366,11 +393,16 @@ function gameSignalMark(slot: CommandCenterSlot, roblox: RobloxData | undefined)
   }
   if (slot.render.type === 'valorant-slot') {
     if (slot.render.iconUrl) return <img src={slot.render.iconUrl} alt="" aria-hidden className="command-game-tile-icon" />;
-    const mark = slot.render.badge === 'riot' ? 'riot/mark.png' : 'valorant/mark.png';
-    return <img src={publicAsset(mark)} alt="" aria-hidden className="command-game-tile-icon" />;
+    if (slot.render.badge === 'riot') {
+      return <span className="command-game-tile-icon command-game-tile-icon--riot" aria-hidden><img src={publicAsset('riot/mark.png')} alt="" /></span>;
+    }
+    return <ValorantMark className="command-game-tile-icon" />;
   }
   if (slot.render.type === 'minecraft-slot') {
     return <img src={publicAsset('minecraft/mark.png')} alt="" aria-hidden className="command-game-tile-icon" />;
+  }
+  if (slot.render.type === 'rocket-league-slot') {
+    return <img src={publicAsset('rocket-league/icon.png')} alt="" aria-hidden className="command-game-tile-icon command-game-tile-icon--rocket-league" />;
   }
   return undefined;
 }
@@ -393,6 +425,10 @@ function signalDetailFor(
     </div>;
   }
   if (slot.render.type === 'sonar-quality-gate') return <div className="mt-1"><QualityGatePill status={slot.render.status} /></div>;
+  if (slot.render.type === 'valorant-slot' && slot.render.rank) {
+    const { rr, lastChange } = slot.render.rank;
+    return <ValorantRankProgress rr={rr} lastChange={lastChange} className="command-valorant-rank-progress--tile" />;
+  }
   if (slot.render.type === 'clash-royale-moment' && slot.render.kind === 'best-trophies' && slot.render.bestTrophies !== undefined) {
     return <span className="command-icon-stat-tile mt-1" aria-hidden>
       <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" />

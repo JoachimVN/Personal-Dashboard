@@ -10,10 +10,10 @@ const LIVE_FRESH_MS = 3 * 60_000;
 function formatSessionLength(ms: number): string {
   const minutes = Math.round(ms / 60_000);
   if (minutes < 1) return 'just started';
-  if (minutes < 60) return `${minutes}m in`;
+  if (minutes < 60) return `for ${minutes}m`;
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
-  return remainder === 0 ? `${hours}h in` : `${hours}h ${remainder}m in`;
+  return remainder === 0 ? `for ${hours}h` : `for ${hours}h ${remainder}m`;
 }
 
 /** The scoreline, when the reading carried one. Both halves are optional in the schema, so a
@@ -43,7 +43,13 @@ export function rocketLeagueCandidates(live: RocketLeagueLiveData | null | undef
   const startedAt = Date.parse(live.startedAt);
   const sessionLength = Number.isNaN(startedAt) ? undefined : formatSessionLength(now - startedAt);
   const score = scoreline(live);
-  const common = { source: 'rocket-league' as const, kind: 'rocket-league' as const, shapes: [...allShapes], href: '#/', render: { type: 'text' as const } };
+  const common = {
+    source: 'rocket-league' as const,
+    kind: 'rocket-league' as const,
+    shapes: [...allShapes],
+    href: '#/',
+    render: { type: 'rocket-league-slot' as const },
+  };
 
   if (live.state === 'ingame') {
     return [{
@@ -75,6 +81,7 @@ export function rocketLeagueCandidates(live: RocketLeagueLiveData | null | undef
     score: 58,
     kicker: 'Playing now',
     title: 'Rocket League',
-    detail: joined('In the menus', sessionLength),
+    detail: sessionLength ?? 'Playing now',
+    render: { type: 'rocket-league-slot', activity: 'In the menus' },
   }];
 }

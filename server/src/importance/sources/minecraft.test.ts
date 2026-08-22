@@ -12,6 +12,17 @@ describe('minecraftCandidates', () => {
     expect(candidate).toMatchObject({ kicker: 'Playing now', title: 'Minecraft', detail: 'for 45m' });
   });
 
+  it('keeps the kind of world separate from the session duration', () => {
+    expect(minecraftCandidates({
+      startedAt: new Date(NOW - 45 * 60_000).toISOString(), observedAt: new Date(NOW - 20_000).toISOString(),
+      activity: 'singleplayer',
+    }, NOW)[0]).toMatchObject({ title: 'Minecraft', detail: 'for 45m', render: { activity: 'Singleplayer' } });
+    expect(minecraftCandidates({
+      startedAt: new Date(NOW - 45 * 60_000).toISOString(), observedAt: new Date(NOW - 20_000).toISOString(),
+      activity: 'server', destination: 'play.example.net',
+    }, NOW)[0]).toMatchObject({ title: 'Minecraft', detail: 'for 45m', render: { activity: 'Server: play.example.net' } });
+  });
+
   it('spells longer sessions out in hours', () => {
     expect(minecraftCandidates({
       startedAt: new Date(NOW - 154 * 60_000).toISOString(),

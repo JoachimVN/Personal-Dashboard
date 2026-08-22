@@ -212,11 +212,13 @@ let cachedMaps: Record<string, ResolvedMap> | undefined;
 async function fetchMaps(signal: AbortSignal): Promise<Record<string, ResolvedMap>> {
   const res = await fetch('https://valorant-api.com/v1/maps', { signal });
   if (!res.ok) throw new Error(`valorant-api maps failed: HTTP ${res.status}`);
-  const body = (await res.json()) as { data?: { mapUrl?: string; displayName?: string; listViewIcon?: string }[] };
+  const body = (await res.json()) as { data?: { mapUrl?: string; displayName?: string; splash?: string; listViewIcon?: string }[] };
   return Object.fromEntries(
     (body.data ?? [])
-      .filter((entry): entry is { mapUrl: string; displayName: string; listViewIcon?: string } => Boolean(entry.mapUrl && entry.displayName))
-      .map((entry) => [entry.mapUrl, { name: entry.displayName, artUrl: entry.listViewIcon }]),
+      .filter((entry): entry is { mapUrl: string; displayName: string; splash?: string; listViewIcon?: string } => Boolean(entry.mapUrl && entry.displayName))
+      // `listViewIcon` is a UI tile with its own dark fade baked in. `splash` is the actual
+      // landscape used by the game loading screen and is the right input for a full-card backdrop.
+      .map((entry) => [entry.mapUrl, { name: entry.displayName, artUrl: entry.splash ?? entry.listViewIcon }]),
   );
 }
 

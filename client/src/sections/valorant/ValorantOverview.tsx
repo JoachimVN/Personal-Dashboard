@@ -1,9 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import type { ValorantData } from '@personal-dashboard/shared';
+import { valorantMapArt, type ValorantData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
-import { valorantMapArt } from '../../lib/valorant';
 import {
   RESULT_LABELS,
   actLabel,

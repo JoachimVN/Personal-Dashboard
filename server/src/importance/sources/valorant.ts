@@ -1,4 +1,4 @@
-import type { ValorantData, ValorantLiveData } from '@personal-dashboard/shared';
+import { valorantMapArt, type ValorantData, type ValorantLiveData } from '@personal-dashboard/shared';
 
 import type { Candidate } from '../types.js';
 import { allShapes } from './shapes.js';
@@ -10,6 +10,11 @@ const LIVE_FRESH_MS = 3 * 60_000;
 /** Past this, "last match" stops being news and the ambient rank card is the more useful thing to
  * show instead. */
 const LAST_MATCH_FRESH_MS = 6 * 60 * 60_000;
+const COMPETITIVE_TIERS_UUID = '03621f52-342b-cf4e-4f86-9350a49c6d04';
+
+function tierIconUrl(tierId: number): string | undefined {
+  return tierId > 0 ? `https://media.valorant-api.com/competitivetiers/${COMPETITIVE_TIERS_UUID}/${tierId}/smallicon.png` : undefined;
+}
 
 function isFresh(observedAt: string, now: number): boolean {
   const at = Date.parse(observedAt);
@@ -31,7 +36,7 @@ function inGameCandidate(live: ValorantLiveData): Candidate | undefined {
   const score = live.roundsWon !== undefined && live.roundsLost !== undefined ? `${live.roundsWon}–${live.roundsLost}` : undefined;
   return {
     id: 'valorant:live:ingame', source: 'valorant', kind: 'valorant', score: 74, shapes: [...allShapes],
-    kicker: live.idle ? 'In a Valorant match (away)' : 'In a Valorant match',
+    kicker: live.idle ? 'Valorant · away in match' : 'Valorant · in match',
     title: joinDetail(live.map ?? 'Valorant', score),
     detail: joinDetail(live.mode, partyDetail(live)) || 'Playing now',
     href: '#/valorant', render: { type: 'valorant-slot', badge: 'valorant', artUrl: live.mapArtUrl },
@@ -42,7 +47,7 @@ function agentSelectCandidate(live: ValorantLiveData): Candidate | undefined {
   if (live.state !== 'pregame') return undefined;
   return {
     id: 'valorant:live:pregame', source: 'valorant', kind: 'valorant', score: 70, shapes: [...allShapes],
-    kicker: 'Valorant agent select', title: live.map ?? 'Picking an agent',
+    kicker: 'Valorant · agent select', title: live.map ?? 'Picking an agent',
     detail: joinDetail(live.mode, partyDetail(live)) || 'Match starting',
     href: '#/valorant', render: { type: 'valorant-slot', badge: 'valorant', artUrl: live.mapArtUrl },
   };
@@ -52,7 +57,7 @@ function menusCandidate(live: ValorantLiveData): Candidate | undefined {
   if (live.state !== 'menus') return undefined;
   return {
     id: 'valorant:live:menus', source: 'valorant', kind: 'valorant', score: 48, shapes: ['secondary', 'tile'],
-    kicker: live.idle ? 'Away in Valorant' : 'In the Valorant menus', title: 'Between matches',
+    kicker: 'Valorant', title: live.idle ? 'Away in menus' : 'In menus',
     detail: joinDetail(live.mode, partyDetail(live)) || 'Valorant is open',
     href: '#/valorant', render: { type: 'valorant-slot', badge: 'valorant', artUrl: live.mapArtUrl },
   };
@@ -65,7 +70,7 @@ function riotOnlineCandidate(live: ValorantLiveData): Candidate | undefined {
   if (live.state !== 'riot') return undefined;
   return {
     id: 'valorant:live:riot', source: 'valorant', kind: 'valorant', score: 30, shapes: ['tile'],
-    kicker: 'Riot', title: live.idle ? 'Away on Riot Launcher' : 'Online on Riot Launcher',
+    kicker: 'Riot Launcher', title: live.idle ? 'Away' : 'Online',
     detail: '', href: '#/valorant', render: { type: 'valorant-slot', badge: 'riot' },
   };
 }
@@ -82,7 +87,9 @@ function lastMatchCandidate(data: ValorantData | undefined, now: number): Candid
     score: match.result === 'win' ? 56 : 52, shapes: ['secondary', 'tile'],
     kicker: 'Last Valorant match', title: joinDetail(`${outcome} on ${match.map}`, score),
     detail: joinDetail(match.mode, `${match.kills}/${match.deaths}/${match.assists}`, match.agentName),
-    href: '#/valorant', render: { type: 'valorant-slot', badge: 'valorant', iconUrl: match.agentIconUrl },
+    href: '#/valorant', render: {
+      type: 'valorant-slot', badge: 'valorant', artUrl: valorantMapArt(match.map), iconUrl: match.agentIconUrl,
+    },
   };
 }
 
@@ -98,7 +105,12 @@ function rankCandidate(data: ValorantData | undefined): Candidate | undefined {
     id: 'valorant:rank', source: 'valorant', kind: 'valorant', score: 24, shapes: ['tile'],
     kicker: 'Valorant rank', title: data.rank.tierName,
     detail: joinDetail(`${data.rank.rr} RR`, movement), href: '#/valorant',
-    render: { type: 'valorant-slot', badge: 'valorant', iconUrl: data.rank.tierIconUrl },
+    render: {
+      type: 'valorant-slot',
+      badge: 'valorant',
+      iconUrl: data.rank.tierIconUrl ?? tierIconUrl(data.rank.tierId),
+      rank: { rr: data.rank.rr, lastChange: data.rank.lastChange },
+    },
   };
 }
 

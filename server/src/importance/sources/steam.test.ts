@@ -63,6 +63,12 @@ describe('steamCandidates', () => {
     ]);
   });
 
+  it('leaves now-playing to a richer live source when asked to suppress it', () => {
+    const data: SteamData = { ...baseline, currentGame: { appId: 252950, name: 'Rocket League' } };
+
+    expect(steamCandidates(data, ACHIEVEMENT_FRESH_MS, { completedGame: false }, 10, true)).toEqual([]);
+  });
+
   it('falls back to friends playing when nothing is currently running', () => {
     const data: SteamData = {
       ...baseline,

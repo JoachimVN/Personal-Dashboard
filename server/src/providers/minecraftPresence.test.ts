@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSessionRunning, sessionStartedAt } from './minecraftPresence.js';
+import { isSessionRunning, minecraftActivity, sessionStartedAt } from './minecraftPresence.js';
 
 describe('sessionStartedAt', () => {
   it('dates the log\'s time-of-day stamp from the file\'s last write', () => {
@@ -34,5 +34,22 @@ describe('isSessionRunning', () => {
 
   it('lets a session that went quiet for too long lapse', () => {
     expect(isSessionRunning('[23:08:22] [Render thread/INFO]: chunk saved', lastWrite, lastWrite.getTime() + 11 * 60_000)).toBe(false);
+  });
+});
+
+describe('minecraftActivity', () => {
+  it('identifies an integrated server as singleplayer', () => {
+    expect(minecraftActivity('[Server thread/INFO]: Starting integrated minecraft server version 1.21.4'))
+      .toEqual({ activity: 'singleplayer' });
+  });
+
+  it('identifies the latest multiplayer destination and preserves its nonstandard port', () => {
+    expect(minecraftActivity('[Render thread/INFO]: Connecting to old.example.net, 25565\n[Render thread/INFO]: Connecting to play.example.net, 25566'))
+      .toEqual({ activity: 'server', destination: 'play.example.net:25566' });
+  });
+
+  it('identifies a Realm when the client gives it a name', () => {
+    expect(minecraftActivity('[Render thread/INFO]: Connecting to realm: Cozy SMP'))
+      .toEqual({ activity: 'realm', destination: 'Cozy SMP' });
   });
 });

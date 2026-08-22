@@ -329,6 +329,11 @@ export function createCommandCenterProvider(
         ),
       ]);
       const activityPush = widgetData<ActivityPushData>(envelopes, 'activity-push');
+      const rocketLeague = rocketLeagueCandidates(activityPush?.rocketLeagueLive);
+      // Rocket League writes the same session to its own log and to Steam rich presence. Prefer
+      // the local reading: it has match state, score, arena, and clock, so showing Steam's generic
+      // "Playing now · Rocket League" beside it would be a duplicate rather than another signal.
+      const rocketLeagueOwnsSteamPresence = rocketLeague.length > 0 && steam?.currentGame?.appId === 252950;
       return rankCandidates([
         ...calendarCandidates(calendar, Date.now()),
         ...gmailCandidates(gmail, config.commandCenter.gmailFreshMs, config.commandCenter.gmailStaleMs),
@@ -338,7 +343,13 @@ export function createCommandCenterProvider(
         ...newsCandidates(widgetData<NewsData>(envelopes, 'news')),
         ...aiNewsCandidates(widgetData<AiNewsData>(envelopes, 'ai-news')),
         ...spotifyCandidates(spotify, spotifyFresh, config.commandCenter.spotifyRecentPlayedMaxAgeMs),
-        ...steamCandidates(steam, config.commandCenter.steamAchievementFreshMs, steamMoments, config.commandCenter.steamRareAchievementPercent),
+        ...steamCandidates(
+          steam,
+          config.commandCenter.steamAchievementFreshMs,
+          steamMoments,
+          config.commandCenter.steamRareAchievementPercent,
+          rocketLeagueOwnsSteamPresence,
+        ),
         ...robloxCandidates(widgetData<RobloxData>(envelopes, 'roblox')),
         ...clashRoyaleCandidates(
           clashRoyale, clashRoyaleMoments,
@@ -353,7 +364,7 @@ export function createCommandCenterProvider(
         // what is happening right now.
         ...valorantCandidates(widgetData<ValorantData>(envelopes, 'valorant'), activityPush?.valorantLive),
         ...minecraftCandidates(activityPush?.minecraftLive),
-        ...rocketLeagueCandidates(activityPush?.rocketLeagueLive),
+        ...rocketLeague,
         ...sonarCandidates(sonarCloud, sonarMoments),
         ...weatherCandidates(
           widgetData<WeatherData>(envelopes, 'weather'),

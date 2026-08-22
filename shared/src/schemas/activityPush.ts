@@ -18,11 +18,15 @@ export const valorantLiveSchema = z.object({
   observedAt: z.string(),
 });
 
-/** Minecraft publishes no presence and has no local API, so this is inferred from the log the game
- * writes as it runs. Presence and session length are all it can know. */
+/** Minecraft publishes no formal presence, so this is inferred from the current client log. Recent
+ * versions do record whether the player entered singleplayer, a Realm, or a multiplayer server. */
 export const minecraftLiveSchema = z.object({
   startedAt: z.string(),
   observedAt: z.string(),
+  activity: z.enum(['singleplayer', 'realm', 'server']).optional(),
+  /** World/Realm/server label when the client log includes one. Never required: launchers and game
+   * versions vary widely in what they write. */
+  destination: z.string().optional(),
 });
 
 /** Rocket League has no API either, but unlike Minecraft it writes its Steam rich presence into

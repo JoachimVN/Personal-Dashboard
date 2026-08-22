@@ -272,6 +272,13 @@
   z-index: auto;
 }
 
+/* Framer Motion transforms each carousel slide, creating its own stacking context. Lift PR slides
+   above the stretched card link so their direct GitHub anchors remain reachable. */
+.command-panel--full-link:has(.command-pr-link) > .command-secondary-carousel {
+  position: relative;
+  z-index: 3;
+}
+
 .command-panel--full-link .command-secondary-carousel-dots {
   position: relative;
   z-index: 3;
@@ -477,14 +484,116 @@
 .command-signal--minecraft { --signal-color: var(--color-accent-minecraft); }
 .command-signal--rocket-league { --signal-color: var(--color-accent-rocket-league); }
 
-/* Square art in a tile row — an agent portrait, a rank badge, a game mark. Sized to match the
-   other tile marks so a row of mixed sources still lines up. */
+/* Square art in a tile row — an agent portrait, a rank badge, a game mark. Game identity is the
+   headline of these compact cards, so size it with Steam/Roblox rather than like a tiny utility
+   glyph. */
 .command-game-tile-icon {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 2rem;
+  height: 2rem;
   flex: 0 0 auto;
   object-fit: contain;
-  border-radius: 3px;
+  border-radius: 0.625rem;
+}
+
+.command-sonar-tile-icon {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+/* The source mark is a black transparent PNG. A mask preserves its original geometry while using
+   the Valorant red that remains visible against the command center's dark panels. */
+.command-valorant-mark {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.command-secondary-valorant {
+  min-width: 0;
+}
+
+.command-secondary-valorant--with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.command-secondary-valorant--with-icon > .min-w-0 {
+  flex: 1 1 auto;
+}
+
+.command-secondary-valorant-icon {
+  width: 4.75rem;
+  height: 4.75rem;
+  flex: 0 0 auto;
+  border-radius: 0.8rem;
+  object-fit: contain;
+}
+
+.command-valorant-rank-progress {
+  margin-top: 0.55rem;
+}
+
+/* A rank meter should read as progress across a tier, not as a decorative line under the RR
+   number. On a full card this is about four times the old text-sized meter; compact tiles still
+   naturally cap it to their available width. */
+.command-valorant-rank-progress {
+  width: min(100%, 24rem);
+}
+
+.command-valorant-rank-progress > div {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  color: var(--color-ink-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.command-valorant-rank-progress em {
+  font-style: normal;
+  font-weight: 700;
+}
+
+.command-valorant-rank-progress em.is-up { color: light-dark(#0a7a3d, #4ade80); }
+.command-valorant-rank-progress em.is-down { color: light-dark(#b91c1c, #fb7185); }
+
+.command-valorant-rank-progress progress {
+  display: block;
+  width: 100%;
+  height: 0.35rem;
+  margin-top: 0.3rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-track) 75%, transparent);
+}
+
+.command-valorant-rank-progress progress::-webkit-progress-bar { background: color-mix(in oklab, var(--color-track) 75%, transparent); }
+.command-valorant-rank-progress progress::-webkit-progress-value {
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--color-accent-valorant) 55%, white), var(--color-accent-valorant));
+}
+.command-valorant-rank-progress progress::-moz-progress-bar {
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--color-accent-valorant) 55%, white), var(--color-accent-valorant));
+}
+
+.command-game-tile-icon--rocket-league {
+  object-fit: contain;
+}
+
+.command-game-tile-icon--riot {
+  overflow: hidden;
+}
+
+.command-game-tile-icon--riot img {
+  display: block;
+  width: 120%;
+  height: 120%;
+  max-width: none;
+  transform: translate(-8.33%, -8.33%);
 }
 
 .command-roblox-tile-mark {
@@ -589,6 +698,25 @@
   vertical-align: middle;
 }
 
+/* Riot's source mark has a generous transparent safety border. Crop it in its frame so its visual
+   weight matches the other service badges instead of reading as a tiny glyph. */
+.command-kicker-badge--riot {
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.command-kicker-badge--riot img {
+  display: block;
+  width: 120%;
+  height: 120%;
+  max-width: none;
+  transform: translate(-8.33%, -8.33%);
+}
+
+.command-kicker-badge--rocket-league {
+  object-fit: contain;
+}
+
 /* Weather's badge is a plain emoji glyph, not art — the fixed image box above would clip or
    squash it, so this resets to the glyph's own natural size instead. */
 .command-kicker-badge--glyph {
@@ -665,6 +793,23 @@
 .command-primary > .command-panel-art,
 .command-agenda > .command-panel-art {
   z-index: 0;
+}
+
+/* Maps are environmental texture, not a right-hand illustration. Let them cover the whole
+   Valorant surface, then blur them below the content so the card reads as one cohesive match
+   state instead of a hard-edged, cropped poster. */
+.command-panel--valorant > .command-panel-art {
+  inset: -14%;
+  width: 128%;
+  height: 128%;
+  /* The original full-card treatment had the right atmosphere; this is only a small additional
+     zoom, not a new crop strategy. */
+  object-fit: cover;
+  object-position: center;
+  opacity: 0.38;
+  filter: blur(12px) saturate(0.9);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 14%, black 84%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 14%, black 84%, transparent 100%);
 }
 
 /* The game artwork adds atmosphere, while the wordmark and structured stats make the surface
@@ -1207,6 +1352,27 @@
   grid-template-columns: 6.5rem minmax(0, 1fr);
   gap: 0.8rem;
   font-size: 0.78rem;
+}
+
+/* This needs to sit above the secondary card's stretched section link. The title and each compact
+   row deliberately open the PR itself, while blank card space still opens the GitHub section. */
+.command-pr-link {
+  position: relative;
+  z-index: 4;
+  color: inherit;
+  text-decoration: none;
+}
+
+.command-pr-link:hover,
+.command-pr-link:focus-visible {
+  color: var(--color-accent-github);
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.command-agenda-item.command-pr-link {
+  grid-template-columns: minmax(9rem, max-content) minmax(0, 1fr);
+  width: 100%;
 }
 
 .command-agenda-item time {
