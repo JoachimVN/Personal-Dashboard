@@ -17,7 +17,7 @@ function formatSessionLength(ms: number): string {
 }
 
 function minecraftActivityLabel(live: MinecraftLiveData): string | undefined {
-  if (live.activity === 'singleplayer') return live.destination ?? 'Singleplayer';
+  if (live.activity === 'singleplayer') return live.destination ? `Singleplayer: ${live.destination}` : 'Singleplayer';
   if (live.activity === 'realm') return live.destination ? `Realm: ${live.destination}` : 'Realm';
   if (live.activity === 'server') return live.destination ? `Server: ${live.destination}` : 'Multiplayer';
   return undefined;
