@@ -66,16 +66,32 @@ const EMPTY_SPOTIFY_FRESHNESS: SpotifyFreshness = {
   artistAllTime: false, albumAllTime: false,
 };
 
+const SIGNAL_HISTORY_TIMEOUT_MS = 4_000;
+
 /** The signal-history checks below are ~12 concurrent transactions against a remote Postgres; a
  * single dropped connection there must not blank the whole ranked list, since most candidates
  * (calendar, gmail, weather, health...) never touch that database at all. Degrade to "no moment
- * detected" instead of failing the fetch. */
-async function withFallback<T>(promise: Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await promise;
-  } catch {
-    return fallback;
-  }
+ * detected" instead of failing the fetch. The database client's abort support is not reliable
+ * across every network failure, so bound the wait instead of letting this derived provider hold
+ * the overview on its initial fallback forever. */
+export function withFallback<T>(
+  promise: Promise<T>,
+  fallback: T,
+  timeoutMs = SIGNAL_HISTORY_TIMEOUT_MS,
+): Promise<T> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(fallback), timeoutMs);
+    void promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timeout);
+        resolve(fallback);
+      },
+    );
+  });
 }
 
 /** Whether a metric just recorded via `record()` changed within `freshMs` — one round trip
