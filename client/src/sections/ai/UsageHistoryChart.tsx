@@ -60,8 +60,8 @@ interface ChartGeometry {
   points: ChartPoint[];
   /** Line through runs of normally-spaced samples (may hold several M subpaths). */
   solidPath: string;
-  /** Fill under the solid runs only, so gaps don't read as recorded usage. */
-  areaPath: string;
+  /** Fill under established measured runs only, so reset markers and short joins stay legible. */
+  areaPaths: string[];
   /** Dashed joins across sampling gaps (server asleep / dashboard off). */
   gapPath: string;
   /** Samples with a gap on both sides — invisible without their own mark. */
@@ -130,12 +130,17 @@ function buildGeometry(chartPoints: ChartPoint[]): ChartGeometry {
   const solidRuns = runs.filter((run) => run.length > 1);
   const runLine = (run: ChartPoint[]) =>
     run.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+  // A two-point run is often just the crisp vertical edge of a reset, or the first pair after
+  // the dashboard comes back online. Filling it turns a useful boundary into a heavy rectangle;
+  // reserve the quiet area wash for a sustained sequence of real samples instead.
+  const areaRuns = solidRuns.filter((run) => (
+    run.length >= 3
+    && run.every((point) => !point.sessionCapEnd && !point.resetAnchor && !point.sessionStart && !point.observedReset)
+  ));
   return {
     points: chartPoints,
     solidPath: solidRuns.map(runLine).join(' '),
-    areaPath: solidRuns
-      .map((run) => `${runLine(run)} L${run.at(-1)!.x},${H} L${run[0].x},${H} Z`)
-      .join(' '),
+    areaPaths: areaRuns.map((run) => `${runLine(run)} L${run.at(-1)!.x},${H} L${run[0].x},${H} Z`),
     gapPath: gapJoins
       .map(({ from, to }) => `M${from.x},${from.y} L${to.x},${to.y}`)
       .join(' '),
@@ -348,7 +353,10 @@ function useChartGeometry(
     const end = Date.now();
     const start = end - windowMs;
     const chartPoints = points
-      .filter((point) => point[metric] !== undefined && Date.parse(point.at) >= start)
+      .filter((point) => {
+        const at = Date.parse(point.at);
+        return point[metric] !== undefined && Number.isFinite(at) && at >= start && at <= end;
+      })
       .map((point): ChartPoint => {
         const percent = point[metric]!;
         return {
@@ -449,7 +457,7 @@ export function UsageHistoryChart({
               vectorEffect="non-scaling-stroke"
             />
           ))}
-          {geometry.areaPath && <path d={geometry.areaPath} fill={color} opacity={0.15} />}
+          {geometry.areaPaths.map((path) => <path key={path} d={path} fill={color} opacity={0.1} />)}
           {geometry.gapPath && (
             <motion.path
               d={geometry.gapPath}
