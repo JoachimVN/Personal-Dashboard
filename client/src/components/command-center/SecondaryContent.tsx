@@ -42,6 +42,9 @@ import {
   SpotifyTrackSecondary,
 } from './secondary/spotify';
 import { SteamAchievementSecondary, SteamNowPlayingSecondary } from './secondary/steam';
+import { RocketLeagueNowPlayingSecondary } from './secondary/rocketLeague';
+import { MinecraftNowPlayingSecondary } from './secondary/minecraft';
+import { ValorantRankProgress } from './ValorantRankProgress';
 import { WeatherHourlyRows, WeatherSignalSecondary } from './secondary/weather';
 
 /**
@@ -81,11 +84,30 @@ export function SecondaryContent(props: Readonly<{
     case 'ai-usage-tool': return AiUsageSecondary({ slot, aiUsage }) ?? <FallbackSecondary slot={slot} />;
     case 'steam-now-playing': return SteamNowPlayingSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
     case 'steam-achievement': return SteamAchievementSecondary({ slot, steam }) ?? <FallbackSecondary slot={slot} />;
+    case 'rocket-league-slot': return RocketLeagueNowPlayingSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
+    case 'minecraft-slot': return MinecraftNowPlayingSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
     case 'roblox-now-playing': return <RobloxNowPlayingSecondary slot={slot} roblox={roblox} />;
     case 'clash-royale-moment': return ClashRoyaleWinStreakSecondary({ slot }) ?? ClashRoyaleSessionSecondary({ slot }) ?? ClashRoyaleBestTrophiesSecondary({ slot }) ?? ClashRoyaleArenaLeagueSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
     case 'clash-of-clans-moment': return ClashOfClansMomentSecondary({ slot }) ?? <FallbackSecondary slot={slot} />;
+    case 'valorant-slot': return ValorantSlotSecondary({ slot });
     default: return <FallbackSecondary slot={slot} />;
   }
+}
+
+/** Map art belongs to the panel backdrop. Only a real agent/rank image earns a compact media row;
+ * live-state cards stay single-column so a short status never inherits an artificial narrow text
+ * column and wraps unpredictably. */
+function ValorantSlotSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>): ReactNode {
+  if (slot.render.type !== 'valorant-slot') return undefined;
+  const hasIcon = Boolean(slot.render.iconUrl);
+  const rank = slot.render.rank;
+  return <div className={`command-secondary-valorant${hasIcon ? ' command-secondary-valorant--with-icon' : ''} mt-4`}>
+    {slot.render.iconUrl && <img src={slot.render.iconUrl} alt="" aria-hidden className="command-secondary-valorant-icon" />}
+    <div className="min-w-0">
+      <p className="command-hero-title truncate text-sm font-semibold text-ink">{slot.title}</p>
+      {rank ? <ValorantRankProgress rr={rank.rr} lastChange={rank.lastChange} /> : slot.detail && <p className="mt-1 truncate text-sm text-ink-muted">{slot.detail}</p>}
+    </div>
+  </div>;
 }
 
 export function heroExtraFor(
@@ -126,7 +148,7 @@ export function heroExtraFor(
   if (!trend) return null;
   return <div className="mt-4 flex max-w-sm items-center gap-3">
     <div className="flex shrink-0 flex-col items-center gap-2">
-      {render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className={render.toolIds.length > 1 ? 'h-5 w-5' : 'h-8 w-8'} />)}
+      {render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-8 w-8" />)}
     </div>
     <div className="min-w-0 flex-1">{trend}</div>
   </div>;
@@ -157,6 +179,9 @@ export function heroLeadFor(
   if (render.type === 'spotify-album') return heroLead(SpotifyAlbumSecondary({ slot: hero, spotify }));
   if (render.type === 'steam-now-playing') return heroLead(SteamNowPlayingSecondary({ slot: hero, steam }));
   if (render.type === 'steam-achievement') return heroLead(SteamAchievementSecondary({ slot: hero, steam }));
+  if (render.type === 'rocket-league-slot') return heroLead(RocketLeagueNowPlayingSecondary({ slot: hero }));
+  if (render.type === 'minecraft-slot') return heroLead(MinecraftNowPlayingSecondary({ slot: hero }));
+  if (render.type === 'valorant-slot') return heroLead(ValorantSlotSecondary({ slot: hero }));
   if (render.type === 'roblox-now-playing') return heroLead(RobloxNowPlayingSecondary({ slot: hero, roblox }));
   if (render.type === 'clash-royale-moment' && (render.kind === 'win-streak' || render.kind === 'session')) {
     return heroLead(ClashRoyaleWinStreakSecondary({ slot: hero }) ?? ClashRoyaleSessionSecondary({ slot: hero }));

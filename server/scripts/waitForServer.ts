@@ -2,7 +2,10 @@ export {};
 
 const port = Number(process.env.PORT ?? 4821);
 const url = `http://127.0.0.1:${port}/api/health`;
-const timeoutMs = 30_000;
+// A cold Railway Postgres connection can take a little over 30 seconds while the
+// server acquires its migration lock and subscribes to refresh notifications.
+// Keep the dev client from giving up just before the API starts listening.
+const timeoutMs = 60_000;
 const retryMs = 200;
 const deadline = Date.now() + timeoutMs;
 

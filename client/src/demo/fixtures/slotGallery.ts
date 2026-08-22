@@ -1,13 +1,14 @@
-import type {
-  CalendarData,
-  CommandCenterSlot,
-  GitHubData,
-  GmailData,
-  HealthData,
-  RobloxData,
-  SpotifyData,
-  SteamData,
-  WeatherData,
+import {
+  valorantMapArt,
+  type CalendarData,
+  type CommandCenterSlot,
+  type GitHubData,
+  type GmailData,
+  type HealthData,
+  type RobloxData,
+  type SpotifyData,
+  type SteamData,
+  type WeatherData,
 } from '@personal-dashboard/shared';
 import type { AiUsageByTool } from '../../components/command-center/useCommandCenterData';
 import { aiUsage } from './ai';
@@ -71,6 +72,17 @@ function sessionCrownsBackTo(now: Date, results: ('win' | 'loss')[]): { crownsFo
     const [crownsFor, crownsAgainst] = scores[result];
     return { crownsFor, crownsAgainst, result, battleTime: new Date(now.getTime() - (results.length - i) * 3_600_000).toISOString() };
   });
+}
+
+function minecraftGallerySlot(id: string, label: string, activity: string): GallerySlot {
+  return {
+    label,
+    slot: {
+      id: `gallery:minecraft:${id}`, source: 'minecraft', kind: 'minecraft', kicker: 'Playing now',
+      title: 'Minecraft', detail: 'for 45m', href: '#/', score: 60,
+      render: { type: 'minecraft-slot', activity },
+    },
+  };
 }
 
 export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
@@ -370,6 +382,73 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
         render: { type: 'clash-of-clans-moment', kind: 'league', leagueIconUrl: 'https://api-assets.clashofclans.com/leaguetiers/125/yIfqSgrhiYRcuMbAPCoeCj1FTmfylCLxnrAljEZc8K0.png', trophies: 312 },
       },
     },
+    {
+      label: 'valorant (live: in a match)',
+      slot: {
+        id: 'gallery:valorant:ingame', source: 'valorant', kind: 'valorant', kicker: 'Valorant · in match',
+        title: 'Abyss · 9–7', detail: 'Competitive · 3-stack', href: '#/valorant', score: 74,
+        render: { type: 'valorant-slot', badge: 'valorant', artUrl: valorantMapArt('Abyss') },
+      },
+    },
+    {
+      label: 'valorant (live: agent select)',
+      slot: {
+        id: 'gallery:valorant:pregame', source: 'valorant', kind: 'valorant', kicker: 'Valorant · agent select',
+        title: 'Sunset', detail: 'Unrated · 2-stack', href: '#/valorant', score: 70,
+        render: { type: 'valorant-slot', badge: 'valorant', artUrl: valorantMapArt('Sunset') },
+      },
+    },
+    {
+      label: 'valorant (live: menus)',
+      slot: {
+        id: 'gallery:valorant:menus', source: 'valorant', kind: 'valorant', kicker: 'Valorant',
+        title: 'In menus', detail: 'Competitive', href: '#/valorant', score: 48,
+        render: { type: 'valorant-slot', badge: 'valorant' },
+      },
+    },
+    {
+      label: 'valorant (live: on the Riot launcher)',
+      slot: {
+        id: 'gallery:valorant:riot', source: 'valorant', kind: 'valorant', kicker: 'Riot Launcher',
+        title: 'Online', detail: '', href: '#/valorant', score: 30,
+        render: { type: 'valorant-slot', badge: 'riot' },
+      },
+    },
+    {
+      label: 'valorant (last match)',
+      slot: {
+        id: 'gallery:valorant:last-match', source: 'valorant', kind: 'valorant', kicker: 'Last Valorant match',
+        title: 'Victory on Abyss · 13–6', detail: 'Competitive · 28/11/5 · Jett',
+        href: '#/valorant', score: 56, render: {
+          type: 'valorant-slot', badge: 'valorant', artUrl: valorantMapArt('Abyss'),
+          iconUrl: 'https://media.valorant-api.com/agents/add6443a-41bd-e414-f6ad-e58d267f4e95/displayicon.png',
+        },
+      },
+    },
+    {
+      label: 'valorant (rank)',
+      slot: {
+        id: 'gallery:valorant:rank', source: 'valorant', kind: 'valorant', kicker: 'Valorant rank',
+        title: 'Diamond 1', detail: '42 RR · +19 RR last game', href: '#/valorant', score: 24,
+        render: {
+          type: 'valorant-slot',
+          badge: 'valorant',
+          iconUrl: 'https://media.valorant-api.com/competitivetiers/03621f52-342b-cf4e-4f86-9350a49c6d04/18/smallicon.png',
+          rank: { rr: 42, lastChange: 19 },
+        },
+      },
+    },
+    minecraftGallerySlot('singleplayer', 'minecraft (live: singleplayer)', 'Singleplayer'),
+    minecraftGallerySlot('realm', 'minecraft (live: Realm)', 'Realm: Cozy SMP'),
+    minecraftGallerySlot('server', 'minecraft (live: server)', 'Server: play.example.net'),
+    {
+      label: 'rocket-league (live: menus)',
+      slot: {
+        id: 'gallery:rocket-league:menus', source: 'rocket-league', kind: 'rocket-league', kicker: 'Playing now',
+        title: 'Rocket League', detail: 'for 45m', href: '#/', score: 58,
+        render: { type: 'rocket-league-slot', activity: 'In the menus' },
+      },
+    },
   ];
 
   assertGalleryCoversEveryRenderType(slots);
@@ -404,6 +483,9 @@ const RENDER_TYPES: Record<CommandCenterSlot['render']['type'], true> = {
   'roblox-now-playing': true,
   'clash-royale-moment': true,
   'clash-of-clans-moment': true,
+  'valorant-slot': true,
+  'minecraft-slot': true,
+  'rocket-league-slot': true,
 };
 
 function assertGalleryCoversEveryRenderType(slots: readonly GallerySlot[]): void {

@@ -7,15 +7,25 @@ import path from 'node:path';
  * games that have already finished, so this is the one source that can say "right now" — it comes
  * from the Riot client running on this machine, not from any web API. */
 export interface PushedValorantLive {
-  /** `menus` covers the lobby, the queue and the post-game screens: Valorant is open, no round is
-   * being played. `pregame` is agent select, `ingame` is a live match. */
-  state: 'menus' | 'pregame' | 'ingame';
-  mode: string;
+  /** `riot` is signed into the Riot client with Valorant not running. That one is Riot-wide rather
+   * than Valorant-specific, since the client is shared with League, so whatever displays it has to
+   * stay honest about meaning "at the launcher" and not "in Valorant".
+   *
+   * The rest are Valorant itself: `menus` covers the lobby, the queue and the post-game screens
+   * (open, no round being played), `pregame` is agent select, `ingame` is a live match. */
+  state: 'riot' | 'menus' | 'pregame' | 'ingame';
+  /** The queue, once there is a Valorant session to have one. Absent for `riot`. */
+  mode?: string;
   map?: string;
+  /** Scenic art for that map, when valorant-api could be reached. */
+  mapArtUrl?: string;
   roundsWon?: number;
   roundsLost?: number;
   partySize?: number;
   maxPartySize?: number;
+  /** Riot's own away flag — set in-game when it marks the player idle, and out of game when they
+   * are signed in as away rather than available. */
+  idle?: boolean;
   observedAt: string;
 }
 
@@ -115,9 +125,13 @@ interface RiotPresence {
   puuid?: string;
   product?: string;
   private?: string;
+  /** Chat availability: `chat` available, `away`/`dnd` around but not to be disturbed, `offline`
+   * signed in but appearing offline on purpose. */
+  state?: string;
 }
 
 interface ValorantPrivateBlob {
+  isIdle?: boolean;
   matchPresenceData?: { sessionLoopState?: string; matchMap?: string; queueId?: string };
   partyPresenceData?: { partySize?: number; maxPartySize?: number };
   partyOwnerMatchScoreAllyTeam?: number;
@@ -135,6 +149,7 @@ export interface ValorantPresenceState {
   roundsLost?: number;
   partySize?: number;
   maxPartySize?: number;
+  idle: boolean;
 }
 
 /** Riot's internal codenames, which is what presence reports. Resolved against valorant-api.com at
@@ -185,32 +200,44 @@ const SESSION_STATES: Readonly<Record<string, PushedValorantLive['state']>> = {
   INGAME: 'ingame',
 };
 
-let cachedMapNames: Record<string, string> | undefined;
+export interface ResolvedMap {
+  name: string;
+  /** The wide scenic render valorant-api publishes per map. Only available once the live lookup
+   * has succeeded — the offline fallback table carries names, not art. */
+  artUrl?: string;
+}
 
-async function fetchMapNames(signal: AbortSignal): Promise<Record<string, string>> {
+let cachedMaps: Record<string, ResolvedMap> | undefined;
+
+async function fetchMaps(signal: AbortSignal): Promise<Record<string, ResolvedMap>> {
   const res = await fetch('https://valorant-api.com/v1/maps', { signal });
   if (!res.ok) throw new Error(`valorant-api maps failed: HTTP ${res.status}`);
-  const body = (await res.json()) as { data?: { mapUrl?: string; displayName?: string }[] };
+  const body = (await res.json()) as { data?: { mapUrl?: string; displayName?: string; splash?: string; listViewIcon?: string }[] };
   return Object.fromEntries(
     (body.data ?? [])
-      .filter((entry): entry is { mapUrl: string; displayName: string } => Boolean(entry.mapUrl && entry.displayName))
-      .map((entry) => [entry.mapUrl, entry.displayName]),
+      .filter((entry): entry is { mapUrl: string; displayName: string; splash?: string; listViewIcon?: string } => Boolean(entry.mapUrl && entry.displayName))
+      // `listViewIcon` is a UI tile with its own dark fade baked in. `splash` is the actual
+      // landscape used by the game loading screen and is the right input for a full-card backdrop.
+      .map((entry) => [entry.mapUrl, { name: entry.displayName, artUrl: entry.splash ?? entry.listViewIcon }]),
   );
 }
 
 /** Cached for the life of the process after the first success: the map list changes a couple of
  * times a year, and this runs on every tick. */
-export async function resolveMapName(mapUrl: string, signal: AbortSignal): Promise<string | undefined> {
+export async function resolveMap(mapUrl: string, signal: AbortSignal): Promise<ResolvedMap | undefined> {
   if (!mapUrl) return undefined;
-  if (!cachedMapNames) {
+  if (!cachedMaps) {
     try {
-      cachedMapNames = await fetchMapNames(signal);
+      cachedMaps = await fetchMaps(signal);
     } catch {
       // Offline, or valorant-api is down — the built-in table still names every map that existed
-      // when this shipped, and a codename beats dropping the whole reading.
+      // when this shipped, and a codename beats dropping the whole reading. No art, though.
     }
   }
-  return cachedMapNames?.[mapUrl] ?? MAP_NAMES[mapUrl] ?? mapUrl.split('/').pop();
+  const resolved = cachedMaps?.[mapUrl];
+  if (resolved) return resolved;
+  const name = MAP_NAMES[mapUrl] ?? mapUrl.split('/').pop();
+  return name ? { name } : undefined;
 }
 
 /** Pulls this account's Valorant presence out of the roster the client keeps for every friend.
@@ -240,12 +267,25 @@ export function parseValorantPresence(presences: RiotPresence[], puuid: string):
     roundsLost: isLiveMatch ? blob.partyOwnerMatchScoreEnemyTeam : undefined,
     partySize: blob.partySize ?? blob.partyPresenceData?.partySize,
     maxPartySize: blob.maxPartySize ?? blob.partyPresenceData?.maxPartySize,
+    idle: blob.isIdle === true,
   };
 }
 
-/** Reads the running Riot client for what this account is doing in Valorant right now. Null for
- * every ordinary "nothing to report" case — client closed, signed out, presence not published yet —
- * so the caller can pass the result along verbatim without telling them apart. */
+/** The Riot client publishes a presence of its own, separate from any game's, so this is what is
+ * left to read when Valorant isn't running: signed in, at the launcher. Deliberately returns
+ * undefined for `offline` — that is someone choosing to appear offline, and republishing it as
+ * "online" anywhere else would defeat the point of the setting. */
+export function parseRiotOnline(presences: RiotPresence[], puuid: string): { idle: boolean } | undefined {
+  const mine = presences.find((presence) => presence.puuid === puuid && presence.product === 'riot_client');
+  const state = mine?.state;
+  if (state === undefined || state === '' || state === 'offline') return undefined;
+  return { idle: state === 'away' || state === 'dnd' };
+}
+
+/** Reads the running Riot client for what this account is doing right now: a Valorant session if
+ * there is one, and otherwise just being signed in. Null for every ordinary "nothing to report"
+ * case — client closed, signed out, deliberately appearing offline, presence not published yet — so
+ * the caller can pass the result along verbatim without telling them apart. */
 export async function readValorantLive(signal: AbortSignal): Promise<PushedValorantLive | null> {
   let lockfile: string;
   try {
@@ -263,18 +303,28 @@ export async function readValorantLive(signal: AbortSignal): Promise<PushedValor
     if (!session.puuid) return null;
 
     const { presences } = await localRiotRequest<{ presences?: RiotPresence[] }>(port, password, '/chat/v4/presences', signal);
+    const observedAt = new Date().toISOString();
     const presence = parseValorantPresence(presences ?? [], session.puuid);
-    if (!presence) return null;
+    const resolvedMap = presence?.mapUrl ? await resolveMap(presence.mapUrl, signal) : undefined;
+
+    // Valorant isn't running, but the client it launches from is — worth reporting as its own,
+    // weaker state rather than as nothing at all.
+    if (!presence) {
+      const online = parseRiotOnline(presences ?? [], session.puuid);
+      return online ? { state: 'riot', idle: online.idle, observedAt } : null;
+    }
 
     return {
       state: presence.state,
       mode: QUEUE_NAMES[presence.queueId] ?? 'Valorant',
-      map: presence.mapUrl ? await resolveMapName(presence.mapUrl, signal) : undefined,
+      map: resolvedMap?.name,
+      mapArtUrl: resolvedMap?.artUrl,
       roundsWon: presence.roundsWon,
       roundsLost: presence.roundsLost,
       partySize: presence.partySize,
       maxPartySize: presence.maxPartySize,
-      observedAt: new Date().toISOString(),
+      idle: presence.idle,
+      observedAt,
     };
   } catch (err) {
     // The client shutting down mid-tick is routine, not a fault worth failing the whole push over.

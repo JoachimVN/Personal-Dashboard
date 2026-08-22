@@ -37,6 +37,7 @@ import { MailMark } from './MailMark';
 import { NewsMark } from './NewsMark';
 import { MessageMark } from './MessageMark';
 import { heroExtraFor, heroLeadFor, SecondaryContent } from './command-center/SecondaryContent';
+import { ValorantRankProgress } from './command-center/ValorantRankProgress';
 import { AiToolMark } from './command-center/secondary/fallback';
 import { QualityGatePill } from './command-center/secondary/sonar';
 import { SonarWordmark } from './SonarWordmark';
@@ -72,7 +73,7 @@ function eventTiming(event: CalendarData['events'][number], now: number): string
   return formatEventDay(event);
 }
 
-export function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'clash-of-clans' | 'claude' | 'codex' {
+export function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' | 'health' | 'spotify' | 'weather' | 'steam' | 'roblox' | 'clash-royale' | 'clash-of-clans' | 'valorant' | 'minecraft' | 'rocket-league' | 'claude' | 'codex' {
   if (slot.accent) return slot.accent;
   if (slot.source === 'github') return 'github';
   if (slot.source === 'ai-usage') return 'ai';
@@ -83,6 +84,9 @@ export function toneFor(slot: CommandCenterSlot): 'personal' | 'github' | 'ai' |
   if (slot.source === 'roblox') return 'roblox';
   if (slot.source === 'clash-royale') return 'clash-royale';
   if (slot.source === 'clash-of-clans') return 'clash-of-clans';
+  if (slot.source === 'valorant') return 'valorant';
+  if (slot.source === 'minecraft') return 'minecraft';
+  if (slot.source === 'rocket-league') return 'rocket-league';
   return 'personal';
 }
 
@@ -149,6 +153,7 @@ export function CommandPanel({
 /** The backdrop art behind hero/secondary Clash Royale cards — only 'arena' and 'league' moments
  * have real art (see lib/clashRoyale.ts); the rest render as plain panels. */
 export function slotArt(slot: CommandCenterSlot): string | undefined {
+  if (slot.render.type === 'valorant-slot') return slot.render.artUrl;
   if (slot.render.type !== 'clash-royale-moment') return undefined;
   if (slot.render.kind === 'arena' && slot.render.arenaName) return clashRoyaleArenaArt(slot.render.arenaName);
   if (slot.render.kind === 'league' && slot.render.leagueNumber !== undefined) {
@@ -185,6 +190,16 @@ function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
   if (slot.render.type === 'roblox-now-playing') {
     return <img src={publicAsset('roblox/icon.svg')} alt="" aria-hidden className="command-kicker-badge" />;
   }
+  if (slot.render.type === 'valorant-slot') {
+    if (slot.render.badge === 'riot') {
+      return <span className="command-kicker-badge command-kicker-badge--riot" aria-hidden><img src={publicAsset('riot/mark.png')} alt="" /></span>;
+    }
+    return <ValorantMark className="command-kicker-badge" />;
+  }
+  if (slot.render.type === 'rocket-league-slot') return <img src={publicAsset('rocket-league/icon.png')} alt="" aria-hidden className="command-kicker-badge command-kicker-badge--rocket-league" />;
+  if (slot.render.type === 'minecraft-slot') {
+    return <img src={publicAsset('minecraft/mark.png')} alt="" aria-hidden className="command-kicker-badge" />;
+  }
   if (slot.render.type === 'github-contributions' || slot.render.type === 'github-reviews' || slot.render.type === 'github-open-prs') {
     return <GitHubMark className="command-kicker-badge text-(--color-github-mark)" />;
   }
@@ -192,6 +207,29 @@ function KickerBadge({ slot }: Readonly<{ slot: CommandCenterSlot }>) {
     return <span className="command-kicker-badge command-kicker-badge--glyph" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
   }
   return null;
+}
+
+/** The supplied Valorant asset is black on transparent; paint its exact silhouette in Riot red so
+ * it stays legible on the command center's near-black game surfaces. */
+function ValorantMark({ className }: Readonly<{ className: string }>) {
+  const markUrl = publicAsset('valorant/mark.png');
+  return (
+    <span
+      aria-hidden
+      className={`command-valorant-mark ${className}`}
+      style={{
+        backgroundColor: 'var(--color-accent-valorant)',
+        maskImage: `url(${markUrl})`,
+        maskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        maskSize: 'contain',
+        WebkitMaskImage: `url(${markUrl})`,
+        WebkitMaskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        WebkitMaskSize: 'contain',
+      }}
+    />
+  );
 }
 
 /** The hero/secondary kicker line's content — normally the badge plus plain `slot.kicker` text,
@@ -289,6 +327,18 @@ function fallbackSignalMark(
   activityDay: ReturnType<typeof latestActivityDay> | undefined,
   roblox: RobloxData | undefined,
 ): ReactNode {
+  return healthSignalMark(slot, health, activityDay)
+    ?? aiSignalMark(slot)
+    ?? serviceSignalMark(slot)
+    ?? gameSignalMark(slot, roblox)
+    ?? <span className="command-signal-dot" aria-hidden />;
+}
+
+function healthSignalMark(
+  slot: CommandCenterSlot,
+  health: HealthData | undefined,
+  activityDay: ReturnType<typeof latestActivityDay> | undefined,
+): ReactNode | undefined {
   if (slot.render.type === 'health-rings' && health && activityDay) {
     return <CompactActivityRings
       activeEnergyKcal={activityDay.activeEnergyKcal ?? 0}
@@ -297,17 +347,25 @@ function fallbackSignalMark(
       goals={health.goals}
     />;
   }
+  return undefined;
+}
+
+function aiSignalMark(slot: CommandCenterSlot): ReactNode | undefined {
   if (slot.accent) return <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" />;
   if (slot.render.type === 'ai-usage-tool' && slot.render.toolIds.length > 1) {
     return <span className="flex shrink-0 flex-col items-center gap-0.5">
-      {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
+      {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-4 w-4" />)}
     </span>;
   }
+  return undefined;
+}
+
+function serviceSignalMark(slot: CommandCenterSlot): ReactNode | undefined {
   if (slot.kind === 'github') {
     return <GitHubMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-github-mark)" />;
   }
   if (slot.kind === 'sonar') {
-    return <img src={publicAsset('sonarqube/icon.svg')} alt="" aria-hidden className="h-[1.1rem] w-[1.1rem] shrink-0" />;
+    return <img src={publicAsset('sonarqube/icon.svg')} alt="" aria-hidden className="command-sonar-tile-icon" />;
   }
   if (slot.kind === 'gmail') {
     return <MailMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
@@ -321,6 +379,10 @@ function fallbackSignalMark(
   if (slot.kind === 'imessage') {
     return <MessageMark className="h-[1.1rem] w-[1.1rem] shrink-0 text-(--color-accent-personal)" />;
   }
+  return undefined;
+}
+
+function gameSignalMark(slot: CommandCenterSlot, roblox: RobloxData | undefined): ReactNode | undefined {
   if (slot.render.type === 'weather-signal') {
     return <span className="text-base leading-none" aria-hidden>{WEATHER_KIND_GLYPH[slot.render.kind]}</span>;
   }
@@ -329,7 +391,20 @@ function fallbackSignalMark(
     if (iconUrl) return <img src={iconUrl} alt="" className="command-roblox-tile-icon" />;
     return <span className="command-roblox-tile-mark" aria-hidden><img src={publicAsset('roblox/icon.svg')} alt="" /></span>;
   }
-  return <span className="command-signal-dot" aria-hidden />;
+  if (slot.render.type === 'valorant-slot') {
+    if (slot.render.iconUrl) return <img src={slot.render.iconUrl} alt="" aria-hidden className="command-game-tile-icon" />;
+    if (slot.render.badge === 'riot') {
+      return <span className="command-game-tile-icon command-game-tile-icon--riot" aria-hidden><img src={publicAsset('riot/mark.png')} alt="" /></span>;
+    }
+    return <ValorantMark className="command-game-tile-icon" />;
+  }
+  if (slot.render.type === 'minecraft-slot') {
+    return <img src={publicAsset('minecraft/mark.png')} alt="" aria-hidden className="command-game-tile-icon" />;
+  }
+  if (slot.render.type === 'rocket-league-slot') {
+    return <img src={publicAsset('rocket-league/icon.png')} alt="" aria-hidden className="command-game-tile-icon command-game-tile-icon--rocket-league" />;
+  }
+  return undefined;
 }
 
 function signalKickerFor(slot: CommandCenterSlot, isSonarGate: boolean): string {
@@ -350,6 +425,16 @@ function signalDetailFor(
     </div>;
   }
   if (slot.render.type === 'sonar-quality-gate') return <div className="mt-1"><QualityGatePill status={slot.render.status} /></div>;
+  if (slot.render.type === 'valorant-slot' && slot.render.rank) {
+    const { rr, lastChange } = slot.render.rank;
+    return <ValorantRankProgress rr={rr} lastChange={lastChange} className="command-valorant-rank-progress--tile" />;
+  }
+  if ((slot.render.type === 'minecraft-slot' || slot.render.type === 'rocket-league-slot') && slot.render.activity) {
+    return <>
+      <p className="command-game-activity mt-0.5 truncate text-[11px] font-medium">{slot.render.activity}</p>
+      <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>
+    </>;
+  }
   if (slot.render.type === 'clash-royale-moment' && slot.render.kind === 'best-trophies' && slot.render.bestTrophies !== undefined) {
     return <span className="command-icon-stat-tile mt-1" aria-hidden>
       <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" />
@@ -363,6 +448,12 @@ function signalDetailFor(
     return <span className="command-icon-stat-tile mt-1" aria-label={`${slot.render.personalLoot.toLocaleString()} capital gold looted by you`}>
       <img src={CLASH_OF_CLANS_CAPITAL_GOLD_ICON_URL} alt="" aria-hidden />
       {slot.render.personalLoot.toLocaleString()}
+    </span>;
+  }
+  if (slot.render.type === 'clash-of-clans-moment' && slot.render.kind === 'league' && slot.render.trophies !== undefined) {
+    return <span className="command-icon-stat-tile mt-1" aria-label={`${slot.render.trophies.toLocaleString()} trophies`}>
+      <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" aria-hidden />
+      {slot.render.trophies.toLocaleString()}
     </span>;
   }
   return <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>;

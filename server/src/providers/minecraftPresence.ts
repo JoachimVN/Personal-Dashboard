@@ -1,6 +1,7 @@
-import { open, readdir, stat } from 'node:fs/promises';
+import { open, readdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { newestExistingLogFile } from './newestLogFile.js';
 
 /** Minecraft has no local API and no presence of any kind, so this is inferred from the log the
  * game writes as it runs: whether it is still being written to, and whether it has already logged
@@ -9,6 +10,8 @@ import path from 'node:path';
 export interface PushedMinecraftLive {
   startedAt: string;
   observedAt: string;
+  activity?: 'singleplayer' | 'realm' | 'server';
+  destination?: string;
 }
 
 /** How quiet the log may go before the session is treated as over. Singleplayer writes an autosave
@@ -25,6 +28,8 @@ const SHUTDOWN_MARKER = 'Stopping!';
  * a couple of lines from shutdown hooks. */
 const TAIL_BYTES = 8192;
 const HEAD_BYTES = 512;
+
+type MinecraftActivity = Pick<PushedMinecraftLive, 'activity' | 'destination'> & { index: number };
 
 function minecraftRoots(): { vanilla: string; modrinthProfiles: string } {
   if (process.platform === 'win32') {
@@ -92,22 +97,53 @@ export function isSessionRunning(tail: string, lastWrite: Date, now: number): bo
   return now - lastWrite.getTime() <= ACTIVE_WINDOW_MS;
 }
 
+/** Returns the final match for a log pattern. A single latest.log can record several destinations
+ * after disconnect/reconnect; the last transition is the only one that can describe the live
+ * session. */
+function lastMatch(text: string, pattern: RegExp): RegExpExecArray | undefined {
+  let latest: RegExpExecArray | undefined;
+  for (const match of text.matchAll(pattern)) latest = match;
+  return latest;
+}
+
+function cleanDestination(value: string | undefined): string | undefined {
+  const destination = value?.trim().replace(/[.,;)]$/, '');
+  if (!destination || destination.length > 96) return undefined;
+  return destination;
+}
+
+/** Minecraft's log formats differ across vanilla, Fabric, and launcher generations. These patterns
+ * intentionally only surface explicit destinations and otherwise leave the activity unlabeled — a
+ * generic live card is preferable to guessing a world or server name. */
+export function minecraftActivity(tail: string): Omit<PushedMinecraftLive, 'startedAt' | 'observedAt'> {
+  const candidates: MinecraftActivity[] = [];
+  const singleplayer = lastMatch(tail, /Starting integrated minecraft server(?: version)?[^\n]*/gi);
+  if (singleplayer?.index !== undefined) candidates.push({ activity: 'singleplayer', index: singleplayer.index });
+
+  const realm = lastMatch(tail, /(?:Connecting to|Joining|Joined) (?:a )?realm(?:\s*[:=]\s*|\s+)([^\n]+)/gi);
+  if (realm?.index !== undefined) candidates.push({ activity: 'realm', destination: cleanDestination(realm[1]), index: realm.index });
+
+  // Modern client logs write `Connecting to host, 25565`; preserve a non-standard port because it
+  // distinguishes otherwise-identical local/server names without leaking any credentials.
+  const server = lastMatch(tail, /Connecting to ([^,\n]+),\s*(\d{1,5})/gi);
+  if (server?.index !== undefined) {
+    const host = cleanDestination(server[1]);
+    const port = server[2];
+    const destination = host && port && port !== '25565' ? `${host}:${port}` : host;
+    candidates.push({ activity: 'server', destination, index: server.index });
+  }
+
+  const latest = candidates.toSorted((a, b) => b.index - a.index)[0];
+  if (!latest) return {};
+  const { index: _index, ...activity } = latest;
+  return activity;
+}
+
 /** Whether Minecraft is being played right now, from whichever launcher's log was written most
  * recently. Null for every "not playing" case, including a game that was closed cleanly seconds
  * ago — the shutdown marker is believed over the file's freshness. */
 export async function readMinecraftLive(): Promise<PushedMinecraftLive | null> {
-  const candidates = await Promise.all((await logPaths()).map(async (file) => {
-    try {
-      return { file, mtime: (await stat(file)).mtime };
-    } catch {
-      // That launcher has never run, or has no log yet.
-      return undefined;
-    }
-  }));
-
-  const newest = candidates
-    .filter((candidate): candidate is { file: string; mtime: Date } => candidate !== undefined)
-    .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())[0];
+  const newest = await newestExistingLogFile(await logPaths());
   if (!newest) return null;
 
   const now = Date.now();
@@ -121,7 +157,7 @@ export async function readMinecraftLive(): Promise<PushedMinecraftLive | null> {
     const startedAt = sessionStartedAt(head.split('\n')[0] ?? '', newest.mtime);
     if (!startedAt) return null;
 
-    return { startedAt: startedAt.toISOString(), observedAt: new Date(now).toISOString() };
+    return { startedAt: startedAt.toISOString(), observedAt: new Date(now).toISOString(), ...minecraftActivity(tail) };
   } catch (err) {
     // The game rotating its log mid-read is routine, not a fault worth failing the whole push over.
     console.warn(`[activity-push] Minecraft log read failed: ${err instanceof Error ? err.message : 'unknown error'}`);

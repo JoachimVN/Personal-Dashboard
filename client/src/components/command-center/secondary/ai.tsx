@@ -44,10 +44,10 @@ export function AiUsageSecondary({ slot, aiUsage }: Readonly<{ slot: CommandCent
   const toolIds = slot.render.toolIds;
   return <div className="command-secondary-ai mt-4">
     <div className="flex shrink-0 flex-col items-center gap-2">
-      {toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className={toolIds.length > 1 ? 'h-6 w-6' : 'h-10 w-10'} />)}
+      {toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-10 w-10" />)}
     </div>
     <div className="min-w-0 flex-1">
-      <p className="text-sm font-semibold text-ink">{slot.title}</p>
+      <p className="command-hero-title text-sm font-semibold text-ink">{slot.title}</p>
       <div className="mt-2">{trend}</div>
       <p className="mt-1.5 text-[11px] tabular-nums text-ink-faint">{slot.detail}</p>
     </div>

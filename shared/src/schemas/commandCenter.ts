@@ -43,6 +43,24 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('steam-achievement'), appId: z.number(), apiName: z.string() }),
   z.object({ type: z.literal('roblox-now-playing') }),
   z.object({
+    type: z.literal('valorant-slot'),
+    /** Which service mark belongs on the card: the launcher state is Riot-wide, everything else is
+     * Valorant proper. */
+    badge: z.enum(['valorant', 'riot']),
+    /** Wide scenic art (the map) for the hero/secondary backdrop. */
+    artUrl: z.string().optional(),
+    /** Small square art (the agent, the rank badge) for the tile mark. */
+    iconUrl: z.string().optional(),
+    /** Present for the standing-rank signal only, so compact cards can show progress through the
+     * current tier rather than reducing rank to a static badge. */
+    rank: z.object({
+      rr: z.number().min(0).max(100),
+      lastChange: z.number(),
+    }).optional(),
+  }),
+  z.object({ type: z.literal('minecraft-slot'), activity: z.string().optional() }),
+  z.object({ type: z.literal('rocket-league-slot'), activity: z.string().optional() }),
+  z.object({
     type: z.literal('clash-royale-moment'),
     kind: z.enum(['arena', 'league', 'best-trophies', 'win-streak', 'session']),
     /** Only present for kind 'arena' — looked up against a local name->art table client-side. */
@@ -104,7 +122,7 @@ export const commandCenterRenderSchema = z.discriminatedUnion('type', [
 export const commandCenterSlotSchema = z.object({
   id: z.string(),
   source: z.string(),
-  kind: z.enum(['calendar', 'gmail', 'github', 'sonar', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'clash-of-clans', 'transit', 'power', 'fallback']),
+  kind: z.enum(['calendar', 'gmail', 'github', 'sonar', 'spotify', 'health', 'ai-usage', 'weather', 'hue', 'news', 'imessage', 'steam', 'roblox', 'clash-royale', 'clash-of-clans', 'valorant', 'minecraft', 'rocket-league', 'transit', 'power', 'fallback']),
   kicker: z.string(),
   title: z.string(),
   detail: z.string(),

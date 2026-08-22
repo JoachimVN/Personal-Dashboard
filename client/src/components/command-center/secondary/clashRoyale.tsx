@@ -40,7 +40,7 @@ export function ClashRoyaleWinStreakSecondary({ slot }: Readonly<{ slot: Command
       {icon && <TrimmedBattleModeIcon src={icon.src} isAppIcon={icon.isAppIcon} />}
     </div>
     <div className="min-w-0 flex-1">
-      <p className="text-sm font-semibold text-ink">{slot.title}</p>
+      <p className="command-hero-title text-sm font-semibold text-ink">{slot.title}</p>
       <ClashCrownRow battles={streakCrowns} />
       <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>
     </div>
@@ -56,7 +56,7 @@ export function ClashRoyaleSessionSecondary({ slot }: Readonly<{ slot: CommandCe
   if (!sessionCrowns?.length) return null;
   return <div className="command-secondary-clash-streak mt-4">
     <div className="min-w-0 flex-1">
-      <p className="text-sm font-semibold text-ink">{slot.title}</p>
+      <p className="command-hero-title text-sm font-semibold text-ink">{slot.title}</p>
       <ClashCrownRow battles={sessionCrowns} />
       <p className="mt-2 text-[11px] text-ink-faint">{slot.detail}</p>
     </div>
@@ -89,6 +89,6 @@ export function ClashRoyaleArenaLeagueSecondary({ slot }: Readonly<{ slot: Comma
   }
   return <div className="command-secondary-spotify mt-4">
     {art && <img src={art} alt="" aria-hidden className="command-clash-royale-art-badge" />}
-    <div className="min-w-0"><p className="text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
+    <div className="min-w-0"><p className="command-hero-title text-sm font-semibold text-ink">{slot.title}</p><p className="mt-0.5 text-sm text-ink-muted">{slot.detail}</p></div>
   </div>;
 }

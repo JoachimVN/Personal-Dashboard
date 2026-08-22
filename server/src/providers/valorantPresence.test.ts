@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseLockfile, parseValorantPresence } from './valorantPresence.js';
+import { parseLockfile, parseRiotOnline, parseValorantPresence } from './valorantPresence.js';
 
 function presence(puuid: string, blob: unknown, product = 'valorant'): { puuid: string; product: string; private: string } {
   return { puuid, product, private: Buffer.from(JSON.stringify(blob)).toString('base64') };
@@ -33,6 +33,7 @@ describe('parseValorantPresence', () => {
       roundsLost: 7,
       partySize: 3,
       maxPartySize: 5,
+      idle: false,
     });
   });
 
@@ -70,5 +71,34 @@ describe('parseValorantPresence', () => {
     expect(parseValorantPresence([{ puuid: 'me', product: 'valorant', private: 'not-base64-json' }], 'me')).toBeUndefined();
     expect(parseValorantPresence([presence('me', { matchPresenceData: { sessionLoopState: 'SOMETHING_NEW' } })], 'me')).toBeUndefined();
     expect(parseValorantPresence([], 'me')).toBeUndefined();
+  });
+});
+
+describe('parseValorantPresence idle flag', () => {
+  it('carries the away marking Riot sets through', () => {
+    expect(parseValorantPresence([presence('me', {
+      isIdle: true,
+      matchPresenceData: { sessionLoopState: 'MENUS', queueId: 'competitive' },
+    })], 'me')?.idle).toBe(true);
+  });
+});
+
+describe('parseRiotOnline', () => {
+  it('reports being signed in at the launcher when nothing is being played', () => {
+    expect(parseRiotOnline([{ puuid: 'me', product: 'riot_client', state: 'chat' }], 'me')).toEqual({ idle: false });
+  });
+
+  it('marks away and do-not-disturb as idle', () => {
+    expect(parseRiotOnline([{ puuid: 'me', product: 'riot_client', state: 'away' }], 'me')).toEqual({ idle: true });
+    expect(parseRiotOnline([{ puuid: 'me', product: 'riot_client', state: 'dnd' }], 'me')).toEqual({ idle: true });
+  });
+
+  it('respects appearing offline rather than republishing it as online', () => {
+    expect(parseRiotOnline([{ puuid: 'me', product: 'riot_client', state: 'offline' }], 'me')).toBeUndefined();
+    expect(parseRiotOnline([{ puuid: 'me', product: 'riot_client', state: '' }], 'me')).toBeUndefined();
+  });
+
+  it('ignores client presence belonging to anyone else', () => {
+    expect(parseRiotOnline([{ puuid: 'friend', product: 'riot_client', state: 'chat' }], 'me')).toBeUndefined();
   });
 });

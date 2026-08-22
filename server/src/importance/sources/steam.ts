@@ -101,6 +101,7 @@ export function steamCandidates(
   achievementFreshMs: number,
   moments: SteamMoments = DEFAULT_STEAM_MOMENTS,
   rareAchievementPercent = 10,
+  suppressNowPlaying = false,
 ): Candidate[] {
   if (!data) return [];
 
@@ -108,7 +109,7 @@ export function steamCandidates(
     steamCompletedGameCandidate(data, moments)
     ?? steamAchievementCandidate(data, achievementFreshMs, rareAchievementPercent)
     ?? steamPlaytimeMilestoneCandidate(data, moments)
-    ?? steamNowPlayingCandidate(data)
+    ?? (suppressNowPlaying ? undefined : steamNowPlayingCandidate(data))
     ?? steamLeaderboardClimbCandidate(moments)
     ?? steamFriendsOnlineCandidate(data)
     ?? steamRecentPlaytimeCandidate(data);

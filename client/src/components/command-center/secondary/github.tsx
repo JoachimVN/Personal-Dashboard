@@ -60,9 +60,9 @@ export function PrMeta({ pr }: Readonly<{ pr: PullRequest }>): ReactNode {
 function PrHeadline({ pr }: Readonly<{ pr: PullRequest }>): ReactNode {
   return (
     <div className="mt-4">
-      <p className="text-sm font-semibold text-ink">
+      <a href={pr.url} className="command-pr-link text-sm font-semibold text-ink">
         {pr.title} <span className="font-normal text-ink-faint">#{pr.number}</span>
-      </p>
+      </a>
       <div className="mt-1"><PrMeta pr={pr} /></div>
     </div>
   );
@@ -72,9 +72,9 @@ export function GithubReviewList({ github, skip = 0 }: Readonly<{ github: GitHub
   const reviews = github?.pullRequests.filter((pr) => pr.role === 'review-requested').slice(skip, skip + 4) ?? [];
   if (!reviews.length) return null;
   return <div className="command-agenda-list mt-4">
-    {reviews.map((pr) => <div key={`${pr.repo}#${pr.number}`} className="command-agenda-item">
+    {reviews.map((pr) => <a key={`${pr.repo}#${pr.number}`} href={pr.url} className="command-agenda-item command-pr-link">
       <span className="command-agenda-lead">{pr.repo}</span><span>{pr.title}</span>
-    </div>)}
+    </a>)}
   </div>;
 }
 
@@ -90,9 +90,9 @@ export function GithubOpenPrList({ github, skip = 0 }: Readonly<{ github: GitHub
   const openPrs = github?.pullRequests.filter((pr) => pr.role === 'author' && !pr.draft).slice(skip, skip + 4) ?? [];
   if (!openPrs.length) return null;
   return <div className="command-agenda-list mt-4">
-    {openPrs.map((pr) => <div key={`${pr.repo}#${pr.number}`} className="command-agenda-item">
+    {openPrs.map((pr) => <a key={`${pr.repo}#${pr.number}`} href={pr.url} className="command-agenda-item command-pr-link">
       <span className="command-agenda-lead">{pr.repo}</span><span>{pr.title}</span>
-    </div>)}
+    </a>)}
   </div>;
 }
 
