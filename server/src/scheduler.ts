@@ -99,10 +99,23 @@ export class ProviderScheduler {
     entry.inFlight = true;
     entry.refreshPromise = (async () => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), entry.provider.timeoutMs);
-      timeout.unref?.();
+      // A provider should honour this signal, but a database driver or third-party SDK may not.
+      // Racing the fetch as well makes the scheduler recover even when the underlying operation
+      // remains pending after abort, instead of leaving the widget in `loading` indefinitely.
+      let timeout: NodeJS.Timeout | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          controller.abort();
+          const error = new Error('provider timed out');
+          error.name = 'AbortError';
+          reject(error);
+        }, entry.provider.timeoutMs);
+      });
       try {
-        const raw = await entry.provider.fetch(controller.signal, force);
+        const raw = await Promise.race([
+          entry.provider.fetch(controller.signal, force),
+          timeoutPromise,
+        ]);
         entry.data = entry.provider.schema.parse(raw);
         entry.fetchedAt = new Date();
         entry.status = 'ready';
@@ -116,7 +129,7 @@ export class ProviderScheduler {
         entry.status = entry.data !== undefined ? 'stale' : 'error';
         console.error(`[${id}] refresh failed (${error}):`, err);
       } finally {
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
         entry.lastAttemptAt = new Date();
         entry.inFlight = false;
         entry.refreshPromise = undefined;

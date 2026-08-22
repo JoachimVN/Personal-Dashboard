@@ -136,6 +136,25 @@ describe('ProviderScheduler', () => {
     expect(envelope.error).toBe('timeout');
   });
 
+  it('times out a fetch that ignores the abort signal instead of remaining loading', async () => {
+    vi.useFakeTimers();
+    scheduler.register(
+      fakeProvider({
+        timeoutMs: 1_000,
+        fetch: () => new Promise(() => {}),
+      }),
+    );
+
+    const refreshing = scheduler.refresh('fake');
+    await vi.advanceTimersByTimeAsync(1_000);
+    await refreshing;
+
+    expect(scheduler.getEnvelope('fake')).toMatchObject({
+      status: 'error',
+      error: 'timeout',
+    });
+  });
+
   it('skips a refresh while the previous one is in flight (single-flight)', async () => {
     let resolveFetch!: (value: { value: number }) => void;
     const fetch = vi.fn(

@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ClashRoyaleData, SonarCloudData, SpotifyData, SteamData } from '@personal-dashboard/shared';
-import { computeClashRoyaleMoments, computeSonarMoments, computeSpotifyFreshness, computeSteamMoments } from './commandCenter.js';
+import { computeClashRoyaleMoments, computeSonarMoments, computeSpotifyFreshness, computeSteamMoments, withFallback } from './commandCenter.js';
 import type { SignalHistoryStore } from '../signalHistory.js';
 
 class InMemorySignals {
@@ -49,6 +49,19 @@ describe('computeSpotifyFreshness', () => {
       .resolves.toMatchObject({ trackAllTime: false });
     await expect(computeSpotifyFreshness(signals as unknown as SignalHistoryStore, spotify('new-track'), 24 * 3_600_000))
       .resolves.toMatchObject({ trackAllTime: true });
+  });
+});
+
+describe('withFallback', () => {
+  it('returns the fallback when a history query does not settle before its deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const result = withFallback(new Promise<never>(() => {}), 'fallback', 1_000);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(result).resolves.toBe('fallback');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
