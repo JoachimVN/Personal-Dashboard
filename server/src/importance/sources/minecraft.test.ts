@@ -19,6 +19,10 @@ describe('minecraftCandidates', () => {
     }, NOW)[0]).toMatchObject({ title: 'Minecraft', detail: 'for 45m', render: { activity: 'Singleplayer: Realm Seed' } });
     expect(minecraftCandidates({
       startedAt: new Date(NOW - 45 * 60_000).toISOString(), observedAt: new Date(NOW - 20_000).toISOString(),
+      activity: 'singleplayer', destination: 'Realm Seed',
+    }, NOW)[0]).toMatchObject({ title: 'Minecraft', detail: 'for 45m', render: { activity: 'Singleplayer: Realm Seed' } });
+    expect(minecraftCandidates({
+      startedAt: new Date(NOW - 45 * 60_000).toISOString(), observedAt: new Date(NOW - 20_000).toISOString(),
       activity: 'server', destination: 'play.example.net',
     }, NOW)[0]).toMatchObject({ title: 'Minecraft', detail: 'for 45m', render: { activity: 'Server: play.example.net' } });
   });

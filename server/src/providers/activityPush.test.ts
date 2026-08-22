@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
 import {
   createActivityPushProvider,
@@ -255,6 +256,7 @@ describe('createActivityPushProvider Clash of Clans', () => {
     await provider.fetch(new AbortController().signal, false);
 
     const body = pushBody(fetchMock, 0);
+    expect(body.machine).toBe(os.hostname());
     expect(body.clashOfClansLastActiveAt).toBeNull();
     expect(body.clashOfClansMilestones).toEqual([]);
     fetchMock.mockRestore();

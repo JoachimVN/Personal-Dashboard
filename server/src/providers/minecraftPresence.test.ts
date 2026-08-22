@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSessionRunning, minecraftActivity, sessionStartedAt } from './minecraftPresence.js';
+import { isSessionRunning, minecraftActivity, nextScanFrom, sessionStartedAt } from './minecraftPresence.js';
 
 describe('sessionStartedAt', () => {
   it('dates the log\'s time-of-day stamp from the file\'s last write', () => {
@@ -59,5 +59,38 @@ describe('minecraftActivity', () => {
   it('identifies a Realm when the client gives it a name', () => {
     expect(minecraftActivity('[Render thread/INFO]: Connecting to realm: Cozy SMP'))
       .toEqual({ activity: 'realm', destination: 'Cozy SMP' });
+  });
+
+  it('names the singleplayer world from the autosave line, which repeats all session', () => {
+    expect(minecraftActivity(`[15:34:33] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Salamalecomalecosalam (World 3)-2]'/minecraft:overworld`))
+      .toEqual({ activity: 'singleplayer', destination: 'Salamalecomalecosalam (World 3)-2' });
+  });
+
+  it('reads the older logs that name the level without wrapping it', () => {
+    expect(minecraftActivity(`[15:34:33] [Server thread/INFO]: Saving chunks for level 'New World'/minecraft:overworld`))
+      .toEqual({ activity: 'singleplayer', destination: 'New World' });
+  });
+
+  it('prefers the server joined after a singleplayer world was left', () => {
+    const log = `[15:34:33] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Home]'/minecraft:overworld
+[15:40:02] [Render thread/INFO]: Connecting to play.example.net, 25565`;
+    expect(minecraftActivity(log)).toEqual({ activity: 'server', destination: 'play.example.net' });
+  });
+});
+
+describe('nextScanFrom', () => {
+  const scanned = { file: 'a/latest.log', scannedTo: 100_000, activity: { activity: 'realm' as const, destination: 'Cozy SMP' } };
+
+  it('reads a log it has never seen from the beginning', () => {
+    expect(nextScanFrom(undefined, 'a/latest.log', 100_000)).toEqual({ from: 0, carried: {} });
+    expect(nextScanFrom(scanned, 'b/latest.log', 100_000)).toEqual({ from: 0, carried: {} });
+  });
+
+  it('starts over when the log shrank, because that is a new session in the same file', () => {
+    expect(nextScanFrom(scanned, 'a/latest.log', 4_000)).toEqual({ from: 0, carried: {} });
+  });
+
+  it('resumes just behind where it stopped and keeps what it already knew', () => {
+    expect(nextScanFrom(scanned, 'a/latest.log', 140_000)).toEqual({ from: 95_904, carried: scanned.activity });
   });
 });

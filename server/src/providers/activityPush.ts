@@ -463,6 +463,7 @@ export function createActivityPushProvider(
           Authorization: `Bearer ${push.secret}`,
         },
         body: JSON.stringify({
+          machine: os.hostname(),
           epicRunning,
           claudeActiveAt,
           codexActiveAt,
