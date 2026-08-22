@@ -1,4 +1,5 @@
 import { open, readdir } from 'node:fs/promises';
+import type { FileHandle } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { newestExistingLogFile } from './newestLogFile.js';
@@ -63,18 +64,11 @@ async function logPaths(): Promise<string[]> {
   return paths;
 }
 
-async function readSlice(file: string, from: 'head' | 'tail'): Promise<string> {
-  const handle = await open(file, 'r');
-  try {
-    const { size } = await handle.stat();
-    const length = from === 'head' ? Math.min(HEAD_BYTES, size) : Math.min(TAIL_BYTES, size);
-    const position = from === 'head' ? 0 : size - length;
-    const buffer = Buffer.alloc(length);
-    await handle.read(buffer, 0, length, position);
-    return buffer.toString('utf8');
-  } finally {
-    await handle.close();
-  }
+async function readRange(handle: FileHandle, position: number, length: number): Promise<string> {
+  if (length <= 0) return '';
+  const buffer = Buffer.alloc(length);
+  await handle.read(buffer, 0, length, position);
+  return buffer.toString('utf8');
 }
 
 /** Log lines carry a time of day and no date (`[23:07:52]`), so the date has to come from the file
@@ -120,6 +114,15 @@ export function minecraftActivity(tail: string): Omit<PushedMinecraftLive, 'star
   const singleplayer = lastMatch(tail, /Starting integrated minecraft server(?: version)?[^\n]*/gi);
   if (singleplayer?.index !== undefined) candidates.push({ activity: 'singleplayer', index: singleplayer.index });
 
+  // Only the integrated server saves chunks, so this both identifies singleplayer and names the
+  // world — and unlike the launch line it repeats on every autosave, so it is found even when a
+  // scan begins in the middle of a session. Older logs name the level directly, newer ones wrap it
+  // in `ServerLevel[...]`.
+  const autosave = lastMatch(tail, /Saving chunks for level '(?:ServerLevel\[([^\]]+)\]|([^']+))'/gi);
+  if (autosave?.index !== undefined) {
+    candidates.push({ activity: 'singleplayer', destination: cleanDestination(autosave[1] ?? autosave[2]), index: autosave.index });
+  }
+
   const realm = lastMatch(tail, /(?:Connecting to|Joining|Joined) (?:a )?realm(?:\s*[:=]\s*|\s+)([^\n]+)/gi);
   if (realm?.index !== undefined) candidates.push({ activity: 'realm', destination: cleanDestination(realm[1]), index: realm.index });
 
@@ -139,6 +142,37 @@ export function minecraftActivity(tail: string): Omit<PushedMinecraftLive, 'star
   return activity;
 }
 
+/** How far back a scan reaches before the point the previous one stopped at, so a destination line
+ * split across two polls is still read whole. Log lines are short; this covers many of them. */
+const SCAN_OVERLAP_BYTES = 4096;
+
+export type MinecraftDestination = Pick<PushedMinecraftLive, 'activity' | 'destination'>;
+
+/** How far the destination scan has read into one log, and what it had found by then. */
+export interface ActivityScan {
+  file: string;
+  scannedTo: number;
+  activity: MinecraftDestination;
+}
+
+/** A world or server announces itself once, when it is joined, and never again — so a fixed window
+ * onto the end of the log only catches that line for as long as the game takes to write past it,
+ * which on a busy world is well under a minute. Scanning forward from wherever the previous poll
+ * stopped catches it whenever it lands, and costs only the lines written since.
+ *
+ * A different file, or one that shrank, is a new session — Minecraft truncates `latest.log` on
+ * every launch — so nothing learned about the old one carries over. */
+export function nextScanFrom(
+  previous: ActivityScan | undefined,
+  file: string,
+  size: number,
+): { from: number; carried: MinecraftDestination } {
+  if (previous?.file !== file || size < previous.scannedTo) return { from: 0, carried: {} };
+  return { from: Math.max(0, previous.scannedTo - SCAN_OVERLAP_BYTES), carried: previous.activity };
+}
+
+let lastScan: ActivityScan | undefined;
+
 /** Whether Minecraft is being played right now, from whichever launcher's log was written most
  * recently. Null for every "not playing" case, including a game that was closed cleanly seconds
  * ago — the shutdown marker is believed over the file's freshness. */
@@ -150,17 +184,31 @@ export async function readMinecraftLive(): Promise<PushedMinecraftLive | null> {
   // Cheap check first: a log last touched days ago needs no reading at all.
   if (now - newest.mtime.getTime() > ACTIVE_WINDOW_MS) return null;
 
+  const handle = await open(newest.file, 'r').catch(() => undefined);
+  if (!handle) return null;
+
   try {
-    const [head, tail] = await Promise.all([readSlice(newest.file, 'head'), readSlice(newest.file, 'tail')]);
+    const { size } = await handle.stat();
+    const head = await readRange(handle, 0, Math.min(HEAD_BYTES, size));
+    const tail = await readRange(handle, Math.max(0, size - TAIL_BYTES), Math.min(TAIL_BYTES, size));
     if (!isSessionRunning(tail, newest.mtime, now)) return null;
 
     const startedAt = sessionStartedAt(head.split('\n')[0] ?? '', newest.mtime);
     if (!startedAt) return null;
 
-    return { startedAt: startedAt.toISOString(), observedAt: new Date(now).toISOString(), ...minecraftActivity(tail) };
+    // Whatever the new lines name wins; otherwise the last known destination stands, because a
+    // stretch of log naming none means nothing changed, not that the world was left.
+    const { from, carried } = nextScanFrom(lastScan, newest.file, size);
+    const found = minecraftActivity(await readRange(handle, from, size - from));
+    const activity = found.activity ? found : carried;
+    lastScan = { file: newest.file, scannedTo: size, activity };
+
+    return { startedAt: startedAt.toISOString(), observedAt: new Date(now).toISOString(), ...activity };
   } catch (err) {
     // The game rotating its log mid-read is routine, not a fault worth failing the whole push over.
     console.warn(`[activity-push] Minecraft log read failed: ${err instanceof Error ? err.message : 'unknown error'}`);
     return null;
+  } finally {
+    await handle.close();
   }
 }
