@@ -12,6 +12,8 @@ import {
   headshotRate,
   kda,
   killDeathRatio,
+  recentRecord,
+  winRateMatches,
 } from '../../widgets/ValorantWidgets';
 import './valorant.css';
 
@@ -33,7 +35,7 @@ export function ValorantOverview() {
 
 function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
   const overviewRef = useRef<HTMLDivElement>(null);
-  const { profile, rank, peak, recentMatches, currentSeason, history } = data;
+  const { profile, rank, peak, recentMatches, history } = data;
   const cardArtUrl = profile.cardIconUrl;
 
   const actShort = history.currentActShort;
@@ -43,10 +45,12 @@ function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
      match rather than showing three dashes. */
   const rankedActMatches = actMatches.filter((match) => match.mode === 'Competitive');
   const statMatches = rankedActMatches.length > 0 ? rankedActMatches : actMatches;
-
-  const seasonWinRate = currentSeason && currentSeason.games > 0
-    ? Math.round((currentSeason.wins / currentSeason.games) * 100)
-    : undefined;
+  // Keep every number in this card rooted in the locally captured act archive. HenrikDev's live
+  // season tally is competitive-only and can otherwise disagree with the visible agent pool,
+  // which intentionally includes all team modes (such as Unrated).
+  const rateMatches = winRateMatches(actMatches);
+  const record = recentRecord(rateMatches);
+  const actWinRate = rateMatches.length > 0 ? Math.round((record.wins / rateMatches.length) * 100) : undefined;
   const actKd = killDeathRatio(statMatches);
   const actHs = aggregateHeadshotRate(statMatches);
   const actAcs = averageCombatScore(statMatches);
@@ -120,10 +124,10 @@ function ValorantOverviewContent({ data }: Readonly<{ data: ValorantData }>) {
       <section className="valorant-overview-act">
         <div className="valorant-overview-act-head">
           <p>Current act{actShort ? ` · ${actLabel(actShort)}` : ''}</p>
-          {currentSeason && <span>{currentSeason.games} played</span>}
+          <span>{rateMatches.length} captured</span>
         </div>
         <dl className="valorant-overview-metrics">
-          <ActMetric label="Win rate" value={seasonWinRate === undefined ? '—' : `${seasonWinRate}%`} />
+          <ActMetric label="Win rate" value={actWinRate === undefined ? '—' : `${actWinRate}%`} />
           <ActMetric label="K/D" value={actKd === undefined ? '—' : actKd.toFixed(2)} />
           <ActMetric label="HS %" value={actHs === undefined ? '—' : `${actHs}%`} />
           <ActMetric label="ACS" value={actAcs === undefined ? '—' : formatNumber(actAcs)} />

@@ -132,7 +132,7 @@ export function minecraftActivity(tail: string): Omit<PushedMinecraftLive, 'star
     candidates.push({ activity: 'server', destination, index: server.index });
   }
 
-  const latest = candidates.sort((a, b) => b.index - a.index)[0];
+  const latest = candidates.toSorted((a, b) => b.index - a.index)[0];
   if (!latest) return {};
   const { index: _index, ...activity } = latest;
   return activity;

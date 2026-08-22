@@ -533,12 +533,6 @@
 
 .command-valorant-rank-progress {
   margin-top: 0.55rem;
-}
-
-/* A rank meter should read as progress across a tier, not as a decorative line under the RR
-   number. On a full card this is about four times the old text-sized meter; compact tiles still
-   naturally cap it to their available width. */
-.command-valorant-rank-progress {
   width: min(100%, 24rem);
 }
 

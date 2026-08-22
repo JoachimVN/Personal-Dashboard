@@ -80,13 +80,13 @@ function WinRateRing({ percent }: Readonly<{ percent: number | undefined }>) {
 
 /** Half of the split act card — K/D and headshot% flank the win-rate ring on the left, games and
  * top agent flank it on the right, all centered within this half. */
-function ValorantActHalf({ eyebrow, badge, winRate, kd, hsPercent, games, topAgent }: Readonly<{
+function ValorantActHalf({ eyebrow, badge, winRate, kd, hsPercent, matches, topAgent }: Readonly<{
   eyebrow: string;
   badge?: string;
   winRate: number | undefined;
   kd: number | undefined;
   hsPercent: number | undefined;
-  games: number | undefined;
+  matches: number | undefined;
   topAgent: AgentSummary | undefined;
 }>) {
   return (
@@ -112,8 +112,8 @@ function ValorantActHalf({ eyebrow, badge, winRate, kd, hsPercent, games, topAge
         </div>
         <dl className="valorant-hero-act-metrics valorant-hero-act-metrics-right">
           <div className="valorant-hero-act-metric">
-            <dd>{games !== undefined ? formatNumber(games) : '—'}</dd>
-            <dt>Games</dt>
+            <dd>{matches !== undefined ? formatNumber(matches) : '—'}</dd>
+            <dt>Matches</dt>
           </div>
           <div className="valorant-hero-act-metric valorant-hero-act-metric-agent">
             <dd>
@@ -139,9 +139,13 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
   const actKd = killDeathRatio(actMatches);
   const actHsPercent = aggregateHeadshotRate(actMatches);
   const actTopAgent = agentSummaries(actMatches)[0];
-  const actGames = data.currentSeason?.games;
-  const actWins = data.currentSeason?.wins;
-  const actWinRate = actGames !== undefined && actGames > 0 && actWins !== undefined ? Math.round((actWins / actGames) * 100) : undefined;
+  // The dashboard's act card and agent-pool filter must describe the same captured history.
+  // HenrikDev's live season tally is competitive-only, whereas the pool includes team modes such
+  // as Unrated; mixing them produced contradictory win rates for a single visible match.
+  const actRateMatches = winRateMatches(actMatches);
+  const actRecord = recentRecord(actRateMatches);
+  const actGames = actRateMatches.length;
+  const actWinRate = actGames > 0 ? Math.round((actRecord.wins / actGames) * 100) : undefined;
 
   const careerMatches = data.history.matches;
   const careerRateMatches = winRateMatches(careerMatches);
@@ -213,7 +217,7 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
             winRate={actWinRate}
             kd={actKd}
             hsPercent={actHsPercent}
-            games={actGames}
+            matches={actGames}
             topAgent={actTopAgent}
           />
           <div className="valorant-hero-act-divider" aria-hidden />
@@ -222,7 +226,7 @@ function ValorantHero({ data }: Readonly<{ data: ValorantData }>) {
             winRate={careerWinRate}
             kd={careerKd}
             hsPercent={careerHsPercent}
-            games={careerRateMatches.length}
+            matches={careerRateMatches.length}
             topAgent={careerTopAgent}
           />
         </div>
