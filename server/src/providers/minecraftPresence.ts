@@ -99,7 +99,7 @@ export function isSessionRunning(tail: string, lastWrite: Date, now: number, min
 async function isMinecraftProcessRunning(): Promise<boolean> {
   try {
     if (process.platform === 'win32') {
-      const command = "Get-CimInstance Win32_Process -Filter \\\"Name = 'java.exe' OR Name = 'javaw.exe'\\\" | Where-Object { $_.CommandLine -match 'net\\.minecraft\\.client\\.main\\.Main' } | Select-Object -First 1 -ExpandProperty ProcessId";
+      const command = String.raw`Get-CimInstance Win32_Process -Filter \"Name = 'java.exe' OR Name = 'javaw.exe'\" | Where-Object { $_.CommandLine -match 'net\.minecraft\.client\.main\.Main' } | Select-Object -First 1 -ExpandProperty ProcessId`;
       const { stdout } = await execFileAsync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command]);
       return stdout.trim() !== '';
     }
