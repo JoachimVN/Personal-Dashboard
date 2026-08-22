@@ -74,6 +74,17 @@ function sessionCrownsBackTo(now: Date, results: ('win' | 'loss')[]): { crownsFo
   });
 }
 
+function minecraftGallerySlot(id: string, label: string, activity: string): GallerySlot {
+  return {
+    label,
+    slot: {
+      id: `gallery:minecraft:${id}`, source: 'minecraft', kind: 'minecraft', kicker: 'Playing now',
+      title: 'Minecraft', detail: 'for 45m', href: '#/', score: 60,
+      render: { type: 'minecraft-slot', activity },
+    },
+  };
+}
+
 export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
   const events = data.calendar.events;
   // calendar-agenda is only ever built from same-day events in production — its layout assumes a
@@ -427,30 +438,9 @@ export function buildGallerySlots(data: GalleryData, now: Date): GallerySlot[] {
         },
       },
     },
-    {
-      label: 'minecraft (live: singleplayer)',
-      slot: {
-        id: 'gallery:minecraft:singleplayer', source: 'minecraft', kind: 'minecraft', kicker: 'Playing now',
-        title: 'Minecraft', detail: 'for 45m', href: '#/', score: 60,
-        render: { type: 'minecraft-slot', activity: 'Singleplayer' },
-      },
-    },
-    {
-      label: 'minecraft (live: Realm)',
-      slot: {
-        id: 'gallery:minecraft:realm', source: 'minecraft', kind: 'minecraft', kicker: 'Playing now',
-        title: 'Minecraft', detail: 'for 45m', href: '#/', score: 60,
-        render: { type: 'minecraft-slot', activity: 'Realm: Cozy SMP' },
-      },
-    },
-    {
-      label: 'minecraft (live: server)',
-      slot: {
-        id: 'gallery:minecraft:server', source: 'minecraft', kind: 'minecraft', kicker: 'Playing now',
-        title: 'Minecraft', detail: 'for 45m', href: '#/', score: 60,
-        render: { type: 'minecraft-slot', activity: 'Server: play.example.net' },
-      },
-    },
+    minecraftGallerySlot('singleplayer', 'minecraft (live: singleplayer)', 'Singleplayer'),
+    minecraftGallerySlot('realm', 'minecraft (live: Realm)', 'Realm: Cozy SMP'),
+    minecraftGallerySlot('server', 'minecraft (live: server)', 'Server: play.example.net'),
     {
       label: 'rocket-league (live: menus)',
       slot: {

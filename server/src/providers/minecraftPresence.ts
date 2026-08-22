@@ -1,6 +1,7 @@
-import { open, readdir, stat } from 'node:fs/promises';
+import { open, readdir } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { newestExistingLogFile } from './newestLogFile.js';
 
 /** Minecraft has no local API and no presence of any kind, so this is inferred from the log the
  * game writes as it runs: whether it is still being written to, and whether it has already logged
@@ -142,18 +143,7 @@ export function minecraftActivity(tail: string): Omit<PushedMinecraftLive, 'star
  * recently. Null for every "not playing" case, including a game that was closed cleanly seconds
  * ago — the shutdown marker is believed over the file's freshness. */
 export async function readMinecraftLive(): Promise<PushedMinecraftLive | null> {
-  const candidates = await Promise.all((await logPaths()).map(async (file) => {
-    try {
-      return { file, mtime: (await stat(file)).mtime };
-    } catch {
-      // That launcher has never run, or has no log yet.
-      return undefined;
-    }
-  }));
-
-  const newest = candidates
-    .filter((candidate): candidate is { file: string; mtime: Date } => candidate !== undefined)
-    .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())[0];
+  const newest = await newestExistingLogFile(await logPaths());
   if (!newest) return null;
 
   const now = Date.now();

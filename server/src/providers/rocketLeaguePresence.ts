@@ -1,6 +1,7 @@
-import { open, stat } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { newestExistingLogFile } from './newestLogFile.js';
 
 /** What Rocket League is doing at this instant, read from the log the game writes as it runs.
  * Psyonix publish no API at all, but the game writes its Steam rich presence into the log every
@@ -189,19 +190,7 @@ async function readTailSlice(file: string): Promise<string> {
 
 /** What Rocket League is doing right now, or null when it is not running. */
 export async function readRocketLeagueLive(): Promise<PushedRocketLeagueLive | null> {
-  const candidates = await Promise.all(logPaths().map(async (file) => {
-    try {
-      return { file, mtime: (await stat(file)).mtime };
-    } catch {
-      // Rocket League has never run from this Documents root, which is the normal case for at
-      // least one of the two.
-      return undefined;
-    }
-  }));
-
-  const newest = candidates
-    .filter((candidate): candidate is { file: string; mtime: Date } => candidate !== undefined)
-    .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())[0];
+  const newest = await newestExistingLogFile(logPaths());
   if (!newest) return null;
 
   const now = Date.now();
