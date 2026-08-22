@@ -167,7 +167,7 @@ export function nextScanFrom(
   file: string,
   size: number,
 ): { from: number; carried: MinecraftDestination } {
-  if (!previous || previous.file !== file || size < previous.scannedTo) return { from: 0, carried: {} };
+  if (previous?.file !== file || size < previous.scannedTo) return { from: 0, carried: {} };
   return { from: Math.max(0, previous.scannedTo - SCAN_OVERLAP_BYTES), carried: previous.activity };
 }
 
