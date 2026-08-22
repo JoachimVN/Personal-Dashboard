@@ -35,6 +35,14 @@ describe('isSessionRunning', () => {
   it('lets a session that went quiet for too long lapse', () => {
     expect(isSessionRunning('[23:08:22] [Render thread/INFO]: chunk saved', lastWrite, lastWrite.getTime() + 11 * 60_000)).toBe(false);
   });
+
+  it('keeps a quiet session live while the Minecraft client process is still running', () => {
+    expect(isSessionRunning('[23:08:22] [Render thread/INFO]: chunk saved', lastWrite, lastWrite.getTime() + 11 * 60_000, true)).toBe(true);
+  });
+
+  it('still believes a clean shutdown marker while the client process exits', () => {
+    expect(isSessionRunning('[23:08:23] [Render thread/INFO]: Stopping!', lastWrite, justAfter, true)).toBe(false);
+  });
 });
 
 describe('minecraftActivity', () => {
