@@ -104,7 +104,7 @@ function ValorantSlotSecondary({ slot }: Readonly<{ slot: CommandCenterSlot }>):
   return <div className={`command-secondary-valorant${hasIcon ? ' command-secondary-valorant--with-icon' : ''} mt-4`}>
     {slot.render.iconUrl && <img src={slot.render.iconUrl} alt="" aria-hidden className="command-secondary-valorant-icon" />}
     <div className="min-w-0">
-      <p className="truncate text-sm font-semibold text-ink">{slot.title}</p>
+      <p className="command-hero-title truncate text-sm font-semibold text-ink">{slot.title}</p>
       {rank ? <ValorantRankProgress rr={rank.rr} lastChange={rank.lastChange} /> : slot.detail && <p className="mt-1 truncate text-sm text-ink-muted">{slot.detail}</p>}
     </div>
   </div>;
@@ -148,7 +148,7 @@ export function heroExtraFor(
   if (!trend) return null;
   return <div className="mt-4 flex max-w-sm items-center gap-3">
     <div className="flex shrink-0 flex-col items-center gap-2">
-      {render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className={render.toolIds.length > 1 ? 'h-5 w-5' : 'h-8 w-8'} />)}
+      {render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-8 w-8" />)}
     </div>
     <div className="min-w-0 flex-1">{trend}</div>
   </div>;
@@ -181,6 +181,7 @@ export function heroLeadFor(
   if (render.type === 'steam-achievement') return heroLead(SteamAchievementSecondary({ slot: hero, steam }));
   if (render.type === 'rocket-league-slot') return heroLead(RocketLeagueNowPlayingSecondary({ slot: hero }));
   if (render.type === 'minecraft-slot') return heroLead(MinecraftNowPlayingSecondary({ slot: hero }));
+  if (render.type === 'valorant-slot') return heroLead(ValorantSlotSecondary({ slot: hero }));
   if (render.type === 'roblox-now-playing') return heroLead(RobloxNowPlayingSecondary({ slot: hero, roblox }));
   if (render.type === 'clash-royale-moment' && (render.kind === 'win-streak' || render.kind === 'session')) {
     return heroLead(ClashRoyaleWinStreakSecondary({ slot: hero }) ?? ClashRoyaleSessionSecondary({ slot: hero }));

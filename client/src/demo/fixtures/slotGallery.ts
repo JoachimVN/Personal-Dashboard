@@ -495,6 +495,7 @@ const RENDER_TYPES: Record<CommandCenterSlot['render']['type'], true> = {
   'clash-of-clans-moment': true,
   'valorant-slot': true,
   'minecraft-slot': true,
+  'rocket-league-slot': true,
 };
 
 function assertGalleryCoversEveryRenderType(slots: readonly GallerySlot[]): void {

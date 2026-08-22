@@ -37,7 +37,7 @@ export function ClashOfClansMomentSecondary({ slot }: Readonly<{ slot: CommandCe
       <img src={badgeSrc} alt="" />
     </div>
     <div className="min-w-0 flex-1">
-      <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+      <p className={`flex items-center gap-1.5 text-sm font-semibold text-ink${kind === 'raid-weekend' ? '' : ' command-hero-title'}`}>
         {kind === 'raid-weekend' && <img src={CLASH_OF_CLANS_RAID_ATTACK_ICON_URL} alt="" aria-hidden className="h-4 w-4 shrink-0 object-contain" />}
         <span className="truncate">{slot.title}</span>
       </p>

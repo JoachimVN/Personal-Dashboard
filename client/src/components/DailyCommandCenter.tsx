@@ -354,7 +354,7 @@ function aiSignalMark(slot: CommandCenterSlot): ReactNode | undefined {
   if (slot.accent) return <AiToolMark accent={slot.accent} className="h-4 w-4 shrink-0" />;
   if (slot.render.type === 'ai-usage-tool' && slot.render.toolIds.length > 1) {
     return <span className="flex shrink-0 flex-col items-center gap-0.5">
-      {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-3 w-3" />)}
+      {slot.render.toolIds.map((toolId) => <AiToolMark key={toolId} accent={toolId} className="h-4 w-4" />)}
     </span>;
   }
   return undefined;
@@ -429,6 +429,12 @@ function signalDetailFor(
     const { rr, lastChange } = slot.render.rank;
     return <ValorantRankProgress rr={rr} lastChange={lastChange} className="command-valorant-rank-progress--tile" />;
   }
+  if ((slot.render.type === 'minecraft-slot' || slot.render.type === 'rocket-league-slot') && slot.render.activity) {
+    return <>
+      <p className="command-game-activity mt-0.5 truncate text-[11px] font-medium">{slot.render.activity}</p>
+      <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>
+    </>;
+  }
   if (slot.render.type === 'clash-royale-moment' && slot.render.kind === 'best-trophies' && slot.render.bestTrophies !== undefined) {
     return <span className="command-icon-stat-tile mt-1" aria-hidden>
       <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" />
@@ -442,6 +448,12 @@ function signalDetailFor(
     return <span className="command-icon-stat-tile mt-1" aria-label={`${slot.render.personalLoot.toLocaleString()} capital gold looted by you`}>
       <img src={CLASH_OF_CLANS_CAPITAL_GOLD_ICON_URL} alt="" aria-hidden />
       {slot.render.personalLoot.toLocaleString()}
+    </span>;
+  }
+  if (slot.render.type === 'clash-of-clans-moment' && slot.render.kind === 'league' && slot.render.trophies !== undefined) {
+    return <span className="command-icon-stat-tile mt-1" aria-label={`${slot.render.trophies.toLocaleString()} trophies`}>
+      <img src={CLASH_ROYALE_TROPHY_ICON_URL} alt="" aria-hidden />
+      {slot.render.trophies.toLocaleString()}
     </span>;
   }
   return <p className="mt-0.5 truncate text-[11px] text-ink-muted">{slot.detail}</p>;

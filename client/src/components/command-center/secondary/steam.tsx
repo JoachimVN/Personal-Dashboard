@@ -15,7 +15,7 @@ export function SteamNowPlayingSecondary({ slot, steam }: Readonly<{ slot: Comma
   if (!game) return null;
   return <div className="mt-4">
     {game.headerUrl && <img src={game.headerUrl} alt="" className="w-full max-w-xs rounded-xl object-cover shadow-lg" />}
-    <p className="mt-3 text-sm font-semibold text-ink">{game.name}</p>
+    <p className="command-hero-title mt-3 text-sm font-semibold text-ink">{game.name}</p>
     {game.playtimeForeverMinutes !== undefined && (
       <p className="mt-0.5 text-sm text-ink-muted">{formatSteamHours(game.playtimeForeverMinutes)} total playtime</p>
     )}
@@ -35,7 +35,7 @@ export function SteamAchievementSecondary({ slot, steam }: Readonly<{ slot: Comm
       <div className="h-12 w-12 shrink-0 rounded-lg bg-track" />
     )}
     <div className="min-w-0">
-      <p className="text-sm font-semibold text-ink">{achievement.displayName}</p>
+      <p className="command-hero-title--compact text-sm font-semibold text-ink">{achievement.displayName}</p>
       <p className="mt-0.5 text-sm text-ink-muted">
         {achievements.unlockedCount}/{achievements.totalCount} unlocked
         {achievement.globalUnlockedPercent !== undefined ? ` · ${achievement.globalUnlockedPercent.toFixed(1)}% of players` : ''}

@@ -320,7 +320,7 @@
   flex: 1;
   min-width: 0;
   margin: -0.45rem -0.35rem;
-  padding: 0.45rem 0.35rem;
+  padding: 0.45rem 0.35rem 0.8rem;
   border-radius: 0.85rem;
   transition: transform 220ms cubic-bezier(.2,.8,.2,1), color 180ms ease;
 }
@@ -745,6 +745,30 @@
   --secondary-carousel-media-size: 8.5rem;
   --secondary-carousel-content-height: 10.625rem;
   margin-top: 1.25rem;
+}
+
+/* These named specialized-card headings get a roomier secondary-card scale; capital-raids stays
+   deliberately compact. The main card then promotes the same title again below. */
+.command-hero-title {
+  font-size: clamp(1.2rem, 2vw, 1.35rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.command-hero-lead .command-hero-title {
+  font-size: clamp(1.65rem, 4vw, 2.75rem);
+  line-height: 1.02;
+  letter-spacing: -0.055em;
+}
+
+.command-hero-lead .command-hero-title--compact {
+  font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+
+.command-game-activity {
+  color: color-mix(in oklab, var(--color-ink) 72%, var(--color-ink-muted));
 }
 
 /* Spotify's artwork is a fixed rem size shared with the secondary carousel (see
