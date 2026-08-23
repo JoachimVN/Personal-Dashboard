@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import { createDatabase } from './db/client.js';
-import { migrateDatabase } from './db/migrate.js';
 import { HealthStore } from './healthStore.js';
 import { SignalHistoryStore } from './signalHistory.js';
 import { notifyProviderRefresh } from './refreshNotify.js';
@@ -42,12 +41,11 @@ const port = Number(process.env.PORT ?? 4823);
 
 // One route, one statement per request — the dashboard's pool of 5 would be idle connections.
 const database = createDatabase(databaseUrl, 2);
-try {
-  await migrateDatabase(database);
-} catch (error) {
-  console.error('[ingest] could not migrate the database, refusing to start:', error);
-  process.exit(1);
-}
+// Migrations deliberately do NOT run here. drizzle-orm costs ~160 MB resident and this container is
+// billed by the GB-month, so it runs as its own process that exits first — `railway.json` chains
+// `db:migrate && start:ingest`, and a failed migration still stops the deploy before this binds a
+// port. The dashboards in `src/index.ts` keep migrating in-process: they run on laptops, not a
+// meter.
 
 // Optional: without it the webhook route is not mounted at all, so a dashboard that never set one
 // up has no unauthenticated GitHub surface sitting there.

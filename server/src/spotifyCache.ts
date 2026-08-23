@@ -49,7 +49,7 @@ export class SpotifySnapshotStore {
     const sql = this.database.client;
     await sql`
       insert into spotify_snapshot (id, snapshot, rate_limited_until, top_data_fetched_at)
-      values (1, ${JSON.stringify(snapshot)}::jsonb, 0, ${topDataFetchedAt ?? 0})
+      values (1, ${JSON.stringify(snapshot)}::text::jsonb, 0, ${topDataFetchedAt ?? 0})
       on conflict (id) do update set
         snapshot = excluded.snapshot,
         rate_limited_until = 0,

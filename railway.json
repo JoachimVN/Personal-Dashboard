@@ -5,7 +5,7 @@
     "buildCommand": "echo 'no build step: the ingest service runs TypeScript through tsx'"
   },
   "deploy": {
-    "startCommand": "npm run start:ingest -w server",
+    "startCommand": "npm run db:migrate -w server && npm run start:ingest -w server",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 30,
     "restartPolicyType": "ON_FAILURE",

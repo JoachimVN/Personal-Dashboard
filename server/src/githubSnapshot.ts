@@ -16,7 +16,7 @@ export class GitHubSnapshotStore {
   async setSnapshot(data: GitHubData): Promise<void> {
     await this.database.client`
       insert into signal_current (source, metric, value, changed_at)
-      values ('github', 'snapshot', ${JSON.stringify(data)}::jsonb, now())
+      values ('github', 'snapshot', ${JSON.stringify(data)}::text::jsonb, now())
       on conflict (source, metric) do update set value = excluded.value, changed_at = now()
     `;
   }

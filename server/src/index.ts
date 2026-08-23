@@ -52,9 +52,23 @@ for (const provider of providers.all) {
 }
 const signalHistory = new SignalHistoryStore(database);
 scheduler.register(createCommandCenterProvider(scheduler, signalHistory, config));
-// Archive every provider's payload as it settles. Unchanged readings are skipped, and nothing is
-// ever pruned — the point is to accumulate history worth querying later.
+// Archive every provider's payload as it settles. Unchanged readings are skipped, so the archive
+// grows with the data rather than with the poll rate.
 persistProviderHistory(scheduler, signalHistory, config.history.excludeProviders);
+// Bound that growth. Runs on every dashboard rather than an elected one: the delete is idempotent
+// and cheap, and electing a leader would mean nothing prunes while that machine is asleep.
+if (config.history.retentionDays > 0) {
+  const prune = () => {
+    void signalHistory
+      .prune(config.history.retentionDays)
+      .then((rows) => {
+        if (rows > 0) console.log(`[history] pruned ${rows} observations older than ${config.history.retentionDays}d`);
+      })
+      .catch((error) => console.error('[history] could not prune:', error));
+  };
+  prune();
+  setInterval(prune, config.history.pruneIntervalMs).unref();
+}
 // Recompute the ranking as soon as any source settles, not just on command-center's own timer —
 // otherwise a cold start can snapshot an all-fallback ranking and sit on it for a full cycle.
 // Throttled: with ~15 providers settling independently (some every few seconds), triggering the

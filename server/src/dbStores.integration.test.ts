@@ -108,6 +108,74 @@ describeDatabase('Postgres stores', () => {
     expect(await signals.lastChangedAt('gmail', 'unreadThreads')).toEqual(first);
   });
 
+  // Regression: the unchanged-check used to stringify the value read back from the jsonb column and
+  // compare it to a fresh JSON.stringify of the payload. jsonb reorders object keys (shortest
+  // first), so any payload of more than one key re-serialized differently every time and every poll
+  // archived a full copy — `signal_history` reached 1 GB, 72% of it byte-identical duplicates. The
+  // case above survived only because a bare `2` round-trips unchanged.
+  it('treats a payload as unchanged when only its key order differs', async () => {
+    const signals = new SignalHistoryStore(database);
+    // Deliberately not jsonb's canonical order, so a round trip is guaranteed to reorder it.
+    const payload = { fiveHourStatus: 'ok', weeklyStatus: 'ok', available: true, asOf: '2026-08-23T12:00:00.000Z' };
+    await signals.record('ai-usage-codex', 'payload', payload);
+    await signals.record('ai-usage-codex', 'payload', { ...payload });
+    expect(await database.client`select * from signal_history where source = 'ai-usage-codex'`).toHaveLength(1);
+
+    // A real change still lands, and nested objects/arrays are compared by value too.
+    await signals.record('ai-usage-codex', 'payload', { ...payload, available: false });
+    expect(await database.client`select * from signal_history where source = 'ai-usage-codex'`).toHaveLength(2);
+
+    const nested = { rooms: [{ id: '83', name: 'Bathroom', anyOn: false }], reachable: true };
+    await signals.record('hue', 'payload', nested);
+    await signals.record('hue', 'payload', { reachable: true, rooms: [{ anyOn: false, name: 'Bathroom', id: '83' }] });
+    expect(await database.client`select * from signal_history where source = 'hue'`).toHaveLength(1);
+  });
+
+  it('skips the database entirely when re-recording a value this process already wrote', async () => {
+    const signals = new SignalHistoryStore(database);
+    await signals.record('weather', 'payload', { tempC: 14, summary: 'cloudy' });
+    expect(await database.client`select * from signal_history where source = 'weather'`).toHaveLength(1);
+
+    // Clearing signal_current removes the only thing the DB-side check consults. If record() still
+    // reached Postgres it would find nothing, conclude "changed", and write a second row.
+    await database.client`delete from signal_current where source = 'weather'`;
+    await signals.record('weather', 'payload', { tempC: 14, summary: 'cloudy' });
+    expect(await database.client`select * from signal_history where source = 'weather'`).toHaveLength(1);
+    expect(await database.client`select * from signal_current where source = 'weather'`).toHaveLength(0);
+
+    // A genuine change still goes through, and a fresh store has no cache to short-circuit with.
+    await signals.record('weather', 'payload', { tempC: 15, summary: 'cloudy' });
+    expect(await database.client`select * from signal_history where source = 'weather'`).toHaveLength(2);
+    await new SignalHistoryStore(database).record('weather', 'payload', { tempC: 15, summary: 'cloudy' });
+    expect(await database.client`select * from signal_current where source = 'weather'`).toHaveLength(1);
+  });
+
+  it('prunes aged observations but never the newest one of a signal', async () => {
+    const signals = new SignalHistoryStore(database);
+    await signals.record('gmail', 'unreadThreads', 1);
+    await signals.record('gmail', 'unreadThreads', 2);
+    await signals.record('gmail', 'unreadThreads', 3);
+    // A signal whose only observation is ancient: it must survive, or `hasChangedSinceBaseline`
+    // would start claiming a long-settled signal had never been seen.
+    await signals.record('steam', 'payload', { game: null });
+    // Distinct ages: (source, metric, recorded_at) is unique, so backdating both gmail rows to the
+    // same instant would collide rather than age them.
+    await database.client`update signal_history set recorded_at = now() - interval '400 days' where value::text = '1'`;
+    await database.client`update signal_history set recorded_at = now() - interval '300 days' where value::text = '2'`;
+    await database.client`update signal_history set recorded_at = now() - interval '400 days' where source = 'steam'`;
+
+    expect(await signals.prune(180)).toBe(2);
+    const remaining = await database.client<{ source: string; value: unknown }[]>`
+      select source, value from signal_history order by source, recorded_at
+    `;
+    expect(remaining.map((r) => r.source)).toEqual(['gmail', 'steam']);
+    expect(remaining[0].value).toBe(3);
+    expect(await signals.hasChangedSinceBaseline('gmail', 'unreadThreads')).toBe(false);
+
+    // Retention off keeps everything.
+    expect(await signals.prune(0)).toBe(0);
+  });
+
   it('round-trips Steam snapshot, library, and per-game achievement caches', async () => {
     const store = new SteamSnapshotStore(database);
     const snapshot = {
