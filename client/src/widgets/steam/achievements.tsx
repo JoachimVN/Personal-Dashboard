@@ -1,7 +1,6 @@
-import { useState } from 'react';
 import type { SteamData } from '@personal-dashboard/shared';
 import { relativeTime } from '../../lib/time';
-import { accent, findTrackedGame } from './shared';
+import { accent, findTrackedGame, useArtFallback } from './shared';
 
 /** Rarity tier for a global-unlock percent, echoed as both text and color — never color alone. */
 function rarityTier(percent: number): { label: string; color: string } {
@@ -68,17 +67,17 @@ export function SteamAchievementsWidget({ data }: Readonly<{ data: SteamData }>)
  * game isn't in any list the client already has (shouldn't happen, but art is never load-bearing). */
 function TrackedGameBanner({ data, appId, gameName }: Readonly<{ data: SteamData; appId: number; gameName: string }>) {
   const game = findTrackedGame(data, appId);
-  const [artFailed, setArtFailed] = useState(false);
-  const hasArt = Boolean(game?.headerUrl) && !artFailed;
+  const art = useArtFallback([game?.headerUrl, game?.heroUrl]);
+  const hasArt = Boolean(art.src);
   return (
     <div className="steam-tracking-banner">
       {hasArt && (
-        <img aria-hidden src={game!.headerUrl} alt="" className="steam-tracking-banner-backdrop" onError={() => setArtFailed(true)} />
+        <img aria-hidden src={art.src} alt="" className="steam-tracking-banner-backdrop" />
       )}
       <div className="steam-tracking-banner-scrim" />
       <div className="relative flex items-center gap-3">
         {hasArt ? (
-          <img src={game!.headerUrl} alt="" className="steam-tracking-banner-thumb" onError={() => setArtFailed(true)} />
+          <img src={art.src} alt="" className="steam-tracking-banner-thumb" onError={art.onError} />
         ) : (
           <div aria-hidden className="steam-tracking-banner-thumb steam-tracking-banner-thumb--fallback" />
         )}

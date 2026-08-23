@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSessionRunning, minecraftActivity, nextScanFrom, sessionStartedAt } from './minecraftPresence.js';
+import { isSessionRunning, minecraftActivity, nextScanFrom, reconcileActivity, sessionStartedAt, telemetryActivity } from './minecraftPresence.js';
 
 describe('sessionStartedAt', () => {
   it('dates the log\'s time-of-day stamp from the file\'s last write', () => {
@@ -75,6 +75,65 @@ describe('minecraftActivity', () => {
     const log = `[15:34:33] [Server thread/INFO]: Saving chunks for level 'ServerLevel[Home]'/minecraft:overworld
 [15:40:02] [Render thread/INFO]: Connecting to play.example.net, 25565`;
     expect(minecraftActivity(log)).toEqual({ activity: 'server', destination: 'play.example.net' });
+  });
+
+  it('names the destination from a mod save path when the client logs no join line at all', () => {
+    const tail = String.raw`[Render thread/INFO]: Started DHLevel for Wrapped{ClientLevel@abc@minecraft:overworld} with saves at [ClientOnlySaveStructure@(C:\Users\me\AppData\Roaming\ModrinthApp\profiles\Fabric 26.2\Distant_Horizons_server_data\Cozy Realm\abc@minecraft@@overworld)]`;
+    expect(minecraftActivity(tail)).toEqual({ activity: 'server', destination: 'Cozy Realm' });
+  });
+});
+
+describe('telemetryActivity', () => {
+  const since = Date.parse('2026-08-23T11:00:00Z');
+  const worldLoaded = (serverType: string, at: string): string =>
+    JSON.stringify({ type: 'world_loaded', server_type: serverType, event_timestamp_utc: at });
+
+  it('reads a Realm out of the join event the client log never writes', () => {
+    expect(telemetryActivity(worldLoaded('realm', '2026-08-23T11:37:37.451Z'), since)).toBe('realm');
+  });
+
+  it('maps a local world to singleplayer and anything else to a server', () => {
+    expect(telemetryActivity(worldLoaded('local', '2026-08-23T11:37:37Z'), since)).toBe('singleplayer');
+    expect(telemetryActivity(worldLoaded('third_party_server', '2026-08-23T11:37:37Z'), since)).toBe('server');
+  });
+
+  it('takes the latest join, so leaving a Realm for a server is not missed', () => {
+    const events = [worldLoaded('realm', '2026-08-23T11:37:37Z'), worldLoaded('third_party_server', '2026-08-23T12:10:00Z')];
+    expect(telemetryActivity(events.join('\n'), since)).toBe('server');
+  });
+
+  it('ignores joins from before this session and events of other kinds', () => {
+    expect(telemetryActivity(worldLoaded('realm', '2026-08-23T09:00:00Z'), since)).toBeUndefined();
+    expect(telemetryActivity(JSON.stringify({ type: 'graphics_capabilities', event_timestamp_utc: '2026-08-23T11:37:00Z' }), since)).toBeUndefined();
+  });
+
+  it('survives the incomplete final line of a log being appended to', () => {
+    expect(telemetryActivity(`${worldLoaded('realm', '2026-08-23T11:37:37Z')}\n{"type":"world_loa`, since)).toBe('realm');
+  });
+
+  it('reports nothing when there is no telemetry to read', () => {
+    expect(telemetryActivity('', since)).toBeUndefined();
+  });
+});
+
+describe('reconcileActivity', () => {
+  it('keeps a mod-derived name but corrects the kind telemetry knows better', () => {
+    expect(reconcileActivity({ activity: 'server', destination: 'Cozy Realm' }, 'realm'))
+      .toEqual({ activity: 'realm', destination: 'Cozy Realm' });
+  });
+
+  it('drops a name that cannot belong to the destination telemetry reports', () => {
+    expect(reconcileActivity({ activity: 'server', destination: 'play.example.net' }, 'singleplayer'))
+      .toEqual({ activity: 'singleplayer' });
+  });
+
+  it('labels a session the log said nothing about', () => {
+    expect(reconcileActivity({}, 'realm')).toEqual({ activity: 'realm' });
+  });
+
+  it('leaves the log reading alone when telemetry has nothing to say', () => {
+    expect(reconcileActivity({ activity: 'server', destination: 'play.example.net' }, undefined))
+      .toEqual({ activity: 'server', destination: 'play.example.net' });
   });
 });
 

@@ -11,23 +11,29 @@ function Stat({ value, label }: Readonly<{ value: string | number; label: string
   );
 }
 
-/** Steam's owned-games endpoint gives every game a derived header URL, but older/delisted apps
- * can still return 404. Fall back to the square Steam icon, then a stable initial tile. */
+/** Steam's owned-games endpoint gives every game a derived header URL, but apps registered after
+ * Steam's asset-pipeline migration 404 on it (their real header art lives at a hashed CDN path we
+ * have no way to derive — see steamHeroUrl on the server). Retry once with the hero art, then fall
+ * back to the square Steam icon, then a stable initial tile. The cover and backdrop `<img>`s share
+ * one candidate URL and can both fire `onError` for the same failure; the `current === tier` guard
+ * collapses that into a single advance instead of skipping a tier. `key={tier}` remounts both
+ * images on a retry so the browser issues a fresh request instead of being stuck with the failed
+ * `src` an already-lazy-loaded element carries. */
 function SteamGameArtwork({ game }: Readonly<{ game: SteamGame }>) {
-  const [headerFailed, setHeaderFailed] = useState(false);
-  const hasHeader = Boolean(game.headerUrl) && !headerFailed;
+  const candidates = [game.headerUrl, game.heroUrl].filter((url): url is string => Boolean(url));
+  const [tier, setTier] = useState(0);
+  const activeUrl = candidates[tier];
+  const hasHeader = Boolean(activeUrl);
   const fallbackInitial = game.name.trim().charAt(0).toUpperCase() || '?';
+  const handleArtError = () => setTier((current) => (current === tier ? current + 1 : current));
+  // Tier 0 stays lazy (deferred to the IntersectionObserver below via data-steam-header); a retry
+  // means the row is already visible, so it loads eagerly instead.
+  const artProps = tier === 0 ? { 'data-steam-header': activeUrl } : { src: activeUrl, fetchPriority: 'high' as const };
 
   let cover: ReactNode;
   if (hasHeader) {
     cover = (
-      <img
-        data-steam-header={game.headerUrl}
-        alt=""
-        className="steam-game-cover"
-        decoding="async"
-        onError={() => setHeaderFailed(true)}
-      />
+      <img key={tier} {...artProps} alt="" className="steam-game-cover" decoding="async" onError={handleArtError} />
     );
   } else if (game.iconUrl) {
     cover = <img src={game.iconUrl} alt="" className="steam-game-cover steam-game-cover--icon" loading="lazy" decoding="async" />;
@@ -39,12 +45,13 @@ function SteamGameArtwork({ game }: Readonly<{ game: SteamGame }>) {
     <>
       {hasHeader && (
         <img
+          key={tier}
           aria-hidden
-          data-steam-header={game.headerUrl}
+          {...artProps}
           alt=""
           className="steam-game-row-backdrop"
           decoding="async"
-          onError={() => setHeaderFailed(true)}
+          onError={handleArtError}
         />
       )}
       {cover}

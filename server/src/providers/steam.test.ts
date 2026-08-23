@@ -7,7 +7,9 @@ import {
   orderByRecency,
   pickTrackedGame,
   steamHeaderUrl,
+  steamHeroUrl,
   steamIconUrl,
+  toStableCommunityImageUrl,
   unixSecondsToIso,
 } from './steam.js';
 
@@ -31,9 +33,9 @@ function emptySnapshotStore() {
 }
 
 describe('image URL derivation and timestamp conversion', () => {
-  it('derives an icon URL from the app ID and icon hash', () => {
+  it('derives an icon URL from the app ID and icon hash, using the stable community-asset host', () => {
     expect(steamIconUrl(400, 'abc123')).toBe(
-      'https://media.steampowered.com/steamcommunity/public/images/apps/400/abc123.jpg',
+      'https://shared.fastly.steamstatic.com/community_assets/images/apps/400/abc123.jpg',
     );
   });
 
@@ -45,8 +47,38 @@ describe('image URL derivation and timestamp conversion', () => {
     expect(steamHeaderUrl(400)).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg');
   });
 
+  it('derives a hero URL from just the app ID', () => {
+    expect(steamHeroUrl(400)).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/library_hero.jpg');
+  });
+
   it('converts Steam unlocktime Unix seconds to an ISO string', () => {
     expect(unixSecondsToIso(1_752_600_000)).toBe(new Date(1_752_600_000 * 1000).toISOString());
+  });
+});
+
+describe('toStableCommunityImageUrl', () => {
+  it('rewrites a legacy per-app image URL to the stable community-asset host', () => {
+    expect(toStableCommunityImageUrl('https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/400/abc123.jpg')).toBe(
+      'https://shared.fastly.steamstatic.com/community_assets/images/apps/400/abc123.jpg',
+    );
+    expect(toStableCommunityImageUrl('https://media.steampowered.com/steamcommunity/public/images/apps/400/abc123.jpg')).toBe(
+      'https://shared.fastly.steamstatic.com/community_assets/images/apps/400/abc123.jpg',
+    );
+  });
+
+  it('leaves an already-stable URL unchanged', () => {
+    const stable = 'https://shared.fastly.steamstatic.com/community_assets/images/apps/400/abc123.jpg';
+    expect(toStableCommunityImageUrl(stable)).toBe(stable);
+  });
+
+  it('leaves a URL that does not match the per-app image shape unchanged', () => {
+    expect(toStableCommunityImageUrl('https://example.com/not-a-steam-icon.png')).toBe(
+      'https://example.com/not-a-steam-icon.png',
+    );
+  });
+
+  it('passes through undefined', () => {
+    expect(toStableCommunityImageUrl(undefined)).toBeUndefined();
   });
 });
 
@@ -57,8 +89,9 @@ describe('mapGame', () => {
     ).toEqual({
       appId: 400,
       name: 'Portal',
-      iconUrl: 'https://media.steampowered.com/steamcommunity/public/images/apps/400/hash1.jpg',
+      iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/400/hash1.jpg',
       headerUrl: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg',
+      heroUrl: 'https://cdn.akamai.steamstatic.com/steam/apps/400/library_hero.jpg',
       playtimeForeverMinutes: 120,
       playtimeRecentMinutes: 30,
     });
@@ -354,6 +387,36 @@ describe('createSteamProvider fetch', () => {
     }
   });
 
+  it('repairs the artwork on cached library games from before image URLs were added', async () => {
+    const cachedLibrary = {
+      totalGames: 1,
+      totalPlaytimeMinutes: 100,
+      recentPlaytimeMinutes: 0,
+      mostPlayed: [{ appId: 400, name: 'Portal', iconUrl: 'https://media.steampowered.com/steamcommunity/public/images/apps/400/abc123.jpg' }],
+      allGames: [{ appId: 400, name: 'Portal', iconUrl: 'https://media.steampowered.com/steamcommunity/public/images/apps/400/abc123.jpg' }],
+    };
+    const snapshotStore = emptySnapshotStore();
+    snapshotStore.getLibraryCache.mockResolvedValue({ data: cachedLibrary, fetchedAt: new Date() });
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({ response: { players: [{ steamid: auth.steamId, personaname: 'Alex', profileurl: 'https://steamcommunity.com/id/alex' }] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: { games: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ friendslist: { friends: [] } }));
+
+    try {
+      const provider = createSteamProvider(auth, snapshotStore as never);
+      const data = await provider.fetch(new AbortController().signal, false);
+
+      expect(data.library?.allGames[0]?.iconUrl).toBe('https://shared.fastly.steamstatic.com/community_assets/images/apps/400/abc123.jpg');
+      expect(data.library?.mostPlayed[0]?.iconUrl).toBe('https://shared.fastly.steamstatic.com/community_assets/images/apps/400/abc123.jpg');
+      expect(data.library?.allGames[0]?.headerUrl).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg');
+      expect(data.library?.allGames[0]?.heroUrl).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/library_hero.jpg');
+      expect(data.library?.mostPlayed[0]?.headerUrl).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg');
+      expect(data.library?.mostPlayed[0]?.heroUrl).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/library_hero.jpg');
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
   it('reuses fresh cached achievement schema and rarity without re-fetching them', async () => {
     const snapshotStore = emptySnapshotStore();
     snapshotStore.getAchievementSchema.mockResolvedValue({
@@ -379,6 +442,39 @@ describe('createSteamProvider fetch', () => {
 
       expect(data.achievements?.recentUnlocks[0]).toMatchObject({ displayName: 'Freeman', globalUnlockedPercent: 12.5 });
       expect(fetchMock).toHaveBeenCalledTimes(5);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('rewrites a cached achievement icon still pointing at a dead legacy host', async () => {
+    const snapshotStore = emptySnapshotStore();
+    snapshotStore.getAchievementSchema.mockResolvedValue({
+      data: [{
+        apiName: 'ACH_1',
+        displayName: 'Freeman',
+        description: 'Do the thing',
+        icon: 'https://steamcdn-a.akamaihd.net/steamcommunity/public/images/apps/10/abc123.jpg',
+      }],
+      fetchedAt: new Date(),
+    });
+    snapshotStore.getAchievementPercentages.mockResolvedValue({ data: [], fetchedAt: new Date() });
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(jsonResponse({
+        response: { players: [{ steamid: auth.steamId, personaname: 'Alex', profileurl: 'https://steamcommunity.com/id/alex', gameid: '10', gameextrainfo: 'Half-Life' }] },
+      }))
+      .mockResolvedValueOnce(jsonResponse({ response: { games: [] } }))
+      .mockResolvedValueOnce(jsonResponse({ response: {} }))
+      .mockResolvedValueOnce(jsonResponse({ playerstats: { success: true, achievements: [{ apiname: 'ACH_1', achieved: 1, unlocktime: 1_752_600_000 }] } }))
+      .mockResolvedValueOnce(jsonResponse({ friendslist: { friends: [] } }));
+
+    try {
+      const provider = createSteamProvider(auth, snapshotStore as never);
+      const data = await provider.fetch(new AbortController().signal, false);
+
+      expect(data.achievements?.recentUnlocks[0]?.iconUrl).toBe(
+        'https://shared.fastly.steamstatic.com/community_assets/images/apps/10/abc123.jpg',
+      );
     } finally {
       fetchMock.mockRestore();
     }

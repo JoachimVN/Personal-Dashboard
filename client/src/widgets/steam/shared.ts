@@ -1,6 +1,39 @@
+import { useState } from 'react';
 import type { SteamData, SteamGame } from '@personal-dashboard/shared';
 
 export const accent = 'var(--color-accent-steam)';
+
+/** Cycles through art candidates in priority order, advancing on an `<img onError>`. Steam's
+ * header.jpg 404s for apps registered after its asset-pipeline migration (see steamHeroUrl on the
+ * server), so callers pass `[headerUrl, heroUrl]` (optionally more) to recover before showing no
+ * art at all. Resets to the first candidate whenever the candidate set itself changes — e.g. the
+ * tracked/current game switches — rather than carrying a stale failure forward onto a different
+ * game; this is the "derive state during render" pattern React recommends in place of a
+ * useEffect-based reset. */
+export function useArtFallback(urls: ReadonlyArray<string | undefined>): {
+  src: string | undefined;
+  onError: () => void;
+} {
+  const candidates = urls.filter((url): url is string => Boolean(url));
+  const key = candidates.join(' ');
+  const [state, setState] = useState({ key, index: 0 });
+  if (state.key !== key) {
+    setState({ key, index: 0 });
+    return {
+      src: candidates[0],
+      onError: () => setState((s) => (s.key === key && s.index === 0 ? { key, index: 1 } : s)),
+    };
+  }
+  return {
+    src: candidates[state.index],
+    // A panel can render the same candidate more than once (for example, as both a poster and a
+    // blurred backdrop). Only the first failure for this tier may advance the fallback; otherwise
+    // the two events skip straight past the valid hero image.
+    onError: () => setState((s) => (
+      s.key === key && s.index === state.index ? { key, index: s.index + 1 } : s
+    )),
+  };
+}
 
 export function formatHours(minutes: number): string {
   const hours = minutes / 60;

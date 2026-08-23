@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { SteamAchievement, SteamData, SteamGame } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody } from '../../components/WidgetCard';
 import { relativeTime } from '../../lib/time';
-import { findTrackedGame } from '../../widgets/steam/shared';
+import { findTrackedGame, useArtFallback } from '../../widgets/steam/shared';
 import './steam.css';
 
 function formatHours(minutes: number): string {
@@ -67,12 +67,12 @@ type ShelfEntry = { game: SteamGame; source: 'recent' | 'all-time' };
 
 function ShelfGame({ entry }: Readonly<{ entry: ShelfEntry }>) {
   const playtime = entry.source === 'recent' ? entry.game.playtimeRecentMinutes : entry.game.playtimeForeverMinutes;
-  const [headerFailed, setHeaderFailed] = useState(false);
-  const hasHeader = Boolean(entry.game.headerUrl) && !headerFailed;
+  const art = useArtFallback([entry.game.headerUrl, entry.game.heroUrl]);
+  const hasHeader = Boolean(art.src);
   return (
     <article className="steam-shelf-game">
       {hasHeader ? (
-        <img aria-hidden src={entry.game.headerUrl} alt="" loading="lazy" onError={() => setHeaderFailed(true)} />
+        <img aria-hidden src={art.src} alt="" loading="lazy" onError={art.onError} />
       ) : (
         <div className="steam-shelf-game-fallback" />
       )}
@@ -175,21 +175,35 @@ function SteamOverviewContent({ data }: Readonly<{ data: SteamData }>) {
   useEffect(() => {
     const card = overviewRef.current?.closest<HTMLElement>('.dashboard-section-card--steam');
     if (!card) return undefined;
-    const headerUrl = featured?.headerUrl;
-    if (!headerUrl) {
+    // Steam's header.jpg 404s for apps registered after its asset-pipeline migration (see
+    // steamHeroUrl on the server) — probe candidates in order and fall through on error, same as
+    // every other art spot on this widget. A bare CSS url() with no onload/onerror hook would
+    // otherwise leave a 404'd header silently unset, hard to distinguish from "no art yet".
+    const candidates = [featured?.headerUrl, featured?.heroUrl].filter((url): url is string => Boolean(url));
+    if (candidates.length === 0) {
       card.style.removeProperty('--steam-card-art');
       return undefined;
     }
-    // Probe the image before wiring it into the background — a bare CSS url() with no onload/onerror
-    // hook would otherwise leave a 404'd header silently unset, hard to distinguish from "no art yet".
-    const probe = new Image();
-    probe.onload = () => card.style.setProperty('--steam-card-art', `url("${headerUrl}")`);
-    probe.src = headerUrl;
+    let cancelled = false;
+    let probe: HTMLImageElement | undefined;
+    const tryNext = (index: number) => {
+      if (cancelled) return;
+      if (index >= candidates.length) {
+        card.style.removeProperty('--steam-card-art');
+        return;
+      }
+      probe = new Image();
+      probe.onload = () => card.style.setProperty('--steam-card-art', `url("${candidates[index]}")`);
+      probe.onerror = () => tryNext(index + 1);
+      probe.src = candidates[index];
+    };
+    tryNext(0);
     return () => {
-      probe.onload = null;
+      cancelled = true;
+      if (probe) probe.onload = probe.onerror = null;
       card.style.removeProperty('--steam-card-art');
     };
-  }, [featured?.headerUrl]);
+  }, [featured?.headerUrl, featured?.heroUrl]);
 
   return (
     <div ref={overviewRef} className="steam-overview space-y-4">

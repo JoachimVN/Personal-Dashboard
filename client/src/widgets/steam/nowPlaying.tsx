@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import type { SteamData } from '@personal-dashboard/shared';
-import { formatHours } from './shared';
+import { formatHours, useArtFallback } from './shared';
 import { SteamLibraryStats } from './library';
 
 /** The "Steam activity" intro's hero band — profile, tracked game, and library stats on the left,
@@ -14,8 +13,8 @@ export function SteamActivityHero({ data }: Readonly<{ data: SteamData }>) {
   // otherwise show a blank card, hence the library fallback.
   const recent = data.recentlyPlayed[0];
   const game = data.currentGame ?? recent ?? data.library?.mostPlayed[0];
-  const [artFailed, setArtFailed] = useState(false);
-  const hasArt = Boolean(game?.headerUrl) && !artFailed;
+  const art = useArtFallback([game?.headerUrl, game?.heroUrl]);
+  const hasArt = Boolean(art.src);
   let label: string | undefined;
   if (data.currentGame) label = 'Playing now';
   else if (recent) label = 'Recently played';
@@ -24,7 +23,7 @@ export function SteamActivityHero({ data }: Readonly<{ data: SteamData }>) {
   return (
     <div className="detail-signal-panel steam-signal-panel">
       {hasArt && (
-        <img aria-hidden src={game!.headerUrl} alt="" className="steam-signal-backdrop" onError={() => setArtFailed(true)} />
+        <img aria-hidden src={art.src} alt="" className="steam-signal-backdrop" />
       )}
       <div aria-hidden className="steam-signal-backdrop-scrim" />
       <div className="steam-signal-body">
@@ -72,7 +71,7 @@ export function SteamActivityHero({ data }: Readonly<{ data: SteamData }>) {
         {game && (
           <div className="steam-signal-art">
             {hasArt ? (
-              <img src={game.headerUrl} alt="" className="steam-signal-art-img" onError={() => setArtFailed(true)} />
+              <img src={art.src} alt="" className="steam-signal-art-img" onError={art.onError} />
             ) : (
               <div aria-hidden className="steam-signal-art-img steam-signal-art-fallback" />
             )}

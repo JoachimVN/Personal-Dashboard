@@ -1,4 +1,4 @@
-import { open, readdir } from 'node:fs/promises';
+import { open, readdir, readFile, stat } from 'node:fs/promises';
 import type { FileHandle } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import os from 'node:os';
@@ -145,6 +145,15 @@ export function minecraftActivity(tail: string): Omit<PushedMinecraftLive, 'star
   const realm = lastMatch(tail, /(?:Connecting to|Joining|Joined) (?:a )?realm(?:\s*[:=]\s*|\s+)([^\n]+)/gi);
   if (realm?.index !== undefined) candidates.push({ activity: 'realm', destination: cleanDestination(realm[1]), index: realm.index });
 
+  // Recent clients log nothing at the moment they connect, so a mod's save path is often the only
+  // place the destination is written down. Distant Horizons keeps one directory per multiplayer
+  // destination and names it after the server or realm, and re-logs the path on every dimension
+  // change — so unlike a join line it is still there mid-session.
+  const distantHorizons = lastMatch(tail, /Distant_Horizons_server_data[\\/]([^\\/\n]+)/gi);
+  if (distantHorizons?.index !== undefined) {
+    candidates.push({ activity: 'server', destination: cleanDestination(distantHorizons[1]), index: distantHorizons.index });
+  }
+
   // Modern client logs write `Connecting to host, 25565`; preserve a non-standard port because it
   // distinguishes otherwise-identical local/server names without leaking any credentials.
   const server = lastMatch(tail, /Connecting to ([^,\n]+),\s*(\d{1,5})/gi);
@@ -159,6 +168,80 @@ export function minecraftActivity(tail: string): Omit<PushedMinecraftLive, 'star
   if (!latest) return {};
   const { index: _index, ...activity } = latest;
   return activity;
+}
+
+type TelemetryActivityEvent = { at: number; activity: PushedMinecraftLive['activity'] };
+
+function activityFromTelemetryServerType(serverType: string): PushedMinecraftLive['activity'] {
+  switch (serverType) {
+    case 'local': return 'singleplayer';
+    case 'realm': return 'realm';
+    default: return 'server';
+  }
+}
+
+function parseTelemetryActivity(line: string): TelemetryActivityEvent | undefined {
+  if (!line.trim()) return undefined;
+  let event: { type?: unknown; server_type?: unknown; event_timestamp_utc?: unknown };
+  try {
+    event = JSON.parse(line) as typeof event;
+  } catch {
+    return undefined; // A telemetry log being appended to can have one incomplete final line.
+  }
+  if (event.type !== 'world_loaded' || typeof event.server_type !== 'string') return undefined;
+  const at = typeof event.event_timestamp_utc === 'string' ? Date.parse(event.event_timestamp_utc) : Number.NaN;
+  return Number.isNaN(at) ? undefined : { at, activity: activityFromTelemetryServerType(event.server_type) };
+}
+
+/** Minecraft writes its own telemetry log beside `latest.log` whether or not the data is ever
+ * sent, and every join appends a `world_loaded` event naming the kind of destination — `local`,
+ * `realm`, or a third-party server. That is the only vanilla record of a Realm left in recent
+ * versions, which log nothing at all when they connect. It carries no world or server name, so it
+ * settles what kind of session this is and leaves the naming to the log patterns above. */
+export function telemetryActivity(contents: string, since: number): PushedMinecraftLive['activity'] | undefined {
+  let latest: TelemetryActivityEvent | undefined;
+  for (const line of contents.split('\n')) {
+    const event = parseTelemetryActivity(line);
+    if (!event || event.at < since || (latest && event.at < latest.at)) continue;
+    latest = event;
+  }
+  return latest?.activity;
+}
+
+/** Clock slack between the log's local timestamps and telemetry's UTC ones, so the join event that
+ * belongs to this session is not filtered out for landing a moment before its first log line. */
+const TELEMETRY_SLACK_MS = 60_000;
+
+/** Telemetry is one file per day, so a session running past midnight has its join in yesterday's;
+ * reading every file touched since the session began covers that without walking a year of them. */
+async function readTelemetryActivity(logFile: string, since: number): Promise<PushedMinecraftLive['activity'] | undefined> {
+  const directory = path.join(path.dirname(logFile), 'telemetry');
+  let names: string[];
+  try {
+    names = (await readdir(directory)).filter((name) => name.endsWith('.json'));
+  } catch {
+    return undefined; // No telemetry log: the session just goes unclassified, as it did before.
+  }
+  const contents = await Promise.all(names.map(async (name) => {
+    const file = path.join(directory, name);
+    try {
+      return (await stat(file)).mtimeMs >= since ? await readFile(file, 'utf8') : '';
+    } catch {
+      return '';
+    }
+  }));
+  return telemetryActivity(contents.join('\n'), since);
+}
+
+/** A name read from a log and a kind read from telemetry can disagree — the save path of a server
+ * left ten minutes ago still sits in the tail. Telemetry is the authority on the kind; the name
+ * survives only while it can still be describing the same destination. */
+export function reconcileActivity(found: MinecraftDestination, classified: PushedMinecraftLive['activity']): MinecraftDestination {
+  if (!classified) return found;
+  const isMultiplayer = (kind: PushedMinecraftLive['activity']): boolean => kind === 'realm' || kind === 'server';
+  const sameDestination = !found.activity || found.activity === classified
+    || (isMultiplayer(found.activity) && isMultiplayer(classified));
+  return sameDestination && found.destination ? { activity: classified, destination: found.destination } : { activity: classified };
 }
 
 /** How far back a scan reaches before the point the previous one stopped at, so a destination line
@@ -223,7 +306,10 @@ export async function readMinecraftLive(): Promise<PushedMinecraftLive | null> {
     const activity = found.activity ? found : carried;
     lastScan = { file: newest.file, scannedTo: size, activity };
 
-    return { startedAt: startedAt.toISOString(), observedAt: new Date(now).toISOString(), ...activity };
+    const classified = await readTelemetryActivity(newest.file, startedAt.getTime() - TELEMETRY_SLACK_MS);
+    const live = reconcileActivity(activity, classified);
+
+    return { startedAt: startedAt.toISOString(), observedAt: new Date(now).toISOString(), ...live };
   } catch (err) {
     // The game rotating its log mid-read is routine, not a fault worth failing the whole push over.
     console.warn(`[activity-push] Minecraft log read failed: ${err instanceof Error ? err.message : 'unknown error'}`);
