@@ -597,11 +597,19 @@ async function fetchAchievements(
   return { appId, gameName, unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest };
 }
 
-/** Rewrites every game's icon to the stable host on the way out, not just on a fresh GetOwnedGames
- * fetch — the 6-hour library cache (LIBRARY_CACHE_TTL_MS) can otherwise keep serving a pre-fix,
- * dead-host icon URL for hours after this shipped. Idempotent, same as withStableIcons above. */
-function withStableLibraryIcons(library: SteamLibrarySnapshot): SteamLibrarySnapshot {
-  const fixGames = (games: SteamGame[]) => games.map((game) => ({ ...game, iconUrl: toStableCommunityImageUrl(game.iconUrl) }));
+/** Fixes up every game's art on the way out, not just on a fresh GetOwnedGames fetch — the 6-hour
+ * library cache (LIBRARY_CACHE_TTL_MS) can otherwise keep serving pre-fix data for hours after this
+ * shipped, and a cache entry written before heroUrl existed at all has no such key to rewrite in the
+ * first place. headerUrl/heroUrl are pure functions of appId, so it's cheapest to just recompute
+ * them unconditionally rather than detect "missing" — idempotent either way, same as
+ * withStableIcons above. */
+function withStableLibraryArt(library: SteamLibrarySnapshot): SteamLibrarySnapshot {
+  const fixGames = (games: SteamGame[]) => games.map((game) => ({
+    ...game,
+    iconUrl: toStableCommunityImageUrl(game.iconUrl),
+    headerUrl: steamHeaderUrl(game.appId),
+    heroUrl: steamHeroUrl(game.appId),
+  }));
   return { ...library, mostPlayed: fixGames(library.mostPlayed), allGames: fixGames(library.allGames) };
 }
 
@@ -613,17 +621,17 @@ async function resolveSteamLibrary(
 ): Promise<{ library: SteamLibrarySnapshot | null; libraryAvailability: SteamData['availability']['library'] }> {
   const cachedLibrary = await snapshotStore?.getLibraryCache();
   if (cachedLibrary && !isExpired(cachedLibrary.fetchedAt, LIBRARY_CACHE_TTL_MS)) {
-    return { library: withStableLibraryIcons(cachedLibrary.data), libraryAvailability: 'available' };
+    return { library: withStableLibraryArt(cachedLibrary.data), libraryAvailability: 'available' };
   }
 
   const result = await fetchOwnedGames(signal, apiKey, steamId);
   if (result.status === 'available') {
     await snapshotStore?.setLibraryCache(result.data);
-    return { library: withStableLibraryIcons(result.data), libraryAvailability: 'available' };
+    return { library: withStableLibraryArt(result.data), libraryAvailability: 'available' };
   }
   if (cachedLibrary) {
     // Prefer a stale-but-real cache over marking the whole library unavailable.
-    return { library: withStableLibraryIcons(cachedLibrary.data), libraryAvailability: 'available' };
+    return { library: withStableLibraryArt(cachedLibrary.data), libraryAvailability: 'available' };
   }
   return { library: null, libraryAvailability: result.status };
 }

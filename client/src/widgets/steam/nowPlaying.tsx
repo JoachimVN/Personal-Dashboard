@@ -23,7 +23,7 @@ export function SteamActivityHero({ data }: Readonly<{ data: SteamData }>) {
   return (
     <div className="detail-signal-panel steam-signal-panel">
       {hasArt && (
-        <img aria-hidden src={art.src} alt="" className="steam-signal-backdrop" onError={art.onError} />
+        <img aria-hidden src={art.src} alt="" className="steam-signal-backdrop" />
       )}
       <div aria-hidden className="steam-signal-backdrop-scrim" />
       <div className="steam-signal-body">

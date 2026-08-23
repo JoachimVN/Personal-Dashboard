@@ -72,7 +72,7 @@ function TrackedGameBanner({ data, appId, gameName }: Readonly<{ data: SteamData
   return (
     <div className="steam-tracking-banner">
       {hasArt && (
-        <img aria-hidden src={art.src} alt="" className="steam-tracking-banner-backdrop" onError={art.onError} />
+        <img aria-hidden src={art.src} alt="" className="steam-tracking-banner-backdrop" />
       )}
       <div className="steam-tracking-banner-scrim" />
       <div className="relative flex items-center gap-3">

@@ -19,11 +19,19 @@ export function useArtFallback(urls: ReadonlyArray<string | undefined>): {
   const [state, setState] = useState({ key, index: 0 });
   if (state.key !== key) {
     setState({ key, index: 0 });
-    return { src: candidates[0], onError: () => setState((s) => (s.key === key ? { key, index: s.index + 1 } : s)) };
+    return {
+      src: candidates[0],
+      onError: () => setState((s) => (s.key === key && s.index === 0 ? { key, index: 1 } : s)),
+    };
   }
   return {
     src: candidates[state.index],
-    onError: () => setState((s) => (s.key === key ? { key, index: s.index + 1 } : s)),
+    // A panel can render the same candidate more than once (for example, as both a poster and a
+    // blurred backdrop). Only the first failure for this tier may advance the fallback; otherwise
+    // the two events skip straight past the valid hero image.
+    onError: () => setState((s) => (
+      s.key === key && s.index === state.index ? { key, index: s.index + 1 } : s
+    )),
   };
 }
 

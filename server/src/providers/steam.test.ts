@@ -387,7 +387,7 @@ describe('createSteamProvider fetch', () => {
     }
   });
 
-  it('rewrites a cached library game icon still pointing at a dead legacy host', async () => {
+  it('repairs the artwork on cached library games from before image URLs were added', async () => {
     const cachedLibrary = {
       totalGames: 1,
       totalPlaytimeMinutes: 100,
@@ -408,6 +408,10 @@ describe('createSteamProvider fetch', () => {
 
       expect(data.library?.allGames[0]?.iconUrl).toBe('https://shared.fastly.steamstatic.com/community_assets/images/apps/400/abc123.jpg');
       expect(data.library?.mostPlayed[0]?.iconUrl).toBe('https://shared.fastly.steamstatic.com/community_assets/images/apps/400/abc123.jpg');
+      expect(data.library?.allGames[0]?.headerUrl).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg');
+      expect(data.library?.allGames[0]?.heroUrl).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/library_hero.jpg');
+      expect(data.library?.mostPlayed[0]?.headerUrl).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg');
+      expect(data.library?.mostPlayed[0]?.heroUrl).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/library_hero.jpg');
     } finally {
       fetchMock.mockRestore();
     }
