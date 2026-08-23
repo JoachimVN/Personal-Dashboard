@@ -106,9 +106,29 @@ async function steamRequest<T>(
   return (await res.json()) as T;
 }
 
+/** Every per-app community image (game icons, achievement icons) Steam has ever handed out a hash
+ * for — regardless of which now-dead host it was minted on (media.steampowered.com,
+ * steamcdn-a.akamaihd.net, cdn.akamai.steamstatic.com's steamcommunity mirror) — still resolves at
+ * this fastly-fronted host, including for apps registered after Steam's asset-pipeline migration
+ * (see steamHeroUrl for why header art needs a different fix: it has no hash we can extract). */
+function stableCommunityImageUrl(appId: number | string, hash: string): string {
+  return `https://shared.fastly.steamstatic.com/community_assets/images/apps/${appId}/${hash}`;
+}
+
 export function steamIconUrl(appId: number, imgIconUrl: string | undefined): string | undefined {
   if (!imgIconUrl) return undefined;
-  return `https://media.steampowered.com/steamcommunity/public/images/apps/${appId}/${imgIconUrl}.jpg`;
+  return stableCommunityImageUrl(appId, `${imgIconUrl}.jpg`);
+}
+
+const LEGACY_COMMUNITY_IMAGE_PATH = /\/images\/apps\/(\d+)\/([0-9a-f]+\.jpg)$/i;
+
+/** Steam's GetSchemaForGame still hands back achievement icon URLs pointing at one of the dead
+ * hosts above rather than the fastly one — same asset, same hash, just a host that 404s for apps
+ * registered after the migration. Rewrite it the same way steamIconUrl builds its own URL. */
+export function toStableCommunityImageUrl(url: string | undefined): string | undefined {
+  if (!url) return url;
+  const match = LEGACY_COMMUNITY_IMAGE_PATH.exec(url);
+  return match ? stableCommunityImageUrl(match[1], match[2]) : url;
 }
 
 export function steamHeaderUrl(appId: number): string {
@@ -480,7 +500,7 @@ async function getOrFetchAchievementSchema(
   snapshotStore: SteamSnapshotStore | undefined,
 ): Promise<SteamAchievementSchemaEntry[]> {
   const cached = await snapshotStore?.getAchievementSchema(appId);
-  if (cached && !isExpired(cached.fetchedAt, ACHIEVEMENT_SCHEMA_TTL_MS)) return cached.data;
+  if (cached && !isExpired(cached.fetchedAt, ACHIEVEMENT_SCHEMA_TTL_MS)) return withStableIcons(cached.data);
 
   try {
     const data = await steamRequest<{ game?: { availableGameStats?: { achievements?: RawSchemaAchievement[] } } }>(
@@ -497,10 +517,18 @@ async function getOrFetchAchievementSchema(
       icon: a.icon,
     }));
     await snapshotStore?.setAchievementSchema(appId, mapped);
-    return mapped;
+    return withStableIcons(mapped);
   } catch {
-    return cached?.data ?? [];
+    return withStableIcons(cached?.data ?? []);
   }
+}
+
+/** Rewrites every achievement icon to the stable host on the way out, not just on a fresh
+ * GetSchemaForGame fetch — the 30-day schema cache (ACHIEVEMENT_SCHEMA_TTL_MS) can otherwise keep
+ * serving a pre-fix, dead-host icon URL for weeks after this shipped. Idempotent: an already-stable
+ * URL matches the same rewrite and comes back unchanged. */
+function withStableIcons(entries: SteamAchievementSchemaEntry[]): SteamAchievementSchemaEntry[] {
+  return entries.map((entry) => ({ ...entry, icon: toStableCommunityImageUrl(entry.icon) }));
 }
 
 async function getOrFetchAchievementPercentages(
@@ -569,6 +597,14 @@ async function fetchAchievements(
   return { appId, gameName, unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest };
 }
 
+/** Rewrites every game's icon to the stable host on the way out, not just on a fresh GetOwnedGames
+ * fetch — the 6-hour library cache (LIBRARY_CACHE_TTL_MS) can otherwise keep serving a pre-fix,
+ * dead-host icon URL for hours after this shipped. Idempotent, same as withStableIcons above. */
+function withStableLibraryIcons(library: SteamLibrarySnapshot): SteamLibrarySnapshot {
+  const fixGames = (games: SteamGame[]) => games.map((game) => ({ ...game, iconUrl: toStableCommunityImageUrl(game.iconUrl) }));
+  return { ...library, mostPlayed: fixGames(library.mostPlayed), allGames: fixGames(library.allGames) };
+}
+
 async function resolveSteamLibrary(
   signal: AbortSignal,
   apiKey: string,
@@ -577,17 +613,17 @@ async function resolveSteamLibrary(
 ): Promise<{ library: SteamLibrarySnapshot | null; libraryAvailability: SteamData['availability']['library'] }> {
   const cachedLibrary = await snapshotStore?.getLibraryCache();
   if (cachedLibrary && !isExpired(cachedLibrary.fetchedAt, LIBRARY_CACHE_TTL_MS)) {
-    return { library: cachedLibrary.data, libraryAvailability: 'available' };
+    return { library: withStableLibraryIcons(cachedLibrary.data), libraryAvailability: 'available' };
   }
 
   const result = await fetchOwnedGames(signal, apiKey, steamId);
   if (result.status === 'available') {
     await snapshotStore?.setLibraryCache(result.data);
-    return { library: result.data, libraryAvailability: 'available' };
+    return { library: withStableLibraryIcons(result.data), libraryAvailability: 'available' };
   }
   if (cachedLibrary) {
     // Prefer a stale-but-real cache over marking the whole library unavailable.
-    return { library: cachedLibrary.data, libraryAvailability: 'available' };
+    return { library: withStableLibraryIcons(cachedLibrary.data), libraryAvailability: 'available' };
   }
   return { library: null, libraryAvailability: result.status };
 }
