@@ -131,6 +131,26 @@ describeDatabase('Postgres stores', () => {
     expect(await database.client`select * from signal_history where source = 'hue'`).toHaveLength(1);
   });
 
+  // Regression: postgres.js decodes temporal columns into Date objects by default. Every store here
+  // expects raw strings, because constructing a drizzle instance used to configure that on the
+  // shared client as a side effect. Dropping drizzle (nothing queries through it, and it costs
+  // ~160 MB resident) silently changed decoding codebase-wide — `health_days.updated_at` began
+  // arriving as a Date where `healthSchema` wants z.string(), and the whole health widget failed.
+  // createDatabase now sets those parsers explicitly; this pins the contract.
+  it('decodes temporal columns as strings, not Date objects', async () => {
+    await new HealthStore(database).ingest({ steps: 100 }, '2026-07-20');
+    const [row] = await database.client<{ updated_at: unknown; date: unknown }[]>`
+      select updated_at, date from health_days limit 1
+    `;
+    expect(typeof row.updated_at).toBe('string');
+    expect(typeof row.date).toBe('string');
+    expect(row.updated_at).not.toBeInstanceOf(Date);
+
+    // And the health provider's own snapshot still satisfies the wire schema.
+    const snapshot = await new HealthStore(database).snapshot('2026-07-20');
+    expect(typeof snapshot.updatedAt).toBe('string');
+  });
+
   it('skips the database entirely when re-recording a value this process already wrote', async () => {
     const signals = new SignalHistoryStore(database);
     await signals.record('weather', 'payload', { tempC: 14, summary: 'cloudy' });
