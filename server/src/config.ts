@@ -169,14 +169,30 @@ const configSchema = z.object({
   history: z
     .object({
       /**
-       * Provider ids whose payloads are NOT archived to `signal_history`. Everything else is kept
-       * forever — nothing prunes this table. Defaults to the two providers that hold no data of
-       * their own: `command-center` (derived from the others) and `activity-push` (a delivery
-       * mechanism). Add an id here to stop archiving it; existing rows are left alone.
+       * Provider ids whose payloads are NOT archived to `signal_history`. Defaults to the two
+       * providers that hold no data of their own: `command-center` (derived from the others) and
+       * `activity-push` (a delivery mechanism). Add an id here to stop archiving it; existing rows
+       * are left alone.
+       *
+       * Worth adding for anything whose payload is large *and* differs per machine — two dashboards
+       * archiving to the same (source, metric) key overwrite each other's `signal_current`, so each
+       * one's poll always looks like a change and both keep writing full copies forever.
        */
       excludeProviders: z.array(z.string()).default(DERIVED_PROVIDER_IDS),
+      /**
+       * How long an archived observation is kept, in days. The newest row of every (source, metric)
+       * is always kept regardless of age, so a signal that has not moved in a year still has the
+       * observation that says so. Set to 0 to keep everything forever (the previous behaviour).
+       */
+      retentionDays: z.number().int().min(0).default(180),
+      /** How often to prune, in ms. Pruning is idempotent, so several dashboards may each run it. */
+      pruneIntervalMs: z.number().int().min(60_000).default(6 * 60 * 60_000),
     })
-    .default({ excludeProviders: DERIVED_PROVIDER_IDS }),
+    .default({
+      excludeProviders: DERIVED_PROVIDER_IDS,
+      retentionDays: 180,
+      pruneIntervalMs: 6 * 60 * 60_000,
+    }),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

@@ -7,21 +7,32 @@ export class SignalHistoryStore {
 
   async record(source: string, metric: string, value: JSONValue): Promise<void> {
     const sql = this.database.client;
+    const json = JSON.stringify(value);
     await sql.begin(async (transaction) => {
       const lockKey = ['signal', source, metric].join(':');
       await transaction`select pg_advisory_xact_lock(hashtext(${lockKey}))`;
-      const [current] = await transaction<{ value: unknown }[]>`
-        select value from signal_current where source = ${source} and metric = ${metric} for update
+      // Compared as jsonb rather than by stringifying what was read back: jsonb stores object keys
+      // in its own canonical order (shortest first), so a round-tripped payload almost never
+      // re-serializes to the byte string the provider produced, and a JS-side string comparison
+      // reports "changed" on every single poll. `=` on jsonb is semantic, so key order and numeric
+      // spelling (1 vs 1.0) do not count as a change.
+      //
+      // The `::text::jsonb` cast is load-bearing: with a bare `::jsonb`, postgres.js types the
+      // parameter as jsonb and JSON-encodes the string we pass, so the comparison runs against a
+      // jsonb *string scalar* ("{\"rooms\":…}") and never matches the stored object.
+      const [current] = await transaction<{ unchanged: boolean }[]>`
+        select value = ${json}::text::jsonb as unchanged
+        from signal_current where source = ${source} and metric = ${metric} for update
       `;
-      if (current && JSON.stringify(current.value) === JSON.stringify(value)) return;
+      if (current?.unchanged) return;
       await transaction`
         insert into signal_current (source, metric, value, changed_at)
-        values (${source}, ${metric}, ${JSON.stringify(value)}::jsonb, now())
+        values (${source}, ${metric}, ${json}::jsonb, now())
         on conflict (source, metric) do update set value = excluded.value, changed_at = now()
       `;
       await transaction`
         insert into signal_history (source, metric, value, recorded_at)
-        values (${source}, ${metric}, ${JSON.stringify(value)}::jsonb, now())
+        values (${source}, ${metric}, ${json}::jsonb, now())
       `;
     });
   }
@@ -39,6 +50,30 @@ export class SignalHistoryStore {
       select value from signal_current where source = ${source} and metric = ${metric}
     `;
     return row?.value;
+  }
+
+  /**
+   * Drops archived observations older than `retentionDays`, keeping the newest row of every
+   * (source, metric) whatever its age.
+   *
+   * That exemption is not tidiness: `hasChangedSinceBaseline` counts rows and `lastChangedAt` reads
+   * the latest, so a signal that settled months ago and has not moved since would otherwise lose
+   * its only observation and start reporting as if it had never been seen.
+   *
+   * Returns the number of rows deleted.
+   */
+  async prune(retentionDays: number): Promise<number> {
+    if (!Number.isFinite(retentionDays) || retentionDays <= 0) return 0;
+    const deleted = await this.database.client<{ id: string }[]>`
+      delete from signal_history
+      where recorded_at < now() - make_interval(days => ${Math.floor(retentionDays)})
+        and id not in (
+          select distinct on (source, metric) id from signal_history
+          order by source, metric, recorded_at desc
+        )
+      returning id
+    `;
+    return deleted.length;
   }
 
   /** The first observation is a baseline, not a meaningful change. */
