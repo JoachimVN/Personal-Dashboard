@@ -23,7 +23,8 @@
     "db:import-json": "tsx scripts/importJsonToPostgres.ts",
     "seed:spotify-streams": "tsx scripts/seedSpotifyStreams.ts",
     "screenshots": "tsx scripts/screenshots.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:cleanup-duplicates": "tsx scripts/cleanupDuplicateSignals.ts"
   },
   "dependencies": {
     "@personal-dashboard/shared": "*",
