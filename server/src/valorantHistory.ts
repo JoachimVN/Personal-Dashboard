@@ -36,7 +36,7 @@ export class ValorantHistoryStore {
     };
     await this.database.client`
       insert into signal_current (source, metric, value, changed_at)
-      values ('valorant', 'stored-match-history', ${JSON.stringify(value)}::jsonb, now())
+      values ('valorant', 'stored-match-history', ${JSON.stringify(value)}::text::jsonb, now())
       on conflict (source, metric) do update set value = excluded.value, changed_at = now()
     `;
     return value;
@@ -54,7 +54,7 @@ export class ValorantHistoryStore {
   async setSnapshot(data: ValorantData): Promise<void> {
     await this.database.client`
       insert into signal_current (source, metric, value, changed_at)
-      values ('valorant', 'snapshot', ${JSON.stringify(data)}::jsonb, now())
+      values ('valorant', 'snapshot', ${JSON.stringify(data)}::text::jsonb, now())
       on conflict (source, metric) do update set value = excluded.value, changed_at = now()
     `;
   }

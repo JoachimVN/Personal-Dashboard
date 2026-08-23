@@ -79,7 +79,7 @@ export class UsageHistoryStore {
         `;
         await transaction`
           insert into ai_usage_snapshots (tool_id, snapshot, updated_at)
-          values (${toolId}, ${JSON.stringify(snapshot)}::jsonb, now())
+          values (${toolId}, ${JSON.stringify(snapshot)}::text::jsonb, now())
           on conflict (tool_id) do update set snapshot = excluded.snapshot, updated_at = now()
         `;
       }

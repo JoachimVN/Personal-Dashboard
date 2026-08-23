@@ -50,7 +50,7 @@ async function getCached<T>(
 async function setCached(database: Database, metric: string, value: unknown): Promise<void> {
   await database.client`
     insert into signal_current (source, metric, value, changed_at)
-    values ('steam', ${metric}, ${JSON.stringify(value)}::jsonb, now())
+    values ('steam', ${metric}, ${JSON.stringify(value)}::text::jsonb, now())
     on conflict (source, metric) do update set value = excluded.value, changed_at = now()
   `;
 }

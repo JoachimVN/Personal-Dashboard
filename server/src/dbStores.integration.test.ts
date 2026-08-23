@@ -131,6 +131,25 @@ describeDatabase('Postgres stores', () => {
     expect(await database.client`select * from signal_history where source = 'hue'`).toHaveLength(1);
   });
 
+  it('skips the database entirely when re-recording a value this process already wrote', async () => {
+    const signals = new SignalHistoryStore(database);
+    await signals.record('weather', 'payload', { tempC: 14, summary: 'cloudy' });
+    expect(await database.client`select * from signal_history where source = 'weather'`).toHaveLength(1);
+
+    // Clearing signal_current removes the only thing the DB-side check consults. If record() still
+    // reached Postgres it would find nothing, conclude "changed", and write a second row.
+    await database.client`delete from signal_current where source = 'weather'`;
+    await signals.record('weather', 'payload', { tempC: 14, summary: 'cloudy' });
+    expect(await database.client`select * from signal_history where source = 'weather'`).toHaveLength(1);
+    expect(await database.client`select * from signal_current where source = 'weather'`).toHaveLength(0);
+
+    // A genuine change still goes through, and a fresh store has no cache to short-circuit with.
+    await signals.record('weather', 'payload', { tempC: 15, summary: 'cloudy' });
+    expect(await database.client`select * from signal_history where source = 'weather'`).toHaveLength(2);
+    await new SignalHistoryStore(database).record('weather', 'payload', { tempC: 15, summary: 'cloudy' });
+    expect(await database.client`select * from signal_current where source = 'weather'`).toHaveLength(1);
+  });
+
   it('prunes aged observations but never the newest one of a signal', async () => {
     const signals = new SignalHistoryStore(database);
     await signals.record('gmail', 'unreadThreads', 1);

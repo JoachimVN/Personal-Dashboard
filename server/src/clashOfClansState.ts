@@ -60,7 +60,7 @@ export class ClashOfClansStateStore {
   async set(state: ClashOfClansPushState): Promise<void> {
     await this.database.client`
       insert into signal_current (source, metric, value, changed_at)
-      values ('clash-of-clans', 'push-state', ${JSON.stringify(state)}::jsonb, now())
+      values ('clash-of-clans', 'push-state', ${JSON.stringify(state)}::text::jsonb, now())
       on conflict (source, metric) do update set value = excluded.value, changed_at = now()
     `;
   }
