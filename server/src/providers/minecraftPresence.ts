@@ -170,26 +170,40 @@ export function minecraftActivity(tail: string): Omit<PushedMinecraftLive, 'star
   return activity;
 }
 
+type TelemetryActivityEvent = { at: number; activity: PushedMinecraftLive['activity'] };
+
+function activityFromTelemetryServerType(serverType: string): PushedMinecraftLive['activity'] {
+  switch (serverType) {
+    case 'local': return 'singleplayer';
+    case 'realm': return 'realm';
+    default: return 'server';
+  }
+}
+
+function parseTelemetryActivity(line: string): TelemetryActivityEvent | undefined {
+  if (!line.trim()) return undefined;
+  let event: { type?: unknown; server_type?: unknown; event_timestamp_utc?: unknown };
+  try {
+    event = JSON.parse(line) as typeof event;
+  } catch {
+    return undefined; // A telemetry log being appended to can have one incomplete final line.
+  }
+  if (event.type !== 'world_loaded' || typeof event.server_type !== 'string') return undefined;
+  const at = typeof event.event_timestamp_utc === 'string' ? Date.parse(event.event_timestamp_utc) : Number.NaN;
+  return Number.isNaN(at) ? undefined : { at, activity: activityFromTelemetryServerType(event.server_type) };
+}
+
 /** Minecraft writes its own telemetry log beside `latest.log` whether or not the data is ever
  * sent, and every join appends a `world_loaded` event naming the kind of destination — `local`,
  * `realm`, or a third-party server. That is the only vanilla record of a Realm left in recent
  * versions, which log nothing at all when they connect. It carries no world or server name, so it
  * settles what kind of session this is and leaves the naming to the log patterns above. */
 export function telemetryActivity(contents: string, since: number): PushedMinecraftLive['activity'] | undefined {
-  let latest: { at: number; activity: PushedMinecraftLive['activity'] } | undefined;
+  let latest: TelemetryActivityEvent | undefined;
   for (const line of contents.split('\n')) {
-    if (!line.trim()) continue;
-    let event: { type?: unknown; server_type?: unknown; event_timestamp_utc?: unknown };
-    try {
-      event = JSON.parse(line) as typeof event;
-    } catch {
-      continue; // A telemetry log being appended to can have one incomplete final line.
-    }
-    if (event.type !== 'world_loaded' || typeof event.server_type !== 'string') continue;
-    const at = typeof event.event_timestamp_utc === 'string' ? Date.parse(event.event_timestamp_utc) : Number.NaN;
-    if (Number.isNaN(at) || at < since || (latest && at < latest.at)) continue;
-    const activity = event.server_type === 'local' ? 'singleplayer' : event.server_type === 'realm' ? 'realm' : 'server';
-    latest = { at, activity };
+    const event = parseTelemetryActivity(line);
+    if (!event || event.at < since || (latest && event.at < latest.at)) continue;
+    latest = event;
   }
   return latest?.activity;
 }

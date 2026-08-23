@@ -9,9 +9,8 @@ function formatSteamHours(minutes: number): string {
 
 export function SteamNowPlayingSecondary({ slot, steam }: Readonly<{ slot: CommandCenterSlot; steam: SteamData | undefined }>): ReactNode {
   const appId = slot.render.type === 'steam-now-playing' ? slot.render.appId : undefined;
-  const game = appId !== undefined
-    ? (steam?.currentGame?.appId === appId ? steam.currentGame : steam?.recentlyPlayed.find((g) => g.appId === appId))
-    : undefined;
+  const game = [steam?.currentGame, ...(steam?.recentlyPlayed ?? [])]
+    .find((candidate) => candidate?.appId === appId);
   const art = useArtFallback([game?.headerUrl, game?.heroUrl]);
   if (slot.render.type !== 'steam-now-playing' || !game) return null;
   return <div className="mt-4">
