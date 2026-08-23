@@ -115,6 +115,15 @@ export function steamHeaderUrl(appId: number): string {
   return `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/header.jpg`;
 }
 
+/** Second art tier: apps registered after Steam's asset-pipeline migration only serve `header.jpg`
+ * from a hashed `store_item_assets/steam/apps/{appId}/{hash}/header.jpg` path we have no way to
+ * derive, so header.jpg 404s for them. This unhashed "library hero" backdrop has stayed available
+ * at a stable per-appid path for both old and newly-registered apps, so the client falls back to it
+ * before giving up on real art. */
+export function steamHeroUrl(appId: number): string {
+  return `https://cdn.akamai.steamstatic.com/steam/apps/${appId}/library_hero.jpg`;
+}
+
 export function unixSecondsToIso(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toISOString();
 }
@@ -125,6 +134,7 @@ export function mapGame(game: RawGame): SteamGame {
     name: game.name,
     iconUrl: steamIconUrl(game.appid, game.img_icon_url),
     headerUrl: steamHeaderUrl(game.appid),
+    heroUrl: steamHeroUrl(game.appid),
     playtimeForeverMinutes: game.playtime_forever,
     playtimeRecentMinutes: game.playtime_2weeks,
     lastPlayedAt: game.rtime_last_played ? unixSecondsToIso(game.rtime_last_played) : undefined,
@@ -244,6 +254,7 @@ async function fetchProfile(
         appId: Number(player.gameid),
         name: player.gameextrainfo ?? 'Playing a Steam game',
         headerUrl: steamHeaderUrl(Number(player.gameid)),
+        heroUrl: steamHeroUrl(Number(player.gameid)),
       }
     : null;
 

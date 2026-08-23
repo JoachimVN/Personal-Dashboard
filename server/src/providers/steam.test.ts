@@ -7,6 +7,7 @@ import {
   orderByRecency,
   pickTrackedGame,
   steamHeaderUrl,
+  steamHeroUrl,
   steamIconUrl,
   unixSecondsToIso,
 } from './steam.js';
@@ -45,6 +46,10 @@ describe('image URL derivation and timestamp conversion', () => {
     expect(steamHeaderUrl(400)).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg');
   });
 
+  it('derives a hero URL from just the app ID', () => {
+    expect(steamHeroUrl(400)).toBe('https://cdn.akamai.steamstatic.com/steam/apps/400/library_hero.jpg');
+  });
+
   it('converts Steam unlocktime Unix seconds to an ISO string', () => {
     expect(unixSecondsToIso(1_752_600_000)).toBe(new Date(1_752_600_000 * 1000).toISOString());
   });
@@ -59,6 +64,7 @@ describe('mapGame', () => {
       name: 'Portal',
       iconUrl: 'https://media.steampowered.com/steamcommunity/public/images/apps/400/hash1.jpg',
       headerUrl: 'https://cdn.akamai.steamstatic.com/steam/apps/400/header.jpg',
+      heroUrl: 'https://cdn.akamai.steamstatic.com/steam/apps/400/library_hero.jpg',
       playtimeForeverMinutes: 120,
       playtimeRecentMinutes: 30,
     });

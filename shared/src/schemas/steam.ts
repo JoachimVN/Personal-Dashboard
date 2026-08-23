@@ -7,6 +7,11 @@ export const steamGameSchema = z.object({
   iconUrl: z.string().optional(),
   /** Derived from appid; Steam does not return a finished header image URL either. */
   headerUrl: z.string().optional(),
+  /** Derived from appid, same as headerUrl. Steam's asset pipeline migrated newer app registrations
+   * onto hashed CDN paths that make the unhashed `header.jpg` 404 (see steamHeroUrl); this unhashed
+   * "library hero" backdrop image has stayed available for both old and newly-registered apps, so
+   * it's the second art tier the client tries before giving up on real art. */
+  heroUrl: z.string().optional(),
   playtimeForeverMinutes: z.number().optional(),
   /** Minutes played in Steam's own trailing "recent" window (currently ~2 weeks). */
   playtimeRecentMinutes: z.number().optional(),

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { CommandCenterSlot, SteamData } from '@personal-dashboard/shared';
+import { useArtFallback } from '../../../widgets/steam/shared';
 
 function formatSteamHours(minutes: number): string {
   const hours = minutes / 60;
@@ -7,14 +8,14 @@ function formatSteamHours(minutes: number): string {
 }
 
 export function SteamNowPlayingSecondary({ slot, steam }: Readonly<{ slot: CommandCenterSlot; steam: SteamData | undefined }>): ReactNode {
-  if (slot.render.type !== 'steam-now-playing') return null;
-  const appId = slot.render.appId;
-  const game = steam?.currentGame?.appId === appId
-    ? steam.currentGame
-    : steam?.recentlyPlayed.find((g) => g.appId === appId);
-  if (!game) return null;
+  const appId = slot.render.type === 'steam-now-playing' ? slot.render.appId : undefined;
+  const game = appId !== undefined
+    ? (steam?.currentGame?.appId === appId ? steam.currentGame : steam?.recentlyPlayed.find((g) => g.appId === appId))
+    : undefined;
+  const art = useArtFallback([game?.headerUrl, game?.heroUrl]);
+  if (slot.render.type !== 'steam-now-playing' || !game) return null;
   return <div className="mt-4">
-    {game.headerUrl && <img src={game.headerUrl} alt="" className="w-full max-w-xs rounded-xl object-cover shadow-lg" />}
+    {art.src && <img src={art.src} alt="" className="w-full max-w-xs rounded-xl object-cover shadow-lg" onError={art.onError} />}
     <p className="command-hero-title mt-3 text-sm font-semibold text-ink">{game.name}</p>
     {game.playtimeForeverMinutes !== undefined && (
       <p className="mt-0.5 text-sm text-ink-muted">{formatSteamHours(game.playtimeForeverMinutes)} total playtime</p>
