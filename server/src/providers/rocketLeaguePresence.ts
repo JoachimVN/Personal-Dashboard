@@ -56,6 +56,15 @@ const MATCH_PRESENCE = /^(.+?) in (.+?)(?: (\+?\d+:\d{2}))? \((\d+) - (\d+)\) da
 /** Unreal stamps every line with seconds since the log was opened, to two decimals. */
 const LINE_OFFSET = /^\[(\d+\.\d+)\]/;
 
+/** Enough to reach the end of the first line, which is where the launch is stamped. */
+const HEAD_BYTES = 512;
+
+/** The first line of the log: `Log: Log file open, 26/08/2026 16:03:04`. Only the time of day is
+ * taken. The date beside it is written in the machine's own day/month order and cannot be read back
+ * unambiguously — but a time of day has no such ordering to get wrong, and the file itself knows
+ * which day it belongs to. */
+const LOG_OPENED = /^Log: Log file open, \S+ (\d{1,2}):(\d{2}):(\d{2})/;
+
 /** Which side of `(2 - 5)` is the account's own team.
  *
  * The log itself never says: it records the already-formatted presence string and does not name the
@@ -108,6 +117,26 @@ export function playlistLabel(mode: string, playlistId: number | undefined): str
   if (RANKED_PLAYLISTS.has(playlistId)) return `Ranked ${mode}`;
   if (CASUAL_PLAYLISTS.has(playlistId)) return `Casual ${mode}`;
   return mode;
+}
+
+/** When the log was opened, which for this game is when it was launched — Rocket League starts a
+ * fresh Launch.log every time and rotates the previous one away, so one file is exactly one session.
+ *
+ * Read out of the header rather than worked out from the file's own timestamps, because the card's
+ * reactions are keyed on this: a start that lands a few milliseconds off the last one is a *new*
+ * card as far as they are concerned, and a whole session of reactions disappears on every push.
+ * The header is a fixed string written once at launch, so every reading of one session agrees.
+ *
+ * Only the time of day is in it, so the date comes from the file the way Minecraft's does: a start
+ * that lands after the last write means the session began before midnight and ran past it. */
+export function sessionStartedAt(firstLine: string, lastWrite: Date): Date | undefined {
+  const match = LOG_OPENED.exec(firstLine);
+  if (!match) return undefined;
+  const [, hours, minutes, seconds] = match;
+  const startedAt = new Date(lastWrite);
+  startedAt.setHours(Number(hours), Number(minutes), Number(seconds), 0);
+  if (startedAt.getTime() > lastWrite.getTime()) startedAt.setDate(startedAt.getDate() - 1);
+  return startedAt;
 }
 
 /** The last presence line in the log, and how many seconds into the session the log's final line
@@ -175,14 +204,22 @@ function logPaths(): string[] {
   );
 }
 
-async function readTailSlice(file: string): Promise<string> {
+/** The head and the tail of the log in one open: the header names the launch, the tail names what
+ * the game is doing now. */
+async function readEnds(file: string): Promise<{ head: string; tail: string }> {
   const handle = await open(file, 'r');
   try {
     const { size } = await handle.stat();
-    const length = Math.min(TAIL_BYTES, size);
-    const buffer = Buffer.alloc(length);
-    await handle.read(buffer, 0, length, size - length);
-    return buffer.toString('utf8');
+    const read = async (position: number, length: number): Promise<string> => {
+      if (length <= 0) return '';
+      const buffer = Buffer.alloc(length);
+      await handle.read(buffer, 0, length, position);
+      return buffer.toString('utf8');
+    };
+    return {
+      head: await read(0, Math.min(HEAD_BYTES, size)),
+      tail: await read(Math.max(0, size - TAIL_BYTES), Math.min(TAIL_BYTES, size)),
+    };
   } finally {
     await handle.close();
   }
@@ -199,13 +236,16 @@ export async function readRocketLeagueLive(): Promise<PushedRocketLeagueLive | n
   if (now - newest.mtime.getTime() > ACTIVE_WINDOW_MS) return null;
 
   try {
-    const { presence, lastOffsetSeconds } = readTail(await readTailSlice(newest.file));
-    // Every line is stamped with its own age in seconds, so the launch is the final line's stamp
-    // subtracted from the moment that line was written. That beats reading the date out of the
-    // header, which Unreal writes in the machine's own day/month order and cannot be read back
-    // unambiguously.
+    const { head, tail } = await readEnds(newest.file);
+    const { presence, lastOffsetSeconds } = readTail(tail);
+    // Every line is also stamped with its own age in seconds, so the launch can be worked out as the
+    // final line's stamp subtracted from the moment that line was written. That still stands in when
+    // the header is unreadable, but it is only ever an estimate: the game sits on a line for a moment
+    // before flushing it, so it lands a few milliseconds off by a different amount every time — which
+    // is the whole reason the header is preferred. See sessionStartedAt.
     if (lastOffsetSeconds === undefined) return null;
-    const startedAt = new Date(newest.mtime.getTime() - lastOffsetSeconds * 1000);
+    const startedAt = sessionStartedAt(head.split('\n')[0] ?? '', newest.mtime)
+      ?? new Date(newest.mtime.getTime() - lastOffsetSeconds * 1000);
 
     return toLive(presence, startedAt, new Date(now));
   } catch (err) {

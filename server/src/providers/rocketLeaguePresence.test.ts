@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePresence, playlistLabel, readTail, toLive } from './rocketLeaguePresence.js';
+import { parsePresence, playlistLabel, readTail, sessionStartedAt, toLive } from './rocketLeaguePresence.js';
 
 describe('parsePresence', () => {
   it('reads mode, arena, clock and score off a live match', () => {
@@ -86,6 +86,41 @@ describe('readTail', () => {
 
   it('reports nothing found rather than guessing', () => {
     expect(readTail('')).toEqual({ presence: undefined, lastOffsetSeconds: undefined });
+  });
+});
+
+describe('sessionStartedAt', () => {
+  const header = 'Log: Log file open, 26/08/2026 16:03:04';
+
+  it('reads the launch off the header and dates it from the file', () => {
+    expect(sessionStartedAt(header, new Date(2026, 7, 26, 18, 13, 38, 935)))
+      .toEqual(new Date(2026, 7, 26, 16, 3, 4, 0));
+  });
+
+  // The reason this is read from the header at all: the reaction key on the dashboard card is this
+  // timestamp, and the estimate it replaced moved by a few milliseconds on every single reading.
+  it('answers the same thing however long the session has been running', () => {
+    const early = sessionStartedAt(header, new Date(2026, 7, 26, 16, 10, 2, 118));
+    const late = sessionStartedAt(header, new Date(2026, 7, 26, 18, 49, 53, 802));
+    expect(early).toEqual(late);
+  });
+
+  it('ignores the ambiguous day/month order beside the time', () => {
+    const american = 'Log: Log file open, 08/26/2026 16:03:04';
+    expect(sessionStartedAt(american, new Date(2026, 7, 26, 18, 13, 38, 935)))
+      .toEqual(sessionStartedAt(header, new Date(2026, 7, 26, 18, 13, 38, 935)));
+  });
+
+  it('dates a session that ran past midnight to the day it began', () => {
+    const beforeMidnight = 'Log: Log file open, 26/08/2026 23:50:10';
+    expect(sessionStartedAt(beforeMidnight, new Date(2026, 7, 27, 0, 30, 0, 0)))
+      .toEqual(new Date(2026, 7, 26, 23, 50, 10, 0));
+  });
+
+  // Nothing found means the caller falls back to working the launch out from the timestamps.
+  it('reports nothing found for a line that is not the header', () => {
+    expect(sessionStartedAt('Log: GPsyonixBuildID 260811.1257.524913', new Date())).toBeUndefined();
+    expect(sessionStartedAt('', new Date())).toBeUndefined();
   });
 });
 
