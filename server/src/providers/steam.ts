@@ -396,13 +396,29 @@ export function deriveFriendsInGame(summaries: RawPlayerSummary[]): SteamFriend[
     }));
 }
 
+interface FriendLibrary {
+  totalPlaytimeMinutes: number;
+  recentPlaytimeMinutes: number;
+  appIds: Set<number>;
+}
+
+/**
+ * `private` means Steam answered and the friend hides Game Details. `failed` means we never got an
+ * answer — HTTP error, abort, network. Collapsing those two into one `undefined` is what let a
+ * Steam blip render as "every friend has a private library", and then cached that for 12 hours.
+ */
+export type FriendLibraryResult =
+  | { status: 'library'; library: FriendLibrary }
+  | { status: 'private' }
+  | { status: 'failed' };
+
 /** Only appid + playtime is needed for the leaderboard, so `include_appinfo` stays off to keep
  * the payload small — unlike the user's own library fetch, which needs names/icons to display. */
 async function fetchFriendLibraryTotal(
   signal: AbortSignal,
   apiKey: string,
   steamId: string,
-): Promise<{ totalPlaytimeMinutes: number; recentPlaytimeMinutes: number; appIds: Set<number> } | undefined> {
+): Promise<FriendLibraryResult> {
   try {
     const data = await steamRequest<{ response?: { games?: RawGame[] } }>(
       signal,
@@ -412,14 +428,17 @@ async function fetchFriendLibraryTotal(
       'GetOwnedGames (friend)',
     );
     const games = data.response?.games;
-    if (!games) return undefined; // private "Game details" setting
+    if (!games) return { status: 'private' }; // private "Game details" setting
     return {
-      totalPlaytimeMinutes: games.reduce((sum, g) => sum + (g.playtime_forever ?? 0), 0),
-      recentPlaytimeMinutes: games.reduce((sum, g) => sum + (g.playtime_2weeks ?? 0), 0),
-      appIds: new Set(games.map((g) => g.appid)),
+      status: 'library',
+      library: {
+        totalPlaytimeMinutes: games.reduce((sum, g) => sum + (g.playtime_forever ?? 0), 0),
+        recentPlaytimeMinutes: games.reduce((sum, g) => sum + (g.playtime_2weeks ?? 0), 0),
+        appIds: new Set(games.map((g) => g.appid)),
+      },
     };
   } catch {
-    return undefined;
+    return { status: 'failed' };
   }
 }
 
@@ -461,17 +480,27 @@ async function getOrFetchFriendsLeaderboard(
     const ownAppIds = new Set((ownLibrary?.allGames ?? []).map((g) => g.appId));
     const summaryBySteamId = new Map(friendSummaries.map((s) => [s.steamid, s]));
 
+    // A friend whose request failed keeps whatever we last knew about them, rather than being
+    // demoted to "library private" — the two are indistinguishable once rendered.
+    const previousById = new Map((cached?.data ?? []).map((entry) => [entry.steamId, entry]));
+    let failures = 0;
+
     const friendEntries = await Promise.all(
       requestedFriendIds.map(async (friendId): Promise<SteamLeaderboardEntry> => {
         const summary = summaryBySteamId.get(friendId);
-        const lib = await fetchFriendLibraryTotal(signal, apiKey, friendId);
+        const result = await fetchFriendLibraryTotal(signal, apiKey, friendId);
+        if (result.status === 'failed') failures += 1;
+        const previous = result.status === 'failed' ? previousById.get(friendId) : undefined;
+        const lib = result.status === 'library' ? result.library : undefined;
         return {
           steamId: friendId,
           personaName: summary?.personaname ?? friendId,
           avatarUrl: summary?.avatarfull,
-          totalPlaytimeMinutes: lib?.totalPlaytimeMinutes,
-          recentPlaytimeMinutes: lib?.recentPlaytimeMinutes,
-          sharedGames: lib ? [...lib.appIds].filter((appId) => ownAppIds.has(appId)).length : 0,
+          totalPlaytimeMinutes: lib?.totalPlaytimeMinutes ?? previous?.totalPlaytimeMinutes,
+          recentPlaytimeMinutes: lib?.recentPlaytimeMinutes ?? previous?.recentPlaytimeMinutes,
+          sharedGames: lib
+            ? [...lib.appIds].filter((appId) => ownAppIds.has(appId)).length
+            : previous?.sharedGames ?? 0,
           isYou: false,
         };
       }),
@@ -488,7 +517,18 @@ async function getOrFetchFriendsLeaderboard(
         sharedGames: ownAppIds.size,
         isYou: true,
       },
-    ].sort((a, b) => (b.totalPlaytimeMinutes ?? -1) - (a.totalPlaytimeMinutes ?? -1));
+    ].sort((a, b) => (b.totalPlaytimeMinutes ?? -1) - (a.totalPlaytimeMinutes ?? -1)
+      || a.steamId.localeCompare(b.steamId));
+
+    // Every single friend failing is a Steam problem, not everyone going private at once. Persisting
+    // that would cache an empty leaderboard for the full TTL — which is exactly what happened on
+    // 2026-08-27, when one bad refresh left 39 friends unranked for 12 hours while their libraries
+    // were public the whole time. Leaving the cache alone also leaves it expired, so the next poll
+    // retries instead of waiting the TTL out.
+    if (requestedFriendIds.length > 0 && failures === requestedFriendIds.length) {
+      if (cached) return { status: 'available', entries: cached.data };
+      return { status: 'unavailable', entries: [] };
+    }
 
     await snapshotStore?.setFriendsLeaderboard(entries);
     return { status: 'available', entries };

@@ -615,3 +615,113 @@ describe('deriveFriendsInGame', () => {
     expect(deriveFriendsInGame([...twins].reverse()).map((f) => f.steamId)).toEqual(['10', '20']);
   });
 });
+
+describe('friends leaderboard resilience', () => {
+  const auth = { apiKey: 'test-key', steamId: '76561198000000000' };
+  const OWN = auth.steamId;
+
+  const cachedEntries = [
+    { steamId: OWN, personaName: 'Me', totalPlaytimeMinutes: 2_000, recentPlaytimeMinutes: 20, sharedGames: 2, isYou: true },
+    { steamId: 'F1', personaName: 'Ada', totalPlaytimeMinutes: 1_000, recentPlaytimeMinutes: 10, sharedGames: 5, isYou: false },
+    { steamId: 'F2', personaName: 'Bo', totalPlaytimeMinutes: 900, recentPlaytimeMinutes: 9, sharedGames: 4, isYou: false },
+  ];
+
+  /** Routes by URL rather than call order, so the assertions don't depend on the fetch sequence. */
+  function routeSteam(friendLibrary: (steamId: string) => Response) {
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      const steamId = url.searchParams.get('steamid') ?? '';
+      const path = url.pathname;
+      if (path.includes('GetPlayerSummaries')) {
+        const ids = (url.searchParams.get('steamids') ?? '').split(',').filter(Boolean);
+        return jsonResponse({ response: { players: ids.map((id) => ({
+          steamid: id, personaname: id === OWN ? 'Me' : id === 'F1' ? 'Ada' : 'Bo',
+          profileurl: 'https://steamcommunity.com/id/x', avatarfull: `https://avatar/${id}.jpg`,
+        })) } });
+      }
+      if (path.includes('GetFriendList')) {
+        return jsonResponse({ friendslist: { friends: [{ steamid: 'F1' }, { steamid: 'F2' }] } });
+      }
+      if (path.includes('GetRecentlyPlayedGames')) return jsonResponse({ response: { games: [] } });
+      if (path.includes('GetOwnedGames')) {
+        if (steamId === OWN) {
+          return jsonResponse({ response: { games: [
+            { appid: 10, name: 'Counter-Strike', playtime_forever: 2_000, playtime_2weeks: 20, img_icon_url: 'h' },
+          ] } });
+        }
+        return friendLibrary(steamId);
+      }
+      if (path.includes('GetPlayerAchievements')) {
+        return jsonResponse({ playerstats: { success: true, achievements: [] } });
+      }
+      return jsonResponse({});
+    });
+  }
+
+  it('keeps the cached leaderboard when every friend request fails, instead of caching them all as private', async () => {
+    // The 2026-08-27 incident: one bad refresh wrote a leaderboard where only the owner had
+    // playtime, and the 12-hour TTL served it while every friend's library was in fact public.
+    const snapshotStore = emptySnapshotStore();
+    snapshotStore.getFriendsLeaderboard.mockResolvedValue({
+      data: cachedEntries, fetchedAt: new Date(Date.now() - 13 * 60 * 60_000),
+    });
+    const fetchMock = routeSteam(() => new Response(null, { status: 500 }));
+
+    try {
+      const provider = createSteamProvider(auth, snapshotStore as never);
+      const data = await provider.fetch(new AbortController().signal, false);
+
+      expect(data.friendsLeaderboard.status).toBe('available');
+      expect(data.friendsLeaderboard.entries).toEqual(cachedEntries);
+      // Not persisting also leaves the cache expired, so the next poll retries rather than
+      // serving an empty leaderboard for another full TTL.
+      expect(snapshotStore.setFriendsLeaderboard).not.toHaveBeenCalled();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('keeps one failed friend at their last known playtime while the rest refresh', async () => {
+    const snapshotStore = emptySnapshotStore();
+    snapshotStore.getFriendsLeaderboard.mockResolvedValue({
+      data: cachedEntries, fetchedAt: new Date(Date.now() - 13 * 60 * 60_000),
+    });
+    const fetchMock = routeSteam((steamId) => (steamId === 'F1'
+      ? new Response(null, { status: 429 })
+      : jsonResponse({ response: { games: [{ appid: 10, playtime_forever: 1_234, playtime_2weeks: 12 }] } })));
+
+    try {
+      const provider = createSteamProvider(auth, snapshotStore as never);
+      const data = await provider.fetch(new AbortController().signal, false);
+
+      const byId = new Map(data.friendsLeaderboard.entries.map((e) => [e.steamId, e]));
+      expect(byId.get('F1')).toMatchObject({ totalPlaytimeMinutes: 1_000, sharedGames: 5 });
+      expect(byId.get('F2')).toMatchObject({ totalPlaytimeMinutes: 1_234, recentPlaytimeMinutes: 12 });
+      // A partial failure is still a real result, so it is worth persisting.
+      expect(snapshotStore.setFriendsLeaderboard).toHaveBeenCalledOnce();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('reports a genuinely private friend as unranked rather than reusing stale playtime', async () => {
+    const snapshotStore = emptySnapshotStore();
+    snapshotStore.getFriendsLeaderboard.mockResolvedValue({
+      data: cachedEntries, fetchedAt: new Date(Date.now() - 13 * 60 * 60_000),
+    });
+    // Steam answering with no games array is the real "Game Details is private" signal.
+    const fetchMock = routeSteam(() => jsonResponse({ response: {} }));
+
+    try {
+      const provider = createSteamProvider(auth, snapshotStore as never);
+      const data = await provider.fetch(new AbortController().signal, false);
+
+      const byId = new Map(data.friendsLeaderboard.entries.map((e) => [e.steamId, e]));
+      expect(byId.get('F1')?.totalPlaytimeMinutes).toBeUndefined();
+      expect(byId.get('F2')?.totalPlaytimeMinutes).toBeUndefined();
+      expect(snapshotStore.setFriendsLeaderboard).toHaveBeenCalledOnce();
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+});
