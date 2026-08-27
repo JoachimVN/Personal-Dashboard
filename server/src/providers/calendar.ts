@@ -112,6 +112,20 @@ function expandEvent(
   return results;
 }
 
+/**
+ * Total order over events, so the same set always serializes to the same bytes.
+ *
+ * The `id` tiebreak is not cosmetic. Events sharing a start time are extremely common (a lecture
+ * and its lab, two all-day entries), and the event groups are assembled from concurrent fetches
+ * whose resolution order varies between polls. Ordering on `start` alone therefore emitted the same
+ * events in a different order almost every poll, which `signalHistory` correctly read as a changed
+ * payload and archived: 231 MB of one calendar reshuffled, and not one distinct event set among it.
+ * `id` is `${uid}-${start.toISOString()}`, unique and stable per occurrence.
+ */
+export function compareCalendarEvents(a: CalendarEvent, b: CalendarEvent): number {
+  return a.start.localeCompare(b.start) || a.id.localeCompare(b.id);
+}
+
 function eventFromOccurrence(
   occurrence: ExpandedEvent,
   calendarName: string,
@@ -388,7 +402,7 @@ export function createCalendarProvider(
       }
       const events = eventGroups.flat();
 
-      events.sort((a, b) => a.start.localeCompare(b.start));
+      events.sort(compareCalendarEvents);
       return { events: events.slice(0, MAX_EVENTS) };
     },
   };

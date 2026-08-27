@@ -378,9 +378,14 @@ async function fetchPlayerSummaries(signal: AbortSignal, apiKey: string, steamId
   return summaries;
 }
 
-function deriveFriendsInGame(summaries: RawPlayerSummary[]): SteamFriend[] {
+export function deriveFriendsInGame(summaries: RawPlayerSummary[]): SteamFriend[] {
   return summaries
     .filter((p) => p.gameid)
+    // Steam returns summaries in no particular order, so without this the slice below kept an
+    // arbitrary subset of in-game friends and reordered them between polls — the only reason a
+    // steam payload ever changed on ~29% of archived rows. Name first so the list reads sensibly;
+    // steamId breaks ties between friends sharing a persona name.
+    .sort((a, b) => a.personaname.localeCompare(b.personaname) || a.steamid.localeCompare(b.steamid))
     .slice(0, MAX_FRIENDS_IN_GAME)
     .map((p) => ({
       steamId: p.steamid,

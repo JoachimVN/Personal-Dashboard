@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   chunkFriendIds,
+  deriveFriendsInGame,
   createSteamProvider,
   mapGame,
   mergeAchievements,
@@ -575,5 +576,42 @@ describe('createSteamProvider fetch', () => {
     } finally {
       fetchMock.mockRestore();
     }
+  });
+});
+
+describe('deriveFriendsInGame', () => {
+  const summary = (steamid: string, personaname: string, gameid?: string) => ({
+    steamid, personaname, gameid, avatarfull: `https://avatar/${steamid}.jpg`,
+    gameextrainfo: gameid ? 'Deep Rock Galactic' : undefined,
+  } as Parameters<typeof deriveFriendsInGame>[0][number]);
+
+  it('keeps only friends who are actually in a game', () => {
+    const friends = deriveFriendsInGame([summary('1', 'Ada', '400'), summary('2', 'Bo')]);
+    expect(friends.map((f) => f.personaName)).toEqual(['Ada']);
+  });
+
+  it('returns the same list whatever order Steam sent the summaries in', () => {
+    // Steam returns summaries unordered, so before the sort this both reordered the list between
+    // polls and — because the slice ran on an unsorted array — kept a different arbitrary subset
+    // once more than MAX_FRIENDS_IN_GAME friends were online. It was the only reason a steam
+    // payload ever changed on ~29% of archived rows.
+    const summaries = ['Ada', 'Bo', 'Cy', 'Dee', 'Eli', 'Fay', 'Gus', 'Hal', 'Ivy', 'Jo']
+      .map((name, i) => summary(String(i), name, '400'));
+
+    const forwards = deriveFriendsInGame(summaries).map((f) => f.personaName);
+    const backwards = deriveFriendsInGame([...summaries].reverse()).map((f) => f.personaName);
+    const shuffled = deriveFriendsInGame([summaries[4], summaries[0], ...summaries.slice(5), summaries[1], summaries[2], summaries[3]])
+      .map((f) => f.personaName);
+
+    expect(forwards).toEqual(backwards);
+    expect(forwards).toEqual(shuffled);
+    // Truncation is now the first 8 by name, not an arbitrary 8.
+    expect(forwards).toEqual(['Ada', 'Bo', 'Cy', 'Dee', 'Eli', 'Fay', 'Gus', 'Hal']);
+  });
+
+  it('breaks ties between friends sharing a persona name', () => {
+    const twins = [summary('20', 'Sam', '400'), summary('10', 'Sam', '400')];
+    expect(deriveFriendsInGame(twins).map((f) => f.steamId)).toEqual(['10', '20']);
+    expect(deriveFriendsInGame([...twins].reverse()).map((f) => f.steamId)).toEqual(['10', '20']);
   });
 });

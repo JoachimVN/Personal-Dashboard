@@ -57,6 +57,29 @@ describeDatabase('Postgres stores', () => {
     expect(await store.getSnapshot('codex')).toEqual(snapshot);
   });
 
+  it('reads only the window the charts render, so the series cannot grow without bound', async () => {
+    // The whole series ships inside the widget payload on every poll, over a billed TCP proxy.
+    // Unbounded, that is the signal_history runaway again in a different table: measured
+    // 2026-08-27 at 7,970 sequential scans over 23.4M tuples in four days.
+    const store = new UsageHistoryStore(database, 15 * 60_000);
+    const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60_000).toISOString();
+    for (const age of [90, 60, 46, 44, 10, 1]) {
+      await database.client`
+        insert into ai_usage_history_points (tool_id, at, five_hour_used_percent)
+        values ('codex', ${daysAgo(age)}, ${age})
+      `;
+    }
+
+    const points = await store.get('codex');
+
+    expect(points.map((p) => p.fiveHourUsedPercent)).toEqual([44, 10, 1]);
+    // The rows are still there — this bounds the read, not the data.
+    const [{ count }] = await database.client<{ count: number }[]>`
+      select count(*)::int as count from ai_usage_history_points where tool_id = 'codex'
+    `;
+    expect(count).toBe(6);
+  });
+
   it('shares Spotify snapshot state and history between store instances', async () => {
     const cache = new SpotifySnapshotStore(database);
     const snapshot = { nowPlaying: null, recentlyPlayed: [], topArtists: { shortTerm: [], mediumTerm: [] }, topTracks: { shortTerm: [], mediumTerm: [] }, allTime: { artists: [], tracks: [], albums: [] } };
