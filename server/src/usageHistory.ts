@@ -41,6 +41,21 @@ function toPoint(row: UsagePointRow): UsageHistoryPoint {
   });
 }
 
+/**
+ * How much of the series a read returns.
+ *
+ * The whole series ships inside the AI-usage widget payload on every poll, and the dashboards read
+ * Postgres over Railway's public TCP proxy where that is billed egress — 7,970 sequential scans
+ * over 23.4M tuples in four days, measured 2026-08-27. Unbounded, that grows forever for data
+ * nothing renders: the widest chart window in `AiDetail.tsx` is 30 days (`MONTH_MS`) and the
+ * importance baseline reads at most `baselineWindowDays`, so everything older is fetched, paid for,
+ * parsed, and then filtered out client-side.
+ *
+ * 45 days leaves headroom over both. Rows past it stay in the table — this bounds the read, not the
+ * data, so raising the window back up recovers the full series.
+ */
+const READ_WINDOW_DAYS = 45;
+
 /** Persisted usage time series. Per-tool advisory locks preserve the sample interval across machines. */
 export class UsageHistoryStore {
   constructor(
@@ -85,7 +100,9 @@ export class UsageHistoryStore {
       }
       const points = await transaction<UsagePointRow[]>`
         select at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, weekly_resets_at, model_weekly_used_percent
-        from ai_usage_history_points where tool_id = ${toolId} order by at asc
+        from ai_usage_history_points
+        where tool_id = ${toolId} and at >= now() - make_interval(days => ${READ_WINDOW_DAYS})
+        order by at asc
       `;
       return points.map(toPoint);
     });
@@ -94,7 +111,9 @@ export class UsageHistoryStore {
   async get(toolId: string): Promise<UsageHistoryPoint[]> {
     const rows = await this.database.client<UsagePointRow[]>`
       select at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, weekly_resets_at, model_weekly_used_percent
-      from ai_usage_history_points where tool_id = ${toolId} order by at asc
+      from ai_usage_history_points
+      where tool_id = ${toolId} and at >= now() - make_interval(days => ${READ_WINDOW_DAYS})
+      order by at asc
     `;
     return rows.map(toPoint);
   }

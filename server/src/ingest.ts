@@ -41,11 +41,17 @@ const port = Number(process.env.PORT ?? 4823);
 
 // One route, one statement per request — the dashboard's pool of 5 would be idle connections.
 const database = createDatabase(databaseUrl, 2);
-// Migrations deliberately do NOT run here. drizzle-orm costs ~160 MB resident and this container is
-// billed by the GB-month, so it runs as its own process that exits first — `railway.json` chains
-// `db:migrate && start:ingest`, and a failed migration still stops the deploy before this binds a
-// port. The dashboards in `src/index.ts` keep migrating in-process: they run on laptops, not a
-// meter.
+// Migrations deliberately do NOT run here: `railway.json` runs `scripts/migrate.ts` as its own
+// process that exits before this one starts, so drizzle-orm is never resident in the long-lived
+// container and a failed migration still stops the deploy before this binds a port. The dashboards
+// in `src/index.ts` keep migrating in-process — they run on laptops, not a meter.
+//
+// That start command execs this file directly rather than going through `npm run`. Measured
+// 2026-08-27: `npm run db:migrate -w server && npm run start:ingest -w server` left npm, the
+// workspace runner, and cross-env alive as parent processes for the container's whole life —
+// four node processes totalling 322 MB where one process needs 85 MB, all of it billed as
+// MEMORY_USAGE_GB. Keep this an `exec` of node, and keep `cd server` so `dotenv/config` still
+// resolves the same `.env` it did under `-w server`.
 
 // Optional: without it the webhook route is not mounted at all, so a dashboard that never set one
 // up has no unauthenticated GitHub surface sitting there.

@@ -65,8 +65,23 @@ function findTrackedGameIcon(data: SteamData, appId: number): string | undefined
 
 type ShelfEntry = { game: SteamGame; source: 'recent' | 'all-time' };
 
+/** A recent entry is here *because* of when it was played, so it says when; an all-time filler is
+ * here because of how much, so it says how much. Recent entries fall back to hours if Steam never
+ * reported an rtime_last_played for the app. */
+function shelfMeta(entry: ShelfEntry): string | undefined {
+  if (entry.source === 'all-time') {
+    return entry.game.playtimeForeverMinutes === undefined
+      ? undefined
+      : `${formatHours(entry.game.playtimeForeverMinutes)} all time`;
+  }
+  if (entry.game.lastPlayedAt) return relativeTime(entry.game.lastPlayedAt);
+  return entry.game.playtimeRecentMinutes === undefined
+    ? undefined
+    : `${formatHours(entry.game.playtimeRecentMinutes)} recent`;
+}
+
 function ShelfGame({ entry }: Readonly<{ entry: ShelfEntry }>) {
-  const playtime = entry.source === 'recent' ? entry.game.playtimeRecentMinutes : entry.game.playtimeForeverMinutes;
+  const meta = shelfMeta(entry);
   const art = useArtFallback([entry.game.headerUrl, entry.game.heroUrl]);
   const hasHeader = Boolean(art.src);
   return (
@@ -79,7 +94,7 @@ function ShelfGame({ entry }: Readonly<{ entry: ShelfEntry }>) {
       <div className="steam-shelf-game-scrim" />
       <div className="steam-shelf-game-copy">
         <p className="truncate text-sm font-semibold text-white">{entry.game.name}</p>
-        {playtime !== undefined && <p className="mt-0.5 text-[10px] tabular-nums text-white/70">{formatHours(playtime)} {entry.source === 'recent' ? 'recent' : 'all time'}</p>}
+        {meta && <p className="mt-0.5 text-[10px] tabular-nums text-white/70">{meta}</p>}
       </div>
     </article>
   );
@@ -88,13 +103,27 @@ function ShelfGame({ entry }: Readonly<{ entry: ShelfEntry }>) {
 function SteamHomeDashboard({ data }: Readonly<{ data: SteamData }>) {
   if (data.availability.library !== 'available' || !data.library) return null;
 
-  // Steam's own API already orders this by most-recently-played, not most-played-recently.
+  // Deliberately last-played order, not most-played (the server sorts it that way in orderByRecency)
+  // — an hours-ranked shelf can sit unchanged for a whole 2-week window no matter how much gets
+  // played, so the card would stop reflecting the evening. The heading below says so rather than
+  // claiming a ranking this isn't.
   const recentGames = data.recentlyPlayed;
   const recentIds = new Set(recentGames.map((game) => game.appId));
   const shelf: ShelfEntry[] = [
     ...recentGames.map((game) => ({ game, source: 'recent' as const })),
     ...data.library.mostPlayed.filter((game) => !recentIds.has(game.appId)).map((game) => ({ game, source: 'all-time' as const })),
   ].slice(0, 3);
+  // The shelf pads with all-time most-played when fewer than 3 games have been touched in Steam's
+  // 2-week window, so neither line can be hardcoded — a padded shelf headed "Last played" would be
+  // naming games that haven't been played in months.
+  const hasRecent = shelf.some((entry) => entry.source === 'recent');
+  const hasAllTime = shelf.some((entry) => entry.source === 'all-time');
+  let shelfHeading = 'Most played';
+  let shelfWindow = 'All time';
+  if (hasRecent) {
+    shelfHeading = 'Last played';
+    shelfWindow = hasAllTime ? 'Recent + all-time' : 'Last 2 weeks';
+  }
   const { totalGames, totalPlaytimeMinutes, recentPlaytimeMinutes } = data.library;
   const achievementPct = data.achievements && data.achievements.totalCount > 0
     ? Math.round((data.achievements.unlockedCount / data.achievements.totalCount) * 100)
@@ -139,10 +168,10 @@ function SteamHomeDashboard({ data }: Readonly<{ data: SteamData }>) {
       </section>
 
       {shelf.length > 0 && (
-        <section className="steam-home-shelf" aria-label="Top three Steam games">
+        <section className="steam-home-shelf" aria-label={`${shelfHeading} Steam games`}>
           <div className="steam-home-section-heading">
-            <p>Top 3</p>
-            <span>{shelf.some((entry) => entry.source === 'all-time') ? 'Recent + all-time' : 'Last 2 weeks'}</span>
+            <p>{shelfHeading}</p>
+            <span>{shelfWindow}</span>
           </div>
           <div className="steam-shelf-grid">
             {shelf.map((entry) => <ShelfGame key={entry.game.appId} entry={entry} />)}

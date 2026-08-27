@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SteamData, SteamGame } from '@personal-dashboard/shared';
 import { formatHours } from './shared';
+import { relativeTime } from '../../lib/time';
 
 function Stat({ value, label }: Readonly<{ value: string | number; label: string }>) {
   return (
@@ -204,6 +205,9 @@ export function SteamGameList({ data }: Readonly<{ data: SteamData }>) {
   );
 }
 
+/** Ordering is this list's whole point — the library list below already carries both playtime
+ * figures, so repeating them here just made it a shorter, unranked copy. Last-played is the one
+ * thing only this list knows (the server sorts on it in orderByRecency). */
 export function SteamRecentGames({ data }: Readonly<{ data: SteamData }>) {
   if (data.recentlyPlayed.length === 0) {
     return <p className="text-sm text-ink-faint">No recently played games.</p>;
@@ -220,14 +224,9 @@ export function SteamRecentGames({ data }: Readonly<{ data: SteamData }>) {
           ) : (
             <div className="h-8 w-8 shrink-0 rounded-md bg-track" />
           )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-ink">{game.name}</p>
-            {game.playtimeRecentMinutes !== undefined && (
-              <p className="truncate text-xs text-ink-faint">{formatHours(game.playtimeRecentMinutes)} recently</p>
-            )}
-          </div>
-          {game.playtimeForeverMinutes !== undefined && (
-            <span className="shrink-0 text-xs text-ink-faint">{formatHours(game.playtimeForeverMinutes)} total</span>
+          <p className="min-w-0 flex-1 truncate font-medium text-ink">{game.name}</p>
+          {game.lastPlayedAt && (
+            <span className="shrink-0 text-xs tabular-nums text-ink-faint">{relativeTime(game.lastPlayedAt)}</span>
           )}
         </li>
       ))}
