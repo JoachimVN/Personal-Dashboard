@@ -28,6 +28,25 @@ export interface PushedRocketLeagueLive {
   /** When the pusher read this. Current state rather than an event, so a stale one is worthless —
    * the same role it plays for the Valorant and Minecraft readings. */
   observedAt: string;
+  /** Every match that finished within the tail window, oldest first — not just whichever one
+   * happens to still be on screen at poll time. See readCompletedMatches: a 60s poll can land
+   * after the scoreboard has already been dismissed, so the single "current state" reading alone
+   * silently drops matches the player didn't linger on. */
+  recentMatches?: CompletedRocketLeagueMatch[];
+}
+
+/** One match's result, as read off a `postmatch` presence line rather than inferred from state
+ * carried between polls — see readCompletedMatches. */
+export interface CompletedRocketLeagueMatch {
+  goalsFor: number;
+  goalsAgainst: number;
+  playlist?: string;
+  map?: string;
+  /** When this match's scoreboard first appeared, derived from the log line's own elapsed-seconds
+   * stamp rather than from when the pusher happened to observe it — so the same match rediscovered
+   * on a later poll (the tail window is generous) produces the exact same timestamp and downstream
+   * dedup by `endedAt` collapses it into the one match it is. */
+  endedAt: string;
 }
 
 /** How quiet the log may go before the game is treated as closed. Rocket League is extremely
@@ -164,6 +183,61 @@ export function readTail(tail: string): { presence?: RocketLeaguePresence; lastO
   return { presence, lastOffsetSeconds };
 }
 
+/** How many finished matches to carry per push. Ten matches is already generous for one sitting,
+ * and matches the cap the dashboard itself keeps — see Batabiboing's nextRocketLeagueHistory. */
+const MAX_RECENT_MATCHES = 10;
+
+/** Whether two presence readings are the same post-match scoreboard rather than two different
+ * matches that happened to finish with the same score — the log keeps re-printing the same line
+ * on its refresh timer while the scoreboard sits on screen. */
+function samePostmatch(a: RocketLeaguePresence | undefined, b: RocketLeaguePresence): boolean {
+  if (a?.kind !== 'match' || b.kind !== 'match') return false;
+  if (a.clock !== undefined || b.clock !== undefined) return false;
+  return a.mode === b.mode && a.map === b.map && a.scoreFirst === b.scoreFirst && a.scoreSecond === b.scoreSecond;
+}
+
+/** Every match that finished somewhere in this tail slice, not just the one reading a single
+ * "current state" poll would land on. A 60s poll cadence against a scoreboard that can be
+ * dismissed in a few seconds — faster, typically, right after a loss than after a win — means
+ * relying on "what does the log say right now" silently drops results. This instead walks every
+ * presence line in the slice looking for a transition into `postmatch`, so a match is caught as
+ * long as its scoreboard line is still somewhere in the tail window, whether or not it is still
+ * showing at the moment this is read.
+ *
+ * Reading the same tail again on the next poll will find the same matches again — that is by
+ * design, not a bug to fix here. `endedAt` is derived from the log line's own elapsed-seconds
+ * stamp, so a rediscovered match produces the exact same timestamp every time, and the caller
+ * dedups on it. */
+export function readCompletedMatches(tail: string, startedAt: Date): CompletedRocketLeagueMatch[] {
+  const matches: CompletedRocketLeagueMatch[] = [];
+  let previous: RocketLeaguePresence | undefined;
+
+  for (const line of tail.split('\n')) {
+    const offset = LINE_OFFSET.exec(line);
+    const start = line.indexOf(PRESENCE_PREFIX);
+    if (offset === null || start === -1) continue;
+
+    const presence = parsePresence(line.slice(start + PRESENCE_PREFIX.length).trim());
+    if (presence === undefined) continue;
+
+    const isPostmatch = presence.kind === 'match' && presence.clock === undefined;
+    if (isPostmatch && !samePostmatch(previous, presence)) {
+      const { mode, map, scoreFirst, scoreSecond, playlistId } = presence;
+      const [goalsFor, goalsAgainst] = PLAYER_TEAM_SCORE_IS_FIRST ? [scoreFirst, scoreSecond] : [scoreSecond, scoreFirst];
+      matches.push({
+        goalsFor,
+        goalsAgainst,
+        playlist: playlistLabel(mode, playlistId),
+        map,
+        endedAt: new Date(startedAt.getTime() + Number(offset[1]) * 1000).toISOString(),
+      });
+    }
+    previous = presence;
+  }
+
+  return matches.slice(-MAX_RECENT_MATCHES);
+}
+
 /** Builds the reading from a parsed presence line. Kept separate from the file handling so the
  * interesting half is testable without a log on disk. */
 export function toLive(
@@ -247,7 +321,9 @@ export async function readRocketLeagueLive(): Promise<PushedRocketLeagueLive | n
     const startedAt = sessionStartedAt(head.split('\n')[0] ?? '', newest.mtime)
       ?? new Date(newest.mtime.getTime() - lastOffsetSeconds * 1000);
 
-    return toLive(presence, startedAt, new Date(now));
+    const live = toLive(presence, startedAt, new Date(now));
+    const recentMatches = readCompletedMatches(tail, startedAt);
+    return recentMatches.length > 0 ? { ...live, recentMatches } : live;
   } catch (err) {
     // The game rotating or truncating its log mid-read is routine, not a fault worth failing the
     // whole push over.

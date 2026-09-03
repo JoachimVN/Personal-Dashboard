@@ -8,7 +8,9 @@ import type { Provider } from '../../scheduler.js';
 import type { UsageHistoryStore } from '../../usageHistory.js';
 import {
   asIso,
+  carryPastReset,
   ensurePtySpawnHelper,
+  FIVE_HOUR_MS,
   jsonlFiles,
   limit,
   limitStatus,
@@ -17,6 +19,7 @@ import {
   recordHistorySafely,
   resolveProbeExecutable,
   stripTerminalControls,
+  WEEKLY_MS,
   type UsageSnapshot,
 } from './shared.js';
 
@@ -384,6 +387,14 @@ export function createCodexUsageProvider(
       }
       applyCodexFallbackWindow('fiveHour', snapshot, fallback);
       applyCodexFallbackWindow('weekly', snapshot, fallback);
+      // Neither the local session log nor the interactive fallback is guaranteed to catch a window
+      // rolling over — a quiet local log and a failing/cooling-down fallback both just leave
+      // whatever was last read untouched. Left alone that reads as, say, a 5-hour window still
+      // pinned at last night's 32% a full day later. Once a window's own reset has passed with
+      // nothing fresher to confirm the real number, report 0% against a rolled-forward reset
+      // instead of the stale, provably-wrong percentage.
+      snapshot.fiveHour = carryPastReset(snapshot.fiveHour, FIVE_HOUR_MS);
+      snapshot.weekly = carryPastReset(snapshot.weekly, WEEKLY_MS);
       return { ...snapshot, history: recordHistorySafely(history, 'ai-usage-codex', snapshot, rememberedHistory) };
     },
   };

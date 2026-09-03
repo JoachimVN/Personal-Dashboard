@@ -33,6 +33,17 @@ export const minecraftLiveSchema = z.object({
  * its own log — so this knows the playlist, the arena, the clock and the score, not just that the
  * game is open. `postmatch` is the scoreboard after the whistle, which goes on reporting the final
  * score with no clock on it. */
+/** One finished match, read straight off a `postmatch` presence line — see
+ * `readCompletedMatches` in rocketLeaguePresence.ts for why this can carry more than one per
+ * push. */
+export const rocketLeagueMatchEndSchema = z.object({
+  goalsFor: z.number().int().nonnegative(),
+  goalsAgainst: z.number().int().nonnegative(),
+  playlist: z.string().optional(),
+  map: z.string().optional(),
+  endedAt: z.string(),
+});
+
 export const rocketLeagueLiveSchema = z.object({
   state: z.enum(['menus', 'ingame', 'postmatch']),
   playlist: z.string().optional(),
@@ -42,6 +53,9 @@ export const rocketLeagueLiveSchema = z.object({
   clock: z.string().optional(),
   startedAt: z.string(),
   observedAt: z.string(),
+  /** Every match the tail window caught finishing, oldest first — may include matches whose
+   * scoreboard already scrolled out of `state`/`goalsFor` above. */
+  recentMatches: z.array(rocketLeagueMatchEndSchema).optional(),
 });
 
 /** Status of the sink provider that pushes local-only activity signals (Epic Games Launcher,
@@ -61,3 +75,4 @@ export type ActivityPushData = z.infer<typeof activityPushSchema>;
 export type ValorantLiveData = z.infer<typeof valorantLiveSchema>;
 export type MinecraftLiveData = z.infer<typeof minecraftLiveSchema>;
 export type RocketLeagueLiveData = z.infer<typeof rocketLeagueLiveSchema>;
+export type RocketLeagueMatchEndData = z.infer<typeof rocketLeagueMatchEndSchema>;

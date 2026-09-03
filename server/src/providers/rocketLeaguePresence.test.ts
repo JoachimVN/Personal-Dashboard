@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePresence, playlistLabel, readTail, sessionStartedAt, toLive } from './rocketLeaguePresence.js';
+import { parsePresence, playlistLabel, readCompletedMatches, readTail, sessionStartedAt, toLive } from './rocketLeaguePresence.js';
 
 describe('parsePresence', () => {
   it('reads mode, arena, clock and score off a live match', () => {
@@ -121,6 +121,52 @@ describe('sessionStartedAt', () => {
   it('reports nothing found for a line that is not the header', () => {
     expect(sessionStartedAt('Log: GPsyonixBuildID 260811.1257.524913', new Date())).toBeUndefined();
     expect(sessionStartedAt('', new Date())).toBeUndefined();
+  });
+});
+
+describe('readCompletedMatches', () => {
+  const startedAt = new Date('2026-08-22T00:00:00Z');
+
+  it('catches a match whose scoreboard already scrolled off screen by the time this is read', () => {
+    // The whole point: a "what's on screen right now" reading would land on the menu line and
+    // miss the match entirely. Scanning the tail catches it anyway.
+    const tail = [
+      '[0010.00] DevOnline: Set rich presence to: Duel in Beckwith Park 0:05 (1 - 0) data: Playlist-10',
+      '[0015.00] DevOnline: Set rich presence to: Duel in Beckwith Park (2 - 3) data: Playlist-10',
+      '[0018.00] DevOnline: Set rich presence to: Main Menu data: Menu',
+    ].join('\n');
+
+    expect(readCompletedMatches(tail, startedAt)).toEqual([
+      { goalsFor: 2, goalsAgainst: 3, playlist: 'Ranked Duel', map: 'Beckwith Park', endedAt: '2026-08-22T00:00:15.000Z' },
+    ]);
+  });
+
+  it('collapses the scoreboard repeating itself on its refresh timer into one match', () => {
+    const tail = [
+      '[0015.00] DevOnline: Set rich presence to: Duel in Beckwith Park (2 - 3) data: Playlist-10',
+      '[0025.00] DevOnline: Set rich presence to: Duel in Beckwith Park (2 - 3) data: Playlist-10',
+      '[0035.00] DevOnline: Set rich presence to: Duel in Beckwith Park (2 - 3) data: Playlist-10',
+    ].join('\n');
+
+    expect(readCompletedMatches(tail, startedAt)).toHaveLength(1);
+  });
+
+  it('catches every match in the slice, oldest first, even back to back', () => {
+    const tail = [
+      '[0015.00] DevOnline: Set rich presence to: Duel in Beckwith Park (2 - 3) data: Playlist-10',
+      '[0040.00] DevOnline: Set rich presence to: Duel in Farmstead (Pitched) 4:00 (0 - 0) data: Playlist-10',
+      '[0090.00] DevOnline: Set rich presence to: Duel in Farmstead (Pitched) (5 - 4) data: Playlist-10',
+    ].join('\n');
+
+    expect(readCompletedMatches(tail, startedAt)).toEqual([
+      { goalsFor: 2, goalsAgainst: 3, playlist: 'Ranked Duel', map: 'Beckwith Park', endedAt: '2026-08-22T00:00:15.000Z' },
+      { goalsFor: 5, goalsAgainst: 4, playlist: 'Ranked Duel', map: 'Farmstead (Pitched)', endedAt: '2026-08-22T00:01:30.000Z' },
+    ]);
+  });
+
+  it('reports nothing when no match ever reached the post-match screen', () => {
+    const tail = '[0010.00] DevOnline: Set rich presence to: Duel in Beckwith Park 4:49 (1 - 0) data: Playlist-10';
+    expect(readCompletedMatches(tail, startedAt)).toEqual([]);
   });
 });
 
