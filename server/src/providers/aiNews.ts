@@ -27,6 +27,13 @@ export interface AiNewsFeed {
 
 export function createAiNewsProvider(feeds: AiNewsFeed[]): Provider<AiNewsData> {
   const parser = new Parser({ timeout: 10_000 });
+  // One group failing outright (e.g. Google News blocking this host's IP for the Anthropic
+  // search proxy) must not read as "Anthropic has no recent stories" while OpenAI's feed is
+  // fine — Promise.allSettled below only throws the whole fetch when every feed across both
+  // groups fails, so a single dead group would otherwise overwrite this group's last known
+  // headlines with an empty list. Carried in-memory per provider group, same idea as the Steam
+  // friends leaderboard keeping a friend's last known playtime through a failed request.
+  const lastGoodByProvider = new Map<AiNewsItem['provider'], AiNewsItem[]>();
 
   return {
     id: 'ai-news',
@@ -51,12 +58,13 @@ export function createAiNewsProvider(feeds: AiNewsFeed[]): Provider<AiNewsData> 
       const fulfilled = results.filter((result) => result.status === 'fulfilled').map((result) => result.value);
       if (fulfilled.length === 0) throw new Error('all feeds failed');
 
-      const items = (['openai', 'anthropic'] satisfies AiNewsItem['provider'][]).flatMap((provider) =>
-        selectNewsItems(
-          fulfilled.filter((feed) => feed.provider === provider).map((feed) => feed.items),
-          MAX_ITEMS_PER_PROVIDER,
-        ),
-      );
+      const items = (['openai', 'anthropic'] satisfies AiNewsItem['provider'][]).flatMap((provider) => {
+        const ownFeeds = fulfilled.filter((feed) => feed.provider === provider);
+        if (ownFeeds.length === 0) return lastGoodByProvider.get(provider) ?? [];
+        const selected = selectNewsItems(ownFeeds.map((feed) => feed.items), MAX_ITEMS_PER_PROVIDER);
+        lastGoodByProvider.set(provider, selected);
+        return selected;
+      });
       return { items };
     },
   };
