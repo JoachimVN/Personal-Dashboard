@@ -7,7 +7,9 @@ import { aiUsageToolSchema, type AiUsageToolData, type UsageHistoryPoint } from 
 import type { Provider } from '../../scheduler.js';
 import type { UsageHistoryStore } from '../../usageHistory.js';
 import {
+  carryPastReset,
   ensurePtySpawnHelper,
+  FIVE_HOUR_MS,
   jsonlFiles,
   limit,
   MONTH_ABBREVIATIONS,
@@ -15,6 +17,7 @@ import {
   resolveProbeExecutable,
   recordHistorySafely,
   stripTerminalControls,
+  WEEKLY_MS,
   WS,
   type UsageSnapshot,
 } from './shared.js';
@@ -31,9 +34,6 @@ const claudeTranscriptEntrySchema = z.object({
     }),
   }),
 });
-
-const FIVE_HOUR_MS = 5 * 60 * 60_000;
-const WEEKLY_MS = 7 * 24 * 60 * 60_000;
 
 /**
  * Claude Code writes every turn's token usage into local session transcripts
@@ -94,24 +94,23 @@ export type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'modelWeek
  * an account is at its cap. That is not an authoritative zero-quota report, so retain the last
  * report that did include quota data. An explicit no-limits report has `asOf` and still replaces it.
  *
- * The retained report only holds while its own windows haven't reset yet: once a window's
- * `resetsAt` has passed, that percentage is provably wrong (the real window has moved on), not
- * merely stale, so it's dropped rather than kept forever — without this a single missed live read
- * (the interactive probe times out, transcripts are empty) could pin the widget to an old reading
- * indefinitely, since nothing else ever re-validates it.
+ * The retained report only holds its exact percentage while its own windows haven't reset yet:
+ * once a window's `resetsAt` has passed, that percentage is provably wrong (the real window has
+ * moved on) — carried forward as 0% used against a rolled-forward reset instead, via
+ * `carryPastReset`, rather than kept unchanged forever. Without this a single missed live read
+ * (the interactive probe times out, transcripts are empty) could pin the widget to an old,
+ * possibly maxed-out reading indefinitely, since nothing else ever re-validates it.
  */
 export function retainKnownClaudeQuota(live: ClaudeQuota, previous?: ClaudeQuota, now = Date.now()): ClaudeQuota {
   if (!previous) return live;
-  const stillCurrent = <T extends { resetsAt: string }>(window: T | undefined) =>
-    window && Date.parse(window.resetsAt) > now ? window : undefined;
 
   // Backfill per window, not per report: a live read can genuinely capture one window (e.g. the
   // 5-hour block) while missing another (e.g. weekly didn't render in time), and that partial read
   // still stamps `asOf`. Gating backfill on "the whole report has no asOf" would let a real 5-hour
   // reading silently blow away a still-valid weekly one merely because weekly didn't parse this tick.
-  const retainedFiveHour = live.fiveHourStatus === 'unknown' ? stillCurrent(previous.fiveHour) : undefined;
-  const retainedWeekly = live.weeklyStatus === 'unknown' ? stillCurrent(previous.weekly) : undefined;
-  const retainedModelWeekly = live.weeklyStatus === 'unknown' ? stillCurrent(previous.modelWeekly) : undefined;
+  const retainedFiveHour = live.fiveHourStatus === 'unknown' ? carryPastReset(previous.fiveHour, FIVE_HOUR_MS, now) : undefined;
+  const retainedWeekly = live.weeklyStatus === 'unknown' ? carryPastReset(previous.weekly, WEEKLY_MS, now) : undefined;
+  const retainedModelWeekly = live.weeklyStatus === 'unknown' ? carryPastReset(previous.modelWeekly, WEEKLY_MS, now) : undefined;
   if (!retainedFiveHour && !retainedWeekly && !retainedModelWeekly) return live;
 
   return {

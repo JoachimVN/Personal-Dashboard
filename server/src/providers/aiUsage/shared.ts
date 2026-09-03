@@ -26,6 +26,29 @@ export function limitStatus(hasLimit: boolean, hasQuotaReport: boolean): LimitSt
   return hasQuotaReport ? 'unlimited' : 'unknown';
 }
 
+export const FIVE_HOUR_MS = 5 * 60 * 60_000;
+export const WEEKLY_MS = 7 * 24 * 60 * 60_000;
+
+/**
+ * A window whose own `resetsAt` has already passed, with nothing fresher to confirm the real
+ * post-reset number, can only ever be *lower* than the stale reading — reporting it unchanged
+ * shows genuinely wrong, sometimes alarmingly high, usage (a Codex 5-hour window pinned at last
+ * night's 32% a full day later, long after it must have reset). Roll the reset forward by whole
+ * window lengths until it's back in the future and report 0% used against it instead — an honest
+ * "we don't know yet" reads better as a plausible number than as a stale, provably-wrong one.
+ */
+export function carryPastReset<T extends { resetsAt: string; usedPercent: number }>(
+  window: T | undefined,
+  windowMs: number,
+  now = Date.now(),
+): T | undefined {
+  if (!window) return undefined;
+  const resetsAtMs = Date.parse(window.resetsAt);
+  if (!Number.isFinite(resetsAtMs) || resetsAtMs > now) return window;
+  const windowsPassed = Math.floor((now - resetsAtMs) / windowMs) + 1;
+  return { ...window, usedPercent: 0, resetsAt: new Date(resetsAtMs + windowsPassed * windowMs).toISOString() };
+}
+
 export async function jsonlFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(

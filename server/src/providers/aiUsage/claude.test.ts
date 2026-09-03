@@ -54,26 +54,35 @@ describe('retainKnownClaudeQuota', () => {
     expect(retainKnownClaudeQuota(unlimited, knownQuota, beforeBothReset)).toEqual(unlimited);
   });
 
-  it('drops a retained window once its own resetsAt has passed, instead of serving it forever', () => {
+  it('zeroes a retained window once its own resetsAt has passed, instead of serving its stale percentage forever', () => {
     const live: ClaudeQuota = { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
 
     // Both knownQuota windows (fiveHour resets 07-17T05:00, weekly resets 07-20T05:00) are behind us.
-    expect(retainKnownClaudeQuota(live, knownQuota, afterBothReset)).toEqual(live);
+    const result = retainKnownClaudeQuota(live, knownQuota, afterBothReset);
+
+    expect(result.fiveHour?.usedPercent).toBe(0);
+    expect(Date.parse(result.fiveHour!.resetsAt)).toBeGreaterThan(afterBothReset);
+    expect(result.weekly?.usedPercent).toBe(0);
+    expect(Date.parse(result.weekly!.resetsAt)).toBeGreaterThan(afterBothReset);
+    expect(result.fiveHourStatus).toBe('limited');
+    expect(result.weeklyStatus).toBe('limited');
+    expect(result.asOf).toBe(knownQuota.asOf);
   });
 
-  it('drops only the expired window, keeping a still-current one from the same retained report', () => {
+  it('zeroes only the expired window, keeping a still-current one from the same retained report untouched', () => {
     const live: ClaudeQuota = { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
     // Between the two resetsAt values: fiveHour (07-17T05:00) has passed, weekly (07-20T05:00) hasn't.
     const between = Date.parse('2026-07-18T00:00:00.000Z');
 
-    expect(retainKnownClaudeQuota(live, knownQuota, between)).toEqual({
-      fiveHour: undefined,
-      weekly: knownQuota.weekly,
-      modelWeekly: undefined,
-      fiveHourStatus: 'unknown',
-      weeklyStatus: 'limited',
-      asOf: knownQuota.asOf,
-    });
+    const result = retainKnownClaudeQuota(live, knownQuota, between);
+
+    expect(result.fiveHour?.usedPercent).toBe(0);
+    expect(Date.parse(result.fiveHour!.resetsAt)).toBeGreaterThan(between);
+    expect(result.weekly).toEqual(knownQuota.weekly);
+    expect(result.modelWeekly).toBeUndefined();
+    expect(result.fiveHourStatus).toBe('limited');
+    expect(result.weeklyStatus).toBe('limited');
+    expect(result.asOf).toBe(knownQuota.asOf);
   });
 });
 
