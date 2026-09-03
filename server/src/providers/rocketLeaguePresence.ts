@@ -191,7 +191,7 @@ const MAX_RECENT_MATCHES = 10;
  * matches that happened to finish with the same score — the log keeps re-printing the same line
  * on its refresh timer while the scoreboard sits on screen. */
 function samePostmatch(a: RocketLeaguePresence | undefined, b: RocketLeaguePresence): boolean {
-  if (!a || a.kind !== 'match' || b.kind !== 'match') return false;
+  if (a?.kind !== 'match' || b.kind !== 'match') return false;
   if (a.clock !== undefined || b.clock !== undefined) return false;
   return a.mode === b.mode && a.map === b.map && a.scoreFirst === b.scoreFirst && a.scoreSecond === b.scoreSecond;
 }
