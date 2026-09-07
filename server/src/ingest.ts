@@ -13,6 +13,10 @@ import { createIngestApp } from './ingestApp.js';
  * them fails whenever that machine is off. Storage is not the problem — every dashboard already
  * shares one Postgres — so this runs the ingest route, and only that route, somewhere that stays
  * up. See `src/index.ts` for the equivalent route on the Tailscale-only dashboards.
+ *
+ * That same "stays up regardless of the laptops or GitHub Actions" property is also why the
+ * periodic BiReal reminder check below lives here rather than as its own thing — see its own
+ * comment for why Batabiboing needs one at all.
  */
 
 // Configuration is validated before the resilience handlers below are installed, so a misconfigured
@@ -81,6 +85,42 @@ async function forwardGithubActivity(eventName: string, payload: unknown): Promi
   } catch (error) {
     console.error('[ingest] could not forward GitHub activity:', error);
   }
+}
+
+const BIREAL_CHECK_INTERVAL_MS = 15 * 60_000;
+
+/** Batabiboing's own reminder trigger is a Vercel Cron (Hobby plan, once a day) that starts a
+ * durable workflow which sleeps until a random target time later that day — a sleep that isn't
+ * guaranteed to survive a Batabiboing deploy landing mid-wait. That used to have a GitHub Actions
+ * job polling every 15 minutes as a backstop, but GitHub Actions is disabled on this account, so
+ * this service does the same job instead: unlike the laptop dashboards it doesn't sleep, and unlike
+ * a GitHub Actions job it doesn't need Actions enabled anywhere — it's just an ordinary interval on
+ * a process that's already required to stay up (see the file doc comment above). The endpoint itself
+ * no-ops once today's reminder has already gone out. */
+function biRealCheckUrl(dashboardPushUrl: string): string {
+  const url = new URL(dashboardPushUrl);
+  url.pathname = '/api/webhooks/bireal-check';
+  url.search = '';
+  return url.toString();
+}
+
+async function checkBiRealReminder(): Promise<void> {
+  if (!pushUrl || !pushSecret) return;
+  try {
+    const response = await fetch(biRealCheckUrl(pushUrl), {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${pushSecret}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) console.error(`[ingest] BiReal check rejected: ${response.status}`);
+  } catch (error) {
+    console.error('[ingest] BiReal check failed:', error);
+  }
+}
+
+if (pushUrl && pushSecret) {
+  void checkBiRealReminder();
+  setInterval(() => void checkBiRealReminder(), BIREAL_CHECK_INTERVAL_MS);
 }
 
 const app = createIngestApp({
