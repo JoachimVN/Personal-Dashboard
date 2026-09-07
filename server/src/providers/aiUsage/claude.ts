@@ -8,6 +8,7 @@ import type { Provider } from '../../scheduler.js';
 import type { UsageHistoryStore } from '../../usageHistory.js';
 import {
   carryPastReset,
+  cleanupProbeSession,
   ensurePtySpawnHelper,
   FIVE_HOUR_MS,
   jsonlFiles,
@@ -21,6 +22,10 @@ import {
   WS,
   type UsageSnapshot,
 } from './shared.js';
+
+function claudeProjectsDir(): string {
+  return path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
+}
 
 const claudeTranscriptEntrySchema = z.object({
   type: z.literal('assistant'),
@@ -44,10 +49,7 @@ const claudeTranscriptEntrySchema = z.object({
  * its own mtime, so anything older is guaranteed out of range.
  */
 async function claudeTokenTotals(): Promise<{ fiveHour: number; weekly: number }> {
-  const projectsDir = path.join(
-    process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'),
-    'projects',
-  );
+  const projectsDir = claudeProjectsDir();
   const now = Date.now();
   let fiveHour = 0;
   let weekly = 0;
@@ -265,6 +267,8 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
 }
 
 export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
+  const projectsDir = claudeProjectsDir();
+  const filesBeforeSpawn = new Set(await jsonlFiles(projectsDir).catch(() => []));
   try {
     const { CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, ...cleanEnv } = process.env;
     await ensurePtySpawnHelper();
@@ -284,7 +288,20 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
       let terminal = '';
       let settled = false;
       let exited = false;
-      let typed = false;
+      // Buffer length at the moment `/usage` was written, or -1 before that's happened. Tracking an
+      // offset rather than a boolean lets the echo check below look only at output produced *after*
+      // our own keystrokes, never at some unrelated earlier mention of "/usage" already sitting in
+      // the screen (a startup tip, say) — and, just as importantly, means the write only ever
+      // happens once. An earlier version retried by sending Ctrl+U (clear line) plus a fresh
+      // "/usage" whenever the echo hadn't shown up yet, trusting that Ctrl+U resets the whole input
+      // line the way shell readline does. Claude Code's prompt is its own widget, not readline; if it
+      // doesn't honor Ctrl+U that way, the retry's "/usage" lands *after* the first instead of
+      // replacing it, submitting the literal text "/usage/usage" — the same failure mode already
+      // hit and fixed on the Codex side (see NUDGE_QUIET_MS in codex.ts) by never re-sending until a
+      // genuine quiet gap, rather than by trying to clear what was already typed. Simply waiting for
+      // the one write we already made to echo — however many settle cycles that takes — sends the six
+      // characters of "/usage" exactly once, so there's nothing left to duplicate.
+      let writtenAt = -1;
       let submitted = false;
       let settleTimer: NodeJS.Timeout | undefined;
       const finish = (result?: string) => {
@@ -317,22 +334,17 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
       // (confirmed live: sometimes Enter fired before typing was registered, leaving the session
       // stuck on the autocomplete dropdown; sometimes the typed text never landed at all within
       // 35s). Acting only once the terminal has gone genuinely quiet — and verifying each step
-      // actually landed before advancing, retrying if not — adapts to however slow this run
-      // happens to be instead of guessing a fixed number that's sometimes wrong.
+      // actually landed before advancing — adapts to however slow this run happens to be instead of
+      // guessing a fixed number that's sometimes wrong.
       const advance = () => {
         const text = stripTerminalControls(terminal);
-        if (!typed) {
-          typed = true;
+        if (writtenAt === -1) {
+          writtenAt = text.length;
           pty.write('/usage');
           return;
         }
         if (!submitted) {
-          if (!text.includes('/usage')) {
-            // Previous write may not have landed yet — retry rather than assume it's lost. Ctrl+U
-            // clears any partial line first, so a slow-but-not-lost echo can't leave "/usage/usage".
-            pty.write('\x15/usage');
-            return;
-          }
+          if (!text.slice(writtenAt).includes('/usage')) return; // Not echoed yet — wait for the next settle.
           submitted = true;
           pty.write('\r');
           return;
@@ -360,6 +372,11 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
     return parseClaudeUsageScreen(output);
   } catch {
     return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+  } finally {
+    // The probe's `/usage` run leaves a real session transcript in ~/.claude/projects, same as any
+    // interactive session — without this, every 15-minute poll leaves one behind permanently, which
+    // is what actually floods the session list (see cleanupProbeSession in shared.ts).
+    await cleanupProbeSession(projectsDir, filesBeforeSpawn);
   }
 }
 
@@ -381,7 +398,7 @@ function usageReportsIn(value: unknown, reports: string[]): void {
  * fallback for a transient PTY failure, not a substitute for the live interactive probe. */
 async function claudeTranscriptUsageSnapshot(): Promise<ClaudeQuota> {
   try {
-    const projectsDir = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
+    const projectsDir = claudeProjectsDir();
     const files = await jsonlFiles(projectsDir);
     let latest: { at: Date; report: string } | undefined;
     await Promise.all(files.map(async (file) => {
