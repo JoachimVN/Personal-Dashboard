@@ -1,4 +1,4 @@
-import { readFile, unlink } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import type { UsageHistoryStore } from '../../usageHistory.js';
 import {
   asIso,
   carryPastReset,
+  cleanupProbeSession,
   ensurePtySpawnHelper,
   FIVE_HOUR_MS,
   jsonlFiles,
@@ -221,26 +222,6 @@ export function parseCodexStatusScreen(
     weeklyStatus: limitStatus(Boolean(windows.weekly), sawAnyLimitLine),
     asOf,
   };
-}
-
-/** Deletes whatever rollout file(s) the interactive probe's own `codex` process just wrote,
- * comparing against the sessions dir listing captured right before it was spawned. The probe
- * exists purely to read the `/status` panel — its transcript has no lasting value — but a `codex`
- * process is a real Codex session as far as anything else watching this directory is concerned
- * (e.g. Batabiboing's "coding with Codex" activity signal reads the same directory's newest
- * mtime), so leaving the file behind falsely reports Codex activity every time this fallback runs. */
-async function cleanupProbeSession(sessionsDir: string, filesBeforeSpawn: Set<string>): Promise<void> {
-  let filesAfterSpawn: string[];
-  try {
-    filesAfterSpawn = await jsonlFiles(sessionsDir);
-  } catch {
-    return;
-  }
-  await Promise.all(
-    filesAfterSpawn
-      .filter((file) => !filesBeforeSpawn.has(file))
-      .map((file) => unlink(file).catch(() => undefined)),
-  );
 }
 
 /** How long the terminal must go without new output before another `/status` is worth sending —
