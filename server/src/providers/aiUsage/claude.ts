@@ -27,6 +27,12 @@ function claudeProjectsDir(): string {
   return path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
 }
 
+// This probe is a throwaway process reading a local screen, not a session the user opened — it
+// shouldn't show up as one of "your sessions" on claude.ai/code or the mobile app the way a real
+// terminal session does. `--settings` layers this on top of (never replaces) the user's own
+// settings files, so their real interactive sessions keep Remote Control exactly as configured.
+const PROBE_ARGS = ['--settings', JSON.stringify({ disableRemoteControl: true })];
+
 const claudeTranscriptEntrySchema = z.object({
   type: z.literal('assistant'),
   timestamp: z.string(),
@@ -274,7 +280,7 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
     await ensurePtySpawnHelper();
     const executable = await resolveProbeExecutable('claude');
     const output = await new Promise<string>((resolve) => {
-      const pty = spawnPty(executable, [], {
+      const pty = spawnPty(executable, PROBE_ARGS, {
         name: 'xterm-256color',
         cols: 160,
         rows: 48,
