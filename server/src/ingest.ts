@@ -119,7 +119,9 @@ async function checkBiRealReminder(): Promise<void> {
 }
 
 if (pushUrl && pushSecret) {
-  void checkBiRealReminder();
+  // checkBiRealReminder never throws (it catches internally), so this can't fail startup — it's
+  // plain top-level await, not a startup gate.
+  await checkBiRealReminder();
   setInterval(() => void checkBiRealReminder(), BIREAL_CHECK_INTERVAL_MS);
 }
 
