@@ -3,12 +3,7 @@
  * its own module here rather than sharing one file. The whole overview card is a single link (see
  * SectionCard), so these components stay display-only — no nested anchors.
  */
-export {
-  SteamAchievementsWidget,
-  SteamAchievementShowcase,
-  SteamAllAchievements,
-  SteamMissingAchievements,
-} from './achievements';
+export { SteamAchievementsWidget, SteamAchievementBrowser } from './achievements';
 export { SteamFriendsLeaderboard, SteamFriendsWidget } from './friends';
 export { SteamGameList, SteamLibraryStats, SteamRecentGames } from './library';
 export { SteamActivityHero } from './nowPlaying';

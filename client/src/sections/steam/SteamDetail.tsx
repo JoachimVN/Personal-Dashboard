@@ -2,14 +2,12 @@ import type { SteamData } from '@personal-dashboard/shared';
 import { useWidget } from '../../useWidget';
 import { WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import {
-  SteamAchievementShowcase,
+  SteamAchievementBrowser,
   SteamAchievementsWidget,
   SteamActivityHero,
-  SteamAllAchievements,
   SteamFriendsLeaderboard,
   SteamFriendsWidget,
   SteamGameList,
-  SteamMissingAchievements,
   SteamPlaytimeTrend,
   SteamRecentGames,
 } from '../../widgets/steam';
@@ -65,31 +63,14 @@ export function SteamDetail() {
       </div>
 
       <DetailSectionHeading
-        title="Tracked game highlights"
-        detail="Rarest unlocks and the achievements you're closest to in your current or most recently played game, ranked by Steam's global unlock rate."
+        title="Tracked game achievements"
+        detail="Every achievement for your current or most recently played game. Sort by Steam's global unlock rate to see what's rare, or by date to see what you've been getting."
       />
-      <WidgetShell title="Achievement highlights">
+      <WidgetShell title="Achievements">
         <WidgetBody envelope={envelope} offline={offline}>
-          {(data) => <SteamAchievementShowcase data={data} />}
+          {(data) => <SteamAchievementBrowser data={data} />}
         </WidgetBody>
       </WidgetShell>
-
-      <DetailSectionHeading
-        title="All achievements"
-        detail="Every achievement for the tracked game, hardest (rarest) first — unlocked and still missing."
-      />
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <WidgetShell title="Unlocked">
-          <WidgetBody envelope={envelope} offline={offline}>
-            {(data) => <SteamAllAchievements data={data} />}
-          </WidgetBody>
-        </WidgetShell>
-        <WidgetShell title="Missing">
-          <WidgetBody envelope={envelope} offline={offline}>
-            {(data) => <SteamMissingAchievements data={data} />}
-          </WidgetBody>
-        </WidgetShell>
-      </div>
 
       <DetailSectionHeading
         title="Playtime leaderboard"
