@@ -258,6 +258,42 @@
   letter-spacing: 0.13em;
   text-transform: uppercase;
 }
+
+/* The one-line callout above the achievement list — "final stretch", or the completed win. Tinted
+   rather than boxed so it reads as a remark on the progress bar above it, not a third card. */
+.steam-achievement-summary {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  background: color-mix(in oklab, var(--color-accent-steam) 12%, var(--color-card));
+}
+.steam-achievement-summary--complete {
+  background: color-mix(in oklab, var(--color-accent-steam) 22%, var(--color-card));
+}
+
+/* The two-extremes summary (rarest owned / easiest missing). Side by side where there's room, and
+   each cell stacks its own label, name and figure so a long achievement name truncates on its own
+   line instead of pushing the figure out of the row. */
+.steam-achievement-summary-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 30rem) {
+  .steam-achievement-summary-grid { grid-template-columns: 1fr 1fr; }
+}
+.steam-achievement-summary-grid p {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.8rem;
+  background: var(--color-track);
+}
+.steam-achievement-summary-grid p > span:last-child { font-size: 0.72rem; }
 .steam-pulse-top {
   display: flex;
   align-items: center;
