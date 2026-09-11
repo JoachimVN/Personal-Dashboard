@@ -166,6 +166,14 @@ function sortByDifficulty<T extends { globalUnlockedPercent?: number }>(items: r
   });
 }
 
+/** The rarity/percent line's text — pulled out of the row so the percent-suffix choice isn't a
+ * ternary nested inside the "do we even have a percent" ternary. */
+function rarityDetail(achievement: SteamAchievement | SteamLockedAchievement, locked: boolean): string {
+  if (achievement.globalUnlockedPercent === undefined) return 'Rarity unknown';
+  const suffix = locked ? ' have this' : '';
+  return `${achievement.globalUnlockedPercent.toFixed(1)}% of players${suffix}`;
+}
+
 function AchievementRow({ achievement, locked }: Readonly<{ achievement: SteamAchievement | SteamLockedAchievement; locked: boolean }>) {
   const tier = achievement.globalUnlockedPercent !== undefined ? rarityTier(achievement.globalUnlockedPercent) : undefined;
   return (
@@ -180,9 +188,7 @@ function AchievementRow({ achievement, locked }: Readonly<{ achievement: SteamAc
         <p className="flex items-center gap-1.5 truncate text-xs text-ink-faint">
           {tier && <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: tier.color }} />}
           {tier ? `${tier.label} · ` : ''}
-          {achievement.globalUnlockedPercent !== undefined
-            ? `${achievement.globalUnlockedPercent.toFixed(1)}% of players${locked ? ' have this' : ''}`
-            : 'Rarity unknown'}
+          {rarityDetail(achievement, locked)}
         </p>
       </div>
     </li>
