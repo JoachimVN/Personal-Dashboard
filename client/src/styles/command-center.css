@@ -262,6 +262,12 @@
   inset: 0;
   z-index: 0;
   border-radius: inherit;
+  /* Without this, a touch device's own gesture system can claim a horizontal drag for native
+     panning/overscroll before CommandPanel's touchstart/touchend handlers ever see a clean
+     gesture — this is what actually blocked the secondary carousel's swipe, not the JS logic
+     itself (which checks out fine under synthetic touch events). Vertical page scroll still
+     passes through untouched. */
+  touch-action: pan-y;
 }
 
 .command-panel--full-link > .command-panel-stretched-link {
