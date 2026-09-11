@@ -5,9 +5,11 @@ import {
   SteamAchievementShowcase,
   SteamAchievementsWidget,
   SteamActivityHero,
+  SteamAllAchievements,
   SteamFriendsLeaderboard,
   SteamFriendsWidget,
   SteamGameList,
+  SteamMissingAchievements,
   SteamPlaytimeTrend,
   SteamRecentGames,
 } from '../../widgets/steam';
@@ -71,6 +73,23 @@ export function SteamDetail() {
           {(data) => <SteamAchievementShowcase data={data} />}
         </WidgetBody>
       </WidgetShell>
+
+      <DetailSectionHeading
+        title="All achievements"
+        detail="Every achievement for the tracked game, hardest (rarest) first — unlocked and still missing."
+      />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <WidgetShell title="Unlocked">
+          <WidgetBody envelope={envelope} offline={offline}>
+            {(data) => <SteamAllAchievements data={data} />}
+          </WidgetBody>
+        </WidgetShell>
+        <WidgetShell title="Missing">
+          <WidgetBody envelope={envelope} offline={offline}>
+            {(data) => <SteamMissingAchievements data={data} />}
+          </WidgetBody>
+        </WidgetShell>
+      </div>
 
       <DetailSectionHeading
         title="Playtime leaderboard"
