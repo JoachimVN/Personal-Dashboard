@@ -1,5 +1,14 @@
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type TouchEvent,
+} from 'react';
 import type {
   CalendarData,
   CommandCenterData,
@@ -123,6 +132,10 @@ function secondarySlotsFor(commandCenter: CommandCenterData | undefined): Comman
     : [commandCenter.secondary as unknown as CommandCenterSlot];
 }
 
+/** Below this, a touch is a tap (let the stretched link navigate); at or above it, it's a swipe
+ * (change slide instead — see onSwipeLeft/onSwipeRight on CommandPanel). */
+const SWIPE_THRESHOLD_PX = 40;
+
 export function CommandPanel({
   href,
   label,
@@ -131,6 +144,8 @@ export function CommandPanel({
   fullCardLink = false,
   style,
   art,
+  onSwipeLeft,
+  onSwipeRight,
 }: Readonly<{
   href: string;
   label: string;
@@ -140,11 +155,42 @@ export function CommandPanel({
   style?: CSSProperties;
   /** Backdrop key art (arena/league renders) — painted first so it sits behind all other children. */
   art?: string;
+  /** Horizontal swipe on the card's stretched link (phone carousels, e.g. the secondary agenda
+   * card) — a small movement still falls through as a normal tap-to-navigate. */
+  onSwipeLeft?: () => void;
+  onSwipeRight?: () => void;
 }>) {
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (event: TouchEvent<HTMLAnchorElement>) => {
+    const touch = event.touches[0];
+    touchStart.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  };
+
+  const handleTouchEnd = (event: TouchEvent<HTMLAnchorElement>) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start || (!onSwipeLeft && !onSwipeRight)) return;
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < SWIPE_THRESHOLD_PX || Math.abs(dx) < Math.abs(dy)) return;
+    // A real swipe, not a tap — stop it from also navigating the stretched link.
+    event.preventDefault();
+    if (dx < 0) onSwipeLeft?.(); else onSwipeRight?.();
+  };
+
   return (
     <div className={`${className} cursor-pointer${fullCardLink ? ' command-panel--full-link' : ''}`} style={style}>
       {art && <img src={art} alt="" aria-hidden className="command-panel-art" />}
-      <a href={href} aria-label={label} className="command-panel-stretched-link" />
+      <a
+        href={href}
+        aria-label={label}
+        className="command-panel-stretched-link"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      />
       {children}
     </div>
   );
@@ -500,21 +546,32 @@ const secondarySlideVariants = {
   exit: (direction: 1 | -1) => ({ x: `${direction * -100}%` }),
 };
 
-function SecondaryCarousel({
-  items,
-  activeIndex,
-  onActiveChange,
-  renderItem,
-}: Readonly<{
+export interface SecondaryCarouselHandle {
+  goTo: (index: number) => void;
+}
+
+const SecondaryCarousel = forwardRef<SecondaryCarouselHandle, Readonly<{
   items: CommandCenterSlot[];
   activeIndex: number;
   onActiveChange: (index: number) => void;
   renderItem: (slot: CommandCenterSlot) => ReactNode;
-}>) {
+}>>(function SecondaryCarousel({ items, activeIndex, onActiveChange, renderItem }, ref) {
   const [paused, setPaused] = useState(false);
   const [direction, setDirection] = useState<1 | -1>(1);
   const hasMultipleItems = items.length > 1;
   const visibleIndex = Math.min(activeIndex, items.length - 1);
+
+  const goTo = (index: number) => {
+    if (items.length < 2) return;
+    const target = (index + items.length) % items.length;
+    const forwardDistance = (target - visibleIndex + items.length) % items.length;
+    setDirection(forwardDistance <= items.length - forwardDistance ? 1 : -1);
+    onActiveChange(target);
+  };
+
+  // Swiping the card (see CommandPanel's onSwipeLeft/onSwipeRight) drives the same goTo the dots
+  // and autoplay use, so a swipe-triggered change gets the correct slide-in direction too.
+  useImperativeHandle(ref, () => ({ goTo }));
 
   useEffect(() => {
     onActiveChange(0);
@@ -534,13 +591,6 @@ function SecondaryCarousel({
   // --secondary-carousel-media-size/-content-height custom properties several secondary bodies
   // size off (e.g. the Roblox icon), not just the slide/dots machinery skipped below.
   if (!hasMultipleItems) return <div className="command-secondary-carousel">{renderItem(items[0]!)}</div>;
-
-  const goTo = (index: number) => {
-    const target = (index + items.length) % items.length;
-    const forwardDistance = (target - visibleIndex + items.length) % items.length;
-    setDirection(forwardDistance <= items.length - forwardDistance ? 1 : -1);
-    onActiveChange(target);
-  };
 
   const pause = () => setPaused(true);
   const resume = () => setPaused(false);
@@ -589,7 +639,7 @@ function SecondaryCarousel({
       </section>
     </MotionConfig>
   );
-}
+});
 
 /** Icon-only so the pill row stays a fixed width as sections are added — labels made it grow
     unbounded. Clash Royale and Valorant remain available in the overview grid, but are
@@ -782,6 +832,7 @@ export function DailyCommandCenter() {
   const { commandCenter, calendar, weather, github, health, gmail, aiUsage, spotify, spotifyFetchedAt, steam, roblox } = useCommandCenterData();
   const [hoveredDay, setHoveredDay] = useState<{ date: string; count: number } | null>(null);
   const [activeSecondaryIndex, setActiveSecondaryIndex] = useState(0);
+  const secondaryCarouselRef = useRef<SecondaryCarouselHandle>(null);
   // A running server may be refreshed separately from the Vite client during local development.
   // Keep the overview usable while the server still returns the pre-carousel single-slot payload.
   const secondarySlots = secondarySlotsFor(commandCenter);
@@ -819,8 +870,11 @@ export function DailyCommandCenter() {
         fullCardLink
         style={secondaryPanelStyle}
         art={secondaryArt(activeSecondary)}
+        onSwipeLeft={() => secondaryCarouselRef.current?.goTo(activeSecondaryIndex + 1)}
+        onSwipeRight={() => secondaryCarouselRef.current?.goTo(activeSecondaryIndex - 1)}
       >
         <SecondaryCarousel
+          ref={secondaryCarouselRef}
           items={secondarySlots}
           activeIndex={activeSecondaryIndex}
           onActiveChange={setActiveSecondaryIndex}

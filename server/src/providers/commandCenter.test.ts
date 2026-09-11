@@ -85,7 +85,7 @@ const FRESH_MS = 3 * 24 * 3_600_000;
 describe('computeSteamMoments', () => {
   it('does not fire a completion on the first poll, only once it changes from incomplete', async () => {
     const signals = new InMemorySignals() as unknown as SignalHistoryStore;
-    const completedGame = { appId: 10, gameName: 'Portal', unlockedCount: 5, totalCount: 5, recentUnlocks: [], rarest: [], nextEasiest: [] };
+    const completedGame = { appId: 10, gameName: 'Portal', unlockedCount: 5, totalCount: 5, recentUnlocks: [], rarest: [], nextEasiest: [], locked: [] };
 
     await expect(computeSteamMoments(signals, steam({ achievements: completedGame }), [], FRESH_MS))
       .resolves.toMatchObject({ completedGame: false });

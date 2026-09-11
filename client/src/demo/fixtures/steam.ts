@@ -56,6 +56,12 @@ export function steam(now: Date): SteamData {
         { apiName: 'ACH_ROUNDTABLE', displayName: 'Roundtable Hold', description: 'Arrived at the Roundtable Hold.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/f4e5fd19d3410470709632cd02b3136b5baca33d.jpg', globalUnlockedPercent: 94.2 },
         { apiName: 'ACH_GREATRUNE', displayName: 'Great Rune', description: 'Acquired a Great Rune.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/3881b1c355ffcc122655c134f988d6c1265cd8c9.jpg', globalUnlockedPercent: 88.7 },
       ],
+      locked: [
+        { apiName: 'ACH_ROUNDTABLE', displayName: 'Roundtable Hold', description: 'Arrived at the Roundtable Hold.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/f4e5fd19d3410470709632cd02b3136b5baca33d.jpg', globalUnlockedPercent: 94.2 },
+        { apiName: 'ACH_GREATRUNE', displayName: 'Great Rune', description: 'Acquired a Great Rune.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/3881b1c355ffcc122655c134f988d6c1265cd8c9.jpg', globalUnlockedPercent: 88.7 },
+        { apiName: 'ACH_MORGOTT', displayName: 'Omen King', description: 'Defeated Morgott, the Omen King.', iconUrl: 'https://shared.fastly.steamstatic.com/community_assets/images/apps/1245620/3d1a5f5e2b0a1e7a1b6a7a1e1a1a1a1a1a1a1a1a.jpg', globalUnlockedPercent: 41.6 },
+        { apiName: 'ACH_ELDENLORD', displayName: 'Elden Lord', description: 'Became the Elden Lord.' },
+      ],
     },
     friendsInGame: [
       { steamId: 'friend1', personaName: 'Alex', appId: 730, gameName: 'Counter-Strike 2' },

@@ -263,10 +263,10 @@ By default all event calendars are shown; to limit it, list display names in `se
 Apple does not always expose subscribed web calendars through CalDAV. Add any such private HTTPS ICS feed in `server/.env`, including a display name that can also be used in the allowlist:
 
 ```sh
-CALENDAR_ICS_FEEDS='[{"name":"Batabiboing","url":"https://batabiboing.vercel.app/api/calendar/<calendar-id>"}]'
+CALENDAR_ICS_FEEDS='[{"name":"My site","url":"https://example.com/api/calendar/<calendar-id>"}]'
 ```
 
-When `DASHBOARD_PUSH_URL` and `DASHBOARD_PUSH_SECRET` are already configured for Batabiboing, all of its active countdowns are included automatically through a protected aggregate feed.
+When `DASHBOARD_PUSH_URL` and `DASHBOARD_PUSH_SECRET` are already configured, all of that linked site's active countdowns are included automatically through a protected aggregate feed.
 
 ### Gmail
 

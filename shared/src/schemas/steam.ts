@@ -115,6 +115,9 @@ export const steamSchema = z.object({
       /** Up to 5 locked achievements with the highest global unlock percent — "most players have
        * this, you don't yet". */
       nextEasiest: z.array(steamLockedAchievementSchema),
+      /** Every locked achievement, unsorted — the client sorts this itself (e.g. by rarity) for
+       * the full "missing achievements" browser, as opposed to nextEasiest's curated showcase. */
+      locked: z.array(steamLockedAchievementSchema),
     })
     .nullable(),
   friendsInGame: z.array(steamFriendSchema),

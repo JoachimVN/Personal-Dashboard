@@ -214,6 +214,23 @@ describe('mergeAchievements', () => {
     // Already-unlocked (ACH_DONE) and rarity-less (ACH_UNKNOWN) achievements never appear here.
     expect(result.nextEasiest.map((a) => a.apiName)).toEqual(['ACH_EASY', 'ACH_HARD']);
   });
+
+  it('carries every locked achievement, including ones with no rarity data, unlike nextEasiest', () => {
+    const result = mergeAchievements(
+      [
+        { apiname: 'ACH_DONE', achieved: 1, unlocktime: 1 },
+        { apiname: 'ACH_HARD', achieved: 0, unlocktime: 0 },
+        { apiname: 'ACH_UNKNOWN', achieved: 0, unlocktime: 0 },
+      ],
+      [
+        { apiName: 'ACH_DONE', displayName: 'Done' },
+        { apiName: 'ACH_HARD', displayName: 'Hard' },
+        { apiName: 'ACH_UNKNOWN', displayName: 'Unknown' },
+      ],
+      [{ apiName: 'ACH_HARD', percent: 2 }],
+    );
+    expect(result.locked.map((a) => a.apiName)).toEqual(['ACH_HARD', 'ACH_UNKNOWN']);
+  });
 });
 
 describe('chunkFriendIds', () => {

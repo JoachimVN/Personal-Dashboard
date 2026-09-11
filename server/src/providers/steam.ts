@@ -207,6 +207,7 @@ export function mergeAchievements(
   recentUnlocks: SteamAchievement[];
   rarest: SteamAchievement[];
   nextEasiest: SteamLockedAchievement[];
+  locked: SteamLockedAchievement[];
 } {
   const schemaByName = new Map(schema.map((entry) => [entry.apiName, entry]));
   const percentByName = new Map(percentages.map((entry) => [entry.apiName, entry.percent]));
@@ -232,9 +233,7 @@ export function mergeAchievements(
     .sort((a, b) => a.globalUnlockedPercent! - b.globalUnlockedPercent!)
     .slice(0, RARITY_SHOWCASE_COUNT);
 
-  // "Most other players already have this, you don't yet" — locked achievements sorted by
-  // descending global unlock rate.
-  const nextEasiest: SteamLockedAchievement[] = schema
+  const locked: SteamLockedAchievement[] = schema
     .filter((entry) => !unlockedNames.has(entry.apiName))
     .map((entry) => ({
       apiName: entry.apiName,
@@ -242,12 +241,16 @@ export function mergeAchievements(
       description: entry.description,
       iconUrl: entry.icon,
       globalUnlockedPercent: percentByName.get(entry.apiName),
-    }))
+    }));
+
+  // "Most other players already have this, you don't yet" — locked achievements sorted by
+  // descending global unlock rate.
+  const nextEasiest = [...locked]
     .filter((entry) => entry.globalUnlockedPercent !== undefined)
     .sort((a, b) => b.globalUnlockedPercent! - a.globalUnlockedPercent!)
     .slice(0, RARITY_SHOWCASE_COUNT);
 
-  return { unlockedCount: unlocked.length, totalCount: playerAchievements.length, recentUnlocks, rarest, nextEasiest };
+  return { unlockedCount: unlocked.length, totalCount: playerAchievements.length, recentUnlocks, rarest, nextEasiest, locked };
 }
 
 function isExpired(fetchedAt: Date, ttlMs: number): boolean {
@@ -634,12 +637,12 @@ async function fetchAchievements(
 
   const schema = await getOrFetchAchievementSchema(signal, apiKey, appId, snapshotStore);
   const percentages = await getOrFetchAchievementPercentages(signal, apiKey, appId, snapshotStore);
-  const { unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest } = mergeAchievements(
+  const { unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest, locked } = mergeAchievements(
     playerAchievements,
     schema,
     percentages,
   );
-  return { appId, gameName, unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest };
+  return { appId, gameName, unlockedCount, totalCount, recentUnlocks, rarest, nextEasiest, locked };
 }
 
 /** Fixes up every game's art on the way out, not just on a fresh GetOwnedGames fetch — the 6-hour

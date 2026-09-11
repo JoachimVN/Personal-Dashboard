@@ -146,12 +146,28 @@ function parseDatedResetAt(monthAbbr: string, day: string, hour: string, minute:
   return Number.isNaN(candidate.getTime()) ? undefined : candidate.toISOString();
 }
 
-/** The five-hour screen says only "Resets 5:20pm", so infer today or tomorrow locally. */
+/**
+ * The five-hour screen says only "Resets 5:20pm", so infer today or tomorrow locally.
+ *
+ * A real five-hour deadline can never be more than FIVE_HOUR_MS out from a live read, so only
+ * trust "must mean tomorrow" when rolling forward lands within that reach (the legitimate case:
+ * reading just after midnight against a window that started late the previous evening). Rolling
+ * forward unconditionally — the original behavior — mistook an ordinary stale terminal render
+ * (the probe capturing a render a few minutes old, already documented elsewhere in this file as a
+ * known ConPTY/redraw-race issue) for "resets tomorrow," overshooting the real deadline by nearly a
+ * full day. That inflated resetsAt then looked like the *next* on-time reset had happened "23
+ * hours early," when the reset was normal and our own estimate was simply wrong. Left unrolled, a
+ * same-day time that's merely a few minutes stale reads as "already reset" — corrected by the next
+ * successful poll instead of compounding into a day-long error.
+ */
 function parseTimeOnlyResetAt(hour: string, minute: string | undefined, meridiem: string, now = new Date()): string | undefined {
   let hour24 = Number(hour) % 12;
   if (meridiem.toLowerCase() === 'pm') hour24 += 12;
   const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour24, minute ? Number(minute) : 0);
-  if (candidate.getTime() < now.getTime()) candidate.setDate(candidate.getDate() + 1);
+  const rolledToTomorrow = candidate.getTime() + 24 * 60 * 60_000;
+  if (candidate.getTime() < now.getTime() && rolledToTomorrow - now.getTime() <= FIVE_HOUR_MS) {
+    candidate.setDate(candidate.getDate() + 1);
+  }
   return Number.isNaN(candidate.getTime()) ? undefined : candidate.toISOString();
 }
 

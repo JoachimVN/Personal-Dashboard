@@ -13,7 +13,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('latestClashRoyaleActivity', () => {
-  it('keeps only the latest battle fields Batabiboing needs', () => {
+  it('keeps only the latest battle fields the linked status site needs', () => {
     expect(latestClashRoyaleActivity({
       recentBattles: [{
         battleTime: '2026-07-23T18:00:00.000Z',

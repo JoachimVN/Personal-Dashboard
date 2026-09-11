@@ -42,7 +42,7 @@ export type ClashOfClansPushState = z.infer<typeof pushStateSchema>;
  * dedup keys and milestone baseline only ever lived in the provider's in-memory closure — a
  * server restart reset them to undefined, which made `fetchClashOfClansActivity` treat the
  * *same* already-reported war attack as brand new, re-stamp it with `new Date().toISOString()`,
- * and re-push it to Batabiboing. Batabiboing then displayed the same stale attack/message with a
+ * and re-push it to the linked status site. It then displayed the same stale attack/message with a
  * timestamp that looked fresh, resetting its 12h staleness window on every restart.
  */
 export class ClashOfClansStateStore {

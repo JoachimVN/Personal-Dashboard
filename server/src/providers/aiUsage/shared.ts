@@ -65,9 +65,9 @@ export async function jsonlFiles(directory: string): Promise<string[]> {
  * against a directory listing captured right before the probe was spawned. The probe exists purely
  * to read a screen rendered in the terminal — its transcript has no lasting value — but the process
  * it spawns is a real CLI session as far as anything else watching that directory is concerned (e.g.
- * Batabiboing's "coding with Claude/Codex" activity signal reads the same directories' newest
- * mtime), so leaving the file behind falsely reports activity, and clutters the session list, every
- * time the probe runs. */
+ * a linked status site's "coding with Claude/Codex" activity signal reads the same directories'
+ * newest mtime), so leaving the file behind falsely reports activity, and clutters the session list,
+ * every time the probe runs. */
 export async function cleanupProbeSession(sessionsDir: string, filesBeforeSpawn: Set<string>): Promise<void> {
   let filesAfterSpawn: string[];
   try {

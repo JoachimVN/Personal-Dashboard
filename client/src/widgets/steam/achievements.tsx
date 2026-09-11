@@ -1,9 +1,9 @@
-import type { SteamData } from '@personal-dashboard/shared';
+import type { SteamAchievement, SteamData, SteamLockedAchievement } from '@personal-dashboard/shared';
 import { relativeTime } from '../../lib/time';
 import { accent, findTrackedGame, useArtFallback } from './shared';
 
 /** Rarity tier for a global-unlock percent, echoed as both text and color — never color alone. */
-function rarityTier(percent: number): { label: string; color: string } {
+export function rarityTier(percent: number): { label: string; color: string } {
   if (percent < 5) return { label: 'Ultra rare', color: 'light-dark(#a3195b, #ff5da8)' };
   if (percent < 15) return { label: 'Rare', color: 'light-dark(#7c3aed, #c4b5fd)' };
   if (percent < 35) return { label: 'Uncommon', color: 'light-dark(#0e7490, #22d3ee)' };
@@ -153,5 +153,82 @@ export function SteamAchievementShowcase({ data }: Readonly<{ data: SteamData }>
         </div>
       )}
     </div>
+  );
+}
+
+/** Hardest (lowest global unlock %) first; achievements Steam has no rarity data for yet sort last
+ * rather than being dropped, since these lists are meant to be the complete set, not a showcase. */
+function sortByDifficulty<T extends { globalUnlockedPercent?: number }>(items: readonly T[]): T[] {
+  return [...items].sort((a, b) => {
+    if (a.globalUnlockedPercent === undefined) return b.globalUnlockedPercent === undefined ? 0 : 1;
+    if (b.globalUnlockedPercent === undefined) return -1;
+    return a.globalUnlockedPercent - b.globalUnlockedPercent;
+  });
+}
+
+/** The rarity/percent line's text — pulled out of the row so the percent-suffix choice isn't a
+ * ternary nested inside the "do we even have a percent" ternary. */
+function rarityDetail(achievement: SteamAchievement | SteamLockedAchievement, locked: boolean): string {
+  if (achievement.globalUnlockedPercent === undefined) return 'Rarity unknown';
+  const suffix = locked ? ' have this' : '';
+  return `${achievement.globalUnlockedPercent.toFixed(1)}% of players${suffix}`;
+}
+
+function AchievementRow({ achievement, locked }: Readonly<{ achievement: SteamAchievement | SteamLockedAchievement; locked: boolean }>) {
+  const tier = achievement.globalUnlockedPercent !== undefined ? rarityTier(achievement.globalUnlockedPercent) : undefined;
+  return (
+    <li className={`flex items-center gap-3 rounded-xl bg-track/25 px-3 py-2${locked ? ' opacity-70' : ''}`}>
+      {achievement.iconUrl ? (
+        <img src={achievement.iconUrl} alt="" className={`h-8 w-8 shrink-0 rounded-md object-cover${locked ? ' grayscale' : ''}`} />
+      ) : (
+        <div className="h-8 w-8 shrink-0 rounded-md bg-track" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-ink">{achievement.displayName}</p>
+        <p className="flex items-center gap-1.5 truncate text-xs text-ink-faint">
+          {tier && <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: tier.color }} />}
+          {tier ? `${tier.label} · ` : ''}
+          {rarityDetail(achievement, locked)}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+/** Every unlocked achievement for the tracked game, hardest-first — the complete list, as opposed
+ * to SteamAchievementShowcase's curated "rarest 5". */
+export function SteamAllAchievements({ data }: Readonly<{ data: SteamData }>) {
+  if (data.availability.achievements !== 'available' || !data.achievements) {
+    return <p className="text-sm text-ink-faint">No achievement data for the tracked game right now.</p>;
+  }
+  const unlocked = sortByDifficulty(data.achievements.recentUnlocks);
+  if (unlocked.length === 0) {
+    return <p className="text-sm text-ink-faint">No unlocked achievements yet.</p>;
+  }
+  return (
+    <ul className="max-h-[28rem] space-y-2 overflow-y-auto pr-1 text-sm">
+      {unlocked.map((achievement) => (
+        <AchievementRow key={achievement.apiName} achievement={achievement} locked={false} />
+      ))}
+    </ul>
+  );
+}
+
+/** Every achievement not yet unlocked for the tracked game, hardest-first — the complete list, as
+ * opposed to SteamAchievementShowcase's curated "next easiest 5". */
+export function SteamMissingAchievements({ data }: Readonly<{ data: SteamData }>) {
+  if (data.availability.achievements !== 'available' || !data.achievements) {
+    return <p className="text-sm text-ink-faint">No achievement data for the tracked game right now.</p>;
+  }
+  const locked = sortByDifficulty(data.achievements.locked);
+  if (locked.length === 0) {
+    return <p className="text-sm text-ink-faint">No missing achievements — full clear.</p>;
+  }
+  return (
+    <ul className="max-h-[28rem] space-y-2 overflow-y-auto pr-1 text-sm">
+      {locked.map((achievement) => (
+        <AchievementRow key={achievement.apiName} achievement={achievement} locked />
+      ))}
+    </ul>
   );
 }

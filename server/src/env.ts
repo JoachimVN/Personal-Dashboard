@@ -119,8 +119,9 @@ export function parseDashboardPush(): ServerEnv['dashboardPush'] {
   return { url, secret };
 }
 
-/** Matches Batabiboing's derived token so a feed URL cannot authenticate its push endpoint. */
-export function batabiboingCalendarFeed(
+/** Matches the linked status site's derived token so a feed URL cannot authenticate its push
+ * endpoint. */
+export function statusSiteCalendarFeed(
   pushUrl: string,
   pushSecret: string,
 ): { name: string; url: string } | undefined {
@@ -133,7 +134,7 @@ export function batabiboingCalendarFeed(
     url.pathname = '/api/calendar';
     url.search = '';
     url.searchParams.set('token', token);
-    return { name: 'Batabiboing', url: url.toString() };
+    return { name: 'Status site', url: url.toString() };
   } catch {
     return undefined;
   }
@@ -175,7 +176,7 @@ export function loadEnv(): ServerEnv {
         : undefined,
     calendarIcsFeeds: [
       ...parseCalendarIcsFeeds(),
-      ...(dashboardPush ? [batabiboingCalendarFeed(dashboardPush.url, dashboardPush.secret)].filter(
+      ...(dashboardPush ? [statusSiteCalendarFeed(dashboardPush.url, dashboardPush.secret)].filter(
         (feed): feed is { name: string; url: string } => feed !== undefined,
       ) : []),
     ],
