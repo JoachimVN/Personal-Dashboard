@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compareCalendarEvents, parseVCardBirthday } from './calendar.js';
-import { batabiboingCalendarFeed, parseCalendarIcsFeeds } from '../env.js';
+import { statusSiteCalendarFeed, parseCalendarIcsFeeds } from '../env.js';
 
 describe('parseVCardBirthday', () => {
   it('parses a dashed BDAY with a known year', () => {
@@ -36,11 +36,11 @@ describe('parseVCardBirthday', () => {
 describe('parseCalendarIcsFeeds', () => {
   it('keeps named HTTPS subscriptions and skips invalid entries', () => {
     expect(parseCalendarIcsFeeds(JSON.stringify([
-      { name: 'Batabiboing', url: 'https://batabiboing.vercel.app/api/calendar/example' },
+      { name: 'Status site', url: 'https://status-site.example/api/calendar/example' },
       { name: '', url: 'https://example.com/empty-name.ics' },
       { name: 'Insecure', url: 'http://example.com/feed.ics' },
     ]))).toEqual([
-      { name: 'Batabiboing', url: 'https://batabiboing.vercel.app/api/calendar/example' },
+      { name: 'Status site', url: 'https://status-site.example/api/calendar/example' },
     ]);
   });
 
@@ -49,16 +49,16 @@ describe('parseCalendarIcsFeeds', () => {
   });
 });
 
-describe('batabiboingCalendarFeed', () => {
+describe('statusSiteCalendarFeed', () => {
   it('derives a scoped feed URL from the existing dashboard push configuration', () => {
-    const feed = batabiboingCalendarFeed('https://batabiboing.vercel.app/api/push', 'push-secret');
-    expect(feed?.name).toBe('Batabiboing');
-    expect(feed?.url).toMatch(/^https:\/\/batabiboing\.vercel\.app\/api\/calendar\?token=/);
+    const feed = statusSiteCalendarFeed('https://status-site.example/api/push', 'push-secret');
+    expect(feed?.name).toBe('Status site');
+    expect(feed?.url).toMatch(/^https:\/\/status-site\.example\/api\/calendar\?token=/);
     expect(feed?.url).not.toContain('push-secret');
   });
 
   it('does not derive a feed from a non-push route', () => {
-    expect(batabiboingCalendarFeed('https://batabiboing.vercel.app/api/other', 'push-secret')).toBeUndefined();
+    expect(statusSiteCalendarFeed('https://status-site.example/api/other', 'push-secret')).toBeUndefined();
   });
 });
 

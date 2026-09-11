@@ -184,7 +184,7 @@ export function readTail(tail: string): { presence?: RocketLeaguePresence; lastO
 }
 
 /** How many finished matches to carry per push. Ten matches is already generous for one sitting,
- * and matches the cap the dashboard itself keeps — see Batabiboing's nextRocketLeagueHistory. */
+ * and matches the cap the dashboard itself keeps — see the linked status site's nextRocketLeagueHistory. */
 const MAX_RECENT_MATCHES = 10;
 
 /** Whether two presence readings are the same post-match scoreboard rather than two different

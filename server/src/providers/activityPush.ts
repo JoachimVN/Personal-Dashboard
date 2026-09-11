@@ -98,7 +98,7 @@ export interface PushedClashRoyaleActivity {
 }
 
 /** The dashboard scheduler has already fetched and validated this data using the configured
- * Supercell key. Batabiboing receives only the display-safe latest battle summary. */
+ * Supercell key. The linked status site receives only the display-safe latest battle summary. */
 export function latestClashRoyaleActivity(data: Pick<ClashRoyaleData, 'recentBattles'> | undefined): PushedClashRoyaleActivity | null {
   const battle = data?.recentBattles[0];
   return battle
@@ -371,8 +371,8 @@ export function createActivityPushProvider(
 
   // Without this, a process restart resets all of the above to undefined, which makes the very
   // next tick treat whatever war attack/raid attack is already on record as brand new — re-stamping
-  // it with the current time and re-pushing it to Batabiboing, which then displays the same stale
-  // event with a timestamp that looks fresh. Loaded once, lazily, before the first fetch.
+  // it with the current time and re-pushing it to the linked status site, which then displays the
+  // same stale event with a timestamp that looks fresh. Loaded once, lazily, before the first fetch.
   let stateLoaded: Promise<void> | undefined;
   function ensureClashOfClansStateLoaded(): Promise<void> {
     if (!clashOfClansState) return Promise.resolve();
