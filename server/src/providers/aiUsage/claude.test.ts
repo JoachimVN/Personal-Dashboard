@@ -289,6 +289,39 @@ describe('parseClaudeUsageScreen', () => {
     expect(quota.fiveHour?.usedPercent).toBe(0);
     expect(quota.asOf).toBe(new Date(2026, 6, 17, 17, 10).toISOString());
   });
+
+  it('reads a same-day five-hour reset that is a few minutes stale as still today, not tomorrow', () => {
+    // Regression: a probe capturing a slightly-stale render (the screen said "Resets 2:10pm" but
+    // by the time it was read it was already 2:15pm) used to be read as "must mean tomorrow",
+    // overshooting the real deadline by very close to a full day. The next on-time reset then
+    // looked like it had happened "23 hours early" purely from our own bad estimate — confirmed
+    // live in production history (5 of 7 "early" five-hour resets over three weeks clustered at
+    // 1400-1430 minutes early, i.e. almost exactly one day). A five-hour deadline can never
+    // legitimately be a day away, so a same-day reading that's merely minutes in the past must stay
+    // today — it gets corrected by the very next successful poll instead of compounding for a day.
+    const quota = parseClaudeUsageScreen(
+      `Current session
+      73% used
+      Resets 2:10pm (Europe/Oslo)`,
+      new Date(2026, 6, 17, 14, 15),
+    );
+
+    expect(quota.fiveHour).toEqual({ usedPercent: 73, resetsAt: new Date(2026, 6, 17, 14, 10).toISOString() });
+  });
+
+  it('still rolls a five-hour reset to tomorrow when that is the only reading within reach', () => {
+    // The legitimate case this guards: reading just after midnight against a window that started
+    // late the previous evening, where "today" at that clock time is many hours gone but "tomorrow"
+    // is only minutes away.
+    const quota = parseClaudeUsageScreen(
+      `Current session
+      90% used
+      Resets 12:05am (Europe/Oslo)`,
+      new Date(2026, 6, 17, 23, 55),
+    );
+
+    expect(quota.fiveHour).toEqual({ usedPercent: 90, resetsAt: new Date(2026, 6, 18, 0, 5).toISOString() });
+  });
 });
 
 describe('claudeNextRefreshMs', () => {
