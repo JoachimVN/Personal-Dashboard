@@ -20,11 +20,65 @@ export interface HueConfig {
   clientSecret: string;
 }
 
+/** A light's full v1 state as the music sync needs it: what it can do, and what to restore. */
+export interface HueLightSnapshot {
+  id: string;
+  on: boolean;
+  bri?: number;
+  colormode?: 'xy' | 'ct' | 'hs';
+  xy?: [number, number];
+  ct?: number;
+  hue?: number;
+  sat?: number;
+  /** Supports `xy` color. */
+  color: boolean;
+  /** Supported mirek range when the light does color temperature. */
+  ctRange?: [number, number];
+}
+
+/** Raw v1 light state body — `transitiontime` is in deciseconds. */
+export interface HueLightStateBody {
+  on?: boolean;
+  bri?: number;
+  xy?: [number, number];
+  ct?: number;
+  hue?: number;
+  sat?: number;
+  transitiontime?: number;
+}
+
 export interface HueProvider extends Provider<HueData> {
   /** Talks to the remote API directly — the Express route just calls this, no duplicated logic. */
   setLightState(id: string, state: { on?: boolean; brightness?: number }): Promise<void>;
   setGroupState(id: string, on: boolean): Promise<void>;
   activateScene(id: string): Promise<void>;
+  /** Room (group) id a scene belongs to, from the bridge; undefined for scenes not tied to a room. */
+  sceneRoomId(sceneId: string): Promise<string | undefined>;
+  /** The lights in a room, with capabilities and current state. */
+  getRoomLights(roomId: string, signal: AbortSignal): Promise<HueLightSnapshot[]>;
+  putLightState(id: string, body: HueLightStateBody, signal: AbortSignal): Promise<void>;
+}
+
+/** An HTTP failure from Philips' cloud, with the status kept so callers can spot rate limiting. */
+export class HueHttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'HueHttpError';
+  }
+}
+
+/** A v1 bridge error (HTTP 200 with an error entry). Type 201 means the light is off. */
+export class HueBridgeError extends Error {
+  constructor(
+    message: string,
+    readonly type: number,
+  ) {
+    super(message);
+    this.name = 'HueBridgeError';
+  }
 }
 
 const bridgeLightSchema = z.object({
@@ -33,7 +87,19 @@ const bridgeLightSchema = z.object({
     on: z.boolean(),
     bri: z.number().optional(),
     reachable: z.boolean().optional(),
+    colormode: z.string().optional(),
+    xy: z.tuple([z.number(), z.number()]).optional(),
+    ct: z.number().optional(),
+    hue: z.number().optional(),
+    sat: z.number().optional(),
   }),
+  capabilities: z
+    .object({
+      control: z
+        .object({ ct: z.object({ min: z.number(), max: z.number() }).optional() })
+        .optional(),
+    })
+    .optional(),
 });
 const bridgeLightsSchema = z.record(z.string(), bridgeLightSchema);
 
@@ -47,6 +113,7 @@ const bridgeSceneSchema = z.object({
 const bridgeGroupSchema = z.object({
   name: z.string(),
   type: z.string().optional(),
+  lights: z.array(z.string()).optional(),
   state: z.object({ any_on: z.boolean().optional() }).optional(),
 });
 
@@ -90,7 +157,7 @@ export function assertNoBridgeError(raw: unknown): void {
   const failure = results.find(
     (entry): entry is Extract<(typeof results)[number], { error: unknown }> => 'error' in entry,
   );
-  if (failure) throw new Error(`Hue bridge error: ${failure.error.description}`);
+  if (failure) throw new HueBridgeError(`Hue bridge error: ${failure.error.description}`, failure.error.type);
 }
 
 /**
@@ -103,7 +170,18 @@ async function currentToken(config: HueConfig, signal: AbortSignal): Promise<Hue
   const token = readHueToken();
   if (!token) throw new Error('hue is not linked — run `npm run setup:hue -w server`');
   if (token.expires_at - Date.now() > 60_000) return token;
+  // Single-flight: the widget poll and the music sync can both find the token expiring at once,
+  // and because Hue rotates the refresh token, a second concurrent refresh would present an
+  // already-spent one and fail.
+  refreshInFlight ??= refreshToken(config, token, signal).finally(() => {
+    refreshInFlight = undefined;
+  });
+  return refreshInFlight;
+}
 
+let refreshInFlight: Promise<HueToken> | undefined;
+
+async function refreshToken(config: HueConfig, token: HueToken, signal: AbortSignal): Promise<HueToken> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: {
@@ -150,7 +228,7 @@ async function remoteRequest(
     body: body !== undefined ? JSON.stringify(body) : undefined,
     signal,
   });
-  if (!res.ok) throw new Error(`hue ${method} ${path} failed: ${res.status}`);
+  if (!res.ok) throw new HueHttpError(`hue ${method} ${path} failed: ${res.status}`, res.status);
   return res.json();
 }
 
@@ -278,6 +356,29 @@ export function mapScenes(
     );
 }
 
+/** Maps a v1 light onto what the music sync needs: capabilities plus a restorable state. */
+export function toLightSnapshot(id: string, light: z.infer<typeof bridgeLightSchema>): HueLightSnapshot {
+  const { state } = light;
+  const ct = light.capabilities?.control?.ct;
+  const colormode =
+    state.colormode === 'xy' || state.colormode === 'ct' || state.colormode === 'hs' ? state.colormode : undefined;
+  let ctRange: [number, number] | undefined;
+  if (ct) ctRange = [ct.min, ct.max];
+  else if (state.ct !== undefined) ctRange = [153, 500];
+  return {
+    id,
+    on: state.on,
+    bri: state.bri,
+    colormode,
+    xy: state.xy,
+    ct: state.ct,
+    hue: state.hue,
+    sat: state.sat,
+    color: state.xy !== undefined,
+    ctRange,
+  };
+}
+
 /** Brightness is left untouched when only toggling off, so the light remembers its level. */
 export function buildLightStateBody(state: { on?: boolean; brightness?: number }): {
   on?: boolean;
@@ -302,6 +403,13 @@ export function createHueProvider(hue: HueConfig | undefined): HueProvider {
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async function getJson(path: string, signal: AbortSignal): Promise<unknown> {
+    if (!hue) throw new Error('hue is not configured');
+    const raw = await remoteRequest(hue, 'GET', path, undefined, signal);
+    assertNoBridgeError(raw);
+    return raw;
   }
 
   return {
@@ -343,6 +451,23 @@ export function createHueProvider(hue: HueConfig | undefined): HueProvider {
       // Group 0 is the built-in all-lights group; recalling a scene through it
       // applies the scene to the lights stored in the scene itself.
       await controlRequest('/groups/0/action', { scene: id });
+    },
+    async sceneRoomId(id): Promise<string | undefined> {
+      const scene = bridgeSceneSchema.parse(await getJson(`/scenes/${id}`, AbortSignal.timeout(10_000)));
+      return scene.type === 'GroupScene' ? scene.group : undefined;
+    },
+    async getRoomLights(roomId, signal): Promise<HueLightSnapshot[]> {
+      const [group, lights] = await Promise.all([
+        getJson(`/groups/${roomId}`, signal).then((raw) => bridgeGroupSchema.parse(raw)),
+        getJson('/lights', signal).then((raw) => bridgeLightsSchema.parse(raw)),
+      ]);
+      return (group.lights ?? [])
+        .filter((id) => lights[id] !== undefined)
+        .map((id) => toLightSnapshot(id, lights[id]));
+    },
+    async putLightState(id, body, signal): Promise<void> {
+      if (!hue) throw new Error('hue is not configured');
+      assertNoBridgeError(await remoteRequest(hue, 'PUT', `/lights/${id}/state`, body, signal));
     },
   };
 }

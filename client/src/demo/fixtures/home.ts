@@ -1,4 +1,4 @@
-import type { HueData, PowerData, SystemData, TransitData } from '@personal-dashboard/shared';
+import type { HueData, HueSyncData, PowerData, SystemData, TransitData } from '@personal-dashboard/shared';
 import { hhmm, mulberry32 } from '@personal-dashboard/shared';
 
 // ── Hue ──────────────────────────────────────────────────────────────────────────────────────
@@ -21,6 +21,11 @@ export function hue(): HueData {
       { id: 's3', name: 'Night', room: 'Bedroom', colors: ['#5a3ea8', '#28204f'] },
     ],
   };
+}
+
+/** Music sync starts off; the demo API fills in a track and palette when a room is switched on. */
+export function hueSync(): HueSyncData {
+  return { roomIds: [], state: 'off', track: null, palette: [], problem: null };
 }
 
 // ── Transit ──────────────────────────────────────────────────────────────────────────────────

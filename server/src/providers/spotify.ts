@@ -212,7 +212,21 @@ export async function accessToken(
   const token = readSpotifyToken();
   if (!token) throw new Error('spotify is not configured');
   if (!forceRefresh && token.expires_at - Date.now() > 60_000) return token.access_token;
+  // Single-flight: the widget and the Hue music sync share this token and can both find it
+  // expiring at once. Spotify may rotate the refresh token, so two refreshes could race.
+  refreshInFlight ??= refreshAccessToken(oauth, token, signal).finally(() => {
+    refreshInFlight = undefined;
+  });
+  return refreshInFlight;
+}
 
+let refreshInFlight: Promise<string> | undefined;
+
+async function refreshAccessToken(
+  oauth: { clientId: string; clientSecret: string },
+  token: NonNullable<ReturnType<typeof readSpotifyToken>>,
+  signal: AbortSignal,
+): Promise<string> {
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: {
@@ -296,11 +310,12 @@ async function refreshTopData(get: SpotifyGet, historyStore: SpotifyHistoryStore
 
   // Album enrichment is useful metadata, but never worth spending live-playback quota on.
   const pendingAlbumIds = await historyStore.getAlbumIdsNeedingDurations(5);
-  const enrichments: AlbumDetailInput[] = [];
-  for (const id of pendingAlbumIds) {
-    const album = await get<RawAlbumDetail>(`/albums/${id}`).catch(() => null);
-    if (album) enrichments.push(toAlbumDetailInput(album));
-  }
+  const albums = await Promise.all(
+    pendingAlbumIds.map((id) => get<RawAlbumDetail>(`/albums/${id}`).catch(() => null)),
+  );
+  const enrichments: AlbumDetailInput[] = albums
+    .filter((album): album is RawAlbumDetail => album !== null)
+    .map(toAlbumDetailInput);
   await historyStore.enrichAlbumDetails(enrichments);
 
   await historyStore.mergeArtistMetadata(

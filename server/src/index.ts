@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { z } from 'zod';
+import type { HueData } from '@personal-dashboard/shared';
 import { parseHealthIngestBody } from './healthIngest.js';
 import {
   EXTERNALLY_WRITTEN_PROVIDER_IDS,
@@ -17,6 +18,7 @@ import { migrateDatabase } from './db/migrate.js';
 import { LayoutStore } from './layoutStore.js';
 import { ProviderScheduler } from './scheduler.js';
 import { createProviders } from './providers/index.js';
+import { HUE_SYNC_PROVIDER_ID } from './providers/hueSync.js';
 import { createCommandCenterProvider } from './providers/commandCenter.js';
 import { SignalHistoryStore } from './signalHistory.js';
 import { createIssue, issueErrorCode, parseIssueInput } from './issues.js';
@@ -54,7 +56,8 @@ const signalHistory = new SignalHistoryStore(database);
 scheduler.register(createCommandCenterProvider(scheduler, signalHistory, config));
 // Archive every provider's payload as it settles. Unchanged readings are skipped, so the archive
 // grows with the data rather than with the poll rate.
-persistProviderHistory(scheduler, signalHistory, config.history.excludeProviders);
+// The music sync's state is per machine and says nothing worth keeping, so it is never archived.
+persistProviderHistory(scheduler, signalHistory, [...config.history.excludeProviders, HUE_SYNC_PROVIDER_ID]);
 // Bound that growth. Runs on every dashboard rather than an elected one: the delete is idempotent
 // and cheap, and electing a leader would mean nothing prunes while that machine is asleep.
 if (config.history.retentionDays > 0) {
@@ -85,6 +88,18 @@ scheduler.onSettled((id) => {
   commandCenterSettleTimer.unref?.();
 });
 scheduler.start();
+// The sync pushes its own changes (track, palette, rooms) instead of waiting out a poll. Coalesced,
+// because one track change fires several updates in the same tick.
+let hueSyncRefreshQueued = false;
+providers.hueSync.onChange(() => {
+  if (hueSyncRefreshQueued) return;
+  hueSyncRefreshQueued = true;
+  setTimeout(() => {
+    hueSyncRefreshQueued = false;
+    void scheduler.refresh(HUE_SYNC_PROVIDER_ID);
+  }, 50).unref?.();
+});
+if (providers.hueSync.isConfigured()) providers.hueSync.resume();
 const layoutStore = new LayoutStore(
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.data/layout.json'),
 );
@@ -156,6 +171,8 @@ app.post('/api/hue/groups/:id', async (req, res) => {
   }
   try {
     await providers.hue.setGroupState(req.params.id, parsed.data.on);
+    // Switching a synced room off means "I'm done with these lights", not "restore them later".
+    if (!parsed.data.on) providers.hueSync.release(req.params.id);
   } catch {
     res.status(502).json({ error: 'hue-control-failed' });
     return;
@@ -171,8 +188,35 @@ app.post('/api/hue/scenes/:id', async (req, res) => {
     res.status(502).json({ error: 'hue-control-failed' });
     return;
   }
+  // A scene is the user taking the room back from the music sync. Resolved from the cached
+  // widget data, so it costs no extra cloud request.
+  const hueData = scheduler.getEnvelope('hue')?.data as HueData | undefined;
+  const sceneRoom = hueData?.scenes.find((scene) => scene.id === req.params.id)?.room;
+  const sceneRoomId = hueData?.rooms.find((room) => room.name === sceneRoom)?.id;
+  if (sceneRoomId) providers.hueSync.release(sceneRoomId);
   await scheduler.refresh('hue', true);
   res.json(scheduler.getEnvelope('hue'));
+});
+
+app.post('/api/hue/sync/:roomId', async (req, res) => {
+  const parsed = hueGroupSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid-hue-sync' });
+    return;
+  }
+  if (!providers.hueSync.isConfigured()) {
+    res.status(503).json({ error: 'hue-sync-not-configured' });
+    return;
+  }
+  try {
+    await providers.hueSync.setRoom(req.params.roomId, parsed.data.on);
+  } catch (error) {
+    console.error(`[hue-sync] could not ${parsed.data.on ? 'start' : 'stop'} room (${error instanceof Error ? error.message : 'unknown'})`);
+    res.status(502).json({ error: 'hue-control-failed' });
+    return;
+  }
+  await scheduler.refresh(HUE_SYNC_PROVIDER_ID);
+  res.json(scheduler.getEnvelope(HUE_SYNC_PROVIDER_ID));
 });
 
 // Ingest endpoint for an Apple Health Shortcut running on the user's phone (over Tailscale).
@@ -185,9 +229,11 @@ app.post('/api/health/ingest', async (req, res) => {
     return;
   }
   const today = todayInZone(env.timezone);
-  for (const sample of samples) {
-    await providers.health.ingest(sample, today);
-  }
+  // Preserve submission order when several samples update the same date.
+  await samples.reduce<Promise<unknown>>(
+    (previous, sample) => previous.then(() => providers.health.ingest(sample, today)),
+    Promise.resolve(),
+  );
   await scheduler.refresh('health'); // reflect the new samples immediately, not on the next 5-min poll
   await scheduler.refresh('command-center');
   // This dashboard is already up to date; the announcement is for the other installations, which

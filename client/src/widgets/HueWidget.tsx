@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import type { HueData, HueLight, HueRoom, HueScene, WidgetEnvelope } from '@personal-dashboard/shared';
+import type { HueData, HueLight, HueRoom, HueScene, HueSyncData, WidgetEnvelope } from '@personal-dashboard/shared';
 import { useWidget } from '../useWidget';
 import { WidgetCard } from '../components/WidgetCard';
 
@@ -206,6 +206,110 @@ function RoomToggle({ room, refetch }: Readonly<{ room: HueRoom; refetch: () => 
   );
 }
 
+function NoteIcon() {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="currentColor">
+      <path d="M9 17.5a3 3 0 1 1-2-2.83V5.6a1 1 0 0 1 .76-.97l10-2.5A1 1 0 0 1 19 3.1v11.4a3 3 0 1 1-2-2.83V7.28l-8 2V17.5z" />
+    </svg>
+  );
+}
+
+/** Dark text on a light palette, white on a dark one — the toggle's fill is the album's colors. */
+function readableTextOn(palette: string[]): string {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const average = palette.reduce((sum, hex) => sum + luminance(hex), 0) / Math.max(1, palette.length);
+  return average > 0.3 ? '#1a1a1a' : '#ffffff';
+}
+
+function MusicSyncToggle({
+  room,
+  syncing,
+  palette,
+  onChanged,
+}: Readonly<{ room: HueRoom; syncing: boolean; palette: string[]; onChanged: () => void }>) {
+  const [override, setOverride] = useState<boolean | null>(null);
+  const active = override ?? syncing;
+
+  async function toggle() {
+    const next = !active;
+    setOverride(next);
+    try {
+      const res = await fetch(`/api/hue/sync/${room.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ on: next }),
+      });
+      if (res.ok) onChanged();
+    } catch {
+      // The sync widget's own polling shows the real state.
+    } finally {
+      setOverride(null);
+    }
+  }
+
+  const colors = palette.length > 0 ? palette : ['#1db954', '#1ed760'];
+  const style = active
+    ? ({
+        '--sync-gradient': `linear-gradient(90deg, ${[...colors, colors[0]].join(', ')})`,
+        color: readableTextOn(colors),
+      } as React.CSSProperties)
+    : undefined;
+
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      aria-label={`${active ? 'Stop syncing' : 'Sync'} ${room.name} to Spotify`}
+      title={active ? 'Lights follow the album art' : 'Match these lights to the album art on Spotify'}
+      onClick={() => void toggle()}
+      className="hue-sync-toggle"
+      style={style}
+    >
+      <NoteIcon />
+      Music
+    </button>
+  );
+}
+
+const SYNC_PROBLEM_COPY: Record<string, string> = {
+  'spotify-rate-limited': 'Spotify is rate limiting, retrying shortly',
+  'spotify-unreachable': "Can't reach Spotify, retrying",
+  'hue-rate-limited': 'Hue is throttling, easing off for a bit',
+  'hue-unreachable': "Some lights aren't responding",
+};
+
+function syncLabel(sync: HueSyncData): string {
+  if (sync.problem) return SYNC_PROBLEM_COPY[sync.problem] ?? 'Having trouble, retrying';
+  if (sync.state === 'starting') return 'Connecting to Spotify';
+  if (sync.state === 'nothing-playing' || !sync.track) return 'Waiting for something to play on Spotify';
+  const song = `${sync.track.name} · ${sync.track.artist}`;
+  return sync.state === 'paused' ? `Paused · ${song}` : song;
+}
+
+function MusicSyncStatus({ sync }: Readonly<{ sync: HueSyncData }>) {
+  return (
+    <div className="mt-1.5 flex min-w-0 items-center gap-2 rounded-lg bg-track px-2.5 py-1.5 text-xs">
+      {sync.track?.imageUrl && (
+        <img src={sync.track.imageUrl} alt="" className="h-5 w-5 shrink-0 rounded-sm object-cover" />
+      )}
+      {sync.palette.length > 0 && (
+        <span aria-hidden className="flex shrink-0 -space-x-1">
+          {sync.palette.map((color) => (
+            <span key={color} className="hue-sync-swatch h-2.5 w-2.5 rounded-full ring-1 ring-black/25" style={{ background: color }} />
+          ))}
+        </span>
+      )}
+      <span className={`min-w-0 truncate ${sync.problem ? 'text-ink-faint' : ''}`}>{syncLabel(sync)}</span>
+    </div>
+  );
+}
+
 function SceneGrid({ scenes, refetch }: Readonly<{ scenes: HueScene[]; refetch: () => void }>) {
   if (scenes.length === 0) return null;
   return (
@@ -224,6 +328,13 @@ function hueErrorFallback(entry: WidgetEnvelope<HueData>) {
 
 export function HueWidget() {
   const { envelope, offline, refetch } = useWidget<HueData>('hue');
+  const sync = useWidget<HueSyncData>('hue-sync');
+  const syncData = sync.envelope?.data;
+  const syncAvailable = sync.envelope?.status === 'ready' || sync.envelope?.status === 'stale';
+  const onSyncChanged = () => {
+    sync.refetch();
+    refetch(); // starting a sync can switch lights on
+  };
 
   return (
     <WidgetCard
@@ -244,18 +355,32 @@ export function HueWidget() {
             </div>
             {(data.rooms.length > 0 || data.scenes.length > 0) && (
               <div className="mt-3 space-y-2.5 border-t border-card-border pt-3">
-                {data.rooms.map((room) => (
+                {data.rooms.map((room) => {
+                  const syncing = syncData?.roomIds.includes(room.id) ?? false;
+                  return (
                   <div key={room.id}>
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs uppercase tracking-wider text-ink-faint">{room.name}</p>
-                      <RoomToggle room={room} refetch={refetch} />
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-xs uppercase tracking-wider text-ink-faint">{room.name}</p>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {syncAvailable && (
+                          <MusicSyncToggle
+                            room={room}
+                            syncing={syncing}
+                            palette={syncData?.palette ?? []}
+                            onChanged={onSyncChanged}
+                          />
+                        )}
+                        <RoomToggle room={room} refetch={onSyncChanged} />
+                      </div>
                     </div>
+                    {syncing && syncData && <MusicSyncStatus sync={syncData} />}
                     <SceneGrid
                       scenes={data.scenes.filter((scene) => scene.room === room.name)}
-                      refetch={refetch}
+                      refetch={onSyncChanged}
                     />
                   </div>
-                ))}
+                  );
+                })}
                 {(() => {
                   const roomNames = new Set(data.rooms.map((room) => room.name));
                   const orphans = data.scenes.filter(
