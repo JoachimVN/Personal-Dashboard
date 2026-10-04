@@ -218,7 +218,7 @@ function NoteIcon() {
 function readableTextOn(palette: string[]): string {
   const luminance = (hex: string) => {
     const [r, g, b] = [1, 3, 5].map((i) => {
-      const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+      const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
       return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
     });
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
@@ -300,8 +300,8 @@ function MusicSyncStatus({ sync }: Readonly<{ sync: HueSyncData }>) {
       )}
       {sync.palette.length > 0 && (
         <span aria-hidden className="flex shrink-0 -space-x-1">
-          {sync.palette.map((color, i) => (
-            <span key={i} className="hue-sync-swatch h-2.5 w-2.5 rounded-full ring-1 ring-black/25" style={{ background: color }} />
+          {sync.palette.map((color) => (
+            <span key={color} className="hue-sync-swatch h-2.5 w-2.5 rounded-full ring-1 ring-black/25" style={{ background: color }} />
           ))}
         </span>
       )}

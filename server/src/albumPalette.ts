@@ -188,7 +188,8 @@ function whiteMatching(tint: number): LampColor {
 function mulberry32(seed: number): () => number {
   let t = seed;
   return () => {
-    t = (t + 0x6d2b79f5) | 0;
+    // Keep the 32-bit wrap without relying on bitwise coercion for the running seed.
+    t = (t + 0x6d2b79f5) % 4294967296;
     let r = Math.imul(t ^ (t >>> 15), 1 | t);
     r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
     return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
@@ -202,8 +203,39 @@ function distanceSq(p: Float64Array, i: number, c: Lab): number {
   return dL * dL + da * da + db * db;
 }
 
+type Cluster = { centroid: Lab; share: number };
+
+function closestCentroid(points: Float64Array, pointIndex: number, centroids: Lab[]): number {
+  let best = 0;
+  let bestDistance = Infinity;
+  for (let c = 0; c < centroids.length; c++) {
+    const distance = distanceSq(points, pointIndex, centroids[c]);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = c;
+    }
+  }
+  return best;
+}
+
+function updateCentroids(points: Float64Array, centroids: Lab[], assignment: Int32Array): void {
+  const sums = centroids.map(() => ({ L: 0, a: 0, b: 0, count: 0 }));
+  for (let i = 0; i < assignment.length; i++) {
+    const best = closestCentroid(points, i * 3, centroids);
+    assignment[i] = best;
+    const sum = sums[best];
+    sum.L += points[i * 3];
+    sum.a += points[i * 3 + 1];
+    sum.b += points[i * 3 + 2];
+    sum.count++;
+  }
+  sums.forEach((sum, c) => {
+    if (sum.count > 0) centroids[c] = { L: sum.L / sum.count, a: sum.a / sum.count, b: sum.b / sum.count };
+  });
+}
+
 /** k-means++ seeded k-means over OKLab points (flat L,a,b triples). */
-function kmeans(points: Float64Array, k: number): { centroid: Lab; share: number }[] {
+function kmeans(points: Float64Array, k: number): Cluster[] {
   const n = points.length / 3;
   if (n === 0) return [];
   const random = mulberry32(0x9e3779b9);
@@ -212,7 +244,7 @@ function kmeans(points: Float64Array, k: number): { centroid: Lab; share: number
   centroids.push({ L: points[first], a: points[first + 1], b: points[first + 2] });
   const nearest = new Float64Array(n).fill(Infinity);
   while (centroids.length < Math.min(k, n)) {
-    const latest = centroids[centroids.length - 1];
+    const latest = centroids.at(-1)!;
     let total = 0;
     for (let i = 0; i < n; i++) {
       nearest[i] = Math.min(nearest[i], distanceSq(points, i * 3, latest));
@@ -233,27 +265,7 @@ function kmeans(points: Float64Array, k: number): { centroid: Lab; share: number
 
   const assignment = new Int32Array(n);
   for (let iter = 0; iter < KMEANS_ITERATIONS; iter++) {
-    const sums = centroids.map(() => ({ L: 0, a: 0, b: 0, count: 0 }));
-    for (let i = 0; i < n; i++) {
-      let best = 0;
-      let bestDistance = Infinity;
-      for (let c = 0; c < centroids.length; c++) {
-        const d = distanceSq(points, i * 3, centroids[c]);
-        if (d < bestDistance) {
-          bestDistance = d;
-          best = c;
-        }
-      }
-      assignment[i] = best;
-      const sum = sums[best];
-      sum.L += points[i * 3];
-      sum.a += points[i * 3 + 1];
-      sum.b += points[i * 3 + 2];
-      sum.count++;
-    }
-    sums.forEach((sum, c) => {
-      if (sum.count > 0) centroids[c] = { L: sum.L / sum.count, a: sum.a / sum.count, b: sum.b / sum.count };
-    });
+    updateCentroids(points, centroids, assignment);
   }
 
   const counts = new Array<number>(centroids.length).fill(0);
@@ -272,28 +284,33 @@ function hueDistance(x: Lab, y: Lab): number {
   return d > 180 ? 360 - d : d;
 }
 
+function closestHuePair(clusters: Cluster[]): [number, number] | undefined {
+  let best: [number, number] | undefined;
+  let bestDistance = MERGE_HUE_DEGREES;
+  for (let i = 0; i < clusters.length; i++) {
+    for (let j = i + 1; j < clusters.length; j++) {
+      const distance = hueDistance(clusters[i].centroid, clusters[j].centroid);
+      const [ci, cj] = [chroma(clusters[i].centroid), chroma(clusters[j].centroid)];
+      if (Math.max(ci, cj) > Math.min(ci, cj) * MERGE_CHROMA_RATIO) continue;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = [i, j];
+      }
+    }
+  }
+  return best;
+}
+
 /**
  * Joins clusters a lamp would show as the same color. k-means happily slices one gradient (a gold
  * helmet, a sunset) into several light-to-dark bands; each band alone can fall under the minimum
  * share and be thrown away even though together they're the cover's main color. Lightness doesn't
  * reach the lamp, so hue (plus roughly equal saturation) decides "same color". Closest pairs first.
  */
-function mergeSameHue(clusters: { centroid: Lab; share: number }[]): { centroid: Lab; share: number }[] {
+function mergeSameHue(clusters: Cluster[]): Cluster[] {
   const merged = clusters.map((cluster) => ({ ...cluster }));
   for (;;) {
-    let best: [number, number] | undefined;
-    let bestDistance = MERGE_HUE_DEGREES;
-    for (let i = 0; i < merged.length; i++) {
-      for (let j = i + 1; j < merged.length; j++) {
-        const distance = hueDistance(merged[i].centroid, merged[j].centroid);
-        const [ci, cj] = [chroma(merged[i].centroid), chroma(merged[j].centroid)];
-        if (Math.max(ci, cj) > Math.min(ci, cj) * MERGE_CHROMA_RATIO) continue;
-        if (distance < bestDistance) {
-          bestDistance = distance;
-          best = [i, j];
-        }
-      }
-    }
+    const best = closestHuePair(merged);
     if (!best) return merged;
     const [i, j] = best;
     const x = merged[i];
@@ -322,8 +339,7 @@ function lampScore(lab: Lab, share: number): number {
   return Math.sqrt(share) * saturation * darkness;
 }
 
-/** Picks up to four distinct lamp colors from RGBA pixels, strongest first. */
-export function extractPalette(rgba: Uint8Array | Uint8ClampedArray | Buffer, width: number, height: number): LampColor[] {
+function sampleCover(rgba: Uint8Array | Uint8ClampedArray | Buffer, width: number, height: number) {
   const total = width * height;
   const stride = Math.max(1, Math.floor(Math.sqrt(total / MAX_SAMPLES)));
   // Only pixels a lamp could actually show get clustered. Black backgrounds and grey areas are
@@ -346,16 +362,12 @@ export function extractPalette(rgba: Uint8Array | Uint8ClampedArray | Buffer, wi
       }
     }
   }
-  const coloredShare = sampled > 0 ? colored.length / 3 / sampled : 0;
-  if (coloredShare < MIN_SHARE * 2) return FALLBACK_PALETTE;
+  return { colored, sampled, whites, whiteTint };
+}
 
-  const candidates = mergeSameHue(kmeans(Float64Array.from(colored), CLUSTERS))
-    .map(({ centroid, share }) => ({ centroid, share: share * coloredShare }))
-    .filter(({ centroid, share }) => share >= MIN_SHARE && chroma(centroid) >= MIN_CHROMA)
-    .map((cluster) => ({ ...cluster, score: lampScore(cluster.centroid, cluster.share) }))
-    .sort((x, y) => y.score - x.score);
-  if (candidates.length === 0 || candidates[0].score < MIN_LEAD_SCORE) return FALLBACK_PALETTE;
+type ScoredCluster = Cluster & { score: number };
 
+function chooseLampColors(candidates: ScoredCluster[]): SwatchedLampColor[] {
   const chosen: SwatchedLampColor[] = [];
   for (const candidate of candidates) {
     // A faint tint next to a strong lead color is noise that the chroma boost would exaggerate
@@ -369,7 +381,23 @@ export function extractPalette(rgba: Uint8Array | Uint8ClampedArray | Buffer, wi
     if (distinct) chosen.push(lamp);
     if (chosen.length === MAX_COLORS) break;
   }
+  return chosen;
+}
 
+/** Picks up to four distinct lamp colors from RGBA pixels, strongest first. */
+export function extractPalette(rgba: Uint8Array | Uint8ClampedArray | Buffer, width: number, height: number): LampColor[] {
+  const { colored, sampled, whites, whiteTint } = sampleCover(rgba, width, height);
+  const coloredShare = sampled > 0 ? colored.length / 3 / sampled : 0;
+  if (coloredShare < MIN_SHARE * 2) return FALLBACK_PALETTE;
+
+  const candidates = mergeSameHue(kmeans(Float64Array.from(colored), CLUSTERS))
+    .map(({ centroid, share }) => ({ centroid, share: share * coloredShare }))
+    .filter(({ centroid, share }) => share >= MIN_SHARE && chroma(centroid) >= MIN_CHROMA)
+    .map((cluster) => ({ ...cluster, score: lampScore(cluster.centroid, cluster.share) }))
+    .sort((x, y) => y.score - x.score);
+  if (candidates.length === 0 || candidates[0].score < MIN_LEAD_SCORE) return FALLBACK_PALETTE;
+
+  const chosen = chooseLampColors(candidates);
   const palette: LampColor[] = chosen.map(({ xy, hex, weight }) => ({ xy, hex, weight }));
   // A cover that is mostly white or cream (a white suit, a paper backdrop) is honestly shown with
   // a white among its colors, instead of only the small colored parts of it.

@@ -229,9 +229,11 @@ app.post('/api/health/ingest', async (req, res) => {
     return;
   }
   const today = todayInZone(env.timezone);
-  for (const sample of samples) {
-    await providers.health.ingest(sample, today);
-  }
+  // Preserve submission order when several samples update the same date.
+  await samples.reduce<Promise<unknown>>(
+    (previous, sample) => previous.then(() => providers.health.ingest(sample, today)),
+    Promise.resolve(),
+  );
   await scheduler.refresh('health'); // reflect the new samples immediately, not on the next 5-min poll
   await scheduler.refresh('command-center');
   // This dashboard is already up to date; the announcement is for the other installations, which

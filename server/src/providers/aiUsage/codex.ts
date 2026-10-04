@@ -115,8 +115,9 @@ export async function codexSnapshot(sessionsDir = codexSessionsDir()): Promise<U
     const files = (await jsonlFiles(sessionsDir)).sort((a, b) => a.localeCompare(b)).slice(-12);
     const latest: CodexLimits = {};
 
-    for (const file of files) {
-      const lines = (await readFile(file, 'utf8')).trim().split('\n');
+    const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')));
+    for (const content of contents) {
+      const lines = content.trim().split('\n');
       readCodexLimits(lines, latest);
     }
 

@@ -119,7 +119,7 @@ describe('hue music sync loop', () => {
 
     await vi.advanceTimersByTimeAsync(endOfA() - Date.now() + 200);
     const blue = colorPuts().filter((put) => isBlue(put.body.xy!));
-    expect(blue.length).toBe(2);
+    expect(blue).toHaveLength(2);
     // The lights moved before the audio ended (lead time) and well before Spotify admitted it.
     expect(blue[0].at).toBeLessThanOrEqual(endOfA());
     expect(blue[0].at).toBeLessThan(endOfA() + SPOTIFY_LAG_MS);
@@ -137,7 +137,7 @@ describe('hue music sync loop', () => {
     await vi.advanceTimersByTimeAsync(3_000);
     const countWhenPaused = puts.length;
     await vi.advanceTimersByTimeAsync(20_000);
-    expect(puts.length).toBe(countWhenPaused);
+    expect(puts).toHaveLength(countWhenPaused);
     expect((await sync.fetch(new AbortController().signal, false)).state).toBe('paused');
 
     // Off: each light goes back exactly as found, including the one the sync switched on.
@@ -151,7 +151,7 @@ describe('hue music sync loop', () => {
     expect((await sync.fetch(new AbortController().signal, false)).state).toBe('off');
     const settled = puts.length;
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(puts.length).toBe(settled);
+    expect(puts).toHaveLength(settled);
   });
 
   it('lets a room go without restoring it when the user takes the lights over', async () => {
@@ -160,7 +160,7 @@ describe('hue music sync loop', () => {
     const before = puts.length;
     sync.release('83');
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(puts.length).toBe(before);
+    expect(puts).toHaveLength(before);
     expect((await sync.fetch(new AbortController().signal, false)).roomIds).toEqual([]);
   });
 });

@@ -399,7 +399,7 @@ export function createHueSyncProvider(
       return nextPollDelay(null, now - idleSince, options.pollMs);
     }
     // The lights already moved on to a predicted track; Spotify just hasn't caught up yet.
-    if (predicted && playback.track.id === predicted.previousId && now - predicted.at < PREDICTION_GRACE_MS) {
+    if (playback.track.id === predicted?.previousId && now - predicted.at < PREDICTION_GRACE_MS) {
       return MIN_POLL_MS;
     }
     predicted = undefined;
@@ -482,14 +482,14 @@ export function createHueSyncProvider(
     refreshMs: 60_000,
     timeoutMs: 5_000,
     isConfigured: () => isHueEnabled() && hue.isConfigured() && spotifyOauth !== undefined && readSpotifyToken() !== undefined,
-    async fetch(): Promise<HueSyncData> {
-      return {
+    fetch(): Promise<HueSyncData> {
+      return Promise.resolve({
         roomIds: [...sessions.keys()],
         state,
         track: track ? { id: track.id, name: track.name, artist: track.artist, imageUrl: track.imageUrl } : null,
         palette: palette.map((color) => color.hex),
         problem,
-      };
+      });
     },
 
     async setRoom(roomId, on): Promise<void> {

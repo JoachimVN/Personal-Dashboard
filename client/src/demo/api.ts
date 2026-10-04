@@ -33,7 +33,7 @@ function writeLayout(layout: Record<string, string[]>): void {
   }
 }
 
-async function bodyOf(init: RequestInit | undefined): Promise<any> {
+function bodyOf(init: RequestInit | undefined): any {
   if (!init?.body) return {};
   try {
     return JSON.parse(init.body as string);
@@ -101,17 +101,17 @@ function handleWidgetRoute(path: string, envelopes: Envelopes): Response | undef
 }
 
 // Hue light/scene/group control — applied optimistically to the in-memory Hue envelope.
-async function handleHueLightRoute(
+function handleHueLightRoute(
   path: string,
   method: string,
   init: RequestInit | undefined,
   envelopes: Envelopes,
-): Promise<Response | undefined> {
+): Response | undefined {
   const match = HUE_LIGHT_ROUTE.exec(path);
   if (!match || method !== 'POST') return undefined;
   const hue = envelopes.hue?.data as HueData | undefined;
   if (hue) {
-    const state = await bodyOf(init);
+    const state = bodyOf(init);
     const light = hue.lights.find((l) => l.id === match[1]);
     if (light) {
       if (typeof state.on === 'boolean') light.on = state.on;
@@ -133,36 +133,36 @@ function handleHueSceneRoute(path: string, method: string, envelopes: Envelopes)
   return jsonResponse({ ok: true });
 }
 
-async function handleHueGroupRoute(
+function handleHueGroupRoute(
   path: string,
   method: string,
   init: RequestInit | undefined,
   envelopes: Envelopes,
-): Promise<Response | undefined> {
+): Response | undefined {
   const match = HUE_GROUP_ROUTE.exec(path);
   if (!match || method !== 'POST') return undefined;
   const hue = envelopes.hue?.data as HueData | undefined;
   const room = hue?.rooms.find((r) => r.id === match[1]);
   if (room) {
-    const state = await bodyOf(init);
+    const state = bodyOf(init);
     if (typeof state.on === 'boolean') room.anyOn = state.on;
   }
   return jsonResponse({ ok: true });
 }
 
 /** Music sync — no Spotify or bridge here, so the demo shows the current fake track with a fixed palette. */
-async function handleHueSyncRoute(
+function handleHueSyncRoute(
   path: string,
   method: string,
   init: RequestInit | undefined,
   envelopes: Envelopes,
-): Promise<Response | undefined> {
+): Response | undefined {
   const match = HUE_SYNC_ROUTE.exec(path);
   if (!match || method !== 'POST') return undefined;
   const envelope = envelopes['hue-sync'];
   const sync = envelope?.data as HueSyncData | undefined;
   if (!envelope || !sync) return notFound();
-  const { on } = await bodyOf(init);
+  const { on } = bodyOf(init);
   const roomIds = on ? [...new Set([...sync.roomIds, match[1]])] : sync.roomIds.filter((id) => id !== match[1]);
   const nowPlaying = spotifyNowPlayingAt(new Date());
   const data: HueSyncData =
@@ -189,24 +189,24 @@ function handleCodeRoutes(path: string, method: string): Response | undefined {
   return undefined;
 }
 
-async function handleGithubRoutes(path: string, method: string, init: RequestInit | undefined): Promise<Response | undefined> {
+function handleGithubRoutes(path: string, method: string, init: RequestInit | undefined): Response | undefined {
   if (path === '/api/github/repos' && method === 'GET') {
     return jsonResponse({ repos: ['yourname/personal-dashboard', 'yourname/weekend-project', 'yourname/dotfiles'] });
   }
   if (path === '/api/github/issues' && method === 'POST') {
-    const body = await bodyOf(init);
+    const body = bodyOf(init);
     return jsonResponse({ number: 43, url: '#', title: body.title });
   }
   return undefined;
 }
 
-async function handleLayoutRoutes(path: string, method: string, init: RequestInit | undefined): Promise<Response | undefined> {
+function handleLayoutRoutes(path: string, method: string, init: RequestInit | undefined): Response | undefined {
   if (path === '/api/layout' && method === 'GET') {
     return jsonResponse({ layout: readLayout() });
   }
   const match = LAYOUT_ITEM_ROUTE.exec(path);
   if (match && method === 'PUT') {
-    const body = await bodyOf(init);
+    const body = bodyOf(init);
     const layout = readLayout();
     layout[match[1]] = Array.isArray(body.order) ? body.order : [];
     writeLayout(layout);
@@ -222,21 +222,21 @@ function handleWeatherRoutes(path: string, method: string): Response | undefined
   return undefined;
 }
 
-async function handleApiRoute(
+function handleApiRoute(
   path: string,
   method: string,
   init: RequestInit | undefined,
   envelopes: Envelopes,
-): Promise<Response> {
+): Response {
   return (
     handleWidgetRoute(path, envelopes) ??
-    (await handleHueLightRoute(path, method, init, envelopes)) ??
+    handleHueLightRoute(path, method, init, envelopes) ??
     handleHueSceneRoute(path, method, envelopes) ??
-    (await handleHueGroupRoute(path, method, init, envelopes)) ??
-    (await handleHueSyncRoute(path, method, init, envelopes)) ??
+    handleHueGroupRoute(path, method, init, envelopes) ??
+    handleHueSyncRoute(path, method, init, envelopes) ??
     handleCodeRoutes(path, method) ??
-    (await handleGithubRoutes(path, method, init)) ??
-    (await handleLayoutRoutes(path, method, init)) ??
+    handleGithubRoutes(path, method, init) ??
+    handleLayoutRoutes(path, method, init) ??
     handleWeatherRoutes(path, method) ??
     notFound()
   );
@@ -253,7 +253,7 @@ export function installDemoApi(): void {
   const envelopes = buildDemoEnvelopes(now);
   const realFetch = window.fetch.bind(window);
 
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = resolveUrl(input);
     const method = resolveMethod(input, init);
     let path: string;
@@ -264,6 +264,6 @@ export function installDemoApi(): void {
     }
     if (!path.startsWith('/api/')) return realFetch(input, init);
 
-    return handleApiRoute(path, method, init, envelopes);
+    return Promise.resolve(handleApiRoute(path, method, init, envelopes));
   };
 }

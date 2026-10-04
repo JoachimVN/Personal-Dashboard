@@ -310,11 +310,12 @@ async function refreshTopData(get: SpotifyGet, historyStore: SpotifyHistoryStore
 
   // Album enrichment is useful metadata, but never worth spending live-playback quota on.
   const pendingAlbumIds = await historyStore.getAlbumIdsNeedingDurations(5);
-  const enrichments: AlbumDetailInput[] = [];
-  for (const id of pendingAlbumIds) {
-    const album = await get<RawAlbumDetail>(`/albums/${id}`).catch(() => null);
-    if (album) enrichments.push(toAlbumDetailInput(album));
-  }
+  const albums = await Promise.all(
+    pendingAlbumIds.map((id) => get<RawAlbumDetail>(`/albums/${id}`).catch(() => null)),
+  );
+  const enrichments: AlbumDetailInput[] = albums
+    .filter((album): album is RawAlbumDetail => album !== null)
+    .map(toAlbumDetailInput);
   await historyStore.enrichAlbumDetails(enrichments);
 
   await historyStore.mergeArtistMetadata(
