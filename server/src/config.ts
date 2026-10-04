@@ -158,6 +158,15 @@ const configSchema = z.object({
       area: z.enum(POWER_AREAS).optional(),
     })
     .default({}),
+  hueSync: z
+    .object({
+      /** How often Spotify is polled while a room syncs to music, in ms. This is what bounds how
+       * fast a manual skip shows up on the lights; natural track changes are predicted instead. */
+      pollMs: z.number().int().min(1_000).default(2_500),
+      /** How long each color drift step lasts, in ms (one Hue request per light per step). */
+      stepMs: z.number().int().min(2_000).default(8_000),
+    })
+    .default({ pollMs: 2_500, stepMs: 8_000 }),
   code: z
     .object({
       /** Local parent directory to scan for git repos, per OS. Each immediate subdirectory with a .git and a GitHub-remote origin becomes a launchable project. */

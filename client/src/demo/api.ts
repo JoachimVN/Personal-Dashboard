@@ -3,7 +3,7 @@
 // makes has to be answered locally instead. A single window.fetch wrapper is the smallest way to
 // do that: every widget, button and drag interaction keeps calling the same real endpoints it
 // always does, completely unaware it's talking to fixtures instead of a server.
-import type { CalendarData, HueData, SpotifyData, WidgetEnvelope } from '@personal-dashboard/shared';
+import type { CalendarData, HueData, HueSyncData, SpotifyData, WidgetEnvelope } from '@personal-dashboard/shared';
 import { buildDemoEnvelopes, spotifyNowPlayingAt } from './fixtures';
 import { calendar } from './fixtures/calendar';
 
@@ -56,6 +56,7 @@ const WIDGET_ROUTE = /^\/api\/widgets\/([^/]+)(\/refresh)?$/;
 const HUE_LIGHT_ROUTE = /^\/api\/hue\/lights\/([^/]+)$/;
 const HUE_SCENE_ROUTE = /^\/api\/hue\/scenes\/([^/]+)$/;
 const HUE_GROUP_ROUTE = /^\/api\/hue\/groups\/([^/]+)$/;
+const HUE_SYNC_ROUTE = /^\/api\/hue\/sync\/([^/]+)$/;
 const LAYOUT_ITEM_ROUTE = /^\/api\/layout\/([^/]+)$/;
 
 type Envelopes = Record<string, WidgetEnvelope>;
@@ -149,6 +150,35 @@ async function handleHueGroupRoute(
   return jsonResponse({ ok: true });
 }
 
+/** Music sync — no Spotify or bridge here, so the demo shows the current fake track with a fixed palette. */
+async function handleHueSyncRoute(
+  path: string,
+  method: string,
+  init: RequestInit | undefined,
+  envelopes: Envelopes,
+): Promise<Response | undefined> {
+  const match = HUE_SYNC_ROUTE.exec(path);
+  if (!match || method !== 'POST') return undefined;
+  const envelope = envelopes['hue-sync'];
+  const sync = envelope?.data as HueSyncData | undefined;
+  if (!envelope || !sync) return notFound();
+  const { on } = await bodyOf(init);
+  const roomIds = on ? [...new Set([...sync.roomIds, match[1]])] : sync.roomIds.filter((id) => id !== match[1]);
+  const nowPlaying = spotifyNowPlayingAt(new Date());
+  const data: HueSyncData =
+    roomIds.length === 0 || !nowPlaying
+      ? { roomIds, state: 'off', track: null, palette: [], problem: null }
+      : {
+          roomIds,
+          state: 'playing',
+          track: { id: 'demo', name: nowPlaying.track, artist: nowPlaying.artist, imageUrl: nowPlaying.imageUrl },
+          palette: ['#f05320', '#f0e26e', '#f19611'],
+          problem: null,
+        };
+  envelopes['hue-sync'] = { ...envelope, data };
+  return jsonResponse(envelopes['hue-sync']);
+}
+
 function handleCodeRoutes(path: string, method: string): Response | undefined {
   if (path === '/api/code/projects' && method === 'GET') {
     return jsonResponse({ projects: [{ repo: 'yourname/personal-dashboard' }, { repo: 'yourname/weekend-project' }] });
@@ -203,6 +233,7 @@ async function handleApiRoute(
     (await handleHueLightRoute(path, method, init, envelopes)) ??
     handleHueSceneRoute(path, method, envelopes) ??
     (await handleHueGroupRoute(path, method, init, envelopes)) ??
+    (await handleHueSyncRoute(path, method, init, envelopes)) ??
     handleCodeRoutes(path, method) ??
     (await handleGithubRoutes(path, method, init)) ??
     (await handleLayoutRoutes(path, method, init)) ??

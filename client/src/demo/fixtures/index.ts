@@ -13,7 +13,7 @@ import { clashRoyale } from './clashRoyale';
 import { commandCenter } from './commandCenter';
 import { github, sonarCloud } from './github';
 import { health } from './health';
-import { hue, power, system, transit } from './home';
+import { hue, hueSync, power, system, transit } from './home';
 import { aiNews, gmail, imessage, news } from './personal';
 import { roblox } from './roblox';
 import { envelope } from './shared';
@@ -38,6 +38,7 @@ export function buildDemoEnvelopes(now: Date): Record<string, WidgetEnvelope> {
     news: envelope('news', news(now), now, 15 * 60_000),
     'ai-news': envelope('ai-news', aiNews(now), now, 15 * 60_000),
     hue: envelope('hue', hue(), now, 30_000),
+    'hue-sync': envelope('hue-sync', hueSync(), now, 60_000),
     transit: envelope('transit', transit(now), now, 30_000),
     power: envelope('power', power(now), now, 15 * 60_000),
     health: envelope('health', hlth, now, 5 * 60_000),

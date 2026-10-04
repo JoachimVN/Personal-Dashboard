@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { spawn as spawnPty } from 'node-pty';
 import { aiUsageToolSchema, type AiUsageToolData, type UsageHistoryPoint } from '@personal-dashboard/shared';
 import type { Provider } from '../../scheduler.js';
-import type { UsageHistoryStore } from '../../usageHistory.js';
+import type { UsageHistoryStore, UsageSnapshot as PersistedUsageSnapshot } from '../../usageHistory.js';
 import {
   asIso,
   carryPastReset,
@@ -86,7 +86,10 @@ function readCodexLimits(lines: string[], limits: CodexLimits): void {
         const bucket = recordLatestLimit(limits, event.timestamp, entry);
         return bucket ? [bucket] : [];
       });
-      if (!limits.latestReport || event.timestamp > limits.latestReport.timestamp) {
+      // An empty rate_limits object is also emitted when Codex cannot start a turn at its
+      // cap. It is not evidence that both windows became unlimited. Keep the last report
+      // with an actual quota reading until another one arrives.
+      if (buckets.length > 0 && (!limits.latestReport || event.timestamp > limits.latestReport.timestamp)) {
         limits.latestReport = { timestamp: event.timestamp, buckets };
       }
     } catch {
@@ -100,16 +103,14 @@ function readCodexLimits(lines: string[], limits: CodexLimits): void {
  * few logs: limits are account-wide and a current session always writes into the latest files.
  *
  * Which window rides in `primary` vs `secondary` isn't fixed, so classify entries by
- * `window_minutes` rather than trusting the slot. The latest rate-limit event is authoritative:
- * if it omits a window, the dashboard reports that window as temporarily unlimited instead of
- * showing a stale cap from an older session event.
+ * `window_minutes` rather than trusting the slot. The latest nonempty rate-limit event is
+ * authoritative: an empty event can mean the account is capped and cannot start a turn.
  */
 function codexSessionsDir(): string {
   return path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'sessions');
 }
 
-async function codexSnapshot(): Promise<UsageSnapshot> {
-  const sessionsDir = codexSessionsDir();
+export async function codexSnapshot(sessionsDir = codexSessionsDir()): Promise<UsageSnapshot> {
   try {
     const files = (await jsonlFiles(sessionsDir)).sort((a, b) => a.localeCompare(b)).slice(-12);
     const latest: CodexLimits = {};
@@ -320,6 +321,22 @@ const CODEX_STATUS_FALLBACK_COOLDOWN_MS = 5 * 60_000;
 
 type CodexFallback = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>;
 
+/** Backfill only when the current session files contain no usable quota report at all. A
+ * partial report still describes the current account state and must keep its own statuses. */
+export function retainKnownCodexQuota(snapshot: UsageSnapshot, previous?: PersistedUsageSnapshot): UsageSnapshot {
+  if (snapshot.fiveHourStatus !== 'unknown' || snapshot.weeklyStatus !== 'unknown' || !previous?.asOf) return snapshot;
+  if (!previous.fiveHour && !previous.weekly) return snapshot;
+  return {
+    ...snapshot,
+    available: true,
+    fiveHour: previous.fiveHour,
+    weekly: previous.weekly,
+    fiveHourStatus: previous.fiveHourStatus ?? (previous.fiveHour ? 'limited' : 'unknown'),
+    weeklyStatus: previous.weeklyStatus ?? (previous.weekly ? 'limited' : 'unknown'),
+    asOf: previous.asOf,
+  };
+}
+
 /** Overwrite one stale window (`bucket`) in `snapshot` with the fallback's reading, if the fallback
  * itself isn't also stale. Applied separately per window since Codex's `/status` panel today only
  * ever reports the weekly one — the 5-hour bucket stays untouched (and local-only) until it does. */
@@ -348,7 +365,21 @@ export function createCodexUsageProvider(
 ): Provider<AiUsageToolData> {
   let fallback: CodexFallback = { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
   let lastFallbackAttemptAt = 0;
+  let rememberedQuota: PersistedUsageSnapshot | undefined;
+  let loadedRememberedQuota = false;
   const rememberedHistory: { points: UsageHistoryPoint[] } = { points: [] };
+
+  const loadRememberedQuota = async (): Promise<PersistedUsageSnapshot | undefined> => {
+    if (loadedRememberedQuota) return rememberedQuota;
+    loadedRememberedQuota = true;
+    try {
+      const previous = await history.getSnapshot('ai-usage-codex');
+      if (previous?.asOf && (previous.fiveHour || previous.weekly)) rememberedQuota = previous;
+    } catch {
+      // The persisted baseline is optional; a failed lookup must not fail the provider.
+    }
+    return rememberedQuota;
+  };
 
   return {
     id: 'ai-usage-codex',
@@ -357,7 +388,13 @@ export function createCodexUsageProvider(
     timeoutMs: 60_000,
     isConfigured: () => true,
     fetch: async (_signal, force) => {
-      const snapshot = await codexSnapshot();
+      let snapshot = await codexSnapshot();
+      // Once all quota entries disappear from recent session files, use the last confirmed
+      // reading saved before the cap. This also survives server restarts and log rotation.
+      if (snapshot.fiveHourStatus === 'unknown' && snapshot.weeklyStatus === 'unknown') {
+        const previous = rememberedQuota ?? await loadRememberedQuota();
+        snapshot = retainKnownCodexQuota(snapshot, previous);
+      }
       const needsFallback = (['fiveHour', 'weekly'] as const).some(
         (bucket) => isCodexLimitStale(snapshot[bucket], snapshot.asOf) && isCodexLimitStale(fallback[bucket], fallback.asOf),
       );
@@ -376,6 +413,7 @@ export function createCodexUsageProvider(
       // instead of the stale, provably-wrong percentage.
       snapshot.fiveHour = carryPastReset(snapshot.fiveHour, FIVE_HOUR_MS);
       snapshot.weekly = carryPastReset(snapshot.weekly, WEEKLY_MS);
+      if (snapshot.fiveHour || snapshot.weekly) rememberedQuota = { ...snapshot };
       return { ...snapshot, history: recordHistorySafely(history, 'ai-usage-codex', snapshot, rememberedHistory) };
     },
   };

@@ -19,6 +19,7 @@ import { createGitHubProvider } from './github.js';
 import { createGmailProvider } from './gmail.js';
 import { createHealthProvider } from './health.js';
 import { createHueProvider, type HueProvider } from './hue.js';
+import { createHueSyncProvider, type HueSyncProvider } from './hueSync.js';
 import { createIMessageProvider } from './imessage.js';
 import { createNewsProvider } from './news.js';
 import { createPowerProvider, type PowerProvider } from './power.js';
@@ -39,6 +40,7 @@ export interface Providers {
   transit: TransitProvider;
   power: PowerProvider;
   hue: HueProvider;
+  hueSync: HueSyncProvider;
   health: HealthStore;
 }
 
@@ -66,6 +68,8 @@ export function createProviders(
   const usageHistory = new UsageHistoryStore(database, config.aiUsage.historySampleMs);
   const spotifySnapshot = new SpotifySnapshotStore(database);
   const githubSnapshot = new GitHubSnapshotStore(database);
+  // Follows the Hue widget's config switch: no lights widget, no music sync either.
+  const hueSync = createHueSyncProvider(hue, env.spotify, spotifySnapshot, config.hueSync, () => config.widgets.hue?.enabled !== false);
   const spotifyHistory = new SpotifyHistoryStore(database);
   const steamSnapshot = new SteamSnapshotStore(database);
   const steamHistory = new SteamHistoryStore(database);
@@ -76,6 +80,7 @@ export function createProviders(
     transit,
     power,
     hue,
+    hueSync,
     health,
     all: (
       [
@@ -108,6 +113,7 @@ export function createProviders(
         }),
         createSystemProvider(env.timezone),
         hue,
+        hueSync,
         createIMessageProvider(),
         createSteamProvider(env.steam, steamSnapshot, steamHistory, {
           maxFriends: config.steam.leaderboardMaxFriends,

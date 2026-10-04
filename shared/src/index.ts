@@ -10,6 +10,7 @@ export * from './schemas/gmail.js';
 export * from './schemas/news.js';
 export * from './schemas/aiNews.js';
 export * from './schemas/hue.js';
+export * from './schemas/hueSync.js';
 export * from './schemas/imessage.js';
 export * from './schemas/spotify.js';
 export * from './schemas/health.js';
