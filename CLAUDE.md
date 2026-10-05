@@ -25,8 +25,10 @@ request:
 - Fetch output is validated against the provider's schema before being cached; a schema failure is
   treated the same as a fetch failure.
 - Single-flight per provider — an overlapping refresh is a no-op.
-- Errors are sanitized to a category string (`timeout` / `invalid-response` / `fetch-failed`) before
-  being stored or logged, so raw error bodies (which can carry tokens/account info) never leak.
+- Errors are sanitized to a category string (`timeout` / `invalid-response` / `fetch-failed` /
+  `auth-required`) before being stored or logged, so raw error bodies (which can carry tokens/account
+  info) never leak. `auth-required` comes from a provider throwing `ProviderAuthError`: credentials
+  that need a person to sign in again, which no retry will fix.
 - Widget status is one of `loading | ready | stale | error | disabled`. `stale` means "last fetch
   failed but we still have earlier good data" — the cache always serves the last good payload until
   a newer one replaces it. `disabled` means `isConfigured()` was false at registration; that provider

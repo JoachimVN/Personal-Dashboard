@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   claudeNextRefreshMs,
+  isClaudeLoggedOut,
   parseClaudeUsageScreen,
   retainKnownClaudeQuota,
   type ClaudeQuota,
@@ -83,6 +84,21 @@ describe('retainKnownClaudeQuota', () => {
     expect(result.fiveHourStatus).toBe('limited');
     expect(result.weeklyStatus).toBe('limited');
     expect(result.asOf).toBe(knownQuota.asOf);
+  });
+});
+
+describe('isClaudeLoggedOut', () => {
+  it('recognizes the expired-login footer, including the compact conpty capture', () => {
+    // Captured from Claude Code v2.1.289 with an expired refresh token.
+    expect(isClaudeLoggedOut('⏵⏵automodeon (shift+tabtocycle)·←foragentsNotloggedin·Run/login')).toBe(true);
+    expect(isClaudeLoggedOut('\u001B[2mNot logged in · Run /login\u001B[22m')).toBe(true);
+  });
+
+  it('does not flag a signed-in Usage screen', () => {
+    expect(isClaudeLoggedOut(`⏵⏵ auto mode on (shift+tab to cycle)
+      Current session
+      ████████████████                                  32% used
+      Resets 2:50am (Europe/Oslo)`)).toBe(false);
   });
 });
 

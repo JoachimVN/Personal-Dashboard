@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { ProviderScheduler, type Provider } from './scheduler.js';
+import { ProviderAuthError, ProviderScheduler, type Provider } from './scheduler.js';
 
 const schema = z.object({ value: z.number() });
 
@@ -112,6 +112,24 @@ describe('ProviderScheduler', () => {
     expect(envelope.status).toBe('stale');
     expect(envelope.data).toEqual({ value: 1 });
     expect(envelope.error).toBe('invalid-response');
+  });
+
+  it('reports a sign-in failure as auth-required while keeping the last good data', async () => {
+    let signedIn = true;
+    scheduler.register(fakeProvider({
+      fetch: async () => {
+        if (!signedIn) throw new ProviderAuthError('session token for someone@example.com expired');
+        return { value: 1 };
+      },
+    }));
+    await scheduler.refresh('fake');
+    signedIn = false;
+    await scheduler.refresh('fake');
+
+    const envelope = scheduler.getEnvelope('fake')!;
+    expect(envelope.status).toBe('stale');
+    expect(envelope.data).toEqual({ value: 1 });
+    expect(envelope.error).toBe('auth-required');
   });
 
   it('aborts a hung fetch at timeoutMs and records a timeout error', async () => {

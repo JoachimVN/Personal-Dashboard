@@ -3,6 +3,7 @@ import { formatCompactNumber } from '../../lib/format';
 import { useWidget } from '../../useWidget';
 import { isWidgetDisabled, WidgetBody } from '../../components/WidgetCard';
 import { FIVE_HOUR_MS, UsageLane, WEEKLY_MS } from './UsageMeter';
+import { AuthRequiredNote } from './AuthRequiredNote';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
 import type { ToolIconProps } from './ToolIcons';
@@ -48,6 +49,7 @@ function ToolRow({
           <UsageRefreshButton label={label} refreshing={refreshing} onRefresh={refresh} />
         </span>
       </div>
+      <AuthRequiredNote envelope={envelope} />
       <WidgetBody envelope={envelope} offline={offline}>
         {(data) =>
           data.available ? (

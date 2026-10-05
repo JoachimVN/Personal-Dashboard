@@ -4,7 +4,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import { spawn as spawnPty } from 'node-pty';
 import { aiUsageToolSchema, type AiUsageToolData, type UsageHistoryPoint } from '@personal-dashboard/shared';
-import type { Provider } from '../../scheduler.js';
+import { ProviderAuthError, type Provider } from '../../scheduler.js';
 import type { UsageHistoryStore } from '../../usageHistory.js';
 import {
   carryPastReset,
@@ -182,6 +182,20 @@ const ALL_MODELS_CLOSE = String.raw`all${WS}models${WS}\)`;
  */
 const STALE_USAGE_BANNER = new RegExp(String.raw`last-known${WS}usage${WS}as${WS}of${WS}(\d+)${WS}(m|h|d)${WS}ago`, 'i');
 
+/**
+ * Once the CLI's refresh token expires, its footer reads "Not logged in · Run /login" and `/usage`
+ * renders only the session cost table, never a quota. Left alone, the probe then waits out its whole
+ * 35s timeout on every poll, which (with the transcript scan alongside it) overruns the provider's
+ * 40s budget: the widget went stale for ~19 hours on 2026-10-05 reporting only `timeout`, and a
+ * manual Refresh looked like a no-op. Recognizing the footer lets the probe stop at once and the
+ * widget ask for a re-login instead.
+ */
+const LOGGED_OUT_FOOTER = new RegExp(String.raw`Not${WS}logged${WS}in`, 'i');
+
+export function isClaudeLoggedOut(screen: string): boolean {
+  return LOGGED_OUT_FOOTER.test(stripTerminalControls(screen));
+}
+
 function staleBannerAgeMs(amount: string, unit: string): number {
   const msPerUnit: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000 };
   return Number(amount) * (msPerUnit[unit.toLowerCase()] ?? 60_000);
@@ -288,7 +302,9 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
   };
 }
 
-export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
+type ClaudeProbeResult = ClaudeQuota & { loggedOut?: boolean };
+
+export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeProbeResult> {
   const projectsDir = claudeProjectsDir();
   const filesBeforeSpawn = new Set(await jsonlFiles(projectsDir).catch(() => []));
   try {
@@ -360,7 +376,15 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
       // guessing a fixed number that's sometimes wrong.
       const advance = () => {
         const text = stripTerminalControls(terminal);
+        if (LOGGED_OUT_FOOTER.test(text)) {
+          finish(terminal);
+          return;
+        }
         if (writtenAt === -1) {
+          // The first quiet gap can come before the CLI has painted anything but terminal setup
+          // codes. Typing then makes the slash-command list take the footer's place, so the "Not
+          // logged in" line never reaches the stream at all. Wait for the first real paint.
+          if (!text.trim()) return;
           writtenAt = text.length;
           pty.write('/usage');
           return;
@@ -391,6 +415,7 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeQuota> {
         if (!settled) finish(terminal);
       });
     });
+    if (isClaudeLoggedOut(output)) return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown', loggedOut: true };
     return parseClaudeUsageScreen(output);
   } catch {
     return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
@@ -492,6 +517,10 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
       const [tokenTotals, liveQuota, transcriptQuota] = await Promise.all([
         claudeTokenTotals(), claudeInteractiveUsageSnapshot(), claudeTranscriptUsageSnapshot(),
       ]);
+      // Nothing newer can arrive until someone signs in again, so say that rather than quietly
+      // re-serving the remembered quota under a fresh fetchedAt (the scheduler keeps the last good
+      // payload either way).
+      if (liveQuota.loggedOut) throw new ProviderAuthError('Claude CLI is logged out');
       const observedQuota = liveQuota.asOf ? liveQuota : transcriptQuota;
       // Always make the last-known-good baseline available for backfill — in-memory if we have it,
       // otherwise the shared Postgres snapshot. The old code only loaded the snapshot when the

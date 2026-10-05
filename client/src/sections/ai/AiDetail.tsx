@@ -6,6 +6,7 @@ import { useWidget } from '../../useWidget';
 import { isWidgetDisabled, StaleBadge, WidgetBody, WidgetShell } from '../../components/WidgetCard';
 import { FIVE_HOUR_MS, UsageMeter, WEEKLY_MS, ZeroUsageMeter } from './UsageMeter';
 import { UsageHistoryChart } from './UsageHistoryChart';
+import { AuthRequiredNote } from './AuthRequiredNote';
 import { UsageRefreshButton } from './UsageRefreshButton';
 import { AI_TOOLS } from './tools';
 import type { ToolIconProps } from './ToolIcons';
@@ -88,6 +89,7 @@ function ToolCard({
           </div>
         }
       >
+        <AuthRequiredNote envelope={envelope} />
         <WidgetBody envelope={envelope} offline={offline}>
         {(data) =>
           data.available ? (

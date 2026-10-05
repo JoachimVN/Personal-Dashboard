@@ -30,8 +30,15 @@ interface Entry {
   timer?: NodeJS.Timeout;
 }
 
+/** A failure no retry can fix: the provider's credentials need a person to sign in again. Kept as
+ * its own category so the widget can say so, instead of looking like an ordinary flaky fetch. */
+export class ProviderAuthError extends Error {
+  override name = 'ProviderAuthError';
+}
+
 /** Map any failure to a safe category string — raw errors can leak tokens/URLs. */
 function sanitizeError(err: unknown): string {
+  if (err instanceof ProviderAuthError) return 'auth-required';
   if (err instanceof ZodError) return 'invalid-response';
   if (err instanceof Error && err.name === 'AbortError') return 'timeout';
   return 'fetch-failed';
