@@ -190,7 +190,7 @@ const STALE_USAGE_BANNER = new RegExp(String.raw`last-known${WS}usage${WS}as${WS
  * manual Refresh looked like a no-op. Recognizing the footer lets the probe stop at once and the
  * widget ask for a re-login instead.
  */
-const LOGGED_OUT_FOOTER = new RegExp(String.raw`Not${WS}logged${WS}in`, 'i');
+const LOGGED_OUT_FOOTER = new RegExp(`Not${WS}logged${WS}in`, 'i');
 
 export function isClaudeLoggedOut(screen: string): boolean {
   return LOGGED_OUT_FOOTER.test(stripTerminalControls(screen));
