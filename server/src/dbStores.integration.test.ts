@@ -57,6 +57,21 @@ describeDatabase('Postgres stores', () => {
     expect(await store.getSnapshot('codex')).toEqual(snapshot);
   });
 
+  it('persists fresh quota inside the chart interval and rejects an older reset from another machine', async () => {
+    const store = new UsageHistoryStore(database, 15 * 60_000);
+    const start = Date.now() - 600_000;
+    const reading = (offset: number, usedPercent: number) => ({ available: true,
+      asOf: new Date(start + offset).toISOString(),
+      fiveHour: { usedPercent, resetsAt: new Date(start + 3_600_000).toISOString() },
+    });
+    await store.record('claude', reading(0, 50));
+    const fresh = reading(60_000, 55);
+    expect(await store.record('claude', fresh)).toHaveLength(1);
+    expect(await store.getSnapshot('claude')).toEqual(fresh);
+    expect(await store.record('claude', reading(-86_400_000, 0))).toHaveLength(1);
+    expect(await store.getSnapshot('claude')).toEqual(fresh);
+  });
+
   it('reads only the window the charts render, so the series cannot grow without bound', async () => {
     // The whole series ships inside the widget payload on every poll, over a billed TCP proxy.
     // Unbounded, that is the signal_history runaway again in a different table: measured

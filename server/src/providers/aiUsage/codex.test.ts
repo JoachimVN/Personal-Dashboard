@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -9,6 +9,23 @@ describe('codexSnapshot', () => {
     timestamp,
     type: 'event_msg',
     payload: { rate_limits: { primary, secondary } },
+  });
+
+  it('finds fresh quota appended to an old resumed session rather than selecting by filename', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'codex-resumed-test-'));
+    try {
+      const resumed = path.join(directory, '000-old-session.jsonl');
+      await writeFile(resumed, quota('2026-10-11T12:00:00.000Z', { used_percent: 4, window_minutes: 300, resets_at: 1791723600 }));
+      await utimes(resumed, new Date(), new Date());
+      for (let index = 0; index < 12; index++) {
+        const file = path.join(directory, `zzz-${index}.jsonl`);
+        await writeFile(file, quota('2026-10-10T12:00:00.000Z', { used_percent: 90, window_minutes: 300, resets_at: 1791723600 }));
+        await utimes(file, new Date(0), new Date(0));
+      }
+      expect((await codexSnapshot(directory)).fiveHour?.usedPercent).toBe(4);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('keeps the last confirmed limits when a later event has no quota entries', async () => {
@@ -49,6 +66,15 @@ describe('codexSnapshot', () => {
 });
 
 describe('retainKnownCodexQuota', () => {
+  it('retains a newer account reading when session logs are older', () => {
+    const previous = { available: true, asOf: '2026-10-11T12:00:00.000Z',
+      fiveHour: { usedPercent: 4, resetsAt: '2026-10-11T17:00:00.000Z' },
+      fiveHourStatus: 'limited' as const, weeklyStatus: 'unknown' as const,
+    };
+    expect(retainKnownCodexQuota({ ...previous, asOf: '2026-10-11T03:00:00.000Z',
+      fiveHour: { ...previous.fiveHour, usedPercent: 98 },
+    }, previous)).toMatchObject(previous);
+  });
   it('uses a persisted confirmed quota when recent session files have only empty reports', () => {
     const previous = {
       available: true,

@@ -4,6 +4,7 @@ import { access } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { resolveProbeExecutable } from '../src/providers/aiUsage/shared.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -68,6 +69,24 @@ function describeGitDirectory(gitDir: string | undefined, gitDirectoryWritable: 
 }
 
 async function main(): Promise<void> {
+  const configOnly = process.argv.includes('--config-only');
+  let configurationOk = false;
+  try {
+    const codex = await resolveProbeExecutable('codex');
+    // Validate from the repository root, even when npm runs this in server/.
+    // Discard stdout: MCP listings can contain credentials.
+    await execFileAsync(codex, ['mcp', 'list', '--json'], {
+      cwd: join(import.meta.dirname, '../..'), timeout: 10_000, windowsHide: true,
+    });
+    configurationOk = true;
+    console.log('PASS  Codex configuration: merged MCP transports are valid');
+  } catch {
+    console.log('CHECK  Codex configuration: CLI unavailable or configuration invalid. Keep project .codex/config.toml free of global MCP transport overrides.');
+  }
+  if (configOnly) {
+    process.exitCode = configurationOk ? 0 : 1;
+    return;
+  }
   const home = homedir();
   const expectedHost = join(home, '.local/bin/codex-code-mode-host');
   const standaloneHost = join(home, '.codex/packages/standalone/current/bin/codex-code-mode-host');

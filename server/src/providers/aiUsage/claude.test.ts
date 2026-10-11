@@ -19,6 +19,11 @@ describe('retainKnownClaudeQuota', () => {
   const beforeBothReset = Date.parse('2026-07-17T02:00:00.000Z');
   const afterBothReset = Date.parse('2026-07-21T00:00:00.000Z');
 
+  it('does not replace a newer live reading with an older timestamped observation', () => {
+    const old = { ...knownQuota, asOf: '2026-07-12T00:00:00.000Z', weekly: { ...knownQuota.weekly!, usedPercent: 77 } };
+    expect(retainKnownClaudeQuota(old, knownQuota, beforeBothReset)).toEqual(knownQuota);
+  });
+
   it('keeps the last quota report when Claude only returns run statistics at the cap', () => {
     expect(retainKnownClaudeQuota({ fiveHourStatus: 'unknown', weeklyStatus: 'unknown' }, knownQuota, beforeBothReset))
       .toEqual(knownQuota);
@@ -103,6 +108,24 @@ describe('isClaudeLoggedOut', () => {
 });
 
 describe('parseClaudeUsageScreen', () => {
+  it('uses the final screen-reader redraw even when the session header is not repeated', () => {
+    const quota = parseClaudeUsageScreen(`Current session
+47% 47% used
+Resets 3pm (Europe/Oslo)
+Current week (all models)
+27% 27% used
+Resets Oct 18, 12am (Europe/Oslo)
+What's contributing to your limits usage?
+Refreshing…
+48% 48% used
+Resets 3pm (Europe/Oslo)
+Current week (all models)
+28% 28% used
+Resets Oct 18, 12am (Europe/Oslo)
+What's contributing to your limits usage?`, new Date(2026, 9, 11, 14, 0));
+    expect(quota.fiveHour?.usedPercent).toBe(48);
+    expect(quota.weekly?.usedPercent).toBe(28);
+  });
   it('reads the multiline interactive Usage screen rather than the print-mode statistics', () => {
     const now = new Date(2026, 6, 17, 13, 0);
     const quota = parseClaudeUsageScreen(`
@@ -341,7 +364,7 @@ describe('parseClaudeUsageScreen', () => {
 });
 
 describe('claudeNextRefreshMs', () => {
-  it('waits until the last capped window resets instead of probing during a rate limit', () => {
+  it('keeps polling at the normal cadence when both windows are capped', () => {
     const now = Date.parse('2026-07-17T12:00:00.000Z');
     const refreshMs = claudeNextRefreshMs({
       available: true,
@@ -352,6 +375,14 @@ describe('claudeNextRefreshMs', () => {
       asOf: new Date(now).toISOString(),
     }, 15 * 60_000, now);
 
-    expect(refreshMs).toBe(Date.parse('2026-07-19T00:00:00.000Z') - now + 5_000);
+    expect(refreshMs).toBe(15 * 60_000);
+  });
+
+  it('checks just after the nearest capped reset if it is sooner than the regular poll', () => {
+    const now = Date.parse('2026-07-17T12:00:00.000Z');
+    expect(claudeNextRefreshMs({ available: true, fiveHourStatus: 'limited', weeklyStatus: 'limited',
+      fiveHour: { usedPercent: 100, resetsAt: '2026-07-17T12:01:00.000Z' },
+      weekly: { usedPercent: 100, resetsAt: '2026-07-19T00:00:00.000Z' },
+    }, 900_000, now)).toBe(65_000);
   });
 });

@@ -1,0 +1,3 @@
+# MCP servers are configured globally in ~/.codex/config.toml.
+# Do not redefine a global server's transport here: Codex merges tables, so a
+# project `url` plus a global `command` produces "url is not supported for stdio".

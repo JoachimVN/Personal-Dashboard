@@ -83,7 +83,7 @@ export class UsageHistoryStore {
       // Keep the regular series compact, but never round a reset boundary away just because it
       // landed inside the normal sampling interval. The graph and command center both need its
       // actual observation timestamp.
-      if (!last || at.getTime() - Date.parse(last.at) >= this.sampleMs || resetObserved) {
+      if (!last || (at.getTime() > Date.parse(last.at) && (at.getTime() - Date.parse(last.at) >= this.sampleMs || resetObserved))) {
         await transaction`
           insert into ai_usage_history_points (
             tool_id, at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, weekly_resets_at, model_weekly_used_percent
@@ -92,12 +92,16 @@ export class UsageHistoryStore {
             ${snapshot.weekly?.usedPercent ?? null}, ${snapshot.weekly?.resetsAt ?? null}, ${snapshot.modelWeekly?.usedPercent ?? null}
           ) on conflict (tool_id, at) do nothing
         `;
-        await transaction`
-          insert into ai_usage_snapshots (tool_id, snapshot, updated_at)
-          values (${toolId}, ${JSON.stringify(snapshot)}::text::jsonb, now())
-          on conflict (tool_id) do update set snapshot = excluded.snapshot, updated_at = now()
-        `;
       }
+      // Preserve every newer live baseline independently of chart sampling.
+      // A second machine serving old cached data must never rewind this row.
+      await transaction`
+        insert into ai_usage_snapshots (tool_id, snapshot, updated_at)
+        values (${toolId}, ${JSON.stringify(snapshot)}::text::jsonb, now())
+        on conflict (tool_id) do update set snapshot = excluded.snapshot, updated_at = now()
+        where coalesce((ai_usage_snapshots.snapshot->>'asOf')::timestamptz, '-infinity'::timestamptz)
+          < (excluded.snapshot->>'asOf')::timestamptz
+      `;
       const points = await transaction<UsagePointRow[]>`
         select at, five_hour_used_percent, five_hour_resets_at, weekly_used_percent, weekly_resets_at, model_weekly_used_percent
         from ai_usage_history_points

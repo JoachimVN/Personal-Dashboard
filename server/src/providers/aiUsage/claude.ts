@@ -1,4 +1,5 @@
 import { readFile, stat } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
@@ -13,6 +14,7 @@ import {
   FIVE_HOUR_MS,
   jsonlFiles,
   limit,
+  loadUsageSnapshot,
   MONTH_ABBREVIATIONS,
   ptyProbeEnv,
   resolveProbeExecutable,
@@ -31,7 +33,7 @@ function claudeProjectsDir(): string {
 // shouldn't show up as one of "your sessions" on claude.ai/code or the mobile app the way a real
 // terminal session does. `--settings` layers this on top of (never replaces) the user's own
 // settings files, so their real interactive sessions keep Remote Control exactly as configured.
-const PROBE_ARGS = ['--settings', JSON.stringify({ disableRemoteControl: true })];
+const PROBE_ARGS = ['--settings', JSON.stringify({ disableRemoteControl: true }), '--ax-screen-reader'];
 
 const claudeTranscriptEntrySchema = z.object({
   type: z.literal('assistant'),
@@ -111,6 +113,11 @@ export type ClaudeQuota = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'modelWeek
  */
 export function retainKnownClaudeQuota(live: ClaudeQuota, previous?: ClaudeQuota, now = Date.now()): ClaudeQuota {
   if (!previous) return live;
+  // A failed live probe can rediscover a transcript from days ago. Never let
+  // that overwrite a newer live or persisted observation.
+  if (live.asOf && previous.asOf && Date.parse(live.asOf) < Date.parse(previous.asOf)) {
+    return retainKnownClaudeQuota({ fiveHourStatus: 'unknown', weeklyStatus: 'unknown' }, previous, now);
+  }
 
   // Backfill per window, not per report: a live read can genuinely capture one window (e.g. the
   // 5-hour block) while missing another (e.g. weekly didn't render in time), and that partial read
@@ -243,7 +250,9 @@ function parseUsageWindows(text: string, now: Date): UsageWindows {
   // Terminal cursor updates can erase visual spaces from the captured stream, so accept both
   // the readable UI labels and their compact `Currentsession` / `Currentweek(allmodels)` form.
   const sessionMatch = new RegExp(String.raw`Current${WS}session([\s\S]*?)(?=${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}|$)`, 'i').exec(text);
-  const weeklyMatch = new RegExp(String.raw`${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}([\s\S]*)`, 'i').exec(text);
+  const weeklyMatches = [...text.matchAll(new RegExp(
+    String.raw`${CURRENT_WEEK}${WS}${ALL_MODELS_CLOSE}([\s\S]*?)(?=${CURRENT_WEEK}|What's${WS}contributing|$)`, 'gi',
+  ))];
   const modelMatch = new RegExp(
     String.raw`${CURRENT_WEEK}${WS}(?!${ALL_MODELS_CLOSE})([^)]+)\)([\s\S]*?)(?=${CURRENT_WEEK}|What's${WS}contributing|$)`,
     'i',
@@ -251,7 +260,7 @@ function parseUsageWindows(text: string, now: Date): UsageWindows {
   const modelLimit = modelMatch ? parseUsageWindow(modelMatch[2], now) : undefined;
   return {
     fiveHour: parseUsageWindow(sessionMatch?.[1] ?? '', now),
-    weekly: parseUsageWindow(weeklyMatch?.[1] ?? '', now),
+    weekly: weeklyMatches.toReversed().map((match) => parseUsageWindow(match[1], now)).find(Boolean),
     modelWeekly: modelLimit && modelMatch ? { ...modelLimit, model: modelMatch[1].trim() } : undefined,
   };
 }
@@ -280,6 +289,12 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
     windows.modelWeekly ??= parsed.modelWeekly;
     if (windows.fiveHour && windows.weekly && windows.modelWeekly) break;
   }
+  // Screen-reader mode can redraw just the session's values without repeating
+  // its header. Only session windows have a time-only reset; take its latest
+  // complete percentage/reset pair from the captured stream.
+  const sessionRedraws = [...text.matchAll(/\d{1,3}(?:\.\d{1,2})?%\s*used\s*Resets\s*\d{1,2}(?::\d{2})?\s*(?:am|pm)/gi)];
+  const lastSessionRedraw = sessionRedraws.at(-1);
+  if (windows.fiveHour && lastSessionRedraw) windows.fiveHour = parseUsageWindow(lastSessionRedraw[0], now) ?? windows.fiveHour;
   const hasQuotaReport = Boolean(windows.fiveHour || windows.weekly || windows.modelWeekly);
   const staleBanner = STALE_USAGE_BANNER.exec(text);
   const staleAgeMs = staleBanner ? staleBannerAgeMs(staleBanner[1], staleBanner[2]) : 0;
@@ -304,24 +319,24 @@ export function parseClaudeUsageScreen(screen: string, now = new Date()): Claude
 
 type ClaudeProbeResult = ClaudeQuota & { loggedOut?: boolean };
 
-export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeProbeResult> {
+export async function claudeInteractiveUsageSnapshot(signal?: AbortSignal): Promise<ClaudeProbeResult> {
+  if (signal?.aborted) return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
   const projectsDir = claudeProjectsDir();
-  const filesBeforeSpawn = new Set(await jsonlFiles(projectsDir).catch(() => []));
+  const sessionId = randomUUID();
   try {
     const { CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, ...cleanEnv } = process.env;
     await ensurePtySpawnHelper();
     const executable = await resolveProbeExecutable('claude');
     const output = await new Promise<string>((resolve) => {
-      const pty = spawnPty(executable, PROBE_ARGS, {
+      const pty = spawnPty(executable, [...PROBE_ARGS, '--session-id', sessionId], {
         name: 'xterm-256color',
         cols: 160,
         rows: 48,
         cwd: process.cwd(),
         env: ptyProbeEnv(cleanEnv),
-        // node-pty's default Windows ConPTY path forks a helper that tries to
-        // AttachConsole to an already-exited CLI process during cleanup. Its
-        // bundled ConPTY implementation avoids that helper and its noisy error.
-        useConptyDll: process.platform === 'win32',
+        // The OS ConPTY path preserves the plain screen-reader capture on
+        // Windows; the bundled terminal failed to produce quota in live checks.
+        useConptyDll: false,
       });
       let terminal = '';
       let settled = false;
@@ -347,6 +362,7 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeProbeResul
         settled = true;
         clearTimeout(timeout);
         clearTimeout(settleTimer);
+        signal?.removeEventListener('abort', abort);
         // Killing a PTY whose process already exited is worse than a no-op on Windows: conpty's
         // kill forks a helper that calls AttachConsole on the dead pid, which throws
         // "AttachConsole failed" straight to stderr and leaves the conpty handle open for the
@@ -366,6 +382,8 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeProbeResul
       // provider on a transcript report that can be days old — a timeout is a partial read, not
       // proof that nothing was read.
       const timeout = setTimeout(() => finish(), 35_000);
+      const abort = () => finish();
+      signal?.addEventListener('abort', abort, { once: true });
       // The CLI's own render pace (boot, the slash-command autocomplete, and the Usage screen
       // itself) varies with system load on a machine that's also running everything else this
       // dashboard polls — a fixed delay before typing or before Enter loses the race under load
@@ -384,7 +402,7 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeProbeResul
           // The first quiet gap can come before the CLI has painted anything but terminal setup
           // codes. Typing then makes the slash-command list take the footer's place, so the "Not
           // logged in" line never reaches the stream at all. Wait for the first real paint.
-          if (!text.trim()) return;
+          if (!/Claude Code v\d|Welcome (?:back|to Claude)/i.test(text)) return;
           writtenAt = text.length;
           pty.write('/usage');
           return;
@@ -406,7 +424,7 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeProbeResul
       pty.onData((chunk) => {
         terminal += chunk;
         clearTimeout(settleTimer);
-        settleTimer = setTimeout(advance, 500);
+        settleTimer = setTimeout(advance, submitted ? 1_500 : 500);
       });
       pty.onExit(() => {
         exited = true;
@@ -423,53 +441,7 @@ export async function claudeInteractiveUsageSnapshot(): Promise<ClaudeProbeResul
     // The probe's `/usage` run leaves a real session transcript in ~/.claude/projects, same as any
     // interactive session — without this, every 15-minute poll leaves one behind permanently, which
     // is what actually floods the session list (see cleanupProbeSession in shared.ts).
-    await cleanupProbeSession(projectsDir, filesBeforeSpawn);
-  }
-}
-
-function usageReportsIn(value: unknown, reports: string[]): void {
-  if (typeof value === 'string') {
-    if (/Current\s*session/i.test(value) && /Current\s*week\s*\(\s*all\s*models\s*\)/i.test(value)) reports.push(value);
-    return;
-  }
-  if (Array.isArray(value)) {
-    value.forEach((entry) => usageReportsIn(entry, reports));
-    return;
-  }
-  if (value && typeof value === 'object') {
-    Object.values(value).forEach((entry) => usageReportsIn(entry, reports));
-  }
-}
-
-/** The interactive CLI persists its rendered Usage report in session transcripts. This is a
- * fallback for a transient PTY failure, not a substitute for the live interactive probe. */
-async function claudeTranscriptUsageSnapshot(): Promise<ClaudeQuota> {
-  try {
-    const projectsDir = claudeProjectsDir();
-    const files = await jsonlFiles(projectsDir);
-    let latest: { at: Date; report: string } | undefined;
-    await Promise.all(files.map(async (file) => {
-      const fileInfo = await stat(file);
-      if (Date.now() - fileInfo.mtimeMs > WEEKLY_MS) return;
-      for (const line of (await readFile(file, 'utf8')).split('\n')) {
-        try {
-          const entry = JSON.parse(line) as { timestamp?: string };
-          if (!entry.timestamp) continue;
-          const at = new Date(entry.timestamp);
-          if (Number.isNaN(at.getTime())) continue;
-          const reports: string[] = [];
-          usageReportsIn(entry, reports);
-          for (const report of reports) {
-            if (!latest || at > latest.at) latest = { at, report };
-          }
-        } catch {
-          // A concurrently-written transcript can have one incomplete final line.
-        }
-      }
-    }));
-    return latest ? parseClaudeUsageScreen(latest.report, latest.at) : { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
-  } catch {
-    return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
+    await cleanupProbeSession(projectsDir, sessionId);
   }
 }
 
@@ -478,7 +450,9 @@ export function claudeNextRefreshMs(data: UsageSnapshot | undefined, refreshMs: 
     .filter((window): window is NonNullable<typeof window> => Boolean(window && window.usedPercent >= 100))
     .map((window) => Date.parse(window.resetsAt) - now)
     .filter((delay) => Number.isFinite(delay) && delay > 0);
-  return cappedResets.length > 0 ? Math.max(...cappedResets) + 5_000 : refreshMs;
+  // A quota cap is not an HTTP rate limit. Continue polling for early allowance
+  // resets and schedule a check just after the nearest known reset as well.
+  return cappedResets.length > 0 ? Math.min(refreshMs, Math.min(...cappedResets) + 5_000) : refreshMs;
 }
 
 export function createClaudeUsageProvider(refreshMs: number, history: UsageHistoryStore): Provider<AiUsageToolData> {
@@ -490,7 +464,7 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
     if (loadedRememberedQuota) return rememberedQuota;
     loadedRememberedQuota = true;
     try {
-      const snapshot = await history.getSnapshot('ai-usage-claude');
+      const snapshot = await loadUsageSnapshot(history, 'ai-usage-claude');
       if (snapshot?.asOf && (snapshot.fiveHour || snapshot.weekly || snapshot.modelWeekly)) {
         rememberedQuota = {
           fiveHour: snapshot.fiveHour,
@@ -513,15 +487,15 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
     refreshMs,
     timeoutMs: 40_000,
     isConfigured: () => true,
-    fetch: async () => {
-      const [tokenTotals, liveQuota, transcriptQuota] = await Promise.all([
-        claudeTokenTotals(), claudeInteractiveUsageSnapshot(), claudeTranscriptUsageSnapshot(),
+    fetch: async (signal) => {
+      const [tokenTotals, liveQuota] = await Promise.all([
+        claudeTokenTotals(), claudeInteractiveUsageSnapshot(signal),
       ]);
       // Nothing newer can arrive until someone signs in again, so say that rather than quietly
       // re-serving the remembered quota under a fresh fetchedAt (the scheduler keeps the last good
       // payload either way).
       if (liveQuota.loggedOut) throw new ProviderAuthError('Claude CLI is logged out');
-      const observedQuota = liveQuota.asOf ? liveQuota : transcriptQuota;
+      const observedQuota = liveQuota;
       // Always make the last-known-good baseline available for backfill — in-memory if we have it,
       // otherwise the shared Postgres snapshot. The old code only loaded the snapshot when the
       // observation had *no* `asOf`, so a partial-but-timestamped read (e.g. a transcript that carries
@@ -544,7 +518,7 @@ export function createClaudeUsageProvider(refreshMs: number, history: UsageHisto
         fiveHourStatus: quota.fiveHourStatus,
         weeklyStatus: quota.weeklyStatus,
         tokens: tokenTotals,
-        asOf: quota.asOf ?? new Date().toISOString(),
+        asOf: quota.asOf,
       };
       return { ...snapshot, history: recordHistorySafely(history, 'ai-usage-claude', snapshot, rememberedHistory) };
     },

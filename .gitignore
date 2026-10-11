@@ -29,4 +29,5 @@ server/.valorant-history-backup-*.json
 .DS_Store
 /.vscode
 /.claude
-/.codex
+/.codex/*
+!/.codex/config.toml

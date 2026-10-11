@@ -1,24 +1,21 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
-import { spawn as spawnPty } from 'node-pty';
 import { aiUsageToolSchema, type AiUsageToolData, type UsageHistoryPoint } from '@personal-dashboard/shared';
 import type { Provider } from '../../scheduler.js';
 import type { UsageHistoryStore, UsageSnapshot as PersistedUsageSnapshot } from '../../usageHistory.js';
+import { codexAccountSnapshot } from './codexAccount.js';
 import {
   asIso,
   carryPastReset,
-  cleanupProbeSession,
-  ensurePtySpawnHelper,
   FIVE_HOUR_MS,
   jsonlFiles,
   limit,
   limitStatus,
+  loadUsageSnapshot,
   MONTH_ABBREVIATIONS,
-  ptyProbeEnv,
   recordHistorySafely,
-  resolveProbeExecutable,
   stripTerminalControls,
   WEEKLY_MS,
   type UsageSnapshot,
@@ -112,7 +109,11 @@ function codexSessionsDir(): string {
 
 export async function codexSnapshot(sessionsDir = codexSessionsDir()): Promise<UsageSnapshot> {
   try {
-    const files = (await jsonlFiles(sessionsDir)).sort((a, b) => a.localeCompare(b)).slice(-12);
+    // A resumed session keeps its old filename but receives new quota events.
+    const recent = await Promise.all((await jsonlFiles(sessionsDir)).map(async (file) => ({
+      file, modified: await stat(file).then((info) => info.mtimeMs, () => 0),
+    })));
+    const files = recent.sort((a, b) => b.modified - a.modified).slice(0, 12).map(({ file }) => file);
     const latest: CodexLimits = {};
 
     const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')));
@@ -226,106 +227,16 @@ export function parseCodexStatusScreen(
   };
 }
 
-/** How long the terminal must go without new output before another `/status` is worth sending —
- * long enough that a quiet stretch reads as "idle at the prompt" rather than "mid-redraw", so a
- * nudge never lands on top of one still being processed and get echoed back as garbled input
- * (observed as literal chat text like "status/status" once concatenated). */
-const NUDGE_QUIET_MS = 4_000;
+/** Minimum interval between automatic live account requests; manual Refresh bypasses it. */
+const CODEX_ACCOUNT_REFRESH_MS = 5 * 60_000;
 
-/**
- * Fallback for when the local session log has nothing newer than the cached weekly reset: launch
- * a short-lived interactive `codex` session and read its `/status` panel directly, the same
- * PTY-probe approach used for Claude's `/usage`. Codex boots its configured MCP servers before
- * accepting input (can take 10s+), so nudge `/status` repeatedly rather than guess a fixed delay —
- * but only once the terminal has gone quiet for a beat, not on a blind timer, since sending it
- * while Codex is still mid-boot/redraw means the next nudge can land on an unfinished input line.
- * Slow, so it's a fallback for the fast local read, never a replacement for it.
- */
-export async function codexInteractiveStatusSnapshot(): Promise<
-  Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>
-> {
-  const sessionsDir = codexSessionsDir();
-  const filesBeforeSpawn = new Set(await jsonlFiles(sessionsDir).catch(() => []));
-  try {
-    await ensurePtySpawnHelper();
-    const executable = await resolveProbeExecutable('codex');
-    const output = await new Promise<string>((resolve) => {
-      const pty = spawnPty(executable, [], {
-        name: 'xterm-256color',
-        cols: 160,
-        rows: 48,
-        cwd: process.cwd(),
-        env: ptyProbeEnv(process.env),
-        // See the Claude probe: on Windows this avoids node-pty's
-        // AttachConsole cleanup helper for short-lived CLI sessions.
-        useConptyDll: process.platform === 'win32',
-      });
-      let terminal = '';
-      let settled = false;
-      let exited = false;
-      let settleTimer: NodeJS.Timeout | undefined;
-      let lastDataAt = Date.now();
-      let lastNudgeAt = 0;
-      const finish = (result?: string) => {
-        if (settled) return;
-        settled = true;
-        clearInterval(nudgeStatus);
-        clearTimeout(timeout);
-        clearTimeout(settleTimer);
-        // Killing a PTY whose process already exited is worse than a no-op on Windows: conpty's
-        // kill forks a helper that calls AttachConsole on the dead pid, which throws
-        // "AttachConsole failed" straight to stderr and leaves the conpty handle open for the
-        // helper's full 5s timeout.
-        if (!exited) {
-          try {
-            pty.kill();
-          } catch {
-            // The process may already have exited after rendering the status panel.
-          }
-        }
-        resolve(result ?? terminal);
-      };
-      const nudgeStatus = setInterval(() => {
-        const now = Date.now();
-        if (now - lastDataAt < NUDGE_QUIET_MS || now - lastNudgeAt < NUDGE_QUIET_MS) return;
-        lastNudgeAt = now;
-        pty.write('/status\r');
-      }, 500);
-      // Resolve with whatever the panel painted rather than rejecting. Parsing an incomplete capture
-      // yields the same "unknown" the error path did when nothing rendered, but keeps a panel that
-      // landed just before the CLI gave up — and a discarded read here costs a full fallback cooldown
-      // of staleness, since the local session log has nothing newer to fall back to.
-      const timeout = setTimeout(() => finish(), 50_000);
-      pty.onData((chunk) => {
-        terminal += chunk;
-        lastDataAt = Date.now();
-        if (/Weekly\s*limit\s*:/i.test(terminal)) {
-          clearTimeout(settleTimer);
-          settleTimer = setTimeout(() => finish(terminal), 750);
-        }
-      });
-      pty.onExit(() => {
-        exited = true;
-        if (!settled) finish();
-      });
-    });
-    return parseCodexStatusScreen(output);
-  } catch {
-    return { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
-  } finally {
-    await cleanupProbeSession(sessionsDir, filesBeforeSpawn);
-  }
-}
 
-/** How often a stale-by-clock reading may retry the slow interactive `/status` fallback. */
-const CODEX_STATUS_FALLBACK_COOLDOWN_MS = 5 * 60_000;
-
-type CodexFallback = Pick<UsageSnapshot, 'fiveHour' | 'weekly' | 'fiveHourStatus' | 'weeklyStatus' | 'asOf'>;
-
-/** Backfill only when the current session files contain no usable quota report at all. A
- * partial report still describes the current account state and must keep its own statuses. */
+/** Keep the newest confirmed observation across local logs and persisted reads.
+ * A newer partial report remains authoritative about the account's windows. */
 export function retainKnownCodexQuota(snapshot: UsageSnapshot, previous?: PersistedUsageSnapshot): UsageSnapshot {
-  if (snapshot.fiveHourStatus !== 'unknown' || snapshot.weeklyStatus !== 'unknown' || !previous?.asOf) return snapshot;
+  if (!previous?.asOf) return snapshot;
+  const previousIsNewer = !snapshot.asOf || Date.parse(previous.asOf) > Date.parse(snapshot.asOf);
+  if (!previousIsNewer && (snapshot.fiveHourStatus !== 'unknown' || snapshot.weeklyStatus !== 'unknown')) return snapshot;
   if (!previous.fiveHour && !previous.weekly) return snapshot;
   return {
     ...snapshot,
@@ -338,34 +249,11 @@ export function retainKnownCodexQuota(snapshot: UsageSnapshot, previous?: Persis
   };
 }
 
-/** Overwrite one stale window (`bucket`) in `snapshot` with the fallback's reading, if the fallback
- * itself isn't also stale. Applied separately per window since Codex's `/status` panel today only
- * ever reports the weekly one — the 5-hour bucket stays untouched (and local-only) until it does. */
-function applyCodexFallbackWindow(
-  bucket: 'fiveHour' | 'weekly',
-  snapshot: UsageSnapshot,
-  fallback: CodexFallback,
-): void {
-  const statusKey = bucket === 'fiveHour' ? 'fiveHourStatus' : 'weeklyStatus';
-  if (!isCodexLimitStale(snapshot[bucket], snapshot.asOf)) return;
-  if (isCodexLimitStale(fallback[bucket], fallback.asOf)) return;
-  snapshot[bucket] = fallback[bucket];
-  snapshot[statusKey] = fallback[statusKey];
-  snapshot.asOf = fallback.asOf ?? snapshot.asOf;
-  snapshot.available = true;
-}
-
-/** Codex just re-reads local session files, so its cadence is configurable — see config.json. That
- * read is only ever as fresh as the last real Codex CLI turn, though — see isCodexLimitStale for
- * why a quiet local log doesn't just mean "no change." Only once a window is judged stale do we
- * fall back to the slow interactive `/status` probe, throttled so a quiet stretch doesn't spawn it
- * every tick; a successful live read is itself remembered and reused until it goes stale in turn. */
 export function createCodexUsageProvider(
   refreshMs: number,
   history: UsageHistoryStore,
 ): Provider<AiUsageToolData> {
-  let fallback: CodexFallback = { fiveHourStatus: 'unknown', weeklyStatus: 'unknown' };
-  let lastFallbackAttemptAt = 0;
+  let lastAccountAttemptAt: number | undefined;
   let rememberedQuota: PersistedUsageSnapshot | undefined;
   let loadedRememberedQuota = false;
   const rememberedHistory: { points: UsageHistoryPoint[] } = { points: [] };
@@ -374,7 +262,7 @@ export function createCodexUsageProvider(
     if (loadedRememberedQuota) return rememberedQuota;
     loadedRememberedQuota = true;
     try {
-      const previous = await history.getSnapshot('ai-usage-codex');
+      const previous = await loadUsageSnapshot(history, 'ai-usage-codex');
       if (previous?.asOf && (previous.fiveHour || previous.weekly)) rememberedQuota = previous;
     } catch {
       // The persisted baseline is optional; a failed lookup must not fail the provider.
@@ -386,27 +274,20 @@ export function createCodexUsageProvider(
     id: 'ai-usage-codex',
     schema: aiUsageToolSchema,
     refreshMs,
-    timeoutMs: 60_000,
+    timeoutMs: 25_000,
     isConfigured: () => true,
-    fetch: async (_signal, force) => {
+    fetch: async (signal, force) => {
       let snapshot = await codexSnapshot();
-      // Once all quota entries disappear from recent session files, use the last confirmed
-      // reading saved before the cap. This also survives server restarts and log rotation.
-      if (snapshot.fiveHourStatus === 'unknown' && snapshot.weeklyStatus === 'unknown') {
-        const previous = rememberedQuota ?? await loadRememberedQuota();
-        snapshot = retainKnownCodexQuota(snapshot, previous);
+      const previous = rememberedQuota ?? await loadRememberedQuota();
+      snapshot = retainKnownCodexQuota(snapshot, previous);
+      // Recheck the account periodically even when no CLI turn has written a
+      // session event. A manual Refresh always bypasses this local cooldown.
+      if (force || lastAccountAttemptAt === undefined || Date.now() - lastAccountAttemptAt >= CODEX_ACCOUNT_REFRESH_MS) {
+        lastAccountAttemptAt = Date.now();
+        const account = await codexAccountSnapshot(signal);
+        if (account.available) snapshot = account;
       }
-      const needsFallback = (['fiveHour', 'weekly'] as const).some(
-        (bucket) => isCodexLimitStale(snapshot[bucket], snapshot.asOf) && isCodexLimitStale(fallback[bucket], fallback.asOf),
-      );
-      if (needsFallback && (force || Date.now() - lastFallbackAttemptAt > CODEX_STATUS_FALLBACK_COOLDOWN_MS)) {
-        lastFallbackAttemptAt = Date.now();
-        const status = await codexInteractiveStatusSnapshot();
-        if (status.fiveHour || status.weekly) fallback = status;
-      }
-      applyCodexFallbackWindow('fiveHour', snapshot, fallback);
-      applyCodexFallbackWindow('weekly', snapshot, fallback);
-      // Neither the local session log nor the interactive fallback is guaranteed to catch a window
+      // Neither the local session log nor a failing account request is guaranteed to catch a window
       // rolling over — a quiet local log and a failing/cooling-down fallback both just leave
       // whatever was last read untouched. Left alone that reads as, say, a 5-hour window still
       // pinned at last night's 32% a full day later. Once a window's own reset has passed with

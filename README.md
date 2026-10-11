@@ -227,8 +227,12 @@ Note: the activity feed uses GitHub's events API, which is **delayed** (typicall
 
 Each service has its own card showing its current rolling allowance: **five-hour** and **weekly** percentages, with reset times, not token totals or estimated costs. A thin marker on each bar shows where usage "should" be if it tracked evenly with the window's elapsed time; the marker turns amber when usage is running ahead of that pace.
 
-- **Codex:** no setup when Codex is signed in locally; its local session snapshots contain the current account limits. This card polls those local files only (no network call), so it refreshes independently and much more often than Claude; tune the interval with `aiUsage.codexRefreshMs` (ms, default `30000`) in `server/config.json`.
-- **Claude Code:** no setup beyond having the `claude` CLI signed in locally on this machine. The card shells out to `claude -p "/usage"` (the same local command `/usage` runs inside an interactive session) and parses its report. This is free and reliable, unlike the account-wide quota endpoint, which turned out to be rate-limited to the point of never returning a usable reading from server-side automation. Each call writes a small local session transcript file, so this card refreshes on a coarser cadence than Codex; tune it with `aiUsage.claudeRefreshMs` (ms, default `900000` / 15 min) in `server/config.json`.
+- **Codex:** sign in to the local Codex CLI. The card checks session logs every `aiUsage.codexRefreshMs` (default `30000`) and reads live account limits through `codex app-server` every five minutes. Manual Refresh always requests a new account reading. It does not open a coding thread, consume a reset credit, or start project MCP servers. The account read uses the [documented rate-limits endpoint](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt).
+- **Claude Code:** sign in to the local `claude` CLI. The card opens a temporary terminal and runs the interactive `/usage` command in screen-reader mode; it never sends a model prompt. Set `aiUsage.claudeRefreshMs` (default `900000` / 15 min) to change the cadence. Polling continues at quota caps so early allowance resets can be detected. Only live CLI reports and confirmed persisted snapshots supply quota values: coding transcripts can contain examples or test output and are used only for token totals.
+
+Usage snapshots never move backward in observation time, including when another machine writes to the shared database. A failed live read retains its actual observation timestamp.
+
+The tracked `.codex/config.toml` deliberately inherits globally configured MCP servers. Defining a project Railway `url` alongside a global Railway `command` merges incompatible transports and prevents sessions from starting. Run `npm run doctor:codex -- --config-only` to validate the effective root configuration.
 
 Each machine's dashboard reports that machine's signed-in accounts only.
 
