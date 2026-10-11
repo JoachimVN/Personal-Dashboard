@@ -113,7 +113,7 @@ export async function codexSnapshot(sessionsDir = codexSessionsDir()): Promise<U
     const recent = await Promise.all((await jsonlFiles(sessionsDir)).map(async (file) => ({
       file, modified: await stat(file).then((info) => info.mtimeMs, () => 0),
     })));
-    const files = recent.sort((a, b) => b.modified - a.modified).slice(0, 12).map(({ file }) => file);
+    const files = recent.toSorted((a, b) => b.modified - a.modified).slice(0, 12).map(({ file }) => file);
     const latest: CodexLimits = {};
 
     const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')));
