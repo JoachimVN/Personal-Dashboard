@@ -10,6 +10,8 @@ This npm-workspaces monorepo has three packages:
 
 Runtime configuration belongs in `server/config.json`; secrets belong in the ignored `server/.env` or `server/.tokens/`. Do not commit either. `scripts/install-launchd.sh` configures the macOS background service.
 
+Keep `.codex/config.toml` free of MCP server transport overrides. Configure Railway and other MCP servers once in the user's global Codex config. Codex merges server tables across scopes: a project `url` and global `command` under the same name make every new session fail. Validate configuration with `npm run doctor:codex -- --config-only` before changing Codex configuration; never put MCP credentials in the repository.
+
 ## Build, Test, and Development Commands
 
 - `npm run dev` starts the server on port 4821 and Vite on port 5173.

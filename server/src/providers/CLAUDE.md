@@ -21,13 +21,13 @@ playtime, and the rest are still kept in full.
   `createClaudeUsageProvider` (`aiUsage/claude.ts`) and `createCodexUsageProvider`
   (`aiUsage/codex.ts`) over a small shared base (`aiUsage/shared.ts`), each with its own widget id
   (`ai-usage-claude`, `ai-usage-codex`) and refresh cadence, even though they render in one section.
-  Codex reads local session files (cheap, configurable cadence via `config.json`). Claude shells out to
-  `claude -p "/usage" --output-format json` and regex-parses the report text — a local command the CLI
-  short-circuits before the model, so it's free and untouched by `/api/oauth/usage`'s rate limiting
-  (that endpoint proved unusable from server-side automation: 0 successful reads ever recorded on the
-  dev machine — see git history around the switch). Each CLI invocation writes a small local session
-  transcript, which is why `aiUsage.claudeRefreshMs` stays coarse (15 min default) instead of polling
-  every scheduler tick.
+  Codex reads local session files by modification time and checks `account/rateLimits/read` through
+  `codex app-server` every five minutes (immediately on manual Refresh). It starts no coding thread
+  or MCP servers. Claude captures the interactive `/usage` screen in screen-reader mode. Print mode
+  treats `/usage` as a model prompt and must not be used. Transcripts supply token totals only:
+  recursively searching their text for quota reports also matches code examples and test fixtures,
+  which previously rewound the card to unrelated, days-old values. Failed probes retain confirmed
+  readings with their real timestamps. Cleanup removes only the probe's explicit session ID.
 - Provider `fetch` functions generally avoid logging raw response bodies/errors for anything that
   touches an authenticated account (see the comment in `claudeSnapshot`) — sanitize before logging,
   don't rely solely on the scheduler's category-string sanitization.

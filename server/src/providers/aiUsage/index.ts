@@ -1,6 +1,6 @@
 /**
  * Two independent AI-usage providers that render as one section. Each CLI has its own parsing
- * stack — Codex reads local session JSONL and, when that goes stale, scrapes its `/status` panel;
+ * stack — Codex reads local session JSONL and the app-server account rate-limits endpoint;
  * Claude scrapes the interactive `/usage` screen and sums token totals from session transcripts —
  * so they live in separate modules over a small shared base (see ./shared.ts).
  */
@@ -13,9 +13,9 @@ export {
   type ClaudeQuota,
 } from './claude.js';
 export {
-  codexInteractiveStatusSnapshot,
   createCodexUsageProvider,
   isCodexLimitStale,
   parseCodexStatusScreen,
 } from './codex.js';
+export { codexAccountSnapshot } from './codexAccount.js';
 export { jsonlFiles, limitStatus } from './shared.js';

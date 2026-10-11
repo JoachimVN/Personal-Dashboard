@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import type { AiUsageToolData, UsageHistoryPoint } from '@personal-dashboard/shared';
-import { isUsageReset, type UsageHistoryStore } from '../../usageHistory.js';
+import { isUsageReset, type UsageHistoryStore, type UsageSnapshot as PersistedUsageSnapshot } from '../../usageHistory.js';
 
 const require = createRequire(import.meta.url);
 
@@ -61,14 +61,9 @@ export async function jsonlFiles(directory: string): Promise<string[]> {
   return nested.flat();
 }
 
-/** Deletes whatever session file(s) an interactive probe's own CLI process just wrote, comparing
- * against a directory listing captured right before the probe was spawned. The probe exists purely
- * to read a screen rendered in the terminal — its transcript has no lasting value — but the process
- * it spawns is a real CLI session as far as anything else watching that directory is concerned (e.g.
- * a linked status site's "coding with Claude/Codex" activity signal reads the same directories'
- * newest mtime), so leaving the file behind falsely reports activity, and clutters the session list,
- * every time the probe runs. */
-export async function cleanupProbeSession(sessionsDir: string, filesBeforeSpawn: Set<string>): Promise<void> {
+/** Remove only the probe's explicit session ID. A real session opened while a
+ * probe is running belongs to the user and must survive cleanup. */
+export async function cleanupProbeSession(sessionsDir: string, sessionId: string): Promise<void> {
   let filesAfterSpawn: string[];
   try {
     filesAfterSpawn = await jsonlFiles(sessionsDir);
@@ -77,7 +72,7 @@ export async function cleanupProbeSession(sessionsDir: string, filesBeforeSpawn:
   }
   await Promise.all(
     filesAfterSpawn
-      .filter((file) => !filesBeforeSpawn.has(file))
+      .filter((file) => path.basename(file) === `${sessionId}.jsonl`)
       .map((file) => unlink(file).catch(() => undefined)),
   );
 }
@@ -158,6 +153,21 @@ export function ptyProbeEnv(baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   delete env.Path;
   env.PATH = `${localBin}${path.delimiter}${basePath}`;
   return env;
+}
+
+/** An optional persisted baseline must not consume the live provider's timeout. */
+export async function loadUsageSnapshot(history: UsageHistoryStore, toolId: string): Promise<PersistedUsageSnapshot | undefined> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      history.getSnapshot(toolId),
+      new Promise<undefined>((resolve) => { timer = setTimeout(() => resolve(undefined), 1_000); }),
+    ]);
+  } catch {
+    return undefined;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** A slow or hung DB write must never block returning an already-successful live read (see the
