@@ -42,7 +42,10 @@ process.on('uncaughtException', (error) => {
 const env = loadEnv();
 const config = loadConfig();
 const database = createDatabase(env.databaseUrl);
-await migrateDatabase(database);
+// Not awaited: if Postgres is unreachable (Railway stopped, usage cap) or another install holds the
+// migration lock, awaiting here kept the server from ever binding its port and took the whole
+// dashboard down with it. Providers already tolerate a failing database; the listener must not wait.
+void migrateDatabase(database).catch((error) => console.error('[db] migration did not complete:', error));
 const app = express();
 app.disable('x-powered-by');
 app.use(express.json());
@@ -347,7 +350,7 @@ if (env.isProduction) {
 
 // A Shortcut posting to the always-on ingest service, or a GitHub webhook reaching it, writes to
 // the shared database without this process noticing until that provider's next poll.
-await listenForProviderRefresh(database, (providerId) => {
+void listenForProviderRefresh(database, (providerId) => {
   // No id means "you reconnected and may have missed an announcement". Refreshing everything would
   // kick off expensive probes (the Claude PTY one alone can take 35s), so refresh only the
   // providers an outside writer can actually change.
